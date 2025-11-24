@@ -249,7 +249,7 @@ def before_request():
 
 
 # Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Initialize cache for API endpoints
 cache = Cache(app)
