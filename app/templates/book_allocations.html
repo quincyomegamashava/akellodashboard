@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.10.0/js/anychart-bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> -->
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+  <!-- DataTables CSS + JS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+
+  <style>
+    .asl-color{
+      background-color: yellow !important;
+    }
+    
+  </style>
+</head>
+{% block content %}
+
+<style>
+  .alloc-wrapper { max-width: 95vw; margin: 40px auto; padding: 0 16px; }
+  .alloc-header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin-bottom:16px }
+  .alloc-actions { display:flex; gap:10px; flex-wrap:wrap }
+  .btn-chip { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius: 999px; border:1px solid #dbe4f0; background:#fff; color:#0b213f; text-decoration:none; box-shadow:0 4px 12px rgba(10,31,68,.06) }
+  .btn-chip:hover { background:#0d6efd; color:#fff; border-color:#0d6efd }
+  .search-input { width:100%; max-width:360px; padding:10px 14px; border-radius:999px; border:1px solid #dbe4f0; box-shadow:0 3px 10px rgba(10,31,68,.04) }
+  .alloc-grid { display:grid; grid-template-columns: 1.2fr .9fr .9fr; gap:16px }
+  .card { background:#fff; border-radius:14px; box-shadow:0 8px 20px rgba(10,31,68,.08); overflow:hidden }
+  .card-header { padding:14px 16px; border-bottom:1px solid #eef2f7; font-weight:700; background:linear-gradient(180deg,#f7faff,#fff) }
+  .card-body { padding:14px 16px }
+  table { width:100%; background:#fff }
+  thead th { background:#f1f5fb; font-weight:600 }
+  th, td { padding:10px 8px; vertical-align:middle }
+  .tags span { display:inline-block; margin:2px 6px 2px 0; padding:6px 10px; border-radius:999px; font-size:.8rem; background:#00407d; color:#fff }
+  @media (max-width: 1100px) { .alloc-grid { grid-template-columns: 1fr 1fr } }
+  @media (max-width: 780px)  { .alloc-grid { grid-template-columns: 1fr } .alloc-header { justify-content:center } .alloc-actions { justify-content:center } .alloc-wrapper { max-width: 85vw; } }
+</style>
+
+<div class="alloc-wrapper w3-small">
+  <div class="alloc-header">
+    <div class="alloc-actions">
+      <a href="#" class="btn-chip" onclick="document.getElementById('allocate_books').style.display='block'">
+        <i class="fa fa-plus-circle"></i>
+        Add New Record
+      </a>
+      <a href="#" class="btn-chip" onclick="document.getElementById('visuals').style.display='block'">
+        <i class="fa fa-line-chart"></i>
+        Province Visuals
+      </a>
+      <a href="#" class="btn-chip" onclick="document.getElementById('publisherTotalsW3').style.display='block'">
+        <i class="fa fa-building"></i>
+        Publisher Totals
+      </a>
+      <a href="#" class="btn-chip" onclick="document.getElementById('provinceTotalsW3').style.display='block'">
+        <i class="fa fa-map"></i>
+        Provincial Totals
+      </a>
+    </div>
+    <input id="allocationsSearchInput" class="search-input" type="text" placeholder="Search allocations..." onkeyup="filterAllocations()" />
+  </div>
+
+  {% if province_summary %}
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header">Quick Summary</div>
+    <div class="card-body">
+      <div style="display:flex; flex-wrap:wrap; gap:8px">
+        {% for province, count in province_summary.items() %}
+          <span class="btn-chip" style="padding:6px 10px"><i class="fa fa-map-marker"></i> {{ province }}: {{ count }}</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="w3-container">
+    <!-- Allocations -->
+    <section class="card">
+      <div class="card-header">Allocations</div>
+      <div class="card-body" style="overflow:auto; max-height:60vh">
+        <table id="allocTable" class="table table-striped">
+          <thead>
+            <tr>
+              <th>School</th>
+              <th>Province</th>
+              <th>Grades</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for alloc in allocations %}
+              <tr>
+                <td>{{ alloc.school_name }}</td>
+                <td>{{ alloc.school_province }}</td>
+                <td class="tags">
+                  {% for book in alloc.books_allocated.split(',') %}
+                    <span>{{ book.strip() }}</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  <button class="btn-chip" title="Edit"><i class="fa fa-pencil"></i></button>
+                  <button class="btn-chip" title="Delete" style="color:#c1121f"><i class="fa fa-trash"></i></button>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Publisher and Provincial totals moved to modals. Use the action buttons above to open. -->
+  </div>
+
+  <!-- Keep scripts and DT init -->
+  <script>
+    function filterAllocations() {
+      const input = document.getElementById('allocationsSearchInput');
+      const filter = input.value.toLowerCase();
+      const trs = document.querySelectorAll('#allocTable tbody tr');
+      trs.forEach(tr => {
+        tr.style.display = tr.textContent.toLowerCase().includes(filter) ? '' : 'none';
+      })
+    }
+    $(document).ready(function () { $('#allocTable').DataTable({ pageLength: 10 }); });
+  </script>
+
+  <script>
+    async function loadpubData() {
+      const start_date = document.getElementById("pubstart_date").value;
+      const end_date = document.getElementById("pubend_date").value;
+
+      let url = "/api/publisherlibraryamount";
+      const params = [];
+      if (start_date) params.push(`start_date=${start_date}`);
+      if (end_date) params.push(`end_date=${end_date}`);
+      if (params.length) url += "?" + params.join("&");
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      const tbody = document.getElementById("publisherresults");
+      tbody.innerHTML = "";
+
+      let totalZWL = 0;
+      let totalUSD = 0;
+
+      if (data.data && data.data.length > 0) {
+        data.data.forEach(row => {
+          if (row.publisher_name !== "Grand Total") {
+            tbody.innerHTML += `
+              <tr>
+                <td>${row.publisher_name}</td>
+                <td class="text-right">${Number(row.total_amount_zwl || 0).toLocaleString()}</td>
+                <td class="text-right">${Number(row.total_amount_usd || 0).toLocaleString()}</td>
+              </tr>
+            `;
+            totalZWL += Number(row.total_amount_zwl || 0);
+            totalUSD += Number(row.total_amount_usd || 0);
+          }
+        });
+      } else {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="3" class="text-center soft">No results found</td>
+          </tr>
+        `;
+      }
+
+      document.getElementById("grand_total_zwl").innerText = totalZWL.toLocaleString();
+      document.getElementById("grand_total_usd").innerText = totalUSD.toLocaleString();
+    }
+
+    async function loadData() {
+      const start_date = document.getElementById("start_date").value;
+      const end_date = document.getElementById("end_date").value;
+
+      let url = "/provincialmoneylibraryallocation";
+      const params = [];
+      if (start_date) params.push(`start_date=${start_date}`);
+      if (end_date) params.push(`end_date=${end_date}`);
+      if (params.length) url += "?" + params.join("&");
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      const tbody = document.getElementById("provinceresults");
+      tbody.innerHTML = "";
+
+      if (data.data && data.data.length > 0) {
+        data.data.forEach(row => {
+          tbody.innerHTML += `
+            <tr>
+              <td>${row.province || '-'}</td>
+              <td class="text-right">${Number(row.total_amount || 0).toLocaleString()}</td>
+            </tr>
+          `;
+        });
+      } else {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="2" class="text-center soft">No results found</td>
+          </tr>
+        `;
+      }
+
+      document.getElementById("grand_total").innerText = Number(data.grand_total || 0).toLocaleString();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadpubData();
+      loadData();
+    });
+  </script>
+
+</div>
+
+
+
+
+
+<!-- view aslhome modal -->
+                <div id="allocate_books" class="w3-modal w3-white w3-card w3-border">
+                    <div class="w3-modal-content w3-white w3-padding w3-card w3-border" style="width: 85vw; height: 80vh;">
+                        <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                            <span onclick="document.getElementById('allocate_books').style.display='none'" 
+                            class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                            <span class="w3-large"><b>Add New Allocation Record</b></span>
+                            <br>
+                        </header>
+                        <div class="w3-container w3-margin-top">
+                            <form method="POST" action="{{ url_for('allocate_books') }}" class="modal-content">
+      {{ allocate_form.hidden_tag() }}
+      <!-- <div class="modal-header"><h5 class="modal-title">Add Allocation</h5></div> -->
+      <div class="modal-body w3-padding">
+        <div class="form-group">{{ allocate_form.school_name.label }}{{ allocate_form.school_name(class="form-control") }}</div>
+        <div class="form-group">{{ allocate_form.school_province.label }}{{ allocate_form.school_province(class="form-control") }}</div>
+        <div class="form-group">{{ allocate_form.books_allocated.label }}{{ allocate_form.books_allocated(class="form-control", multiple=True) }}</div>
+      </div>
+      <div class="modal-footer">
+        {{ allocate_form.submit(class="btn btn-success") }}
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </form>
+                            <script>
+                            function filterUsers() {
+                            const input = document.getElementById("userSearchInput");
+                            const filter = input.value.toLowerCase();
+                            const table = document.getElementById("aslhome");
+                            const trs = table.getElementsByTagName("tr");
+
+                            for (let i = 1; i < trs.length; i++) {
+                                const rowText = trs[i].textContent.toLowerCase();
+                                trs[i].style.display = rowText.includes(filter) ? "" : "none";
+                            }
+                            }
+                            </script>
+                        </div>
+
+                    </div>
+                </div>
+                 <!-- visuals-->
+
+
+<!-- Publisher Totals Modal -->
+<div id="publisherTotalsW3" class="w3-modal" style="z-index:3000;">
+  <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 90vw; max-width: 1100px;">
+    <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
+      <span onclick="document.getElementById('publisherTotalsW3').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <h6 class="w3-margin-0">Publisher totals</h6>
+    </header>
+    <div class="w3-container w3-padding" style="max-height:75vh; overflow:auto;">
+      <div class="w3-row-padding" style="margin: -8px 0 8px">
+        <div class="w3-half" style="padding:4px"><input id="pubstart_date" type="date" class="w3-input"></div>
+        <div class="w3-half" style="padding:4px"><input id="pubend_date" type="date" class="w3-input"></div>
+      </div>
+      <button onclick="loadpubData()" class="w3-button w3-indigo w3-round w3-small" style="margin-bottom:10px"><i class="fa fa-filter"></i> Filter</button>
+      <div style="overflow:auto; max-height:48vh">
+        <table class="w3-table-all w3-small w3-striped w3-hoverable">
+          <thead>
+            <tr>
+              <th>Publisher</th>
+              <th class="text-right">Total Amount (ZWL)</th>
+              <th class="text-right">Total Amount (USD)</th>
+            </tr>
+          </thead>
+          <tbody id="publisherresults"></tbody>
+          <tfoot>
+            <tr>
+              <td>Grand Total</td>
+              <td id="grand_total_zwl" class="text-right">0</td>
+              <td id="grand_total_usd" class="text-right">0</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    <footer class="w3-container w3-padding w3-light-grey">
+      <button class="w3-button w3-teal w3-small" onclick="document.getElementById('publisherTotalsW3').style.display='none'">Close</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Provincial Totals Modal -->
+<div id="provinceTotalsW3" class="w3-modal" style="z-index:3000;">
+  <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 90vw; max-width: 1000px;">
+    <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
+      <span onclick="document.getElementById('provinceTotalsW3').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <h6 class="w3-margin-0">Provincial totals</h6>
+    </header>
+    <div class="w3-container w3-padding" style="max-height:75vh; overflow:auto;">
+      <div class="w3-row-padding" style="margin: -8px 0 8px">
+        <div class="w3-half" style="padding:4px"><input id="start_date" type="date" class="w3-input"></div>
+        <div class="w3-half" style="padding:4px"><input id="end_date" type="date" class="w3-input"></div>
+      </div>
+      <button onclick="loadData()" class="w3-button w3-indigo w3-round w3-small" style="margin-bottom:10px"><i class="fa fa-filter"></i> Filter</button>
+      <div style="overflow:auto; max-height:48vh">
+        <table class="w3-table-all w3-small w3-striped w3-hoverable">
+          <thead>
+            <tr>
+              <th>Province</th>
+              <th class="text-right">Total Amount (ZWL)</th>
+            </tr>
+          </thead>
+          <tbody id="provinceresults"></tbody>
+          <tfoot>
+            <tr>
+              <td>Grand Total</td>
+              <td id="grand_total" class="text-right">0</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    <footer class="w3-container w3-padding w3-light-grey">
+      <button class="w3-button w3-teal w3-small" onclick="document.getElementById('provinceTotalsW3').style.display='none'">Close</button>
+    </footer>
+  </div>
+</div>
+
+
+
+<!-- visuals modal -->
+                <div id="provincevisuals" class="w3-modal w3-white w3-card w3-border">
+                    <div class="w3-modal-content w3-white w3-card w3-border" style="width: 85vw; height: 80vh;">
+                        <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                            <span onclick="document.getElementById('provincevisuals').style.display='none'" 
+                            class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                            <span class="w3-large"><b>Akello books</b></span>
+                            <br>
+                        </header>
+                        <div class="w3-container w3-margin-top">
+                           <h4>Book Allocations by Province</h4>
+<canvas id="provincePieChart" width="400" height="400"></canvas>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+const ctx = document.getElementById('provincePieChart').getContext('2d');
+new Chart(ctx, {
+    type: 'pie',
+    data: {
+        labels: {{ province_labels|tojson }},
+        datasets: [{
+            label: 'Allocations by Province',
+            data: {{ province_counts|tojson }},
+            backgroundColor: [
+                '#4e79a7', '#f28e2c', '#e15759', '#76b7b2', '#59a14f',
+                '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ab'
+            ],
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'right'
+            },
+            title: {
+                display: true,
+                text: 'Allocations by Province'
+            }
+        }
+    }
+});
+</script>
+
+                        </div>
+
+                    </div>
+                </div>
+                 <!-- visuals-->
+
+{% endblock %}

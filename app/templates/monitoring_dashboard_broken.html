@@ -1,0 +1,598 @@
+{% extends "base.html" %}
+
+{% block head %}
+    <!-- Monitoring Dashboard Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Dedicated Monitoring Dashboard CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/monitoring-dashboard.css') }}">
+    <!-- Filters -->
+    <div class="filters-section">
+        <h3>Filter Activities</h3>
+        <div class="filter-row">
+            <div class="filter-group">
+                <label class="filter-label">Username</label>
+                <input type="text" class="filter-input" id="filterUsername" placeholder="Enter username">
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Activity Type</label>
+                <select class="filter-input" id="filterActivityType">
+                    <option value="">All Types</option>
+                    <option value="page_visit">Page Visits</option>
+                    <option value="login">Logins</option>
+                    <option value="logout">Logouts</option>
+                    <option value="form_submit">Form Submissions</option>
+                    <option value="api_call">API Calls</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Start Date</label>
+                <input type="datetime-local" class="filter-input" id="filterStartDate">
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">End Date</label>
+                <input type="datetime-local" class="filter-input" id="filterEndDate">
+            </div>
+            <div class="filter-group">
+                <button class="btn-filter" onclick="applyFilters()">Apply Filters</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Dashboard Panels -->
+    <div class="dashboard-grid">
+        <!-- Live Activity Feed -->
+        <div class="dashboard-panel">
+            <div class="panel-header">
+                <h3 class="panel-title">Live Activity Feed</h3>
+                <small id="lastUpdate" class="last-update-text">Never updated</small>
+            </div>
+            <div class="activity-feed" id="activityFeed">
+                <div class="loading-state">
+                    Loading activities...
+                </div>
+            </div>
+        </div>
+        
+        <!-- Active Sessions -->
+        <div class="dashboard-panel">
+            <div class="panel-header">
+                <h3 class="panel-title">Active Sessions</h3>
+                <small class="last-update-text">Last 15 minutes</small>
+            </div>
+            <div class="sessions-grid" id="activeSessions">
+                <div class="loading-state">
+                    Loading sessions...
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Activity Charts -->
+    <div class="dashboard-panel">
+        <div class="panel-header">
+            <h3 class="panel-title">Activity Overview</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="activityChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- User Journey Modal -->
+<div id="journeyModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">User Journey</h2>
+            <button class="close-modal" onclick="closeJourneyModal()">&times;</button>
+        </div>
+        <div id="journeyContent">
+            <div style="text-align: center; color: #999; padding: 40px 0;">
+                Loading journey...
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Global variables
+let socket = null;
+let activityChart = null;
+let isConnected = false;
+
+// Initialize the dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    initializeSocketConnection();
+    loadInitialData();
+    setupPeriodicUpdates();
+    initializeChart();
+});
+
+// Socket.IO connection
+function initializeSocketConnection() {
+    socket = io('/monitoring');
+    
+    socket.on('connect', function() {
+        console.log('Connected to monitoring namespace');
+        isConnected = true;
+        updateConnectionStatus(true);
+    });
+    
+    socket.on('disconnect', function() {
+        console.log('Disconnected from monitoring');
+        isConnected = false;
+        updateConnectionStatus(false);
+    });
+    
+    socket.on('connected', function(data) {
+        console.log('Monitoring connection established:', data);
+    });
+    
+    socket.on('new_activity', function(activity) {
+        console.log('New activity:', activity);
+        addActivityToFeed(activity);
+        updateStats();
+    });
+    
+    socket.on('stats_update', function(data) {
+        console.log('Stats update:', data);
+        updateDashboardStats(data);
+    });
+    
+    socket.on('initial_stats', function(data) {
+        console.log('Initial stats:', data);
+        updateDashboardStats(data);
+    });
+    
+    socket.on('error', function(error) {
+        console.error('Socket error:', error);
+        showNotification('Error: ' + error.message, 'error');
+    });
+}
+
+// Update connection status indicator
+function updateConnectionStatus(connected) {
+    const statusEl = document.getElementById('connectionStatus');
+    const indicator = statusEl.querySelector('.status-indicator');
+    
+    if (connected) {
+        statusEl.classList.remove('disconnected');
+        indicator.className = 'status-indicator online';
+        statusEl.innerHTML = '<span class="status-indicator online"></span> Connected to monitoring';
+    } else {
+        statusEl.classList.add('disconnected');
+        indicator.className = 'status-indicator offline';
+        statusEl.innerHTML = '<span class="status-indicator offline"></span> Disconnected from monitoring';
+    }
+}
+
+// Load initial data
+async function loadInitialData() {
+    try {
+        await Promise.all([
+            loadStats(),
+            loadActivities(),
+            loadActiveSessions()
+        ]);
+    } catch (error) {
+        console.error('Error loading initial data:', error);
+        showNotification('Error loading dashboard data', 'error');
+    }
+}
+
+// Load statistics
+async function loadStats() {
+    try {
+        const response = await fetch('/api/monitoring/stats');
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        document.getElementById('activeUsersCount').textContent = data.active_users;
+        document.getElementById('recentActivitiesCount').textContent = data.activity_counts.last_hour;
+        document.getElementById('totalPagesTracked').textContent = data.popular_pages.length;
+        
+        updateActivityChart(data);
+        
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+// Load activities
+async function loadActivities() {
+    try {
+        const response = await fetch('/api/monitoring/activities?limit=20');
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        const feedEl = document.getElementById('activityFeed');
+        feedEl.innerHTML = '';
+        
+        data.activities.forEach(activity => {
+            addActivityToFeed(activity, false);
+        });
+        
+        updateLastUpdateTime();
+        
+    } catch (error) {
+        console.error('Error loading activities:', error);
+        document.getElementById('activityFeed').innerHTML = '<div style="text-align: center; color: #dc3545; padding: 40px 0;">Error loading activities</div>';
+    }
+}
+
+// Load active sessions
+async function loadActiveSessions() {
+    try {
+        const response = await fetch('/api/monitoring/sessions');
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        document.getElementById('activeSessionsCount').textContent = data.active_count;
+        
+        const sessionsEl = document.getElementById('activeSessions');
+        sessionsEl.innerHTML = '';
+        
+        if (data.sessions.length === 0) {
+            sessionsEl.innerHTML = '<div style="text-align: center; color: #999; padding: 20px 0;">No active sessions</div>';
+            return;
+        }
+        
+        data.sessions.forEach(session => {
+            const sessionEl = document.createElement('div');
+            sessionEl.className = 'session-item';
+            sessionEl.innerHTML = `
+                <div>
+                    <div class="session-user">${session.username || 'Anonymous'}</div>
+                    <div class="session-details">${session.ip_address} • ${formatRelativeTime(session.last_seen)}</div>
+                </div>
+                <div class="session-duration">${session.duration_minutes}min</div>
+            `;
+            sessionEl.onclick = () => showUserJourney(session.session_id);
+            sessionEl.style.cursor = 'pointer';
+            sessionsEl.appendChild(sessionEl);
+        });
+        
+    } catch (error) {
+        console.error('Error loading sessions:', error);
+        document.getElementById('activeSessions').innerHTML = '<div style="text-align: center; color: #dc3545; padding: 20px 0;">Error loading sessions</div>';
+    }
+}
+
+// Add activity to feed
+function addActivityToFeed(activity, prepend = true) {
+    const feedEl = document.getElementById('activityFeed');
+    const activityEl = document.createElement('div');
+    activityEl.className = 'activity-item';
+    
+    const icon = getActivityIcon(activity.activity_type);
+    const time = formatRelativeTime(activity.timestamp);
+    
+    activityEl.innerHTML = `
+        <div class="activity-icon ${activity.activity_type}">${icon}</div>
+        <div class="activity-details">
+            <div class="activity-user">${activity.username || 'Anonymous'}</div>
+            <div class="activity-action">${formatActivityAction(activity)}</div>
+            <div class="activity-time">${time}</div>
+        </div>
+    `;
+    
+    if (prepend) {
+        feedEl.insertBefore(activityEl, feedEl.firstChild);
+        // Remove old items to keep feed manageable
+        while (feedEl.children.length > 50) {
+            feedEl.removeChild(feedEl.lastChild);
+        }
+    } else {
+        feedEl.appendChild(activityEl);
+    }
+}
+
+// Get activity icon
+function getActivityIcon(type) {
+    const icons = {
+        'page_visit': '👁',
+        'login': '🔑',
+        'logout': '🚪',
+        'form_submit': '📝',
+        'api_call': '🔌'
+    };
+    return icons[type] || '❓';
+}
+
+// Format activity action
+function formatActivityAction(activity) {
+    const actions = {
+        'page_visit': `visited ${activity.url_path}`,
+        'login': 'logged in',
+        'logout': 'logged out',
+        'form_submit': `submitted form at ${activity.url_path}`,
+        'api_call': `called API ${activity.url_path}`
+    };
+    return actions[activity.activity_type] || `performed ${activity.activity_type}`;
+}
+
+// Format relative time
+function formatRelativeTime(timestamp) {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffMs = now - time;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    
+    if (diffSec < 60) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHour < 24) return `${diffHour}h ago`;
+    return time.toLocaleDateString();
+}
+
+// Update last update time
+function updateLastUpdateTime() {
+    document.getElementById('lastUpdate').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+}
+
+// Setup periodic updates
+function setupPeriodicUpdates() {
+    // Update stats every 30 seconds
+    setInterval(() => {
+        if (isConnected) {
+            updateStats();
+        }
+    }, 30000);
+    
+    // Refresh sessions every minute
+    setInterval(() => {
+        loadActiveSessions();
+    }, 60000);
+}
+
+// Update stats via socket
+function updateStats() {
+    if (socket && isConnected) {
+        socket.emit('request_stats');
+    }
+}
+
+// Update dashboard stats
+function updateDashboardStats(data) {
+    if (data.active_users !== undefined) {
+        document.getElementById('activeUsersCount').textContent = data.active_users;
+    }
+    
+    if (data.active_sessions) {
+        document.getElementById('activeSessionsCount').textContent = data.active_sessions.length;
+    }
+    
+    if (data.recent_activities) {
+        document.getElementById('recentActivitiesCount').textContent = data.recent_activities.length;
+    }
+    
+    updateLastUpdateTime();
+}
+
+// Initialize activity chart
+function initializeChart() {
+    const ctx = document.getElementById('activityChart').getContext('2d');
+    activityChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Activities per Hour',
+                data: [],
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Update activity chart
+function updateActivityChart(data) {
+    // This is a placeholder - implement based on your data structure
+    if (activityChart && data.activity_counts) {
+        // Update chart with real data
+        activityChart.update();
+    }
+}
+
+// Apply filters
+function applyFilters() {
+    const filters = {
+        username: document.getElementById('filterUsername').value,
+        activity_type: document.getElementById('filterActivityType').value,
+        start_date: document.getElementById('filterStartDate').value,
+        end_date: document.getElementById('filterEndDate').value
+    };
+    
+    // Build query string
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach(key => {
+        if (filters[key]) {
+            if (key.includes('date') && filters[key]) {
+                // Convert datetime-local to ISO string
+                params.append(key, new Date(filters[key]).toISOString());
+            } else {
+                params.append(key, filters[key]);
+            }
+        }
+    });
+    
+    // Load filtered activities
+    loadFilteredActivities(params.toString());
+}
+
+// Load filtered activities
+async function loadFilteredActivities(queryString) {
+    try {
+        const response = await fetch(`/api/monitoring/activities?${queryString}&limit=50`);
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        const feedEl = document.getElementById('activityFeed');
+        feedEl.innerHTML = '';
+        
+        if (data.activities.length === 0) {
+            feedEl.innerHTML = '<div style="text-align: center; color: #999; padding: 40px 0;">No activities found matching the filters</div>';
+            return;
+        }
+        
+        data.activities.forEach(activity => {
+            addActivityToFeed(activity, false);
+        });
+        
+        updateLastUpdateTime();
+        showNotification(`Found ${data.activities.length} activities`, 'success');
+        
+    } catch (error) {
+        console.error('Error loading filtered activities:', error);
+        showNotification('Error applying filters', 'error');
+    }
+}
+
+// Show user journey
+async function showUserJourney(sessionId) {
+    const modal = document.getElementById('journeyModal');
+    const content = document.getElementById('journeyContent');
+    const title = modal.querySelector('.modal-title');
+    
+    // Show modal
+    modal.classList.add('show');
+    
+    // Set loading state
+    content.innerHTML = '<div style="text-align: center; color: #999; padding: 40px 0;">Loading journey...</div>';
+    title.textContent = 'User Journey';
+    
+    try {
+        const response = await fetch(`/api/monitoring/user-journey/${sessionId}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Update modal title with user info
+        title.textContent = `User Journey - ${data.username || 'Anonymous User'}`;
+        
+        // Render journey timeline
+        renderJourneyTimeline(data.activities, content);
+        
+    } catch (error) {
+        console.error('Error loading user journey:', error);
+        content.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 40px 0;">Error loading user journey</div>';
+    }
+}
+
+// Close journey modal
+function closeJourneyModal() {
+    const modal = document.getElementById('journeyModal');
+    modal.classList.remove('show');
+}
+
+// Render journey timeline
+function renderJourneyTimeline(activities, container) {
+    if (!activities || activities.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #999; padding: 40px 0;">No activities found for this session</div>';
+        return;
+    }
+    
+    const timeline = document.createElement('div');
+    timeline.className = 'journey-timeline';
+    
+    activities.forEach((activity, index) => {
+        const step = document.createElement('div');
+        step.className = `journey-step ${activity.activity_type}`;
+        
+        const metadata = activity.metadata || {};
+        const metadataHtml = Object.keys(metadata).length > 0 ? 
+            `<div class="journey-metadata">${Object.entries(metadata).map(([k, v]) => `<strong>${k}:</strong> ${v}`).join(' • ')}</div>` : '';
+        
+        step.innerHTML = `
+            <div class="journey-step-header">
+                <div class="journey-step-action">${formatActivityAction(activity)}</div>
+                <div class="journey-step-time">${formatTimestamp(activity.timestamp)}</div>
+            </div>
+            <div class="journey-step-details">
+                <strong>URL:</strong> ${activity.url_path}<br>
+                <strong>IP:</strong> ${activity.ip_address}<br>
+                <strong>User Agent:</strong> ${activity.user_agent || 'N/A'}
+            </div>
+            ${metadataHtml}
+        `;
+        
+        timeline.appendChild(step);
+    });
+    
+    container.innerHTML = '';
+    container.appendChild(timeline);
+}
+
+// Format timestamp for journey
+function formatTimestamp(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleString();
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('journeyModal');
+    if (event.target === modal) {
+        closeJourneyModal();
+    }
+});
+
+// Show notification
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 100px;
+        right: 20px;
+        background: ${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#007bff'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        z-index: 1000;
+        max-width: 300px;
+    `;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
+
+// Send heartbeat every 30 seconds
+setInterval(() => {
+    if (socket && isConnected) {
+        socket.emit('heartbeat');
+    }
+}, 30000);
+</script>
+{% endblock %}

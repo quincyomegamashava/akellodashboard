@@ -1,0 +1,904 @@
+{% extends 'base.html' %}
+{% block title %}Content Development{% endblock %}
+
+{% block content %}
+
+ <div class="w3-card w3-white w3-round w3-border w3-margin-bottom">
+  <header class="w3-container w3-padding" style="background:#f05dc6; color:#fff; border-top-left-radius:8px;border-top-right-radius:8px;">
+          <div class="w3-large"><b>Lesson Plan Generator</b></div>
+          <div class="w3-small w3-opacity">Generate comprehensive lesson plans using AI</div>
+        </header>
+      <div class="w3-container w3-padding">
+        <div class="w3-row-padding">
+          <div class="w3-col s12 m6">
+            <label class="w3-small">Topic *
+              <input class="w3-input w3-border w3-round-small" id="lpTopic" placeholder="e.g., The Water Cycle" required>
+            </label>
+          </div>
+          <div class="w3-col s12 m3">
+            <label class="w3-small">Learner Age *
+              <input class="w3-input w3-border w3-round-small" id="lpAge" type="number" min="5" max="18" placeholder="10" required>
+            </label>
+          </div>
+          <div class="w3-col s12 m3">
+            <label class="w3-small">Subject
+              <input class="w3-input w3-border w3-round-small" id="lpSubject" placeholder="e.g., Science">
+            </label>
+          </div>
+        </div>
+        
+        <div class="w3-row-padding w3-margin-top">
+          <div class="w3-col s12">
+            <label class="w3-small">Learning Objectives (one per line)
+              <textarea class="w3-input w3-border w3-round-small" id="lpObjectives" rows="3" placeholder="Students will be able to:
+• Identify the stages of the water cycle
+• Explain how water moves through different states
+• Describe the importance of the water cycle in nature"></textarea>
+            </label>
+          </div>
+        </div>
+        
+        <div class="w3-row-padding w3-margin-top">
+          <div class="w3-col s12 m6">
+            <label class="w3-small">Duration (minutes)
+              <input class="w3-input w3-border w3-round-small" id="lpDuration" type="number" min="15" max="180" value="45" placeholder="45">
+            </label>
+          </div>
+          <div class="w3-col s12 m6">
+            <label class="w3-small">Class Size
+              <input class="w3-input w3-border w3-round-small" id="lpClassSize" type="number" min="1" max="50" value="25" placeholder="25">
+            </label>
+          </div>
+        </div>
+        
+        <div class="w3-row-padding w3-margin-top">
+          <div class="w3-col s12">
+            <label class="w3-small">Additional Requirements or Notes
+              <textarea class="w3-input w3-border w3-round-small" id="lpNotes" rows="2" placeholder="Any specific requirements, materials needed, or special considerations..."></textarea>
+            </label>
+          </div>
+        </div>
+        
+        <div class="w3-row-padding w3-margin-top">
+          <div class="w3-col s12 m6">
+            <button type="button" class="w3-button w3-pink w3-round w3-block" onclick="generateBasicLesson()" id="lpGenerateBtn">
+              <i class="fa fa-magic"></i> Generate Lesson Plan
+            </button>
+          </div>
+          <div class="w3-col s12 m6">
+            <button type="button" class="w3-button w3-light-gray w3-round w3-block" onclick="clearLessonForm()">
+              <i class="fa fa-refresh"></i> Clear Form
+            </button>
+          </div>
+        </div>
+        
+        <!-- Loading indicator -->
+        <div id="lpLoading" class="w3-center w3-margin-top w3-hide">
+          <div class="w3-text-pink"><i class="fa fa-spinner w3-spin"></i> Generating lesson plan...</div>
+          <div class="w3-small w3-text-gray w3-margin-top">This may take a few moments</div>
+        </div>
+        
+        <!-- Output area -->
+        <div id="lpOutputSection" class="w3-margin-top w3-hide">
+          <div class="w3-small w3-text-gray w3-margin-bottom">Generated Lesson Plan:</div>
+          <div class="w3-card w3-light-gray w3-round">
+            <div class="w3-container w3-padding">
+              <div id="lpOutput" class="w3-small" style="white-space: pre-wrap; max-height: 400px; overflow-y: auto;"></div>
+            </div>
+          </div>
+          <div class="w3-right w3-margin-top">
+            <button class="w3-button w3-indigo w3-round" type="button" onclick="copyLessonPlan()">
+              <i class="fa fa-copy"></i> Copy
+            </button>
+            <button class="w3-button w3-green w3-round" type="button" onclick="downloadLessonPlan()">
+              <i class="fa fa-download"></i> Download
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="w3-animate-opacity">
+  <div class="w3-row-padding">
+    <div class="w3-col l7 m12 s12 w3-margin-bottom">
+      <div class="w3-card w3-white w3-round w3-border">
+        <header class="w3-container w3-padding" style="background:#0ea5e9; color:#fff; border-top-left-radius:8px;border-top-right-radius:8px;">
+          <div class="w3-large"><b>Subject Workspaces</b></div>
+          <div class="w3-small w3-opacity">Create and manage collaborative workspaces per subject and grade</div>
+        </header>
+        <div class="w3-container w3-padding">
+          <div class="w3-margin-bottom">
+            <button class="w3-button w3-blue w3-round" type="button" onclick="openWsModal()"><i class="fa fa-folder"></i> New Workspace</button>
+          </div>
+          <div>
+            <div class="w3-small w3-text-gray w3-margin-bottom">Your Workspaces</div>
+            <div id="workspaceCards" class="w3-row-padding" style="margin-left:-8px;margin-right:-8px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+   
+
+    <!-- Workspace Create Modal -->
+    <div id="wsCreateModal" class="w3-modal">
+      <div class="w3-modal-content w3-animate-top w3-round">
+        <header class="w3-container" style="background:#0ea5e9; color:#fff;">
+          <span onclick="closeWsModal()" class="w3-button w3-display-topright">&times;</span>
+          <h5 class="w3-margin">Create Subject Workspace</h5>
+        </header>
+        <div class="w3-container w3-padding">
+          <form id="workspaceForm" class="w3-margin-bottom">
+            <div class="w3-row-padding">
+              <div class="w3-col s12 m7">
+                <label class="w3-small">Subject
+                  <input class="w3-input w3-border w3-round-small" id="wsSubject" placeholder="e.g., English" required>
+                </label>
+              </div>
+              <div class="w3-col s6 m2">
+                <label class="w3-small">Grade
+                  <input class="w3-input w3-border w3-round-small" id="wsGrade" type="number" min="1" max="13" placeholder="7" required>
+                </label>
+              </div>
+              <div class="w3-col s6 m3">
+                <label class="w3-small">Term
+                  <input class="w3-input w3-border w3-round-small" id="wsTerm" type="text" placeholder="e.g., Term 1">
+                </label>
+              </div>
+            </div>
+            <div class="w3-row-padding w3-margin-top">
+              <div class="w3-col s12">
+                <label class="w3-small">Description
+                  <textarea class="w3-input w3-border w3-round-small" id="wsDescription" rows="2" placeholder="Short description of the workspace"></textarea>
+                </label>
+              </div>
+            </div>
+
+            <div class="w3-row-padding w3-margin-top">
+              <div class="w3-col s12">
+                <label class="w3-small">Collaborators
+                  <select multiple class="w3-input w3-border w3-round-small" id="wsCollaboratorsSelect" size="6"></select>
+                </label>
+                <div class="w3-small w3-text-gray">Hold Ctrl (Windows) or Cmd (Mac) to select multiple</div>
+              </div>
+            </div>
+
+            <div class="w3-row-padding w3-margin-top">
+              <div class="w3-col s12">
+                <label class="w3-small">Files and Documents
+                  <input class="w3-input w3-border w3-round-small" id="wsFiles" type="file" multiple>
+                </label>
+                <div id="wsFileList" class="w3-small w3-text-gray w3-margin-top"></div>
+              </div>
+            </div>
+
+            <div class="w3-row-padding w3-margin-top">
+              <div class="w3-col s12">
+                <div class="w3-small w3-text-gray">Tasks and Sub-tasks</div>
+                <div class="w3-row-padding" style="margin-left:-8px;margin-right:-8px;">
+                  <div class="w3-col s8">
+                    <input class="w3-input w3-border w3-round-small" id="taskInput" placeholder="Task title e.g., Prepare reading list">
+                  </div>
+                  <div class="w3-col s4">
+                    <button type="button" class="w3-button w3-indigo w3-round w3-block" onclick="addTask()"><i class="fa fa-plus"></i> Add Task</button>
+                  </div>
+                </div>
+                <ul id="taskList" class="w3-ul w3-margin-top w3-small" style="border:1px dashed #e5e7eb; border-radius:8px;"></ul>
+              </div>
+            </div>
+
+            <div class="w3-row-padding w3-margin-top">
+              <div class="w3-col s12 m6">
+                <button type="submit" class="w3-button w3-blue w3-round w3-block"><i class="fa fa-folder"></i> Create Workspace</button>
+              </div>
+              <div class="w3-col s12 m6">
+                <button type="button" class="w3-button w3-light-gray w3-round w3-block" onclick="closeWsModal()">Cancel</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="w3-col l5 m12 s12">
+      <div class="w3-card w3-white w3-round w3-border">
+        <header class="w3-container w3-padding" style="background:#10b981; color:#fff; border-top-left-radius:8px;border-top-right-radius:8px;">
+          <div class="w3-large"><b>Lesson Script Generator</b></div>
+          <div class="w3-small w3-opacity">Generate a clear lesson prompt in British English</div>
+        </header>
+        <div class="w3-container w3-padding">
+          <div class="w3-right w3-margin-bottom">
+            <button class="w3-button w3-light-gray w3-round" type="button" onclick="testOllama()"><i class="fa fa-plug"></i> Test Ollama</button>
+            <span id="ollamaStatus" class="w3-small w3-text-gray w3-margin-left"></span>
+          </div>
+          <form id="lessonForm">
+            <div class="w3-row-padding">
+              <div class="w3-col s12 m7">
+                <label class="w3-small">Assign to Workspace
+                  <select class="w3-input w3-border w3-round-small" id="lsWorkspaceSelect"></select>
+                </label>
+              </div>
+              <div class="w3-col s12 m5">
+                <label class="w3-small">Ollama Model
+                  <select class="w3-input w3-border w3-round-small" id="lsModelSelect"></select>
+                </label>
+              </div>
+            </div>
+            <div class="w3-row-padding">
+              <div class="w3-col s12">
+                <label class="w3-small">Topic
+                  <input class="w3-input w3-border w3-round-small" id="lsTopic" placeholder="e.g., Purpose of the totem system" required>
+                </label>
+              </div>
+            </div>
+            <div class="w3-row-padding w3-margin-top">
+              <div class="w3-col s6">
+                <label class="w3-small">Age of learner
+                  <input class="w3-input w3-border w3-round-small" id="lsAge" type="number" min="3" max="21" placeholder="10" required>
+                </label>
+              </div>
+              <div class="w3-col s6">
+                <label class="w3-small">Subject (optional)
+                  <input class="w3-input w3-border w3-round-small" id="lsSubject" placeholder="e.g., Social Studies">
+                </label>
+              </div>
+            </div>
+
+            <div class="w3-row-padding w3-margin-top">
+              <div class="w3-col s12">
+                <label class="w3-small">Objectives (one per line)
+                  <textarea class="w3-input w3-border w3-round-small" id="lsObjectives" rows="3" placeholder="e.g., define a totem
+explain the importance of the totem system"></textarea>
+                </label>
+              </div>
+            </div>
+
+            <div class="w3-row-padding w3-margin-top">
+              <div class="w3-col s12">
+                <label class="w3-small">Content aspects (one per line)
+                  <textarea class="w3-input w3-border w3-round-small" id="lsAspects" rows="3" placeholder="e.g., Totems
+identity
+regulating marriage
+social interaction
+expressing gratitude
+preservation of culture"></textarea>
+                </label>
+              </div>
+            </div>
+
+            <div class="w3-row-padding w3-margin-top">
+              <div class="w3-col s12">
+                <label class="w3-small">Activities (one per line)
+                  <textarea class="w3-input w3-border w3-round-small" id="lsActivities" rows="3" placeholder="e.g., Explaining the term totem
+Tabulating totems and their sacred animals or objects
+Discussing the importance of totems
+Drawing and labelling their own totem symbols
+Praising classmates with their totems
+Explaining how totems help in preservation of resources"></textarea>
+                </label>
+              </div>
+            </div>
+
+            <div class="w3-row-padding w3-margin-top">
+              <div class="w3-col s12">
+                <label class="w3-small">Suggested images/illustrations (optional; one per line)
+                  <textarea class="w3-input w3-border w3-round-small" id="lsImages" rows="2" placeholder="e.g., A collage of local totem symbols
+An infographic showing how totems regulate marriage"></textarea>
+                </label>
+              </div>
+            </div>
+
+            <div class="w3-row-padding w3-margin-top">
+              <div class="w3-col s12 m6">
+                <button type="button" class="w3-button w3-green w3-round w3-block" onclick="generateLessonScript()"><i class="fa fa-magic"></i> Generate Script</button>
+              </div>
+              <div class="w3-col s12 m6">
+                <button type="reset" class="w3-button w3-light-gray w3-round w3-block">Clear</button>
+              </div>
+            </div>
+          </form>
+
+          <div class="w3-margin-top">
+            <div class="w3-small w3-text-gray">Generated lesson script (copy and use with your content engine):</div>
+            <textarea id="lsOutput" class="w3-input w3-border w3-round-small w3-small" rows="14" readonly></textarea>
+            <div class="w3-right w3-margin-top">
+              <button class="w3-button w3-indigo w3-round" type="button" onclick="copyOutput()"><i class="fa fa-copy"></i> Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+</div>
+</div>
+
+<!-- Lesson View Modal -->
+<div id="lessonModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-top w3-round" style="max-width: 900px;">
+    <header class="w3-container" style="background:#10b981; color:#fff;">
+      <span onclick="document.getElementById('lessonModal').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <h5 id="lessonModalTitle" class="w3-margin">Lesson</h5>
+    </header>
+    <div class="w3-container w3-padding">
+      <pre id="lessonModalBody" class="w3-small" style="white-space: pre-wrap;"></pre>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // State
+  let BOOTSTRAP = { collaborators: [], workspaces: [] };
+
+  // Elements
+  const wsFiles = document.getElementById('wsFiles');
+  const wsFileList = document.getElementById('wsFileList');
+  const workspaceForm = document.getElementById('workspaceForm');
+  const workspaceCards = document.getElementById('workspaceCards');
+  const collaboratorsSelect = document.getElementById('wsCollaboratorsSelect');
+  const lsWorkspaceSelect = document.getElementById('lsWorkspaceSelect');
+  const lsModelSelect = document.getElementById('lsModelSelect');
+
+  // Load initial data
+  document.addEventListener('DOMContentLoaded', async () => {
+    await bootstrapContentDev();
+    await loadWorkspaces();
+  });
+
+  async function bootstrapContentDev(){
+    try{
+      const r = await fetch('/api/content-dev/bootstrap');
+      if(!r.ok) throw new Error('Failed bootstrap');
+      BOOTSTRAP = await r.json();
+      paintCollaborators();
+      paintWorkspaceSelect();
+      await loadOllamaModels();
+      // Optionally paint existing workspaces cards list names only
+    }catch(e){ console.error(e); }
+  }
+
+  async function loadOllamaModels(){
+    lsModelSelect.innerHTML = '';
+    try{
+      const r = await fetch('/api/ollama/models');
+      const data = await r.json();
+      const models = data.models || [];
+      models.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        lsModelSelect.appendChild(opt);
+      });
+      // default selection
+      const defaultModel = (models.includes('llama3.1') ? 'llama3.1' : models[0]) || 'llama3.1';
+      if (lsModelSelect.options.length) {
+        lsModelSelect.value = defaultModel;
+      } else {
+        const opt = document.createElement('option');
+        opt.value = 'llama3.1';
+        opt.textContent = 'llama3.1';
+        lsModelSelect.appendChild(opt);
+      }
+    }catch(e){
+      const opt = document.createElement('option');
+      opt.value = 'llama3.1';
+      opt.textContent = 'llama3.1';
+      lsModelSelect.appendChild(opt);
+    }
+  }
+
+  function paintCollaborators(){
+    collaboratorsSelect.innerHTML = '';
+    BOOTSTRAP.collaborators.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id;
+      opt.textContent = `${u.name} (${u.username})`;
+      collaboratorsSelect.appendChild(opt);
+    });
+  }
+
+  function paintWorkspaceSelect(){
+    lsWorkspaceSelect.innerHTML = '';
+    BOOTSTRAP.workspaces.forEach(w => {
+      const opt = document.createElement('option');
+      opt.value = w.id;
+      opt.textContent = w.name;
+      lsWorkspaceSelect.appendChild(opt);
+    });
+  }
+
+  // File list
+  wsFiles.addEventListener('change', () => {
+    const names = Array.from(wsFiles.files).map(f => `• ${f.name}`).join('\n');
+    wsFileList.textContent = names || '';
+  });
+
+  async function testOllama(){
+    const status = document.getElementById('ollamaStatus');
+    status.textContent = 'Checking...';
+    try{
+      const r = await fetch('/api/ollama/models');
+      const data = await r.json();
+      if ((data.models||[]).length){
+        status.textContent = `OK: ${(data.models||[]).join(', ')}`;
+        status.className = 'w3-small w3-text-green w3-margin-left';
+      }else{
+        status.textContent = 'No models found';
+        status.className = 'w3-small w3-text-amber w3-margin-left';
+      }
+    }catch(e){
+      status.textContent = 'Not reachable';
+      status.className = 'w3-small w3-text-red w3-margin-left';
+    }
+  }
+
+  // Modal controls
+  function openWsModal(){ document.getElementById('wsCreateModal').style.display = 'block'; }
+  function closeWsModal(){ document.getElementById('wsCreateModal').style.display = 'none'; }
+  window.openWsModal = openWsModal; window.closeWsModal = closeWsModal;
+
+  // Tasks with subtasks
+  function addTask() {
+    const input = document.getElementById('taskInput');
+    const title = input.value.trim();
+    if (!title) return;
+    const li = document.createElement('li');
+    li.className = 'w3-padding-small';
+    li.innerHTML = `
+      <div class="w3-row">
+        <div class="w3-col s8"><b>${escapeHtml(title)}</b></div>
+        <div class="w3-col s4 w3-right-align">
+          <button class="w3-button w3-tiny w3-round w3-light-gray" type="button" onclick="this.closest('li').remove()"><i class="fa fa-trash"></i></button>
+        </div>
+      </div>
+      <div class="w3-margin-top">
+        <div class="w3-row" style="gap:8px; align-items:center;">
+          <input class="w3-input w3-border w3-round-small" style="width:70%; display:inline-block;" placeholder="Add sub-task">
+          <button class="w3-button w3-tiny w3-round w3-indigo" type="button">Add</button>
+        </div>
+        <ul class="w3-ul w3-small w3-margin-top" style="border-left:2px solid #e5e7eb; padding-left:8px;"></ul>
+      </div>
+    `;
+    const taskList = document.getElementById('taskList');
+    taskList.appendChild(li);
+    const addBtn = li.querySelector('button.w3-indigo');
+    const subInput = li.querySelector('input');
+    const subList = li.querySelector('ul');
+    addBtn.onclick = () => {
+      const st = subInput.value.trim();
+      if (!st) return;
+      const subLi = document.createElement('li');
+      subLi.className = 'w3-padding-small';
+      subLi.innerHTML = `
+        <span>${escapeHtml(st)}</span>
+        <button class="w3-button w3-tiny w3-round w3-light-gray w3-right" type="button" onclick="this.closest('li').remove()"><i class="fa fa-times"></i></button>
+      `;
+      subList.appendChild(subLi);
+      subInput.value = '';
+    };
+    input.value = '';
+  }
+
+  // Create workspace (persist to backend)
+  workspaceForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const subject = document.getElementById('wsSubject').value.trim();
+    const grade = document.getElementById('wsGrade').value.trim();
+    const term = document.getElementById('wsTerm').value.trim();
+    const description = document.getElementById('wsDescription').value.trim();
+
+    const tasks = Array.from(document.querySelectorAll('#taskList > li')).map(li => ({
+      title: li.querySelector('b')?.textContent || '',
+      subtasks: Array.from(li.querySelectorAll('ul > li > span')).map(s => s.textContent)
+    }));
+
+    const selectedCollabs = Array.from(collaboratorsSelect.selectedOptions).map(o => o.value);
+
+    const fd = new FormData();
+    fd.append('subject', subject);
+    fd.append('grade', grade);
+    fd.append('term', term);
+    fd.append('description', description);
+    selectedCollabs.forEach(id => fd.append('collaborators', id));
+    fd.append('tasks', JSON.stringify(tasks));
+    Array.from(wsFiles.files).forEach(f => fd.append('files', f));
+
+    try{
+      const r = await fetch('/api/workspaces', { method: 'POST', body: fd });
+      if(!r.ok) throw new Error('Failed to create workspace');
+      await r.json();
+      await loadWorkspaces();
+      workspaceForm.reset();
+      document.getElementById('taskList').innerHTML = '';
+      wsFileList.textContent = '';
+      closeWsModal();
+    }catch(err){
+      alert('Error creating workspace');
+      console.error(err);
+    }
+  });
+
+  async function loadWorkspaces(){
+    try{
+      const r = await fetch('/api/workspaces/mine');
+      if(!r.ok) throw new Error('Failed to load workspaces');
+      const data = await r.json();
+      paintWorkspaces(data.workspaces || []);
+      // Sync workspace dropdown for lesson assignment
+      BOOTSTRAP.workspaces = (data.workspaces || []).map(w => ({id: w.id, name: w.name}));
+      paintWorkspaceSelect();
+    }catch(e){ console.error(e); }
+  }
+
+  function paintWorkspaces(list){
+    workspaceCards.innerHTML = '';
+    if(!list.length){
+      workspaceCards.innerHTML = '<div class="w3-padding w3-text-gray">No workspaces yet. Create one to get started.</div>';
+      return;
+    }
+    list.forEach(ws => {
+      const card = document.createElement('div');
+      card.className = 'w3-col s12 w3-margin-bottom';
+      const tasksHtml = (ws.tasks||[]).map(t => `
+        <li class='w3-padding-small'>
+          <b>${escapeHtml(t.title)}</b> <span class='w3-tag w3-light-gray w3-round w3-tiny'>${escapeHtml(t.status||'')}</span>
+          ${(t.subtasks && t.subtasks.length) ? `<ul class='w3-ul w3-small w3-margin-top' style='border-left:2px solid #e5e7eb; padding-left:8px;'>${t.subtasks.map(s=>`<li class='w3-padding-small'>${escapeHtml(s.title)} <span class='w3-tag w3-light-gray w3-round w3-tiny'>${escapeHtml(s.status||'')}</span></li>`).join('')}</ul>` : ''}
+        </li>
+      `).join('') || '<li class="w3-padding-small w3-text-gray">No tasks</li>';
+      const filesHtml = (ws.files||[]).map(f => `<li class='w3-padding-small'><a class='w3-text-blue' href='${f.url}' target='_blank'>${escapeHtml(f.name)}</a></li>`).join('') || '<li class="w3-padding-small w3-text-gray">No files</li>';
+      const lessonsHtml = (ws.lessons||[]).map(l => `<li class='w3-padding-small'>${escapeHtml(l.topic)} <span class='w3-text-gray w3-tiny'>(Age ${escapeHtml(l.age||'')})</span> <button class='w3-button w3-tiny w3-round w3-light-gray' type='button' onclick='viewLesson(${l.id})'>View</button></li>`).join('') || '<li class="w3-padding-small w3-text-gray">No lessons yet</li>';
+      card.innerHTML = `
+        <div class="w3-card w3-white w3-round w3-border">
+          <div class="w3-container w3-padding" style="cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('w3-hide')">
+            <div class="w3-large" style="font-weight:600;">${escapeHtml(ws.name)}</div>
+            <div class="w3-small w3-text-gray">${escapeHtml(ws.description||'')}</div>
+          </div>
+          <div class="w3-container w3-padding w3-hide">
+            <div class="w3-right w3-margin-bottom">
+              <button class='w3-button w3-tiny w3-indigo w3-round' type='button' onclick='editWorkspace(${ws.id}, ${JSON.stringify(ws.name).replace(/"/g, '\\"')}, ${JSON.stringify(ws.description||'').replace(/"/g, '\\"')})'>Edit</button>
+              <button class='w3-button w3-tiny w3-red w3-round' type='button' onclick='deleteWorkspace(${ws.id})'>Delete</button>
+            </div>
+            <div class="w3-row-padding">
+              <div class="w3-col s12 m6">
+                <div class="w3-small w3-text-gray">Tasks</div>
+                <ul class="w3-ul w3-small" style="border:1px dashed #e5e7eb; border-radius:8px;">${tasksHtml}</ul>
+              </div>
+              <div class="w3-col s12 m6">
+                <div class="w3-small w3-text-gray">Files</div>
+                <ul class="w3-ul w3-small" style="border:1px dashed #e5e7eb; border-radius:8px; max-height:180px; overflow:auto;">${filesHtml}</ul>
+              </div>
+            </div>
+            <div class="w3-row-padding w3-margin-top">
+              <div class="w3-col s12">
+                <div class="w3-small w3-text-gray">Lessons</div>
+                <ul class="w3-ul w3-small" style="border:1px dashed #e5e7eb; border-radius:8px; max-height:220px; overflow:auto;">${lessonsHtml}</ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      workspaceCards.appendChild(card);
+    });
+  }
+
+  // Workspace edit/delete
+  async function deleteWorkspace(id){
+    if(!confirm('Delete this workspace? This cannot be undone.')) return;
+    try{
+      const r = await fetch(`/api/workspaces/${id}`, { method: 'DELETE' });
+      const data = await r.json();
+      if(!r.ok){ throw new Error(data.error || 'Failed'); }
+      await loadWorkspaces();
+    }catch(e){ alert('Error deleting workspace: ' + (e.message||'')); }
+  }
+
+  async function editWorkspace(id, name, description){
+    const newName = prompt('Workspace name:', name||'');
+    if(newName === null) return;
+    const newDesc = prompt('Description (optional):', description||'');
+    try{
+      const r = await fetch(`/api/workspaces/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, description: newDesc })
+      });
+      const data = await r.json();
+      if(!r.ok){ throw new Error(data.error || 'Failed'); }
+      await loadWorkspaces();
+    }catch(e){ alert('Error updating workspace: ' + (e.message||'')); }
+  }
+
+  // Lesson view modal
+  async function viewLesson(lessonId){
+    try{
+      const r = await fetch(`/api/lessons/${lessonId}`);
+      const data = await r.json();
+      if(!r.ok){ throw new Error(data.error || 'Failed'); }
+      document.getElementById('lessonModalTitle').textContent = `${data.topic} (Age ${data.age})`;
+      document.getElementById('lessonModalBody').textContent = data.content || '';
+      document.getElementById('lessonModal').style.display = 'block';
+    }catch(e){ alert('Error loading lesson: ' + (e.message||'')); }
+  }
+  window.viewLesson = viewLesson;
+  window.deleteWorkspace = deleteWorkspace;
+  window.editWorkspace = editWorkspace;
+
+  // Lesson Script Generator via backend (Ollama)
+  async function generateLessonScript(){
+    const topic = document.getElementById('lsTopic').value.trim();
+    const age = document.getElementById('lsAge').value.trim();
+    const subject = document.getElementById('lsSubject').value.trim();
+    const objectives = splitLines(document.getElementById('lsObjectives').value);
+    const aspects = splitLines(document.getElementById('lsAspects').value);
+    const activities = splitLines(document.getElementById('lsActivities').value);
+    const images = splitLines(document.getElementById('lsImages').value);
+    const wsId = lsWorkspaceSelect.value || '';
+
+    if (!topic || !age) {
+      alert('Please provide both Topic and Age.');
+      return;
+    }
+    if (!wsId) {
+      alert('Please select a workspace to assign the lesson to.');
+      return;
+    }
+
+    try{
+      const r = await fetch('/api/lessons/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspace_id: Number(wsId),
+          topic,
+          age: Number(age),
+          subject,
+          objectives,
+          aspects,
+          activities,
+          images,
+          model: lsModelSelect.value || undefined
+        })
+      });
+      const data = await r.json();
+      if(!r.ok){ throw new Error(data.error || 'Failed to generate'); }
+      document.getElementById('lsOutput').value = data.lesson.content || '';
+    }catch(err){
+      console.error(err);
+      alert('Error generating lesson: ' + (err?.message || 'unknown error'));
+    }
+  }
+
+  function copyOutput(){
+    const el = document.getElementById('lsOutput');
+    el.select();
+    el.setSelectionRange(0, 99999);
+    document.execCommand('copy');
+  }
+
+  // Basic Lesson Plan Generator Functions
+  async function generateBasicLesson() {
+    const topic = document.getElementById('lpTopic').value.trim();
+    const age = document.getElementById('lpAge').value.trim();
+    const subject = document.getElementById('lpSubject').value.trim();
+    const objectivesText = document.getElementById('lpObjectives').value.trim();
+    const duration = document.getElementById('lpDuration').value.trim();
+    const classSize = document.getElementById('lpClassSize').value.trim();
+    const notes = document.getElementById('lpNotes').value.trim();
+    
+    if (!topic || !age) {
+      alert('Please provide both Topic and Learner Age.');
+      return;
+    }
+    
+    const objectives = objectivesText.split('\n').map(s => s.trim().replace(/^[•\-\*]\s*/, '')).filter(Boolean);
+    
+    const generateBtn = document.getElementById('lpGenerateBtn');
+    const loading = document.getElementById('lpLoading');
+    const outputSection = document.getElementById('lpOutputSection');
+    const output = document.getElementById('lpOutput');
+    
+    // Show loading state
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<i class="fa fa-spinner w3-spin"></i> Generating...';
+    loading.classList.remove('w3-hide');
+    outputSection.classList.add('w3-hide');
+    
+    try {
+      const response = await fetch('/generate_lesson', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: topic,
+          age: parseInt(age),
+          subject: subject,
+          objectives: objectives,
+          duration: duration ? parseInt(duration) : 45,
+          class_size: classSize ? parseInt(classSize) : 25,
+          notes: notes
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate lesson plan');
+      }
+      
+      // Display the lesson plan
+      let lessonContent = '';
+      if (typeof data.lesson === 'string') {
+        // Try to parse if it's JSON string
+        try {
+          const parsed = JSON.parse(data.lesson);
+          lessonContent = formatLessonPlan(parsed);
+        } catch {
+          lessonContent = data.lesson;
+        }
+      } else if (typeof data.lesson === 'object') {
+        lessonContent = formatLessonPlan(data.lesson);
+      } else {
+        lessonContent = JSON.stringify(data, null, 2);
+      }
+      
+      output.textContent = lessonContent;
+      outputSection.classList.remove('w3-hide');
+      
+    } catch (error) {
+      console.error('Error generating lesson:', error);
+      alert('Error generating lesson plan: ' + (error.message || 'Unknown error'));
+    } finally {
+      // Reset button state
+      generateBtn.disabled = false;
+      generateBtn.innerHTML = '<i class="fa fa-magic"></i> Generate Lesson Plan';
+      loading.classList.add('w3-hide');
+    }
+  }
+  
+  function formatLessonPlan(lesson) {
+    if (typeof lesson === 'string') return lesson;
+    
+    let formatted = '';
+    
+    if (lesson.title) {
+      formatted += `LESSON TITLE: ${lesson.title}\n\n`;
+    }
+    
+    if (lesson.objectives && Array.isArray(lesson.objectives)) {
+      formatted += 'LEARNING OBJECTIVES:\n';
+      lesson.objectives.forEach(obj => {
+        formatted += `• ${obj}\n`;
+      });
+      formatted += '\n';
+    }
+    
+    if (lesson.materials && Array.isArray(lesson.materials) && lesson.materials.length > 0) {
+      formatted += 'MATERIALS REQUIRED:\n';
+      lesson.materials.forEach(material => {
+        formatted += `• ${material}\n`;
+      });
+      formatted += '\n';
+    }
+    
+    if (lesson.introduction) {
+      formatted += `INTRODUCTION/WARM-UP:\n${lesson.introduction}\n\n`;
+    }
+    
+    if (lesson.content) {
+      formatted += 'MAIN CONTENT:\n';
+      if (Array.isArray(lesson.content)) {
+        lesson.content.forEach((section, index) => {
+          formatted += `\n${index + 1}. ${section}\n`;
+        });
+      } else {
+        formatted += lesson.content;
+      }
+      formatted += '\n\n';
+    }
+    
+    if (lesson.exercises && Array.isArray(lesson.exercises)) {
+      formatted += 'ACTIVITIES/EXERCISES:\n';
+      lesson.exercises.forEach((exercise, index) => {
+        formatted += `\n${index + 1}. ${exercise}\n`;
+      });
+      formatted += '\n';
+    }
+    
+    if (lesson.assessment) {
+      formatted += `ASSESSMENT:\n${lesson.assessment}\n\n`;
+    }
+    
+    if (lesson.differentiation) {
+      formatted += `DIFFERENTIATION:\n${lesson.differentiation}\n\n`;
+    }
+    
+    if (lesson.summary) {
+      formatted += `SUMMARY/PLENARY:\n${lesson.summary}\n`;
+    }
+    
+    return formatted || JSON.stringify(lesson, null, 2);
+  }
+  
+  function clearLessonForm() {
+    document.getElementById('lpTopic').value = '';
+    document.getElementById('lpAge').value = '';
+    document.getElementById('lpSubject').value = '';
+    document.getElementById('lpObjectives').value = '';
+    document.getElementById('lpDuration').value = '45';
+    document.getElementById('lpClassSize').value = '25';
+    document.getElementById('lpNotes').value = '';
+    document.getElementById('lpOutputSection').classList.add('w3-hide');
+  }
+  
+  function copyLessonPlan() {
+    const output = document.getElementById('lpOutput');
+    const text = output.textContent;
+    
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        // Show temporary feedback
+        const btn = event.target.closest('button');
+        const original = btn.innerHTML;
+        btn.innerHTML = '<i class="fa fa-check"></i> Copied!';
+        btn.classList.remove('w3-indigo');
+        btn.classList.add('w3-green');
+        setTimeout(() => {
+          btn.innerHTML = original;
+          btn.classList.remove('w3-green');
+          btn.classList.add('w3-indigo');
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy text: ', err);
+        fallbackCopy(text);
+      });
+    } else {
+      fallbackCopy(text);
+    }
+  }
+  
+  function fallbackCopy(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      alert('Lesson plan copied to clipboard!');
+    } catch (err) {
+      console.error('Fallback copy failed: ', err);
+      alert('Failed to copy. Please select the text manually.');
+    }
+    document.body.removeChild(textArea);
+  }
+  
+  function downloadLessonPlan() {
+    const output = document.getElementById('lpOutput');
+    const text = output.textContent;
+    const topic = document.getElementById('lpTopic').value.trim() || 'lesson_plan';
+    
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = `${topic.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_lesson_plan.txt`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  // Helpers
+  function splitLines(v){
+    return v.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  }
+  function formatDate(d){
+    const date = (d instanceof Date) ? d : new Date(d);
+    return date.toLocaleString();
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"]+/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] || c));
+  }
+</script>
+{% endblock %}

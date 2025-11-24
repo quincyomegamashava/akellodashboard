@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Application Logs{% endblock %}
+
+{% block content %}
+<div class="p-4">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900">Application Logs</h1>
+      <p class="text-slate-500 mt-1">Monitor and troubleshoot application activity</p>
+    </div>
+    <button id="downloadLogsBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+      <i class="fas fa-download mr-2"></i>Download Full Log
+    </button>
+  </div>
+
+  <!-- Filters -->
+  <div class="glass soft-shadow rounded-2xl p-4 mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Lines to Display</label>
+        <select id="linesSelect" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <option value="50">50 lines</option>
+          <option value="100" selected>100 lines</option>
+          <option value="200">200 lines</option>
+          <option value="500">500 lines</option>
+          <option value="1000">1000 lines</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Log Level</label>
+        <select id="levelSelect" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <option value="">All Levels</option>
+          <option value="DEBUG">DEBUG</option>
+          <option value="INFO">INFO</option>
+          <option value="WARNING">WARNING</option>
+          <option value="ERROR">ERROR</option>
+          <option value="CRITICAL">CRITICAL</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Search Term</label>
+        <input type="text" id="searchInput" placeholder="Filter logs..." 
+               class="w-full border border-slate-300 rounded-lg px-3 py-2">
+      </div>
+      <div class="flex items-end">
+        <button id="refreshBtn" class="w-full px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors">
+          <i class="fas fa-sync-alt mr-2"></i>Refresh
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log Files List -->
+  <div class="glass soft-shadow rounded-2xl p-4 mb-4">
+    <h3 class="text-lg font-semibold mb-3">Available Log Files</h3>
+    <div id="logFilesList" class="space-y-2">
+      <div class="text-center text-slate-500 py-4">
+        <i class="fas fa-spinner fa-spin"></i> Loading log files...
+      </div>
+    </div>
+  </div>
+
+  <!-- Log Stats -->
+  <div class="glass soft-shadow rounded-2xl p-4 mb-4" id="logStats">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+      <div>
+        <div class="text-2xl font-bold text-slate-900" id="totalLines">-</div>
+        <div class="text-sm text-slate-500">Total Lines</div>
+      </div>
+      <div>
+        <div class="text-2xl font-bold text-slate-900" id="returnedLines">-</div>
+        <div class="text-sm text-slate-500">Displayed</div>
+      </div>
+      <div>
+        <div class="text-2xl font-bold text-green-600" id="levelFilter">-</div>
+        <div class="text-sm text-slate-500">Level Filter</div>
+      </div>
+      <div>
+        <div class="text-2xl font-bold text-blue-600" id="lastUpdate">-</div>
+        <div class="text-sm text-slate-500">Last Updated</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log Display -->
+  <div class="glass soft-shadow rounded-2xl p-6">
+    <h3 class="text-lg font-semibold mb-3 flex items-center">
+      <i class="fas fa-file-alt mr-2 text-indigo-600"></i>
+      Log Output
+      <span class="ml-auto text-sm font-normal text-slate-500" id="logPath"></span>
+    </h3>
+    <div id="logContainer" class="font-mono text-sm bg-slate-900 text-green-400 p-4 rounded-lg overflow-auto" style="max-height: 500px; min-height: 300px;">
+      <div class="text-center text-slate-500 py-8">
+        <i class="fas fa-spinner fa-spin text-2xl"></i>
+        <div class="mt-2">Loading logs...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  #logContainer {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.5;
+  }
+  
+  .log-line {
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(100, 255, 100, 0.1);
+  }
+  
+  .log-line:hover {
+    background-color: rgba(100, 255, 100, 0.1);
+  }
+  
+  .log-ERROR, .log-CRITICAL {
+    color: #ff6b6b;
+    font-weight: 500;
+  }
+  
+  .log-WARNING {
+    color: #ffd93d;
+    font-weight: 500;
+  }
+  
+  .log-INFO {
+    color: #6bcf7f;
+  }
+  
+  .log-DEBUG {
+    color: #94c9ff;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const logContainer = document.getElementById('logContainer');
+  const linesSelect = document.getElementById('linesSelect');
+  const levelSelect = document.getElementById('levelSelect');
+  const searchInput = document.getElementById('searchInput');
+  const refreshBtn = document.getElementById('refreshBtn');
+  const downloadLogsBtn = document.getElementById('downloadLogsBtn');
+  
+  let searchTimeout = null;
+  
+  // Load logs on page load
+  loadLogs();
+  loadLogFiles();
+  
+  // Event listeners
+  linesSelect.addEventListener('change', loadLogs);
+  levelSelect.addEventListener('change', loadLogs);
+  searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(loadLogs, 500);
+  });
+  refreshBtn.addEventListener('click', function() {
+    loadLogs();
+    loadLogFiles();
+  });
+  downloadLogsBtn.addEventListener('click', downloadLogs);
+  
+  // Auto-refresh every 30 seconds
+  setInterval(loadLogs, 30000);
+  
+  function loadLogs() {
+    const lines = linesSelect.value;
+    const level = levelSelect.value;
+    const search = searchInput.value;
+    
+    const params = new URLSearchParams({
+      lines: lines,
+      level: level,
+      search: search
+    });
+    
+    fetch(`/api/monitoring/logs?${params}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.logs) {
+          displayLogs(data.logs);
+          updateStats(data);
+        } else if (data.message) {
+          logContainer.innerHTML = `<div class="text-yellow-400 text-center py-8">${data.message}</div>`;
+        } else {
+          logContainer.innerHTML = '<div class="text-red-400 text-center py-8">Error loading logs</div>';
+        }
+      })
+      .catch(error => {
+        console.error('Error loading logs:', error);
+        logContainer.innerHTML = '<div class="text-red-400 text-center py-8">Error loading logs. Please try again.</div>';
+      });
+  }
+  
+  function loadLogFiles() {
+    fetch('/api/monitoring/logs/files')
+      .then(response => response.json())
+      .then(data => {
+        if (data.files && data.files.length > 0) {
+          displayLogFiles(data.files);
+        } else {
+          document.getElementById('logFilesList').innerHTML = '<div class="text-slate-500">No log files found</div>';
+        }
+      })
+      .catch(error => {
+        console.error('Error loading log files:', error);
+      });
+  }
+  
+  function displayLogs(logs) {
+    if (!logs || logs.length === 0) {
+      logContainer.innerHTML = '<div class="text-slate-500 text-center py-8">No logs found</div>';
+      return;
+    }
+    
+    let html = '';
+    logs.forEach(line => {
+      // Detect log level in line
+      let logClass = '';
+      if (line.includes('ERROR')) logClass = 'log-ERROR';
+      else if (line.includes('CRITICAL')) logClass = 'log-CRITICAL';
+      else if (line.includes('WARNING')) logClass = 'log-WARNING';
+      else if (line.includes('INFO')) logClass = 'log-INFO';
+      else if (line.includes('DEBUG')) logClass = 'log-DEBUG';
+      
+      html += `<div class="log-line ${logClass}">${escapeHtml(line)}</div>`;
+    });
+    
+    logContainer.innerHTML = html;
+    // Scroll to bottom to show most recent logs
+    logContainer.scrollTop = logContainer.scrollHeight;
+  }
+  
+  function displayLogFiles(files) {
+    let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
+    files.forEach(file => {
+      const badge = file.is_current ? '<span class="ml-2 px-2 py-1 bg-green-500 text-white text-xs rounded-full">Current</span>' : '';
+      html += `
+        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+          <div class="flex items-center gap-3">
+            <i class="fas fa-file-alt text-slate-400"></i>
+            <div>
+              <div class="font-medium text-slate-900">${file.filename}${badge}</div>
+              <div class="text-xs text-slate-500">${file.size_mb} MB • ${new Date(file.modified).toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    document.getElementById('logFilesList').innerHTML = html;
+  }
+  
+  function updateStats(data) {
+    document.getElementById('totalLines').textContent = data.total_lines || '-';
+    document.getElementById('returnedLines').textContent = data.returned_lines || '-';
+    document.getElementById('levelFilter').textContent = data.filters?.level || 'all';
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+    
+    if (data.log_file) {
+      document.getElementById('logPath').textContent = data.log_file;
+    }
+  }
+  
+  function downloadLogs() {
+    window.location.href = '/api/monitoring/logs/download';
+  }
+  
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,2120 @@
+{% extends "base.html" %}
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    .filter-bar {
+      position: sticky; top: 0; z-index: 10; background: #fff; border: 1px solid #e5e7eb;
+      border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .kpi-card .value { font-size: 1.6rem; color: #374151; }
+    .placeholder-panel { border: 1px dashed #d1d5db; border-radius: 8px; height: 260px;
+      display: flex; align-items: center; justify-content: center; color: #6b7280; }
+    /* Desktop-only flex row to harden side-by-side layout */
+    @media (min-width: 992px){
+      .flex-row-desktop { display: flex; gap: 12px; align-items: stretch; }
+      .flex-row-desktop > .flex-col { flex: 1 1 0; min-width: 0; }
+    }
+    @media (max-width: 768px){ .w3-quarter, .w3-twothird, .w3-third { width: 100% !important; } }
+</style>
+  <script src="{{ url_for('static', filename='smartlearningandlibraryanalytics.js') }}"></script>
+</head>
+
+{% block content %}
+<div class="w3-container w3-margin-top w3-small">
+
+  <!-- Global Filters trigger -->
+  <div class="w3-row w3-margin-bottom w3-padding">
+    <div class="w3-right">
+      <button class="w3-button w3-round w3-border" onclick="document.getElementById('mon_global_filters').style.display='block'">
+        <i class="fa fa-sliders"></i> Filters
+      </button>
+      <button class="w3-button w3-round w3-border w3-margin-left" onclick="document.getElementById('mon_province_quick').style.display='block'">
+        <i class="fa fa-map-marker"></i> Provinces
+      </button>
+    </div>
+  </div>
+
+  <div class="w3-row-padding">
+    <!-- Left: Accordion -->
+    <div class="w3-quarter w3-padding" style="height: 75vh; overflow:auto;">
+      <div class="w3-round w3-white w3-card w3-border">
+        <div class="w3-padding">
+
+          <!-- Smartlearning -->
+          <div class="w3-margin w3-round w3-padding w3-white w3-hover-shadow w3-hover-border-orange w3-border w3-border-light-gray">
+            <button onclick="toggleAccord('smartlearningAccordMON')" class="w3-button w3-text-orange w3-hover-white w3-block w3-left-align">
+              <i class="fas fa-brain w3-margin-right w3-text-orange"></i>Smartlearning <i class="fa-solid w3-right fa-chevron-down"></i>
+            </button>
+<div id="smartlearningAccordMON" class="w3-hide w3-text-orange w3-container">
+              <button class="w3-button w3-white w3-border w3-round w3-margin-top w3-block w3-left-align" onclick="document.getElementById('mon_smartlearning_custom').style.display='block'">Overview</button>
+              <button class="w3-button w3-white w3-border w3-round w3-margin-top w3-block w3-left-align" onclick="document.getElementById('mon_smartlearning_trends').style.display='block'">Trends</button>
+              <button class="w3-button w3-white w3-border w3-round w3-margin-top w3-block w3-left-align" onclick="openSmartMonthly()">Details</button>
+            </div>
+          </div>
+
+          <!-- Library -->
+          <div class="w3-margin w3-round w3-padding w3-white w3-hover-shadow w3-hover-border-teal w3-border w3-border-light-gray">
+            <button onclick="toggleAccord('libraryAccordMON')" class="w3-button w3-text-teal w3-hover-white w3-block w3-left-align">
+              <i class="fas fa-book-open w3-margin-right w3-text-teal"></i>Library <i class="fa-solid w3-right fa-chevron-down"></i>
+            </button>
+<div id="libraryAccordMON" class="w3-hide w3-text-teal w3-container">
+              <button class="w3-button w3-white w3-border w3-round w3-margin-top w3-block w3-left-align" onclick="openLibraryOverview()">Overview</button>
+              <button class="w3-button w3-white w3-border w3-round w3-margin-top w3-block w3-left-align" onclick="openLibraryTrends()">Trends</button>
+              <button class="w3-button w3-white w3-border w3-round w3-margin-top w3-block w3-left-align" onclick="openLibraryMonthly()">Details</button>
+            </div>
+          </div>
+
+          <!-- Province Distribution -->
+          <div class="w3-margin w3-round w3-padding w3-white w3-hover-shadow w3-hover-border-green w3-border w3-border-light-gray">
+            <button onclick="toggleAccord('provDistAccordMON')" class="w3-button w3-text-green w3-hover-white w3-block w3-left-align">
+              <i class="fas fa-map w3-margin-right w3-text-green"></i>Province Distribution <i class="fa-solid w3-right fa-chevron-down"></i>
+            </button>
+            <div id="provDistAccordMON" class="w3-hide w3-text-green w3-container">
+              <button class="w3-button w3-white w3-border w3-round w3-margin-top w3-block w3-left-align" onclick="document.getElementById('mon_province_distribution').style.display='block'">Table</button>
+            </div>
+          </div>
+
+          <!-- Ask Akello -->
+          <div class="w3-margin w3-round w3-padding w3-white w3-hover-shadow w3-hover-border-blue w3-border w3-border-light-gray">
+            <button onclick="toggleAccord('askAccordMON')" class="w3-button w3-text-blue w3-hover-white w3-block w3-left-align">
+              <i class="fas fa-comments w3-margin-right w3-text-blue"></i>Ask Akello <i class="fa-solid w3-right fa-chevron-down"></i>
+            </button>
+            <div id="askAccordMON" class="w3-hide w3-text-blue w3-container">
+              <button class="w3-button w3-white w3-border w3-round w3-margin-top w3-block w3-left-align" onclick="openAskOverview()">Overview</button>
+              <button class="w3-button w3-white w3-border w3-round w3-margin-top w3-block w3-left-align" onclick="openAskTrends()">Trends</button>
+              <button class="w3-button w3-white w3-border w3-round w3-margin-top w3-block w3-left-align" onclick="openAskMonthly()">Details</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Main content -->
+    <div class="w3-twothird w3-padding" style="height: 75vh; overflow:auto;">
+
+      <!-- KPI Cards -->
+      <div class="w3-row-padding">
+<div class="w3-col l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border">
+            <div class="w3-container w3-light-blue w3-text-white w3-round-top w3-padding-small"><b>Overall</b></div>
+            <div class="w3-container w3-padding-small"><div class="value" id="mon-overall">—</div><div class="w3-text-gray w3-tiny">Total activity</div></div>
+          </div>
+        </div>
+        <div class="w3-col l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border">
+            <div class="w3-container w3-orange w3-text-white w3-round-top w3-padding-small"><b>Smartlearning</b></div>
+<div class="w3-container w3-padding-small"><div class="value" id="mon-asl">—</div><div class="w3-text-gray w3-tiny">ASL metric</div></div>
+          </div>
+        </div>
+        <div class="w3-col l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border">
+            <div class="w3-container w3-teal w3-text-white w3-round-top w3-padding-small"><b>Library</b></div>
+<div class="w3-container w3-padding-small"><div class="value" id="mon-library">—</div><div class="w3-text-gray w3-tiny">Library metric</div></div>
+          </div>
+        </div>
+        <div class="w3-col l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border">
+            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Ask Akello</b></div>
+<div class="w3-container w3-padding-small"><div class="value" id="mon-ask">—</div><div class="w3-text-gray w3-tiny">Ask metric</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row: Charts side-by-side with hardened desktop flex -->
+      <div class="w3-row-padding w3-margin-top">
+        <div class="flex-row-desktop" style="width: 100%;">
+          <div class="flex-col w3-full w3-padding-small">
+            <div class="w3-card w3-round w3-white w3-border w3-padding">
+              <div class="w3-text-gray w3-small w3-margin-bottom"><b>Usage Distribution</b></div>
+              <div class="w3-container w3-padding-small">
+                <div class="w3-bar w3-border w3-round w3-light-gray w3-margin-bottom">
+                  <button id="monBarBtn" class="w3-bar-item w3-button w3-blue w3-round w3-small">Bar</button>
+                  <button id="monPieBtn" class="w3-bar-item w3-button w3-white w3-round w3-small">Pie</button>
+                </div>
+                <div class="w3-row-padding" style="height:260px;">
+                  <div class="w3-third w3-padding-small" style="height:100%;">
+                    <div class="w3-small w3-text-gray" style="margin-bottom:4px;"><b>ASL Gender</b></div>
+                    <canvas id="mon-gender-asl" style="width:100%; height:100%;"></canvas>
+                  </div>
+                  <div class="w3-third w3-padding-small" style="height:100%;">
+                    <div class="w3-small w3-text-gray" style="margin-bottom:4px;"><b>Library Gender</b></div>
+                    <canvas id="mon-gender-lib" style="width:100%; height:100%;"></canvas>
+                  </div>
+                  <div class="w3-third w3-padding-small" style="height:100%;">
+                    <div class="w3-small w3-text-gray" style="margin-bottom:4px;"><b>Ask Akello Gender</b></div>
+                    <canvas id="mon-gender-ask" style="width:100%; height:100%;"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metrics row: Smartlearning and Library side by side -->
+            <div class="w3-row-padding w3-margin-top">
+              <!-- Smartlearning Metrics section -->
+               <div id="smartlearning-metrics-result">
+                <div class="w3-hide" id="spinner" style="display:none;">Loading...</div>
+              <div class="w3-half w3-padding-small">
+                <div class="w3-card w3-round w3-white w3-border w3-padding">
+                  <div class="w3-text-gray w3-small w3-margin-bottom"><b>Smartlearning Metrics</b></div>
+                  <div class="w3-container w3-padding-small">
+                    <table class="w3-table-all w3-small w3-hoverable" id="smartlearning-table">
+                      <thead>
+                        <tr class="w3-light-gray"><th>Metric</th><th>Value</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td colspan="2" class="w3-center w3-text-orange" id="spinner">
+                            <i class="fas fa-spinner fa-spin"></i> Loading metrics...
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              </div>
+              
+
+              <!-- Library Metrics section -->
+               <!-- For example: Display Active 30 separately -->
+              <div class="w3-hide">
+                <h3>Active Users (Last 30 Days): <span id="active30-display">-</span></h3>
+              </div>
+              <div class="w3-half w3-padding-small">
+                <div class="w3-card w3-round w3-white w3-border w3-padding">
+                  <div class="w3-text-gray w3-small w3-margin-bottom"><b>Library Metrics</b></div>
+                  <div class="w3-container w3-padding-small">
+                    <table class="w3-table-all w3-small w3-hoverable" id="library-dataTable">
+                      <thead>
+                        <tr class="w3-light-gray"><th>Metric</th><th>Value</th></tr>
+                      </thead>
+                      <tbody id="library-dataTable">
+                        <tr>
+                          <td colspan="2" class="w3-center w3-text-teal">
+                            <i class="fas fa-spinner fa-spin"></i> Loading library metrics...
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex-col w3-hide w3-half w3-padding-small">
+          <div class="w3-card w3-round w3-white w3-border">
+            <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Recent Activity</b></header>
+            <div class="w3-container w3-padding">
+              <table class="w3-table-all w3-small w3-hoverable">
+                <thead>
+                  <tr class="w3-light-gray"><th>Date</th><th>Platform</th><th>Description</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>—</td><td>—</td><td>Placeholder item</td><td><span class="w3-tag w3-round w3-light-gray">Pending</span></td></tr>
+                  <tr><td>—</td><td>—</td><td>Placeholder item</td><td><span class="w3-tag w3-round w3-orange">In Progress</span></td></tr>
+                  <tr><td>—</td><td>—</td><td>Placeholder item</td><td><span class="w3-tag w3-round w3-green">Done</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Row: Tables -->
+      <div class="w3-row-padding w3-margin-top">
+        <div class="w3-half w3-padding-small">
+<div class="w3-card w3-white w3-round w3-border w3-hide">
+<header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Platform Snapshot</b></header>
+            <div class="w3-container w3-padding">
+              <table class="w3-table-all w3-small w3-hoverable" id="mon-snapshot-table">
+                <thead>
+                  <tr class="w3-light-gray"><th>Metric</th><th>Smartlearning</th><th>Library</th><th>Ask</th></tr>
+                </thead>
+                <tbody id="mon-snapshot-body">
+                  <tr><td>Total Active</td><td>—</td><td>—</td><td>—</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="w3-half w3-padding-small w3-hide">
+          <div class="w3-card w3-white w3-round w3-border">
+            <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Recent Activity</b></header>
+            <div class="w3-container w3-padding">
+              <table class="w3-table-all w3-small w3-hoverable">
+                <thead>
+                  <tr class="w3-light-gray"><th>Date</th><th>Platform</th><th>Description</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>—</td><td>—</td><td>Placeholder item</td><td><span class="w3-tag w3-round w3-light-gray">Pending</span></td></tr>
+                  <tr><td>—</td><td>—</td><td>Placeholder item</td><td><span class="w3-tag w3-round w3-orange">In Progress</span></td></tr>
+                  <tr><td>—</td><td>—</td><td>Placeholder item</td><td><span class="w3-tag w3-round w3-green">Done</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Global Filters Modal -->
+<div id="mon_global_filters" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 720px; max-width: 95vw;">
+    <header class="w3-container w3-padding" style="background:#00407d; color:#fff;">
+      <span onclick="document.getElementById('mon_global_filters').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <b>Global Filters</b>
+    </header>
+    <div class="w3-container w3-padding">
+      <div class="filter-bar" style="position: static; box-shadow:none;">
+        <div class="w3-row-padding">
+          <div class="w3-col s12 m4">
+            <label class="w3-small w3-block">Start Date
+              <input type="date" class="w3-input w3-border w3-round-small">
+            </label>
+          </div>
+          <div class="w3-col s12 m4">
+            <label class="w3-small w3-block">End Date
+              <input type="date" class="w3-input w3-border w3-round-small">
+            </label>
+          </div>
+          <div class="w3-col s12 m4">
+            <label class="w3-small w3-block">Province
+              <select class="w3-input w3-border w3-round-small">
+                <option>All</option>
+                <option>Harare</option><option>Bulawayo</option><option>Manicaland</option>
+                <option>Mashonaland Central</option><option>Mashonaland East</option>
+                <option>Mashonaland West</option><option>Masvingo</option>
+                <option>Matabeleland North</option><option>Matabeleland South</option>
+                <option>Midlands</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="w3-row-padding w3-margin-top">
+          <div class="w3-col s12">
+            <button class="w3-button w3-round w3-text-white" style="background:#00407d; width: 100%;">Apply</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Province Distribution Modal -->
+<div id="mon_province_distribution" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 95vw; max-width: 1100px;">
+    <header class="w3-container w3-padding w3-center" style="background: linear-gradient(135deg,#16a34a,#22c55e); color: #fff;">
+      <span onclick="document.getElementById('mon_province_distribution').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Province Distribution</b></span>
+    </header>
+    <div class="w3-container w3-padding">
+      <div class="w3-responsive">
+        <table class="w3-table-all w3-small w3-hoverable">
+          <thead>
+            <tr class="w3-light-gray"><th>Province</th><th>ASL</th><th>Library</th><th>Ask</th></tr>
+          </thead>
+          <tbody id="mon-dist-body">
+            <tr><td colspan="4" class="w3-center w3-text-gray">No data</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Province Links Modal -->
+<div id="mon_province_quick" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 520px; max-width: 95vw;">
+    <header class="w3-container w3-padding" style="background:#0ea5e9; color:#fff;">
+      <span onclick="document.getElementById('mon_province_quick').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <b>Quick Province Links</b>
+    </header>
+    <div class="w3-container w3-padding">
+      <div class="w3-row-padding">
+        <div class="w3-col s12">
+          <p class="w3-small w3-text-gray">Jump to province statistics:</p>
+          <div class="w3-margin-bottom" style="line-height: 1.9;">
+            <a class="w3-text-teal w3-margin-bottom" href="{{ url_for('provincestats', provincename='Harare') }}" style="text-decoration: none;">Harare</a><br>
+            <a class="w3-text-teal w3-margin-bottom" href="{{ url_for('provincestats', provincename='Bulawayo') }}" style="text-decoration: none;">Bulawayo</a><br>
+            <a class="w3-text-teal w3-margin-bottom" href="{{ url_for('provincestats', provincename='Manicaland') }}" style="text-decoration: none;">Manicaland</a><br>
+            <a class="w3-text-teal w3-margin-bottom" href="{{ url_for('provincestats', provincename='Mashonaland Central') }}" style="text-decoration: none;">Mashonaland Central</a><br>
+            <a class="w3-text-teal w3-margin-bottom" href="{{ url_for('provincestats', provincename='Mashonaland East') }}" style="text-decoration: none;">Mashonaland East</a><br>
+            <a class="w3-text-teal w3-margin-bottom" href="{{ url_for('provincestats', provincename='Mashonaland West') }}" style="text-decoration: none;">Mashonaland West</a><br>
+            <a class="w3-text-teal w3-margin-bottom" href="{{ url_for('provincestats', provincename='Masvingo') }}" style="text-decoration: none;">Masvingo</a><br>
+            <a class="w3-text-teal w3-margin-bottom" href="{{ url_for('provincestats', provincename='Matabeleland North') }}" style="text-decoration: none;">Matabeleland North</a><br>
+            <a class="w3-text-teal w3-margin-bottom" href="{{ url_for('provincestats', provincename='Matabeleland South') }}" style="text-decoration: none;">Matabeleland South</a><br>
+            <a class="w3-text-teal w3-margin-bottom" href="{{ url_for('provincestats', provincename='Midlands') }}" style="text-decoration: none;">Midlands</a><br>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Smartlearning Overview (Custom Date) Modal -->
+<div id="mon_smartlearning_custom" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 85vw; height: 85vh; overflow-y: auto;">
+    <header class="w3-container w3-padding w3-center" style="background: linear-gradient(135deg,#4f46e5,#06b6d4); color: #fff;">
+      <span onclick="document.getElementById('mon_smartlearning_custom').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Smartlearning – Custom Date Overview</b></span>
+    </header>
+    <div class="w3-container w3-margin-top" style="height: 75vh; overflow-y: auto;">
+      <!-- Date Filter Controls -->
+      <div class="w3-container w3-margin-top w3-third  w3-round-large w3-white w3-padding">
+        <div class="w3-row-padding">
+          <div class="w3-col m4">
+            <label for="filter-start-date">Start Date:</label>
+            <input type="date" id="filter-start-date" class="w3-input w3-border w3-round">
+          </div>
+          <div class="w3-col m4">
+            <label for="filter-end-date">End Date:</label>
+            <input type="date" id="filter-end-date" class="w3-input w3-border w3-round">
+          </div>
+          <div class="w3-col m4 w3-flex w3-center">
+            <button class="w3-button w3-indigo w3-margin-top w3-round" onclick="applyDateFilter()">
+              <i class="fas fa-filter"></i> Apply Filter
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Card -->
+      <div class="w3-container w3-half w3-margin-top">
+        <div class="w3-card w3-round-large w3-white w3-hover-shadow">
+          <div class="w3-container w3-indigo w3-text-white w3-padding w3-round-top">
+            <h6 class="w3-margin-0">
+              <i class="fas fa-user-graduate w3-margin-right"></i>Overall Active Learners
+            </h6>
+          </div>
+          <div class="w3-container w3-center w3-padding">
+            <p class="w3-small w3-text-gray w3-margin-0">
+              <span id="overall-active-learners">0</span>
+            </p>
+            <p class="w3-small">From <span id="date-start"></span> to <span id="date-end"></span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="w3-container w3-margin-top">
+        <!-- Search Box -->
+        <div class="w3-container w3-margin-top w3-padding">
+          <input 
+            class="w3-input w3-border w3-round" 
+            type="text" 
+            id="searchInput" 
+            placeholder="Search schools by ID, name, or province..."
+            onkeyup="filterSchoolsTable()">
+        </div>
+
+        <!-- Table -->
+        <div class="w3-container w3-margin-top">
+          <table class="w3-table-all w3-hoverable w3-card-4" id="schoolsTable">
+            <thead>
+              <tr class="w3-indigo">
+                <th>School ID</th>
+                <th>School Name</th>
+                <th>Province</th>
+                <th>Active Learners</th>
+              </tr>
+            </thead>
+            <tbody id="overallActiveLoginsBody">
+              <tr><td colspan="4" class="w3-center">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <script>
+function filterSchoolsTable() {
+  const input = document.getElementById("searchInput");
+  const filter = input.value.toLowerCase();
+  const table = document.getElementById("schoolsTable");
+  const tr = table.getElementsByTagName("tr");
+
+  for (let i = 1; i < tr.length; i++) { // skip header row
+    const tds = tr[i].getElementsByTagName("td");
+    let rowMatch = false;
+
+    for (let j = 0; j < tds.length - 1; j++) { // skip active learners column
+      if (tds[j] && tds[j].innerText.toLowerCase().indexOf(filter) > -1) {
+        rowMatch = true;
+        break;
+      }
+    }
+
+    tr[i].style.display = rowMatch ? "" : "none";
+  }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  // Default: last 30 days
+  const today = new Date().toISOString().split("T")[0];
+  const last30 = new Date();
+  last30.setDate(last30.getDate() - 30);
+  const startDate = last30.toISOString().split("T")[0];
+
+  // Set defaults in date pickers
+  const startEl = document.getElementById("filter-start-date");
+  const endEl = document.getElementById("filter-end-date");
+  if (startEl && endEl) {
+    startEl.value = startDate;
+    endEl.value = today;
+    fetchOverallActiveLogins(startDate, today);
+  }
+});
+
+// Fetch API data
+function fetchOverallActiveLogins(start_date, end_date) {
+  fetch(`/api/overall_school_active_logins?start_date=${start_date}&end_date=${end_date}`)
+    .then(response => {
+      if (!response.ok) throw new Error("Network response was not ok");
+      return response.json();
+    })
+    .then(data => {
+      // Update summary
+      const totalEl = document.getElementById("overall-active-learners");
+      const rangeStart = document.getElementById("date-start");
+      const rangeEnd = document.getElementById("date-end");
+      if (totalEl) totalEl.innerText = data.overall_total || 0;
+      if (rangeStart) rangeStart.innerText = data.date_range?.start || '';
+      if (rangeEnd) rangeEnd.innerText = data.date_range?.end || '';
+
+      // Update table
+      const tbody = document.getElementById("overallActiveLoginsBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      if (!data.schools || data.schools.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="w3-center">No data available</td></tr>`;
+        return;
+      }
+
+      data.schools.forEach(school => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${school.school_id}</td>
+          <td>${school.school_name}</td>
+          <td>${school.school_province}</td>
+          <td><b>${school.active_learners}</b></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    })
+    .catch(error => {
+      console.error("Error fetching overall active logins:", error);
+      const totalEl = document.getElementById("overall-active-learners");
+      if (totalEl) totalEl.innerText = "0";
+      const tbody = document.getElementById("overallActiveLoginsBody");
+      if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="w3-center w3-text-red">Error loading data</td></tr>`;
+    });
+}
+
+// Handle filter button
+function applyDateFilter() {
+  const start = document.getElementById("filter-start-date").value;
+  const end = document.getElementById("filter-end-date").value;
+
+  if (!start || !end) {
+    alert("Please select both start and end dates.");
+    return;
+  }
+
+  fetchOverallActiveLogins(start, end);
+}
+</script>
+    </div>
+  </div>
+</div>
+
+<!-- Smartlearning Trends (Daily Login Activity) Modal -->
+<div id="mon_smartlearning_trends" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 85vw; height: 85vh; overflow-y: auto;">
+    <header class="w3-container w3-padding w3-center" style="background: linear-gradient(135deg,#f59e0b,#ef4444); color: #fff;">
+      <span onclick="document.getElementById('mon_smartlearning_trends').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Smartlearning – Daily Login Activity</b></span>
+    </header>
+    <div class="w3-container w3-margin-top" style="height: 75vh; overflow-y: auto;">
+      <div class="w3-container w3-padding-small">
+        <div class="graph-controls w3-bar w3-border w3-round w3-light-gray">
+          <button id="barGraphBtn" class="w3-bar-item w3-button w3-blue w3-round w3-small w3-hover-indigo active">
+            <i class="fas fa-chart-bar"></i> Bar Graph
+          </button>
+          <button id="lineGraphBtn" class="w3-bar-item w3-button w3-white w3-round w3-small w3-hover-blue">
+            <i class="fas fa-chart-line"></i> Line Graph
+          </button>
+        </div>
+      </div>
+      <div id="loading-indicator" class="w3-container w3-padding-16 w3-center hidden">
+        <div class="spinner w3-margin-bottom">
+          <i class="fas fa-spinner fa-spin fa-2x w3-text-blue"></i>
+        </div>
+        <span class="w3-text-blue w3-small"><strong>Loading daily login data...</strong></span>
+      </div>
+      <div id="error-message" class="w3-container w3-padding-16 w3-center hidden w3-text-red w3-pale-red w3-round"></div>
+      <div class="w3-container">
+        <div style="width: 100%; height: 350px;" id="dailyLoginsGraph"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Smartlearning Monthly (Details) Modal -->
+<div id="mon_smartlearning_monthly" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 85vw; height: 85vh; overflow-y: auto;">
+    <header class="w3-container w3-padding w3-center" style="background: linear-gradient(135deg,#f97316,#3b82f6); color:#fff;">
+      <span onclick="document.getElementById('mon_smartlearning_monthly').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Smartlearning – Monthly Logins</b></span>
+    </header>
+    <div class="w3-container w3-small w3-margin-top" style="height: 75vh; overflow-y: auto;">
+      <div class="w3-bar w3-border w3-round w3-light-gray w3-margin-bottom">
+<button id="monMonthlyLineBtn" class="w3-bar-item w3-button w3-blue w3-round w3-small">Line</button>
+        <button id="monMonthlyBarBtn" class="w3-bar-item w3-button w3-white w3-round w3-small">Bar</button>
+      </div>
+      <div style="width:100%; height: 380px;">
+        <canvas id="aslloginsChart"></canvas>
+      </div>
+      <div class="w3-margin-top w3-responsive">
+        <table id="aslloginsTable" class="w3-table-all w3-small w3-hoverable">
+          <thead>
+            <tr class="w3-indigo"><th>Month</th><th>Year</th><th>Student Count</th></tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" class="w3-center w3-text-gray">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+        <!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  $(document).ready(function () {
+    let barChart = null;
+    let pieChart = null;
+    let showingBar = true;
+
+    // Normalize ID for HTML attributes
+    function normalizeId(name) {
+      return name.replace(/\s+/g, "_").toLowerCase();
+    }
+
+    // Generate soft, accessible colors
+    function generateColors(count) {
+      const hues = [
+        220, 180, 140, 100, 60, 20, 340, 300, 260, 200, 160
+      ]; // Blue, teal, green, yellow, orange, red, pink, purple
+      return hues.slice(0, count).map(h => `hsl(${h}, 70%, 60%)`);
+    }
+
+    function updateChartsAndTable(data) {
+      const labels = data.map(item => item.province);
+      const values = data.map(item => item.student_count);
+
+      // === Update Table ===
+      const tbody = $("#studentsByProvinceBodytable");
+      tbody.empty();
+
+      if (!data || data.length === 0) {
+        tbody.append('<tr><td colspan="2" class="w3-text-grey w3-italic">No data available</td></tr>');
+      } else {
+        data.forEach(row => {
+          const provinceId = normalizeId(row.province);
+          const tr = $("<tr>")
+            .addClass("province-row w3-hover-light-gray")
+            .attr("data-province", row.province);
+
+          const provinceCell = $(`<td style="cursor: pointer;" onclick="document.getElementById('${provinceId}').style.display='block'">`)
+            .text(row.province)
+            .addClass("w3-text-blue");
+
+          tr.append(provinceCell);
+          tr.append($("<td>").text(row.student_count).addClass("w3-right-align"));
+          tbody.append(tr);
+        });
+      }
+
+      // === Destroy existing charts ===
+      if (barChart) barChart.destroy();
+      if (pieChart) pieChart.destroy();
+
+      // === Bar Chart ===
+      const barCtx = document.getElementById('barChart').getContext('2d');
+      barChart = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Active Students',
+            data: values,
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1,
+            borderRadius: 6,
+            borderSkipped: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: '#000',
+              titleColor: '#fff',
+              bodyColor: '#fff',
+              cornerRadius: 4,
+              padding: 10,
+              displayColors: false
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                precision: 0
+              },
+              grid: {
+                color: 'rgba(0, 0, 0, 0.05)'
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              },
+              ticks: {
+                autoSkip: true,
+                maxRotation: 45,
+                minRotation: 45
+              }
+            }
+          },
+          animation: {
+            duration: 1000,
+            easing: 'easeOutQuart'
+          }
+        }
+      });
+
+      // === Pie Chart ===
+      const pieCtx = document.getElementById('pieChart').getContext('2d');
+      const backgroundColors = generateColors(values.length);
+
+      pieChart = new Chart(pieCtx, {
+        type: 'pie',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Students',
+            data: values,
+            backgroundColor: backgroundColors,
+            borderColor: '#fff',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              align: 'center',
+              labels: {
+                usePointStyle: true,
+                padding: 20,
+                boxWidth: 8
+              }
+            },
+            tooltip: {
+              backgroundColor: '#000',
+              titleColor: '#fff',
+              bodyColor: '#fff',
+              cornerRadius: 4,
+              padding: 10
+            }
+          },
+          animation: {
+            animateRotate: true,
+            animateScale: true,
+            duration: 1200,
+            easing: 'easeOutCubic'
+          }
+        }
+      });
+    }
+
+    // Load Data
+    function loadActiveStudentData() {
+      $.ajax({
+        url: "/api/active-students-by-province",
+        method: "GET",
+        dataType: "json",
+        success: function (data) {
+          updateChartsAndTable(data);
+        },
+        error: function (xhr, status, error) {
+          $("#studentsByProvinceBodytable").html(
+            `<tr><td colspan="2" class="w3-text-red w3-italic">Error loading data: ${error}</td></tr>`
+          );
+          console.error("Error fetching student data:", error);
+        }
+      });
+    }
+
+    // Toggle Chart View
+    $("#toggleChartBtn").click(function () {
+      if (showingBar) {
+        $("#barChartContainer").fadeOut(300, function () {
+          $("#pieChartContainer").fadeIn(300);
+        });
+        $(this).text("Switch to Bar Chart");
+      } else {
+        $("#pieChartContainer").fadeOut(300, function () {
+          $("#barChartContainer").fadeIn(300);
+        });
+        $(this).text("Switch to Pie Chart");
+      }
+      setTimeout(() => {
+        if (barChart) barChart.resize();
+        if (pieChart) pieChart.resize();
+      }, 350);
+      showingBar = !showingBar;
+    });
+
+    // Initial Load
+    loadActiveStudentData();
+
+    // Province Filter
+    $("#provinceFilter").on("change", function () {
+      const selected = $(this).val().toLowerCase();
+      $(".province-row").each(function () {
+        const province = $(this).data("province").toLowerCase();
+        $(this).toggle(selected === "all" || province === selected);
+      });
+    });
+  });
+</script>
+
+
+
+<script>
+    let chartInstance = null;
+
+    async function loadDailyCounts() {
+      try {
+        const response = await fetch('/api/asl-daily-unique');
+        const data = await response.json();
+
+        const tableBody = document.querySelector('#aslTable tbody');
+        tableBody.innerHTML = '';
+
+        const dates = [];
+        const counts = [];
+
+        data.daily_counts.forEach(entry => {
+          const row = `
+            <tr>
+              <td>${entry.date}</td>
+              <td>${entry.unique_count}</td>
+            </tr>
+          `;
+          tableBody.insertAdjacentHTML('beforeend', row);
+
+          dates.push(entry.date);
+          counts.push(entry.unique_count);
+        });
+
+        // Destroy old chart if exists
+        if (chartInstance) chartInstance.destroy();
+
+        // Create new chart
+        const ctx = document.getElementById('aslChart').getContext('2d');
+        chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: dates,
+            datasets: [{
+              label: `Unique Student Count (${data.month} ${data.year})`,
+              data: counts,
+              borderColor: 'green',
+              backgroundColor: 'rgba(0, 200, 0, 0.2)',
+              fill: true,
+              tension: 0.3
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    }
+
+    // Init
+    loadDailyCounts();
+  </script>
+
+      <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const graphDiv = document.getElementById('dailyLoginsGraph');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const errorMessageDiv = document.getElementById('error-message');
+    const barGraphBtn = document.getElementById('barGraphBtn');
+    const lineGraphBtn = document.getElementById('lineGraphBtn');
+
+    let currentGraphType = 'bar'; // Default
+    let dailyData = null; // Cache API data
+
+    // Show loading state
+    const showLoading = () => {
+      loadingIndicator.classList.remove('hidden');
+      errorMessageDiv.classList.add('hidden');
+      graphDiv.innerHTML = '';
+    };
+
+    // Hide loading
+    const hideLoading = () => {
+      loadingIndicator.classList.add('hidden');
+    };
+
+    // Show error
+    const showError = (message) => {
+      errorMessageDiv.textContent = `Error: ${message}`;
+      errorMessageDiv.classList.remove('hidden');
+      hideLoading();
+    };
+
+    // Render graph with Plotly
+    const renderGraph = () => {
+      if (!dailyData || !dailyData.usage?.length) return;
+
+      const dates = dailyData.usage.map(item => item.date);
+      const counts = dailyData.usage.map(item => item.count);
+
+      const trace = {
+        x: dates,
+        y: counts,
+        type: currentGraphType,
+        mode: currentGraphType === 'line' ? 'lines+markers' : undefined,
+        marker: {
+          color: '#3498db',
+          line: { color: '#2980b9', width: 1.5 }
+        },
+        line: {
+          color: '#3498db',
+          width: 3,
+          shape: 'spline' // Smooth curve
+        },
+        hovertemplate: `Logins: %{y}<br>Date: %{x}<extra></extra>`
+      };
+
+      const layout = {
+        title: {
+          text: `Daily Logins: ${dailyData.start_date} → ${dailyData.end_date}`,
+          font: { family: 'Inter, Arial, sans-serif', size: 13, color: '#2c3e50' },
+          x: 0,
+          y: 0.95
+        },
+        xaxis: {
+          title: { text: 'Date', font: { size: 12 } },
+          type: 'category',
+          tickangle: -45,
+          automargin: true,
+          gridcolor: '#eaeaea',
+          zeroline: false
+        },
+        yaxis: {
+          title: { text: 'Number of Logins', font: { size: 12 } },
+          rangemode: 'tozero',
+          gridcolor: '#eaeaea',
+          zeroline: false
+        },
+        margin: { l: 50, r: 20, b: 100, t: 50 },
+        plot_bgcolor: '#fdfdfd',
+        paper_bgcolor: '#ffffff',
+        hovermode: 'closest',
+        showlegend: false
+      };
+
+      Plotly.newPlot(graphDiv, [trace], layout, {
+        responsive: true,
+        displayModeBar: false // Hide Plotly toolbar for cleaner UI
+      });
+    };
+
+    // Fetch data once
+    const fetchData = async () => {
+      showLoading();
+      try {
+        const response = await fetch('/api/smartlearning-daily-logins');
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const data = await response.json();
+
+        if (!data?.usage || !Array.isArray(data.usage)) {
+          throw new Error("Invalid or missing data format.");
+        }
+
+        dailyData = data;
+        renderGraph();
+      } catch (error) {
+        console.error('Failed to load login data:', error);
+        showError(error.message);
+      } finally {
+        hideLoading();
+      }
+    };
+
+    // Button interactions
+    barGraphBtn.addEventListener('click', () => {
+      if (currentGraphType === 'bar') return;
+      currentGraphType = 'bar';
+      barGraphBtn.classList.add('active');
+      barGraphBtn.classList.remove('w3-white');
+      lineGraphBtn.classList.remove('active');
+      lineGraphBtn.classList.add('w3-white');
+      renderGraph();
+    });
+
+    lineGraphBtn.addEventListener('click', () => {
+      if (currentGraphType === 'line') return;
+      currentGraphType = 'line';
+      lineGraphBtn.classList.add('active');
+      lineGraphBtn.classList.remove('w3-white');
+      barGraphBtn.classList.remove('active');
+      barGraphBtn.classList.add('w3-white');
+      renderGraph();
+    });
+
+    // Initial load
+    fetchData();
+  });
+</script>
+
+      <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Library Custom Date Modal -->
+<div id="mon_library_custom" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 95vw; height: 85vh; overflow-y: auto;">
+    <header class="w3-container w3-padding w3-center" style="background: linear-gradient(135deg,#14b8a6,#0ea5e9); color:#fff;">
+      <span onclick="document.getElementById('mon_library_custom').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Library – Custom Date Overview</b></span>
+    </header>
+    <div class="w3-container w3-small w3-margin-top" style="height: 75vh; overflow-y: auto;">
+      <!-- Date Range Inputs -->
+  <div class="w3-row-padding w3-margin-bottom">
+    <div class="w3-third">
+      <input type="date" id="libStartDate" class="w3-input w3-border" />
+    </div>
+    <div class="w3-third">
+      <input type="date" id="libEndDate" class="w3-input w3-border" />
+    </div>
+    <div class="w3-third">
+      <button class="w3-button w3-blue" onclick="fetchLibraryAnalytics()">Apply</button>
+    </div>
+  </div>
+
+  <!-- Summary Section -->
+  <div class="w3-row-padding w3-margin-bottom">
+
+    <!-- Overall Total -->
+    <div class="w3-col l4 m6 w3-margin-bottom">
+      <div class="w3-card w3-round-large w3-white w3-hover-shadow">
+        <div class="w3-container w3-blue w3-text-white w3-padding w3-round-top">
+          <h6 class="w3-margin-0">
+            <i class="fas fa-users w3-margin-right"></i>Total Active Users
+          </h6>
+        </div>
+        <div class="w3-container w3-center w3-padding">
+          <p class="w3-large w3-text-gray w3-margin-0">
+            <span id="libraryTotalUsers">0</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Province Totals -->
+    <div class="w3-col l8 m6 w3-margin-bottom">
+      <div class="w3-card w3-round-large w3-white w3-hover-shadow">
+        <div class="w3-container w3-green w3-text-white w3-padding w3-round-top">
+          <h6 class="w3-margin-0">
+            <i class="fas fa-map-marked-alt w3-margin-right"></i>Users by Province
+          </h6>
+        </div>
+        <div class="w3-container w3-padding">
+          <ul id="provinceBreakdown" class="w3-ul"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Box -->
+  <div class="w3-margin-bottom">
+    <div class="w3-row-padding">
+      <div class="w3-col s9 m10">
+        <input 
+          type="text" 
+          id="librarySearch" 
+          class="w3-input w3-border" 
+          placeholder="Search by institution name or province..."
+        />
+      </div>
+      <div class="w3-col s3 m2">
+        <button id="librarySearchBtn" class="w3-button w3-blue w3-block">Search</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Institutions Table -->
+  <table class="w3-table-all w3-hoverable w3-card-4">
+    <thead>
+      <tr class="w3-teal">
+        <th>ID</th>
+        <th>Name</th>
+        <th>Province</th>
+        <th>Active Users</th>
+      </tr>
+    </thead>
+    <tbody id="libraryAnalyticsBody">
+      <tr><td colspan="4" class="w3-center">Loading...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+let libraryData = []; // Store fetched institutions data
+
+async function fetchLibraryAnalytics() {
+  const startDate = document.getElementById("libStartDate").value;
+  const endDate = document.getElementById("libEndDate").value;
+
+  let url = `/api/library_custom_date_analytics`;
+  if (startDate && endDate) {
+    url += `?start_date=${startDate}&end_date=${endDate}`;
+  }
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  // Save institutions data
+  libraryData = data.institutions || [];
+
+  // Update summary
+  document.getElementById("libraryTotalUsers").innerText = data.total_active_users || 0;
+
+  // Province Breakdown
+  updateProvinceBreakdown(libraryData);
+
+  // Render table
+  renderLibraryTable(libraryData);
+}
+
+function renderLibraryTable(data) {
+  const tbody = document.getElementById("libraryAnalyticsBody");
+  tbody.innerHTML = "";
+
+  if (data.length > 0) {
+    data.forEach(inst => {
+      const row = `
+        <tr>
+          <td>${inst.id}</td>
+          <td>${inst.institution_name}</td>
+          <td>${inst.institution_province}</td>
+          <td>${inst.active_users}</td>
+        </tr>`;
+      tbody.innerHTML += row;
+    });
+  } else {
+    tbody.innerHTML = `<tr><td colspan="4" class="w3-center">No records found</td></tr>`;
+  }
+}
+
+function updateProvinceBreakdown(data) {
+  const breakdown = {};
+  data.forEach(inst => {
+    const prov = inst.institution_province || "Unknown";
+    breakdown[prov] = (breakdown[prov] || 0) + inst.active_users;
+  });
+
+  const ul = document.getElementById("provinceBreakdown");
+  ul.innerHTML = "";
+  for (const [province, count] of Object.entries(breakdown)) {
+    ul.innerHTML += `<li><b>${province}:</b> ${count}</li>`;
+  }
+}
+
+// Search filter
+function applyLibrarySearch(){
+  const query = (document.getElementById('librarySearch').value || '').toLowerCase();
+  const filtered = libraryData.filter(inst =>
+    (inst.institution_name||'').toLowerCase().includes(query) ||
+    (inst.institution_province||'').toLowerCase().includes(query)
+  );
+  renderLibraryTable(filtered);
+}
+if (libSearchInput) libSearchInput.addEventListener('input', applyLibrarySearch);
+if (libSearchBtn) libSearchBtn.addEventListener('click', applyLibrarySearch);
+
+// Load on modal open via openLibraryOverview()
+</script>
+    </div>
+  </div>
+</div>
+
+<!-- Library Trends (Daily Logins) Modal -->
+<div id="mon_library_trends" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 95vw; height: 85vh; overflow-y: auto;">
+    <header class="w3-container w3-padding w3-center" style="background: linear-gradient(135deg,#0ea5e9,#14b8a6); color:#fff;">
+      <span onclick="document.getElementById('mon_library_trends').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Library – Daily Logins (Current Month)</b></span>
+    </header>
+    <div class="w3-container w3-margin-top" style="height: 75vh; overflow-y: auto;">
+      <div class="w3-container w3-padding-small">
+        <div class="w3-bar w3-border w3-round w3-light-gray">
+          <button id="libDailyBarBtn" class="w3-bar-item w3-button w3-blue w3-round w3-small">Bar</button>
+          <button id="libDailyLineBtn" class="w3-bar-item w3-button w3-white w3-round w3-small">Line</button>
+        </div>
+      </div>
+      <div class="w3-container w3-padding-small">
+        <div id="libDailyStatus" class="w3-small w3-text-gray w3-margin-bottom">Loading…</div>
+        <div style="width:100%; height: 380px;">
+          <canvas id="libDailyLoginsChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function fetchLibraryDailyLogins(){
+    const res = await fetch('/api/library-daily-logins');
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  }
+
+  let libDailyChart = null;
+  let libDailyChartType = 'bar';
+  let libDailyCache = [];
+
+  function renderLibDailyChart(){
+    const statusEl = document.getElementById('libDailyStatus');
+    const ctx = document.getElementById('libDailyLoginsChart').getContext('2d');
+    const labels = libDailyCache.map(d => d.date);
+    const values = libDailyCache.map(d => d.total_logins);
+
+    if (libDailyChart) libDailyChart.destroy();
+
+    libDailyChart = new Chart(ctx, {
+      type: libDailyChartType,
+      data: {
+        labels,
+        datasets: [{
+          label: 'Daily Logins',
+          data: values,
+          borderColor: '#0ea5e9',
+          backgroundColor: 'rgba(14, 165, 233, 0.25)',
+          fill: libDailyChartType === 'line',
+          tension: 0.3,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+
+    if (statusEl) statusEl.textContent = `Showing ${labels.length} day(s)`;
+  }
+
+  async function loadLibraryDailyGraph(){
+    const statusEl = document.getElementById('libDailyStatus');
+    try{
+      if (statusEl) statusEl.textContent = 'Loading…';
+      libDailyCache = await fetchLibraryDailyLogins();
+      renderLibDailyChart();
+    }catch(err){
+      console.error('Library daily logins error', err);
+      if (statusEl) statusEl.textContent = 'Failed to load data';
+    }
+  }
+
+  window.openLibraryTrends = function(){
+    document.getElementById('mon_library_trends').style.display='block';
+    // Default to bar
+    libDailyChartType = 'bar';
+    const barBtn = document.getElementById('libDailyBarBtn');
+    const lineBtn = document.getElementById('libDailyLineBtn');
+    if (barBtn && lineBtn){
+      barBtn.classList.add('w3-blue');
+      lineBtn.classList.remove('w3-blue');
+      lineBtn.classList.add('w3-white');
+    }
+    loadLibraryDailyGraph();
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    const barBtn = document.getElementById('libDailyBarBtn');
+    const lineBtn = document.getElementById('libDailyLineBtn');
+    if (barBtn) barBtn.addEventListener('click', function(){
+      if (libDailyChartType==='bar') return;
+      libDailyChartType='bar';
+      barBtn.classList.add('w3-blue');
+      lineBtn.classList.remove('w3-blue');
+      lineBtn.classList.add('w3-white');
+      renderLibDailyChart();
+    });
+    if (lineBtn) lineBtn.addEventListener('click', function(){
+      if (libDailyChartType==='line') return;
+      libDailyChartType='line';
+      lineBtn.classList.add('w3-blue');
+      barBtn.classList.remove('w3-blue');
+      barBtn.classList.add('w3-white');
+      renderLibDailyChart();
+    });
+  });
+</script>
+
+<!-- Library Monthly (Details) Modal -->
+<div id="mon_library_monthly" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 95vw; height: 85vh; overflow-y: auto;">
+    <header class="w3-container w3-padding w3-center" style="background: linear-gradient(135deg,#14b8a6,#0ea5e9); color:#fff;">
+      <span onclick="document.getElementById('mon_library_monthly').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Library – Monthly Logins (Current Year)</b></span>
+    </header>
+    <div class="w3-container w3-margin-top" style="height: 75vh; overflow-y: auto;">
+      <div class="w3-bar w3-border w3-round w3-light-gray w3-margin-bottom">
+        <button id="libMonthlyLineBtn" class="w3-bar-item w3-button w3-blue w3-round w3-small">Line</button>
+        <button id="libMonthlyBarBtn" class="w3-bar-item w3-button w3-white w3-round w3-small">Bar</button>
+      </div>
+      <div style="width:100%; height: 380px;">
+        <canvas id="libMonthlyLoginsChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function fetchLibraryMonthlyLogins(){
+    const res = await fetch('/api/library-monthly-logins');
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  }
+
+  let libMonthlyChart = null;
+  let libMonthlyChartType = 'line';
+  let libMonthlyCache = [];
+
+  function renderLibMonthlyChart(){
+    const ctx = document.getElementById('libMonthlyLoginsChart').getContext('2d');
+    const labels = libMonthlyCache.map(d => d.month);
+    const values = libMonthlyCache.map(d => d.total_logins);
+
+    if (libMonthlyChart) libMonthlyChart.destroy();
+
+    libMonthlyChart = new Chart(ctx, {
+      type: libMonthlyChartType,
+      data: {
+        labels,
+        datasets: [{
+          label: 'Monthly Logins',
+          data: values,
+          borderColor: '#14b8a6',
+          backgroundColor: 'rgba(20, 184, 166, 0.25)',
+          fill: libMonthlyChartType === 'line',
+          tension: 0.3,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+
+  async function loadLibraryMonthlyGraph(){
+    try{
+      libMonthlyCache = await fetchLibraryMonthlyLogins();
+      renderLibMonthlyChart();
+    }catch(err){
+      console.error('Library monthly logins error', err);
+    }
+  }
+
+  window.openLibraryMonthly = function(){
+    document.getElementById('mon_library_monthly').style.display='block';
+    // Default to line
+    libMonthlyChartType = 'line';
+    const lineBtn = document.getElementById('libMonthlyLineBtn');
+    const barBtn = document.getElementById('libMonthlyBarBtn');
+    if (lineBtn && barBtn){
+      lineBtn.classList.add('w3-blue');
+      barBtn.classList.remove('w3-blue');
+      barBtn.classList.add('w3-white');
+    }
+    loadLibraryMonthlyGraph();
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    const lineBtn = document.getElementById('libMonthlyLineBtn');
+    const barBtn = document.getElementById('libMonthlyBarBtn');
+    if (lineBtn) lineBtn.addEventListener('click', function(){
+      if (libMonthlyChartType==='line') return;
+      libMonthlyChartType='line';
+      lineBtn.classList.add('w3-blue');
+      barBtn.classList.remove('w3-blue');
+      barBtn.classList.add('w3-white');
+      renderLibMonthlyChart();
+    });
+    if (barBtn) barBtn.addEventListener('click', function(){
+      if (libMonthlyChartType==='bar') return;
+      libMonthlyChartType='bar';
+      barBtn.classList.add('w3-blue');
+      lineBtn.classList.remove('w3-blue');
+      lineBtn.classList.add('w3-white');
+      renderLibMonthlyChart();
+    });
+  });
+</script>
+
+<!-- Ask Akello Trends (Daily Chats) Modal -->
+<div id="mon_ask_trends" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 95vw; height: 85vh; overflow-y: auto;">
+    <header class="w3-container w3-padding w3-center" style="background: linear-gradient(135deg,#3b82f6,#6366f1); color:#fff;">
+      <span onclick="document.getElementById('mon_ask_trends').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Ask Akello – Daily Chats (Current Month)</b></span>
+    </header>
+    <div class="w3-container w3-margin-top" style="height: 75vh; overflow-y: auto;">
+      <div class="w3-container w3-padding-small">
+        <div class="w3-bar w3-border w3-round w3-light-gray">
+          <button id="askDailyBarBtn" class="w3-bar-item w3-button w3-blue w3-round w3-small">Bar</button>
+          <button id="askDailyLineBtn" class="w3-bar-item w3-button w3-white w3-round w3-small">Line</button>
+        </div>
+      </div>
+      <div class="w3-container w3-padding-small">
+        <div id="askDailyStatus" class="w3-small w3-text-gray w3-margin-bottom">Loading…</div>
+        <div style="width:100%; height: 380px;">
+          <canvas id="askDailyChatsChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function fetchAskDailyChats(){
+    const res = await fetch('/api/askakello-daily-chats');
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    return Array.isArray(data?.daily_chats) ? data.daily_chats : [];
+  }
+
+  function aggregateAskDaily(raw){
+    // Normalize to YYYY-MM-DD and sum duplicates
+    const byDay = {};
+    raw.forEach(r => {
+      const d = new Date(r.chat_date);
+      if (isNaN(d)) return;
+      const key = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+      byDay[key] = (byDay[key] || 0) + (Number(r.learner_count) || 0);
+    });
+    return Object.keys(byDay).sort().map(k => ({ date: k, count: byDay[k] }));
+  }
+
+  let askDailyChart = null;
+  let askDailyChartType = 'bar';
+  let askDailyCache = [];
+
+  function renderAskDailyChart(){
+    const statusEl = document.getElementById('askDailyStatus');
+    const ctx = document.getElementById('askDailyChatsChart').getContext('2d');
+    const labels = askDailyCache.map(d => d.date);
+    const values = askDailyCache.map(d => d.count);
+
+    if (askDailyChart) askDailyChart.destroy();
+
+    askDailyChart = new Chart(ctx, {
+      type: askDailyChartType,
+      data: {
+        labels,
+        datasets: [{
+          label: 'Daily Chats (Unique learners)',
+          data: values,
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99, 102, 241, 0.25)',
+          fill: askDailyChartType === 'line',
+          tension: 0.3,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+
+    if (statusEl) statusEl.textContent = `Showing ${labels.length} day(s)`;
+  }
+
+  async function loadAskDailyGraph(){
+    const statusEl = document.getElementById('askDailyStatus');
+    try{
+      if (statusEl) statusEl.textContent = 'Loading…';
+      const raw = await fetchAskDailyChats();
+      askDailyCache = aggregateAskDaily(raw);
+      renderAskDailyChart();
+    }catch(err){
+      console.error('Ask Akello daily chats error', err);
+      if (statusEl) statusEl.textContent = 'Failed to load data';
+    }
+  }
+
+  window.openAskTrends = function(){
+    document.getElementById('mon_ask_trends').style.display='block';
+    // Default to bar
+    askDailyChartType = 'bar';
+    const barBtn = document.getElementById('askDailyBarBtn');
+    const lineBtn = document.getElementById('askDailyLineBtn');
+    if (barBtn && lineBtn){
+      barBtn.classList.add('w3-blue');
+      lineBtn.classList.remove('w3-blue');
+      lineBtn.classList.add('w3-white');
+    }
+    loadAskDailyGraph();
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    const barBtn = document.getElementById('askDailyBarBtn');
+    const lineBtn = document.getElementById('askDailyLineBtn');
+    if (barBtn) barBtn.addEventListener('click', function(){
+      if (askDailyChartType==='bar') return;
+      askDailyChartType='bar';
+      barBtn.classList.add('w3-blue');
+      lineBtn.classList.remove('w3-blue');
+      lineBtn.classList.add('w3-white');
+      renderAskDailyChart();
+    });
+    if (lineBtn) lineBtn.addEventListener('click', function(){
+      if (askDailyChartType==='line') return;
+      askDailyChartType='line';
+      lineBtn.classList.add('w3-blue');
+      barBtn.classList.remove('w3-blue');
+      barBtn.classList.add('w3-white');
+      renderAskDailyChart();
+    });
+  });
+</script>
+
+<!-- Ask Akello Monthly (Details) Modal -->
+<div id="mon_ask_monthly" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 95vw; height: 85vh; overflow-y: auto;">
+    <header class="w3-container w3-padding w3-center" style="background: linear-gradient(135deg,#6366f1,#3b82f6); color:#fff;">
+      <span onclick="document.getElementById('mon_ask_monthly').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Ask Akello – Monthly Chats (Current Year)</b></span>
+    </header>
+    <div class="w3-container w3-margin-top" style="height: 75vh; overflow-y: auto;">
+      <div class="w3-bar w3-border w3-round w3-light-gray w3-margin-bottom">
+        <button id="askMonthlyLineBtn" class="w3-bar-item w3-button w3-blue w3-round w3-small">Line</button>
+        <button id="askMonthlyBarBtn" class="w3-bar-item w3-button w3-white w3-round w3-small">Bar</button>
+      </div>
+      <div style="width:100%; height: 380px;">
+        <canvas id="askMonthlyChatsChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function fetchAskMonthlyChats(){
+    const res = await fetch('/api/askakello-monthly-chats');
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    return Array.isArray(data?.monthly_chats) ? data.monthly_chats : [];
+  }
+
+  function aggregateAskMonthly(raw){
+    // Sum duplicates by month_num and keep month name
+    const byMonth = {};
+    raw.forEach(r => {
+      const m = Number(r.month_num);
+      const count = Number(r.learner_count) || 0;
+      if (!byMonth[m]) byMonth[m] = { month_num: m, month: r.month, count: 0 };
+      byMonth[m].count += count;
+      if (!byMonth[m].month && r.month) byMonth[m].month = r.month;
+    });
+    return Object.values(byMonth).sort((a,b)=>a.month_num-b.month_num);
+  }
+
+  let askMonthlyChart = null;
+  let askMonthlyChartType = 'line';
+  let askMonthlyCache = [];
+
+  function renderAskMonthlyChart(){
+    const ctx = document.getElementById('askMonthlyChatsChart').getContext('2d');
+    const labels = askMonthlyCache.map(d => d.month);
+    const values = askMonthlyCache.map(d => d.count);
+
+    if (askMonthlyChart) askMonthlyChart.destroy();
+
+    askMonthlyChart = new Chart(ctx, {
+      type: askMonthlyChartType,
+      data: {
+        labels,
+        datasets: [{
+          label: 'Monthly Chats (Unique learners)',
+          data: values,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.25)',
+          fill: askMonthlyChartType === 'line',
+          tension: 0.3,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+
+  async function loadAskMonthlyGraph(){
+    try{
+      const raw = await fetchAskMonthlyChats();
+      askMonthlyCache = aggregateAskMonthly(raw);
+      renderAskMonthlyChart();
+    }catch(err){
+      console.error('Ask Akello monthly chats error', err);
+    }
+  }
+
+  window.openAskMonthly = function(){
+    document.getElementById('mon_ask_monthly').style.display='block';
+    // Default to line
+    askMonthlyChartType = 'line';
+    const lineBtn = document.getElementById('askMonthlyLineBtn');
+    const barBtn = document.getElementById('askMonthlyBarBtn');
+    if (lineBtn && barBtn){
+      lineBtn.classList.add('w3-blue');
+      barBtn.classList.remove('w3-blue');
+      barBtn.classList.add('w3-white');
+    }
+    loadAskMonthlyGraph();
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    const lineBtn = document.getElementById('askMonthlyLineBtn');
+    const barBtn = document.getElementById('askMonthlyBarBtn');
+    if (lineBtn) lineBtn.addEventListener('click', function(){
+      if (askMonthlyChartType==='line') return;
+      askMonthlyChartType='line';
+      lineBtn.classList.add('w3-blue');
+      barBtn.classList.remove('w3-blue');
+      barBtn.classList.add('w3-white');
+      renderAskMonthlyChart();
+    });
+    if (barBtn) barBtn.addEventListener('click', function(){
+      if (askMonthlyChartType==='bar') return;
+      askMonthlyChartType='bar';
+      barBtn.classList.add('w3-blue');
+      lineBtn.classList.remove('w3-blue');
+      lineBtn.classList.add('w3-white');
+      renderAskMonthlyChart();
+    });
+  });
+</script>
+
+<!-- Ask Akello Overview (Custom Date) Modal -->
+<div id="mon_ask_custom" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 95vw; height: 85vh; overflow-y: auto;">
+    <header class="w3-container w3-padding w3-center" style="background: linear-gradient(135deg,#1e3a8a,#3b82f6); color:#fff;">
+      <span onclick="document.getElementById('mon_ask_custom').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Ask Akello – Custom Date Overview</b></span>
+    </header>
+    <div class="w3-container w3-margin-top" style="height: 75vh; overflow-y: auto;">
+      <!-- Date Range Controls -->
+      <div class="w3-row-padding w3-margin-bottom">
+        <div class="w3-third">
+          <label class="w3-small">Start Date</label>
+          <input type="date" id="askStartDate" class="w3-input w3-border w3-round" />
+        </div>
+        <div class="w3-third">
+          <label class="w3-small">End Date</label>
+          <input type="date" id="askEndDate" class="w3-input w3-border w3-round" />
+        </div>
+        <div class="w3-third">
+          <label class="w3-small">&nbsp;</label>
+          <button id="askApplyBtn" class="w3-button w3-blue w3-round w3-block">Apply</button>
+        </div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="w3-row-padding w3-margin-bottom">
+        <div class="w3-third w3-margin-bottom">
+          <div class="w3-card w3-round w3-white w3-hover-shadow">
+            <div class="w3-container w3-blue w3-text-white w3-padding w3-round-top"><b>Total Unique Learners</b></div>
+            <div class="w3-container w3-padding"><div id="askCustomTotal" class="w3-xxlarge">0</div></div>
+          </div>
+        </div>
+        <div class="w3-third w3-margin-bottom">
+          <div class="w3-card w3-round w3-white w3-hover-shadow">
+            <div class="w3-container w3-indigo w3-text-white w3-padding w3-round-top"><b>From</b></div>
+            <div class="w3-container w3-padding"><div id="askCustomFrom" class="w3-large">—</div></div>
+          </div>
+        </div>
+        <div class="w3-third w3-margin-bottom">
+          <div class="w3-card w3-round w3-white w3-hover-shadow">
+            <div class="w3-container w3-indigo w3-text-white w3-padding w3-round-top"><b>To</b></div>
+            <div class="w3-container w3-padding"><div id="askCustomTo" class="w3-large">—</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Controls -->
+      <div class="w3-row-padding w3-margin-bottom">
+        <div class="w3-half">
+          <div class="w3-bar w3-border w3-round w3-light-gray w3-margin-bottom">
+            <button id="askProvBarBtn" class="w3-bar-item w3-button w3-blue w3-round w3-small">Bar</button>
+            <button id="askProvLineBtn" class="w3-bar-item w3-button w3-white w3-round w3-small">Line</button>
+          </div>
+          <div style="width:100%; height: 320px;">
+            <canvas id="askCustomProvinceChart"></canvas>
+          </div>
+        </div>
+        <div class="w3-half">
+          <div class="w3-bar w3-border w3-round w3-light-gray w3-margin-bottom">
+            <span class="w3-bar-item w3-small w3-text-gray">Gender Distribution</span>
+          </div>
+          <div style="width:100%; height: 320px;">
+            <canvas id="askCustomGenderChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="w3-responsive">
+        <table class="w3-table-all w3-small w3-hoverable">
+          <thead>
+            <tr class="w3-blue"><th>Province</th><th>Unique Learners</th></tr>
+          </thead>
+          <tbody id="askCustomProvBody">
+            <tr><td colspan="2" class="w3-center w3-text-gray">No data</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  async function fetchAskCustom(start, end){
+    let url = '/api/askakello/custom_date';
+    const params = [];
+    if (start) params.push(`start_date=${start}`);
+    if (end) params.push(`end_date=${end}`);
+    if (params.length) url += `?${params.join('&')}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(await res.text());
+    return await res.json();
+  }
+
+  let askProvChart = null;
+  let askProvChartType = 'bar';
+  let askGenderChart = null;
+
+  function renderProvinceChart(rows){
+    const ctx = document.getElementById('askCustomProvinceChart').getContext('2d');
+    const labels = rows.map(r => r.school_province);
+    const values = rows.map(r => r.count);
+    if (askProvChart) askProvChart.destroy();
+    askProvChart = new Chart(ctx, {
+      type: askProvChartType,
+      data: { labels, datasets: [{ label: 'Unique Learners', data: values, borderColor: '#1d4ed8', backgroundColor: 'rgba(29,78,216,0.25)', fill: askProvChartType==='line', tension: 0.3, borderWidth: 2 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins:{ legend:{ display:true } }, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } }
+    });
+  }
+
+  function renderGenderChart(gender){
+    const ctx = document.getElementById('askCustomGenderChart').getContext('2d');
+    const labels = ['Female','Male','Unknown'];
+    const values = [gender.Female||0, gender.Male||0, gender.Unknown||0];
+    if (askGenderChart) askGenderChart.destroy();
+    askGenderChart = new Chart(ctx, {
+      type: 'pie',
+      data: { labels, datasets: [{ data: values, backgroundColor: ['#60a5fa','#f97316','#9ca3af'], borderColor: '#fff', borderWidth: 2 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins:{ legend:{ position:'right' } } }
+    });
+  }
+
+  function renderProvinceTable(rows){
+    const body = document.getElementById('askCustomProvBody');
+    if (!rows || !rows.length){ body.innerHTML = '<tr><td colspan="2" class="w3-center w3-text-gray">No data</td></tr>'; return; }
+    body.innerHTML = rows.map(r=>`<tr><td>${r.school_province}</td><td>${r.count}</td></tr>`).join('');
+  }
+
+  async function loadAskCustom(){
+    const s = document.getElementById('askStartDate').value;
+    const e = document.getElementById('askEndDate').value;
+    try{
+      const data = await fetchAskCustom(s,e);
+      document.getElementById('askCustomTotal').textContent = data?.totals?.ask_akello ?? 0;
+      document.getElementById('askCustomFrom').textContent = data?.date_range?.start || '—';
+      document.getElementById('askCustomTo').textContent = data?.date_range?.end || '—';
+      const rows = (data?.province_distribution || []).map(r=>({ school_province: r.school_province, count: r.count }));
+      renderProvinceChart(rows);
+      renderGenderChart(data?.gender_distribution || {Female:0,Male:0,Unknown:0});
+      renderProvinceTable(rows);
+    }catch(err){
+      console.error('Ask custom load error', err);
+    }
+  }
+
+  window.openAskOverview = function(){
+    // Defaults: last 30 days
+    const today = new Date();
+    const last30 = new Date(); last30.setDate(today.getDate()-30);
+    document.getElementById('askStartDate').value = last30.toISOString().split('T')[0];
+    document.getElementById('askEndDate').value = today.toISOString().split('T')[0];
+    // set chart buttons
+    askProvChartType = 'bar';
+    const barBtn = document.getElementById('askProvBarBtn');
+    const lineBtn = document.getElementById('askProvLineBtn');
+    if (barBtn && lineBtn){ barBtn.classList.add('w3-blue'); lineBtn.classList.remove('w3-blue'); lineBtn.classList.add('w3-white'); }
+    // open and load
+    document.getElementById('mon_ask_custom').style.display='block';
+    loadAskCustom();
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    const barBtn = document.getElementById('askProvBarBtn');
+    const lineBtn = document.getElementById('askProvLineBtn');
+    const applyBtn = document.getElementById('askApplyBtn');
+    if (barBtn) barBtn.addEventListener('click', function(){ if (askProvChartType==='bar') return; askProvChartType='bar'; barBtn.classList.add('w3-blue'); lineBtn.classList.remove('w3-blue'); lineBtn.classList.add('w3-white'); renderProvinceChart((window._lastAskProvRows)||[]); });
+    if (lineBtn) lineBtn.addEventListener('click', function(){ if (askProvChartType==='line') return; askProvChartType='line'; lineBtn.classList.add('w3-blue'); barBtn.classList.remove('w3-blue'); barBtn.classList.add('w3-white'); renderProvinceChart((window._lastAskProvRows)||[]); });
+    if (applyBtn) applyBtn.addEventListener('click', loadAskCustom);
+  });
+
+  // Keep last rows for re-render when toggling chart types
+  const _origRenderProvinceChart = renderProvinceChart;
+  renderProvinceChart = function(rows){ window._lastAskProvRows = rows || []; _origRenderProvinceChart(rows || []); }
+</script>
+
+<script>
+  function toggleAccord(id){
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.className.indexOf('w3-show') === -1){ el.className += ' w3-show'; }
+    else { el.className = el.className.replace(' w3-show',''); }
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function(){
+    // Elements
+    const kOverall = document.getElementById('mon-overall');
+    const kASL = document.getElementById('mon-asl');
+    const kLib = document.getElementById('mon-library');
+    const kAsk = document.getElementById('mon-ask');
+    const snapshotBody = document.getElementById('mon-snapshot-body');
+    const distBody = document.getElementById('mon-dist-body');
+    const barBtn = document.getElementById('monBarBtn');
+    const pieBtn = document.getElementById('monPieBtn');
+    const aslCanvas = document.getElementById('mon-gender-asl');
+    const libCanvas = document.getElementById('mon-gender-lib');
+    const askCanvas = document.getElementById('mon-gender-ask');
+
+    // Filters
+    const startInput = document.querySelector('.filter-bar input[type="date"]');
+    const endInput = document.querySelectorAll('.filter-bar input[type="date"]')[1];
+    const provSelect = document.querySelector('.filter-bar select');
+    const applyBtn = document.querySelector('.filter-bar button');
+
+    // Library modal elements
+    const libStart = document.getElementById('libStartDate');
+    const libEnd = document.getElementById('libEndDate');
+    const libApply = document.getElementById('libApplyBtn');
+    const libTotalEl = document.getElementById('mon_lib_custom_total');
+    const libProvBody = document.getElementById('mon_lib_prov_body');
+    const libSearchInput = document.getElementById('librarySearch');
+    const libSearchBtn = document.getElementById('librarySearchBtn');
+
+    // Smartlearning custom elements
+    const slStart = document.getElementById('mon_smart_custom_start');
+    const slEnd = document.getElementById('mon_smart_custom_end');
+    const slApply = document.getElementById('mon_smart_custom_apply');
+    const slTotalEl = document.getElementById('mon_smart_custom_total_asl');
+    const slProvBody = document.getElementById('mon_smart_asl_prov_body');
+
+    // Defaults: last 30 days
+    const today = new Date();
+    const last30 = new Date(); last30.setDate(today.getDate()-30);
+    if (startInput) startInput.value = last30.toISOString().split('T')[0];
+    if (endInput) endInput.value = today.toISOString().split('T')[0];
+    if (libStart) libStart.value = last30.toISOString().split('T')[0];
+    if (libEnd) libEnd.value = today.toISOString().split('T')[0];
+    if (slStart) slStart.value = last30.toISOString().split('T')[0];
+    if (slEnd) slEnd.value = today.toISOString().split('T')[0];
+
+    async function fetchQuick(start, end){
+      const url = `/api/platforms/quick_custom_date?start_date=${start}&end_date=${end}`;
+      const res = await fetch(url);
+      return await res.json();
+    }
+
+    function defaultDates(){
+      const today = new Date();
+      const last30 = new Date(); last30.setDate(today.getDate()-30);
+      return {
+        start: last30.toISOString().split('T')[0],
+        end: today.toISOString().split('T')[0]
+      };
+    }
+
+    // Open Library modal: set default dates, fetch, show
+    window.openLibraryOverview = function(){
+      const d = defaultDates();
+      if (libStart) libStart.value = d.start;
+      if (libEnd) libEnd.value = d.end;
+      fetchLibraryAnalytics().finally(()=>{
+        document.getElementById('mon_library_custom').style.display='block';
+      });
+    }
+
+    function mergeDistribution(data){
+      const out = {};
+      const asl = data.province_distribution?.asl || [];
+      const lib = data.province_distribution?.library || [];
+      const ask = data.province_distribution?.ask_akello || [];
+      asl.forEach(r=>{ const p=r.school_province; if(!out[p]) out[p]={asl:0,lib:0,ask:0}; out[p].asl = (r.active_learners||0); });
+      lib.forEach(r=>{ const p=r.institution_province; if(!out[p]) out[p]={asl:0,lib:0,ask:0}; out[p].lib = (r.active_users||0); });
+      ask.forEach(r=>{ const p=r.school_province; if(!out[p]) out[p]={asl:0,lib:0,ask:0}; out[p].ask = (r.count||0); });
+      return out;
+    }
+
+    function applyProvinceFilter(merged, province){
+      if (!province) return merged;
+      const filtered = {};
+      Object.keys(merged).forEach(p=>{ if (p===province) filtered[p]=merged[p]; });
+      return filtered;
+    }
+
+    function renderKPIs(totals){
+      kOverall.textContent = (totals?.overall ?? 0);
+      kASL.textContent = (totals?.asl ?? 0);
+      kLib.textContent = (totals?.library ?? 0);
+      kAsk.textContent = (totals?.ask_akello ?? 0);
+    }
+
+    function renderSnapshot(totals){
+      const rows = [
+        { metric: 'Total Active', asl: totals?.asl ?? 0, lib: totals?.library ?? 0, ask: totals?.ask_akello ?? 0 },
+      ];
+      snapshotBody.innerHTML = rows.map(r=>`<tr><td>${r.metric}</td><td>${r.asl}</td><td>${r.lib}</td><td>${r.ask}</td></tr>`).join('');
+    }
+
+    function renderDistribution(merged){
+      const keys = Object.keys(merged);
+      if (keys.length===0){ distBody.innerHTML = '<tr><td colspan="4" class="w3-center w3-text-gray">No data</td></tr>'; return; }
+      const rows = keys.sort().map(p=>{
+        const v = merged[p];
+        return `<tr><td>${p}</td><td>${v.asl}</td><td>${v.lib}</td><td>${v.ask}</td></tr>`;
+      }).join('');
+      distBody.innerHTML = rows;
+    }
+
+    // Gender charts rendering
+    let aslChart = null, libChart = null, askChart = null;
+    let monGenderChartType = 'bar';
+    let lastGender = {
+      asl: { Female: 0, Male: 0, Unknown: 0 },
+      lib: { Female: 0, Male: 0, Unknown: 0 },
+      ask: { Female: 0, Male: 0, Unknown: 0 }
+    };
+
+    function makeChart(ctx, type, data){
+      const labels = ['Female','Male','Unknown'];
+      const values = [data.Female||0, data.Male||0, data.Unknown||0];
+      const bg = ['#60a5fa','#f97316','#9ca3af'];
+      const border = ['#3b82f6','#ea580c','#6b7280'];
+      return new Chart(ctx, {
+        type: type,
+        data: { labels, datasets: [{ label: 'Gender', data: values, backgroundColor: bg, borderColor: border, borderWidth: 1 }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: type==='pie' } },
+          scales: type==='bar' ? { y: { beginAtZero: true, ticks: { precision: 0 } } } : {}
+        }
+      });
+    }
+
+    function renderGenderCharts(g){
+      // Destroy existing
+      if (aslChart) aslChart.destroy();
+      if (libChart) libChart.destroy();
+      if (askChart) askChart.destroy();
+      // Create new
+      aslChart = makeChart(aslCanvas.getContext('2d'), monGenderChartType, g.asl);
+      libChart = makeChart(libCanvas.getContext('2d'), monGenderChartType, g.lib);
+      askChart = makeChart(askCanvas.getContext('2d'), monGenderChartType, g.ask);
+    }
+
+    function setChartType(t){
+      if (monGenderChartType===t) return;
+      monGenderChartType = t;
+      if (barBtn && pieBtn){
+        if (t==='bar'){ barBtn.classList.add('w3-blue'); pieBtn.classList.remove('w3-blue'); pieBtn.classList.add('w3-white'); }
+        else { pieBtn.classList.add('w3-blue'); barBtn.classList.remove('w3-blue'); barBtn.classList.add('w3-white'); }
+      }
+      renderGenderCharts(lastGender);
+    }
+
+    // Refresh main dashboard
+    async function refresh(){
+      const s = startInput?.value; const e = endInput?.value; const prov = provSelect?.value || '';
+      try{
+        const quick = await fetchQuick(s,e);
+        renderKPIs(quick.totals);
+        renderSnapshot(quick.totals);
+        let merged = mergeDistribution(quick);
+        merged = applyProvinceFilter(merged, prov === 'All' ? '' : prov);
+        renderDistribution(merged);
+        // Render gender charts (not province-filtered since gender is overall distribution)
+        lastGender = {
+          asl: quick.gender_distribution?.asl || {Female:0,Male:0,Unknown:0},
+          lib: quick.gender_distribution?.library || {Female:0,Male:0,Unknown:0},
+          ask: quick.gender_distribution?.ask_akello || {Female:0,Male:0,Unknown:0}
+        };
+        renderGenderCharts(lastGender);
+      }catch(err){
+        console.error('Monitor fetch error', err);
+      }
+    }
+
+    if (applyBtn) applyBtn.addEventListener('click', ()=>{ refresh(); const gf=document.getElementById('mon_global_filters'); if (gf) gf.style.display='none'; });
+    if (barBtn) barBtn.addEventListener('click', ()=>setChartType('bar'));
+    if (pieBtn) pieBtn.addEventListener('click', ()=>setChartType('pie'));
+    refresh();
+
+    // Smartlearning Monthly (Details)
+    let monthlyChart = null;
+    let monthlyChartType = 'line';
+    let monthlyData = { months: [], counts: [] };
+
+    async function loadMonthlyLogins(){
+      try {
+        const response = await fetch('/api/smartlearning-monthly-logins');
+        const data = await response.json();
+        const tbody = document.querySelector('#aslloginsTable tbody');
+        tbody.innerHTML = '';
+        const months = []; const counts = [];
+        (data.monthly_logins || []).forEach(entry => {
+          const row = `<tr><td>${entry.month}</td><td>${entry.year}</td><td>${entry.student_count}</td></tr>`;
+          tbody.insertAdjacentHTML('beforeend', row);
+          months.push(entry.month);
+          counts.push(entry.student_count);
+        });
+        monthlyData = { months, counts };
+        renderMonthlyChart();
+      } catch (e){ console.error('Monthly logins error', e); }
+    }
+
+    function renderMonthlyChart(){
+      const ctx = document.getElementById('aslloginsChart').getContext('2d');
+      if (monthlyChart) monthlyChart.destroy();
+      monthlyChart = new Chart(ctx, {
+        type: monthlyChartType,
+        data: {
+          labels: monthlyData.months,
+          datasets: [{
+            label: 'Monthly Logins', data: monthlyData.counts,
+            borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.2)', fill: true, tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: true }, tooltip: { enabled: true } },
+          scales: monthlyChartType==='bar' ? { y: { beginAtZero: true } } : { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    window.openSmartMonthly = function(){
+      // open modal then load
+      document.getElementById('mon_smartlearning_monthly').style.display='block';
+      // default to line
+      monthlyChartType = 'line';
+const lineBtn = document.getElementById('monMonthlyLineBtn');
+      const barBtn = document.getElementById('monMonthlyBarBtn');
+      if (lineBtn && barBtn){
+        lineBtn.classList.add('w3-blue'); barBtn.classList.remove('w3-blue'); barBtn.classList.add('w3-white');
+      }
+      loadMonthlyLogins();
+    }
+
+const monthlyLineBtn = document.getElementById('monMonthlyLineBtn');
+    const monthlyBarBtn = document.getElementById('monMonthlyBarBtn');
+    if (monthlyLineBtn) monthlyLineBtn.addEventListener('click', ()=>{ monthlyChartType='line'; monthlyLineBtn.classList.add('w3-blue'); monthlyBarBtn.classList.remove('w3-blue'); monthlyBarBtn.classList.add('w3-white'); renderMonthlyChart(); });
+    if (monthlyBarBtn) monthlyBarBtn.addEventListener('click', ()=>{ monthlyChartType='bar'; monthlyBarBtn.classList.add('w3-blue'); monthlyLineBtn.classList.remove('w3-blue'); monthlyLineBtn.classList.add('w3-white'); renderMonthlyChart(); });
+
+    // Wire Library Custom Date modal
+    async function refreshLibraryCustom(){
+      const s = libStart?.value; const e = libEnd?.value;
+      const data = await fetchQuick(s,e);
+      libTotalEl.textContent = data?.totals?.library ?? 0;
+      // Build province distribution table from quick response
+      const rows = (data?.province_distribution?.library || [])
+        .map(r=>`<tr><td>${r.institution_province}</td><td>${r.active_users}</td></tr>`).join('');
+      libProvBody.innerHTML = rows || '<tr><td colspan="2" class="w3-center w3-text-gray">No data</td></tr>';
+    }
+    if (libApply) libApply.addEventListener('click', refreshLibraryCustom);
+
+    // Wire Smartlearning Custom Date modal
+    async function refreshSmartCustom(){
+      const s = slStart?.value; const e = slEnd?.value;
+      const data = await fetchQuick(s,e);
+      slTotalEl.textContent = data?.totals?.asl ?? 0;
+      const rows = (data?.province_distribution?.asl || [])
+        .map(r=>`<tr><td>${r.school_province}</td><td>${r.active_learners}</td></tr>`).join('');
+      slProvBody.innerHTML = rows || '<tr><td colspan="2" class="w3-center w3-text-gray">No data</td></tr>';
+    }
+    if (slApply) slApply.addEventListener('click', refreshSmartCustom);
+  });
+</script>
+{% endblock %}

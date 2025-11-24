@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="w3-container w3-padding w3-margin w3-small w3-full">
+  
+  <style>
+    /* Scoped styles for akello_weekly_reports */
+    .awr-shell { display: grid; grid-template-columns: 300px 1fr; gap: 16px; }
+    @media (max-width: 991px) { .awr-shell { grid-template-columns: 1fr; } }
+
+    .awr-side { border: 1px solid #e6eef9; border-radius: 16px; background: #fff; overflow: hidden; }
+    .awr-side header { background: linear-gradient(135deg, #eaf2ff, #ffffff); border-bottom: 1px solid #d8e7ff; }
+    .awr-side .list { padding: 10px; max-height: 65vh; overflow-y: auto; }
+
+    .awr-user { display:flex; align-items:center; gap:10px; padding:10px 12px; margin:6px 0; border-radius:10px; text-decoration:none; border:1px solid #e7eefc; color:#1f2c48; background:#fff; transition:.18s ease; }
+    .awr-user:hover { background:#f7faff; border-color:#d6e5ff; }
+    .awr-user.active { background:#1e88e5; color:#fff !important; border-color:#1e88e5; box-shadow:0 6px 16px rgba(30,136,229,.25); }
+
+    .awr-card { border:1px solid #e6eef9; border-left:4px solid #8ec5ff; border-radius: 14px; background:#fff; padding:14px; margin-bottom:14px; box-shadow: 0 2px 10px rgba(0,0,0,.03); }
+    .awr-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; background:#f7f9ff; border-radius:10px; border:1px solid #e7eefc; }
+    .awr-meta { font-size: 12px; color: #7a8799; }
+    .awr-grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:10px; }
+    .awr-block { padding:10px; border:1px solid #eff3fb; border-radius:10px; background:#fcfdff; max-height: 200px; overflow-y:auto; }
+    @media (max-width: 991px) { .awr-grid { grid-template-columns: 1fr; } }
+
+    .chip-btn { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; border:1px solid #dfe8f7; background:#fff; color:#00407d; text-decoration:none; transition:.18s; }
+    .chip-btn:hover { background:#f7faff; border-color:#d6e5ff; }
+
+    .modal-narrow { width: 55vw; height: 75vh; }
+    @media (max-width: 991px) { .modal-narrow { width: 95vw; height: 80vh; } }
+    .modal-body-scroll { height: calc(100% - 80px); overflow-y: auto; }
+  </style>
+
+  <!-- Header Row -->
+  <div class="w3-row w3-margin-bottom">
+    <div class="w3-col s12 m8">
+      <h4 class="w3-margin-0" style="color:#1f2c48; font-weight:700;">Akello Weekly Reports</h4>
+      <span class="w3-small w3-text-grey">Department: {{ user_department }}</span>
+    </div>
+    <div class="w3-col s12 m4 w3-right-align w3-margin-top">
+      <a class="chip-btn" onclick="document.getElementById('new_report').style.display='block'">
+        <i class="bi bi-patch-plus"></i> New Report
+      </a>
+    </div>
+  </div>
+
+  <div class="awr-shell">
+
+    <!-- Sidebar with users -->
+    <aside class="awr-side">
+      <header class="w3-padding w3-center w3-small">
+        <b>Team Members</b>
+      </header>
+      <div class="list" style="height: 85vh; overflow-y: auto;">
+        {% for user in users %}
+          {% if user.department == user_department %}
+            <a href="{{ url_for('akello_weekly_reports', user_id=user.id) }}" class="awr-user {% if user.id == selected_user_id %} active {% endif %}">
+              <i class="bi bi-person-circle"></i>
+              <span>{{ user.username }}</span>
+            </a>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </aside>
+
+    <!-- Main content: reports -->
+    <section style="height: 85vh; overflow-y: auto;">
+      {% if reports %}
+        {% for report in reports %}
+          <div class="awr-card {% if selected_report_user.department != user_department %} w3-hide {% endif %}">
+            <div class="awr-head">
+              <div>
+                <span class="w3-small w3-text-grey">Week starting</span>
+                <div><b>{{ report.week_start }}</b></div>
+              </div>
+              <a class="chip-btn" onclick="document.getElementById('edit_report_{{report.id}}').style.display='block'">
+                <i class="bi bi-pen"></i> Edit
+              </a>
+            </div>
+
+            <div class="awr-grid">
+              <div class="awr-block">
+                <strong class="w3-text-dark-grey">✅ This week</strong>
+                <div class="w3-small" style="white-space: pre-wrap;">{{ report.work_done }}</div>
+              </div>
+              <div class="awr-block">
+                <strong class="w3-text-dark-grey">📌 Next week</strong>
+                <div class="w3-small" style="white-space: pre-wrap;">{{ report.work_next }}</div>
+              </div>
+            </div>
+
+            <div class="awr-block w3-margin-top">
+              <strong class="w3-text-dark-grey">⚠️ Challenges</strong>
+              <div class="w3-small" style="white-space: pre-wrap;">{{ report.challenges }}</div>
+            </div>
+
+            <div class="awr-meta w3-right-align w3-margin-top">
+              🕒 Submitted: {{ report.created_at.strftime("%Y-%m-%d %H:%M") }}
+            </div>
+          </div>
+
+          <!-- Edit Modal -->
+          <div id="edit_report_{{report.id}}" class="w3-modal w3-white w3-card w3-border">
+            <div class="w3-modal-content w3-white w3-card w3-border modal-narrow">
+              <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff; border-bottom:1px solid #d8e7ff;">
+                <span onclick="document.getElementById('edit_report_{{report.id}}').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                <span class="w3-large"><b>Edit report</b></span>
+              </header>
+              <div class="w3-container w3-margin-top modal-body-scroll">
+                <div class="w3-padding w3-small w3-margin">
+                  <form action="{{url_for('edit_report',report_id=report.id)}}" method="POST">
+                    <label>Week Start:</label><br>
+                    <input type="date" name="week_start" class="w3-input form-control w3-border w3-round" value="{{ report.week_start }}" required><br><br>
+
+                    <label>Work Done:</label><br>
+                    <textarea name="work_done" class="w3-input form-control w3-border w3-round" required>{{ report.work_done }}</textarea><br><br>
+
+                    <label>Work Next:</label><br>
+                    <textarea name="work_next" class="w3-input form-control w3-border w3-round" required>{{ report.work_next }}</textarea><br><br>
+
+                    <label>Challenges:</label><br>
+                    <textarea name="challenges" class="w3-input form-control w3-border w3-round">{{ report.challenges }}</textarea><br><br>
+
+                    <button class="w3-button w3-round w3-border w3-teal" type="submit">Save Changes</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Edit Modal Ends -->
+
+        {% endfor %}
+      {% else %}
+        <div class="awr-card w3-center w3-text-grey">No reports found for this user.</div>
+      {% endif %}
+    </section>
+
+  </div>
+
+  <!-- New Report Modal -->
+  <div id="new_report" class="w3-modal w3-white w3-card w3-border">
+    <div class="w3-modal-content w3-white w3-card w3-border modal-narrow">
+      <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff; border-bottom:1px solid #d8e7ff;">
+        <span onclick="document.getElementById('new_report').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+        <span class="w3-large"><b>Add new report</b></span>
+      </header>
+      <div class="w3-container w3-margin-top modal-body-scroll">
+        <div class="w3-padding w3-small w3-margin">
+          <form class="w3-small" method="POST" action="/submit_weekly_report">
+            <label>Week Start (must be Monday):</label><br>
+            <input type="date" id="week_start" name="week_start" class="w3-input form-control w3-border w3-round" required><br><br>
+
+            <label>Work Done This Week:</label><br>
+            <textarea name="work_done" class="w3-input form-control w3-border w3-round" required></textarea><br><br>
+
+            <label>Work Planned Next Week:</label><br>
+            <textarea name="work_next" class="w3-input form-control w3-border w3-round" required></textarea><br><br>
+
+            <label>Challenges:</label><br>
+            <textarea name="challenges" class="w3-input form-control w3-border w3-round"></textarea><br><br>
+
+            <button class="w3-button w3-round w3-border w3-teal" type="submit">Submit Report</button>
+          </form>
+        </div>
+
+        <script>
+          // Restrict calendar to Mondays only
+          (function() {
+            var input = document.getElementById('week_start');
+            if (!input) return;
+            input.addEventListener('input', function () {
+              var d = new Date(this.value);
+              if (d && d.getDay && d.getDay() !== 1) { // 1 = Monday
+                alert('Please select a Monday as the week start date.');
+                this.value = '';
+              }
+            });
+          })();
+        </script>
+
+      </div>
+    </div>
+  </div>
+  <!-- New Report Modal Ends -->
+
+</div>
+{% endblock %}

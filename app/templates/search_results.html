@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="w3-card w3-white w3-round w3-margin-bottom">
+        <div class="w3-container w3-padding">
+            <h2 class="w3-text-blue-grey">
+                <i class="fas fa-search w3-margin-right"></i>
+                Search Results
+            </h2>
+            {% if query %}
+                <p class="w3-text-grey">Results for: <strong>"{{ query }}"</strong></p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Search Results Container -->
+    <div id="searchResultsContainer" class="w3-margin-top">
+        <div class="w3-center w3-margin" id="loadingIndicator">
+            <i class="fas fa-spinner fa-spin fa-2x w3-text-blue"></i>
+            <p class="w3-text-grey">Searching...</p>
+        </div>
+    </div>
+
+    <!-- No Results Message -->
+    <div id="noResultsMessage" class="w3-card w3-white w3-round w3-margin-top" style="display: none;">
+        <div class="w3-container w3-padding w3-center">
+            <i class="fas fa-search-minus fa-3x w3-text-grey w3-margin-bottom"></i>
+            <h4 class="w3-text-grey">No results found</h4>
+            <p class="w3-text-grey">Try different keywords or check your spelling.</p>
+            <div class="w3-margin-top">
+                <a href="{{ url_for('overview') }}" class="w3-button w3-blue w3-round">
+                    <i class="fas fa-home w3-margin-right"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Message -->
+    <div id="errorMessage" class="w3-card w3-red w3-round w3-margin-top" style="display: none;">
+        <div class="w3-container w3-padding">
+            <h4><i class="fas fa-exclamation-triangle w3-margin-right"></i>Search Error</h4>
+            <p>There was an error performing your search. Please try again.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const query = urlParams.get('q');
+    
+    if (query && query.trim().length >= 2) {
+        performSearch(query);
+    } else {
+        showNoResults();
+    }
+    
+    function performSearch(searchQuery) {
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const searchContainer = document.getElementById('searchResultsContainer');
+        const noResultsMessage = document.getElementById('noResultsMessage');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        // Show loading
+        loadingIndicator.style.display = 'block';
+        noResultsMessage.style.display = 'none';
+        errorMessage.style.display = 'none';
+        
+        fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`)
+            .then(response => response.json())
+            .then(data => {
+                loadingIndicator.style.display = 'none';
+                
+                if (data.success && data.results && data.results.length > 0) {
+                    displayResults(data.results, searchQuery);
+                } else {
+                    showNoResults();
+                }
+            })
+            .catch(error => {
+                console.error('Search error:', error);
+                loadingIndicator.style.display = 'none';
+                errorMessage.style.display = 'block';
+            });
+    }
+    
+    function displayResults(results, searchQuery) {
+        const container = document.getElementById('searchResultsContainer');
+        
+        let resultsHTML = `
+            <div class="w3-card w3-white w3-round w3-margin-bottom">
+                <div class="w3-container w3-padding w3-border-bottom">
+                    <h5 class="w3-text-blue-grey">
+                        <i class="fas fa-list w3-margin-right"></i>
+                        Found ${results.length} result${results.length !== 1 ? 's' : ''}
+                    </h5>
+                </div>
+            </div>
+        `;
+        
+        results.forEach(result => {
+            const icon = getIconClass(result.icon);
+            const typeColor = getTypeColor(result.type);
+            
+            resultsHTML += `
+                <div class="w3-card w3-white w3-round w3-margin-bottom w3-hover-shadow search-result-item" onclick="navigateToResult('${result.url}')">
+                    <div class="w3-container w3-padding">
+                        <div class="w3-row">
+                            <div class="w3-col s1 m1 l1 w3-center">
+                                <i class="${icon} w3-xlarge ${typeColor}" style="line-height: 1.5;"></i>
+                            </div>
+                            <div class="w3-col s11 m11 l11 w3-padding-left">
+                                <h5 class="w3-margin-bottom-small">
+                                    <span class="search-highlight">${highlightText(result.title, searchQuery)}</span>
+                                </h5>
+                                <p class="w3-text-grey w3-small w3-margin-bottom-small">
+                                    <span class="w3-tag ${typeColor} w3-round w3-tiny">${result.subtitle}</span>
+                                </p>
+                                <p class="w3-text-dark-grey w3-small">
+                                    ${highlightText(result.description, searchQuery)}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = resultsHTML;
+    }
+    
+    function showNoResults() {
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const noResultsMessage = document.getElementById('noResultsMessage');
+        
+        loadingIndicator.style.display = 'none';
+        noResultsMessage.style.display = 'block';
+    }
+    
+    function getIconClass(iconName) {
+        const iconMap = {
+            'user': 'fas fa-user',
+            'folder': 'fas fa-folder',
+            'clipboard': 'fas fa-clipboard-list',
+            'file-text': 'fas fa-file-alt',
+            'award': 'fas fa-award',
+            'book': 'fas fa-book'
+        };
+        return iconMap[iconName] || 'fas fa-circle';
+    }
+    
+    function getTypeColor(type) {
+        const colorMap = {
+            'user': 'w3-text-blue',
+            'workspace': 'w3-text-green',
+            'project': 'w3-text-orange',
+            'report': 'w3-text-purple',
+            'champion': 'w3-text-teal',
+            'allocation': 'w3-text-brown'
+        };
+        return colorMap[type] || 'w3-text-grey';
+    }
+    
+    function highlightText(text, searchQuery) {
+        if (!text || !searchQuery) return text;
+        
+        const regex = new RegExp(`(${escapeRegex(searchQuery)})`, 'gi');
+        return text.replace(regex, '<mark class="w3-yellow">$1</mark>');
+    }
+    
+    function escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
+    }
+    
+    function navigateToResult(url) {
+        if (url) {
+            window.location.href = url;
+        }
+    }
+});
+</script>
+
+<style>
+.search-result-item {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.search-result-item:hover {
+    transform: translateY(-2px);
+}
+
+.search-highlight mark {
+    background-color: #ffeb3b !important;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+#searchResultsContainer {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+</style>
+{% endblock %}

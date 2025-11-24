@@ -1,0 +1,515 @@
+{% extends "base.html" %}
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.10.0/js/anychart-bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> -->
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+
+
+  <!-- In the <head> -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+
+
+  <style>
+    #calendar {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .legend {
+            max-width: 900px;
+            margin: 10px auto;
+            display: flex;
+            gap: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+        }
+
+
+
+
+        .tile-container {
+  display: flex; /* This makes the container a flex container */
+  flex-wrap: wrap; /* This allows items to wrap to a new line */
+  justify-content: space-around; /* This distributes space between and around items */
+  gap: 20px; /* This creates a gap between the tiles */
+  padding: 20px;
+}
+
+.tile-item {
+  flex: 1 1 300px; /* This is a shorthand for flex-grow, flex-shrink, and flex-basis */
+  /* The values mean:
+     - flex-grow: 1 (allows the item to grow to fill space)
+     - flex-shrink: 1 (allows the item to shrink if needed)
+     - flex-basis: 300px (the ideal width of the tile before it grows or shrinks)
+  */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden; /* This is useful for containing the image within the border radius */
+  text-align: center;
+  padding-bottom: 20px;
+  transition: transform 0.3s ease; /* A smooth hover effect */
+}
+
+.tile-item:hover {
+  transform: translateY(-5px); /* Moves the tile up slightly on hover */
+}
+
+.tile-item img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.tile-item h3 {
+  margin-top: 15px;
+  font-size: 1.2em;
+}
+
+.tile-item p {
+  font-size: 0.9em;
+  color: #555;
+  padding: 0 15px;
+}
+    
+  </style>
+</head>
+{% block content %}
+
+
+
+<div class="w3-container w3-margin w3-padding">
+
+    <div class="w3-quarter w3-border w3-border-light-gray w3-padding w3-margin" style="height: 70vh; overflow: auto;">
+        
+        <div class="w3-full  w3-small w3-container w3-margin-bottom">
+            <p onclick="document.getElementById('add_calendar_event').style.display='block'" class="w3-white w3-border-indigo w3-border w3-hover-shadow w3-padding" style="text-align: center; border-radius: 25px 25px 25px 25px; width: fit-content; cursor: pointer;">Add new event</p>
+        </div>
+
+        <div class="w3-full w3-container w3-margin-bottom" style="width: fit-content;" >
+            
+            {% for event in events %}
+            <div class="w3-round w3-margin w3-full w3-small w3-padding w3-white w3-hover-shadow w3-hover-border-indigo w3-border w3-border-light-gray"
+                            style="cursor: pointer; transition: all 0.3s ease; width: 100%; ">
+                <button onclick="myFunction('view_calendar_event_{{ event.id }}')" class="w3-button w3-text-indigo w3-hover-white w3-block  w3-left-align">
+                    <i class="fas fa-book-open w3-margin-right w3-text-indigo"></i>
+                        <strong class="w3-round w3-margin-bottom w3-padding" >{{ event.title }}</strong><i class="fa-solid w3-right fa-chevron-down">
+                    </i>
+                </button>
+                <div id="view_calendar_event_{{ event.id }}"  class="w3-hide w3-text-indigo w3-container">
+                    <p onclick="document.getElementById('view_event_{{ event.id }}').style.display='block'">
+                        From: {{ event.start_date.strftime('%Y-%m-%d %H:%M') }}<br>
+                        To: {{ event.end_date.strftime('%Y-%m-%d %H:%M') }}<br>
+                    </p>
+                </div>
+            </div>
+
+            <!-- view event modal -->
+                        <div id="view_event_{{ event.id }}" class="w3-modal w3-white w3-card w3-border">
+                            <div class="w3-modal-content w3-white w3-card w3-border" style="width: 35vw; width: fit-content; overflow: auto;">
+                                <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                                    <span onclick="document.getElementById('view_event_{{ event.id }}').style.display='none'" 
+                                    class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                                    <span class="w3-large"><b>{{ event.title }}</b></span>
+                                    <br>
+                                </header>
+                                <div class="w3-container w3-margin-top">
+                                    <div class="w3-padding">
+                                        <p>
+                                            <span class="w3-border w3-hover-shadow w3-round w3-padding">
+                                                {{ event.title }} event 
+                                                {% if event.status == 'Confirmed' %}
+                                                    <span class="w3-tag w3-green w3-round">{{ event.status }}</span>
+                                                {% elif event.status == 'Not Confirmed' %}
+                                                    <span class="w3-tag w3-grey w3-round">{{ event.status }}</span>
+                                                {% else %}
+                                                    <span class="w3-tag w3-red w3-round">{{ event.status }}</span>
+                                                {% endif %}
+                                            </span>
+                                        </p>
+                                        <p>
+                                            <span class="w3-border w3-hover-shadow w3-round w3-padding">
+                                                <strong>FROM</strong> {{ event.start_date.strftime('%Y-%m-%d') }}  <strong>UNTIL</strong> {{ event.end_date.strftime('%Y-%m-%d') }}
+                                            </span>
+                                        </p>
+                                        <p>
+                                            <span onclick="document.getElementById('edit_event_{{ event.id }}').style.display='block'" class="w3-right w3-small w3-border w3-blue w3-opacity w3-hover-shadow w3-round w3-padding" style="cursor: pointer;">Edit</span>
+                                        </p>
+
+
+                                        <div id="edit_event_{{ event.id }}" class="w3-container w3-margin w3-padding" style="display: none;">
+                                            <p>
+                                                
+                                            </p>
+
+                                            <form class="w3-small w3-margin w3-padding" action="/event/edit/event.id"  method="POST">
+                                                {{ forms[event.id].hidden_tag() }}
+
+                                                <p>{{ forms[event.id].title.label(class="w3-small") }}<br>
+                                                    {{ forms[event.id].title(class="w3-input w3-border form-control", placeholder="Title") }}</p>
+
+                                                <p>{{ forms[event.id].start_date.label(class="w3-small") }}<br>
+                                                    {{ forms[event.id].start_date(class="w3-input w3-border form-control") }}</p>
+
+                                                <p>{{ forms[event.id].end_date.label(class="w3-small") }}<br>
+                                                    {{ forms[event.id].end_date(class="w3-input w3-border form-group") }}</p>
+
+                                                <p>{{ forms[event.id].status.label(class="w3-small") }}<br>
+                                                    {{ forms[event.id].status(class="w3-input w3-border form-group") }}</p>
+
+                                                <p>{{ forms[event.id].request_collateral.label(class="w3-small") }} 
+                                                    {{ forms[event.id].request_collateral(class="w3-border") }}</p>
+
+                                                <p class="w3-margin-bottom">
+                                                    {{ forms[event.id].submit(class="w3-button w3-small w3-teal w3-border") }} 
+                                                    <span onclick="document.getElementById('edit_event_{{ event.id }}').style.display='none'" 
+                                                            class="w3-right w3-small w3-border w3-red w3-hover-shadow w3-round w3-padding" style="cursor: pointer;">Cancel</span>
+                                                </p>
+                                            </form>
+                                        </div>
+
+                                    </div>
+                                </div>
+
+                            </div> 
+                        </div>
+                 <!-- view event ends here -->
+            {% endfor %}
+
+            <div class="tile-container w3-hide">
+                {% for event in events %}
+                    <div class="tile-item w3-small w3-round w3-padding w3-margin w3-border w3-hover-shadow" style="cursor: pointer;">
+                        <strong class="w3-card w3-round w3-margin-bottom w3-padding" onclick="document.getElementById('view_calendar_event_{{ event.id }}').style.display='block'">{{ event.title }}</strong><br><br>
+                        From: {{ event.start_date.strftime('%Y-%m-%d %H:%M') }}<br>
+                        To: {{ event.end_date.strftime('%Y-%m-%d %H:%M') }}<br>
+                        <p>A brief description of the item.</p>
+                    </div>
+
+                    <!-- view event modal -->
+                        <div id="view_calendar_event_{{ event.id }}" class="w3-modal w3-white w3-card w3-border">
+                            <div class="w3-modal-content w3-white w3-card w3-border" style="width: 35vw; width: fit-content; overflow: auto;">
+                                <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                                    <span onclick="document.getElementById('view_calendar_event_{{ event.id }}').style.display='none'" 
+                                    class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                                    <span class="w3-large"><b>{{ event.title }}</b></span>
+                                    <br>
+                                </header>
+                                <div class="w3-container w3-margin-top">
+                                    <div class="w3-padding">
+                                        <p>
+                                            <span class="w3-border w3-hover-shadow w3-round w3-padding">
+                                                {{ event.title }} event 
+                                                {% if event.status == 'Confirmed' %}
+                                                    <span class="w3-tag w3-green w3-round">{{ event.status }}</span>
+                                                {% elif event.status == 'Not Confirmed' %}
+                                                    <span class="w3-tag w3-grey w3-round">{{ event.status }}</span>
+                                                {% else %}
+                                                    <span class="w3-tag w3-orange w3-round">{{ event.status }}</span>
+                                                {% endif %}
+                                            </span>
+                                        </p>
+                                        <p>
+                                            <span class="w3-border w3-hover-shadow w3-round w3-padding">
+                                                <strong>FROM</strong> {{ event.start_date.strftime('%Y-%m-%d') }}  <strong>UNTIL</strong> {{ event.end_date.strftime('%Y-%m-%d') }}
+                                            </span>
+                                        </p>
+                                        <p>
+                                            <span onclick="document.getElementById('edit_event_{{ event.id }}').style.display='block'" class="w3-right w3-small w3-border w3-blue w3-opacity w3-hover-shadow w3-round w3-padding" style="cursor: pointer;">Edit</span>
+                                        </p>
+
+
+                                        <div id="edit_event_{{ event.id }}" class="w3-container w3-margin w3-padding" style="display: none;">
+                                            <p>
+                                                
+                                            </p>
+
+                                            <form class="w3-small w3-margin w3-padding" action="/event/edit/event.id"  method="POST">
+                                                {{ forms[event.id].hidden_tag() }}
+
+                                                <p>{{ forms[event.id].title.label(class="w3-small") }}<br>
+                                                    {{ forms[event.id].title(class="w3-input w3-border form-control", placeholder="Title") }}</p>
+
+                                                <p>{{ forms[event.id].start_date.label(class="w3-small") }}<br>
+                                                    {{ forms[event.id].start_date(class="w3-input w3-border form-control") }}</p>
+
+                                                <p>{{ forms[event.id].end_date.label(class="w3-small") }}<br>
+                                                    {{ forms[event.id].end_date(class="w3-input w3-border form-group") }}</p>
+
+                                                <p>{{ forms[event.id].status.label(class="w3-small") }}<br>
+                                                    {{ forms[event.id].status(class="w3-input w3-border form-group") }}</p>
+
+                                                <p>{{ forms[event.id].request_collateral.label(class="w3-small") }} 
+                                                    {{ forms[event.id].request_collateral(class="w3-border") }}</p>
+
+                                                <p class="w3-margin-bottom">
+                                                    {{ forms[event.id].submit(class="w3-button w3-small w3-teal w3-border") }} 
+                                                    <span onclick="document.getElementById('edit_event_{{ event.id }}').style.display='none'" 
+                                                            class="w3-right w3-small w3-border w3-red w3-hover-shadow w3-round w3-padding" style="cursor: pointer;">Cancel</span>
+                                                </p>
+                                            </form>
+                                        </div>
+
+                                    </div>
+                                </div>
+
+                            </div> 
+                        </div>
+                 <!-- view event ends here -->
+                {% endfor %}
+            </div>
+            
+        </div>
+
+
+
+    </div>
+
+    <div class="w3-border w3-border-light-gray 3-round w3-twothird w3-padding w3-margin" style="height: 70vh; overflow: auto;">
+        <!-- Legend: Event Status Tags -->
+<div class="w3-small w3-margin-bottom">
+  <span class="status-tag confirmed">Confirmed attendance</span>
+  <span class="status-tag in-progress">Event In Progress</span>
+  <span class="status-tag not-confirmed">Event Not Confirmed</span>
+</div>
+
+<!-- FullCalendar Container -->
+<div id="calendar" class="w3-small" style="width: 100%;"></div>
+
+<!-- FullCalendar JS -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+<!-- Custom JS -->
+<script>
+  // Build a lightweight client-side view of server events for date filtering and modal linking
+  const serverEvents = [
+    {% for e in events %}
+      {
+        id: {{ e.id }},
+        title: {{ e.title|tojson }},
+        start: "{{ e.start_date.strftime('%Y-%m-%dT%H:%M') }}",
+        end: "{{ e.end_date.strftime('%Y-%m-%dT%H:%M') }}",
+        status: {{ e.status|tojson }}
+      }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  function openAddModalWithDate(dateStr) {
+    // Prefill the existing add event modal with the clicked date
+    const modalId = 'add_calendar_event';
+    const modal = document.getElementById(modalId);
+    const startInput = document.querySelector('#' + modalId + ' input[name="start_date"]');
+    const endInput = document.querySelector('#' + modalId + ' input[name="end_date"]');
+    if (startInput) startInput.value = dateStr + 'T09:00';
+    if (endInput) endInput.value = dateStr + 'T10:00';
+    if (modal) modal.style.display = 'block';
+  }
+
+  function eventsOnDate(dateStr) {
+    const dayStart = new Date(dateStr + 'T00:00:00');
+    const dayEnd = new Date(dateStr + 'T23:59:59');
+    return serverEvents.filter(ev => {
+      const s = new Date(ev.start);
+      const e = new Date(ev.end);
+      return s <= dayEnd && e >= dayStart; // overlaps the day
+    });
+  }
+
+  function openDateEvents(dateStr) {
+    const listEl = document.getElementById('date-events-list');
+    const titleEl = document.getElementById('date-events-title');
+    if (titleEl) titleEl.textContent = new Date(dateStr).toDateString();
+    const dayEvents = eventsOnDate(dateStr);
+
+    if (listEl) {
+      if (!dayEvents.length) {
+        listEl.innerHTML = '<p class="w3-small">No events on this date.</p>';
+      } else {
+        listEl.innerHTML = dayEvents.map(ev => `
+          <div class="w3-border w3-round w3-padding w3-margin-bottom">
+            <div class="w3-row">
+              <div class="w3-col s8 m9">
+                <strong>${ev.title}</strong><br/>
+                <span class="w3-small">${ev.start.replace('T',' ')} - ${ev.end.replace('T',' ')}</span>
+              </div>
+              <div class="w3-col s4 m3 w3-right-align">
+                <button class="w3-button w3-small w3-indigo" onclick="document.getElementById('view_event_${ev.id}').style.display='block'">View</button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    const addBtn = document.getElementById('add-event-on-date-btn');
+    if (addBtn) addBtn.onclick = function() { openAddModalWithDate(dateStr); };
+
+    const modal = document.getElementById('date_events_modal');
+    if (modal) modal.style.display = 'block';
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const calendarEl = document.getElementById('calendar');
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      selectable: true,
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+      },
+      events: '/api/events',
+      dateClick: function (info) {
+        openDateEvents(info.dateStr);
+      },
+      eventClick: function(info) {
+        info.jsEvent.preventDefault();
+        const eid = info.event.id || (info.event.extendedProps && info.event.extendedProps.id);
+        if (eid) {
+          const modal = document.getElementById('view_event_' + eid);
+          if (modal) modal.style.display = 'block';
+        }
+      }
+    });
+
+    calendar.render();
+  });
+</script>
+
+<!-- Styles for Status Tags -->
+<style>
+  .status-tag {
+    display: inline-block;
+    padding: 6px 12px;
+    margin: 4px;
+    border-radius: 25px;
+    font-size: 0.875rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: box-shadow 0.2s ease;
+  }
+
+  .status-tag:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  }
+
+  .status-tag.confirmed {
+    background-color: #1E90FF; /* Dodger Blue */
+    color: white;
+  }
+
+  .status-tag.in-progress {
+    background-color: #FFA500; /* Orange */
+    color: white;
+  }
+
+  .status-tag.not-confirmed {
+    background-color: #DC143C; /* Crimson */
+    color: white;
+  }
+  .calendar-wrapper { max-width: 100%; }
+  @media (max-width: 768px) {
+    #calendar { max-width: 100%; }
+    .w3-quarter, .w3-twothird { width: 100% !important; }
+  }
+</style>
+    </div>
+
+</div>
+
+
+
+
+
+
+
+<!-- add calendar event modal -->
+                <div id="add_calendar_event" class="w3-modal w3-white w3-card w3-border">
+                    <div class="w3-modal-content w3-white w3-card w3-border" style="width: 35vw; height: 50vh;">
+                        <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                            <span onclick="document.getElementById('add_calendar_event').style.display='none'" 
+                            class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                            <span class="w3-large"><b>Add Calendar Event</b></span>
+                            <br>
+                        </header>
+                        <div class="w3-container w3-margin-top">
+                          <h2 class="w3-hide">{{ action }} Event</h2>
+                            <form class="w3-small w3-padding" action="/event/add" method="POST">
+                                {{ form.hidden_tag() }}
+                                <p>{{ form.title.label(class="w3-small") }}<br>{{ form.title(class="w3-input w3-border form-group") }}</p>
+                                <p>{{ form.start_date.label(class="w3-small") }}<br>{{ form.start_date(class="w3-input w3-border form-group") }}</p>
+                                <p>{{ form.end_date.label(class="w3-small") }}<br>{{ form.end_date(class="w3-input w3-border form-group") }}</p>
+                                <p>{{ form.status.label(class="w3-small") }}<br>{{ form.status(class="w3-input w3-border form-group") }}</p>
+                                <p>{{ form.request_collateral.label(class="w3-small") }} {{ form.request_collateral(class=" w3-border") }}</p>
+                                <p class="w3-margin-bottom">{{ form.submit(class="w3-button w3-teal w3-border") }}</p>
+                            </form>
+                        </div>
+
+                    </div>
+                </div>
+                 <!-- add calendar  ends here -->
+
+                 <!-- Date events modal (opens when clicking a calendar day) -->
+                 <div id="date_events_modal" class="w3-modal w3-white w3-card w3-border">
+                   <div class="w3-modal-content w3-white w3-card w3-border" style="max-width: 600px; width: 95%; max-height: 80vh; overflow: auto;">
+                     <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;">
+                       <span onclick="document.getElementById('date_events_modal').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                       <span class="w3-large"><b id="date-events-title">Selected date</b></span>
+                     </header>
+                     <div class="w3-container w3-margin-top">
+                       <div class="w3-margin-bottom w3-right-align">
+                         <button id="add-event-on-date-btn" class="w3-button w3-teal w3-border">Add event on this date</button>
+                       </div>
+                       <div id="date-events-list" class="w3-small"></div>
+                     </div>
+                   </div>
+                 </div>
+                 <!-- end date events modal -->
+
+
+
+<script>
+// Accordion
+function myFunction(id) {
+  var x = document.getElementById(id);
+  if (x.className.indexOf("w3-show") == -1) {
+    x.className += " w3-show";
+    x.previousElementSibling.className += " w3-theme-d1";
+  } else { 
+    x.className = x.className.replace("w3-show", "");
+    x.previousElementSibling.className = 
+    x.previousElementSibling.className.replace(" w3-theme-d1", "");
+  }
+}
+
+// Used to toggle the menu on smaller screens when clicking on the menu button
+function openNav() {
+  var x = document.getElementById("navDemo");
+  if (x.className.indexOf("w3-show") == -1) {
+    x.className += " w3-show";
+  } else { 
+    x.className = x.className.replace(" w3-show", "");
+  }
+}
+</script>
+
+
+
+
+{% endblock %}

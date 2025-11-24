@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login Page</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #a8c0ff 0%, #3f2b96 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 8s ease infinite;
+            overflow: hidden;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 360px;
+            background: rgba(173, 216, 230, 0.3);
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            position: relative;
+            z-index: 10;
+            border: 1px solid rgba(173, 216, 230, 0.5);
+        }
+
+        .user-icon {
+            width: 70px;
+            height: 70px;
+            background: transparent;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 10px;
+            position: relative;
+            z-index: 1;
+            font-size: 32px;
+        }
+
+        .form-group {
+            margin-bottom: 1.2rem;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px 12px 40px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: black;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        .form-group input:focus {
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(0, 0, 0, 0.6);
+            font-size: 18px;
+            z-index: 2;
+        }
+
+        .form-group .form-control-placeholder {
+            margin-left: 1rem;
+            color: black;
+            font-weight: 500;
+        }
+
+        .remember-forgot {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.2rem;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .remember-forgot a {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .remember-forgot a:hover {
+            color: white;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 15px;
+            margin-top: 0.5rem;
+        }
+
+        .login-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .login-btn:active {
+            transform: translateY(0);
+        }
+
+        .validation-error {
+            color: red;
+            font-size: 12px;
+            margin-top: 4px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<form action="" method="post" novalidate style="width: fit-content;">
+    {{ form.hidden_tag() }}
+    <div class="login-container w3-text-black">
+        <div class="user-icon w3-margin-bottom">
+            <span>
+                <img class="w3-card w3-circle w3-white" style="width: 100%; height: 100%;" src="{{ url_for('static', filename='smartlearning.webp') }}">
+            </span>
+        </div>
+
+        <div class="form-group">
+            <i class="fas fa-user input-icon"></i>
+            {{ form.username(class="w3-border w3-white w3-padding", placeholder="Username") }}
+            {% for error in form.username.errors %}
+            <span class="validation-error">[{{ error }}]</span>
+            {% endfor %}
+        </div>
+
+        <div class="form-group">
+            <i class="fas fa-lock input-icon"></i>
+            {{ form.password(class="w3-border w3-white w3-padding", placeholder="Password", autocomplete="new-password") }}
+            {% for error in form.password.errors %}
+            <span class="validation-error">[{{ error }}]</span>
+            {% endfor %}
+        </div>
+
+        <div class="remember-forgot">
+            <p>{{ form.remember_me() }} {{ form.remember_me.label }}</p>
+            <a class="w3-hide" style="display:none;" href="{{ url_for('forgot_password') }}">Forgot Password?</a>
+        </div>
+
+        <p>{{ form.submit(class="login-btn") }}</p>
+    </div>
+</form>
+
+<!-- Secure script to prevent password field tampering -->
+<!-- <script>
+document.addEventListener("DOMContentLoaded", () => {
+    const passwordInput = document.querySelector('input[type="password"]');
+
+    if (passwordInput) {
+        const observer = new MutationObserver(() => {
+            if (passwordInput.type !== 'password') {
+                passwordInput.type = 'password';
+                console.warn("⚠️ Password field type was tampered with and has been reset to 'password'.");
+            }
+        });
+        observer.observe(passwordInput, { attributes: true, attributeFilter: ['type'] });
+    }
+});
+</script> -->
+
+</body>
+</html>

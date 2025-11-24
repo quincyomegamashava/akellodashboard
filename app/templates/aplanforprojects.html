@@ -1,0 +1,1843 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sortable Project Board</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css">
+  <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+
+  <script>
+    // This object would be populated by your backend rendering engine (e.g., Jinja, EJS)
+    const current_user = { username: "{{current_user.username}}", id: "{{ current_user.id }}" }; 
+  </script>
+
+  <style>
+    :root {
+      --tl-bg: #ffffff;
+    }
+    body {
+
+    background: linear-gradient(135deg, #dde7fd 0%, #ffffff 100%);
+    background-size: 400% 400%;
+    animation: gradientShift 8s ease infinite;
+
+}
+
+.login-container {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            position: relative;
+            z-index: 10;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+        }
+
+    .ghost {
+      opacity: 0.5;
+      background: #cbd5e1;
+      border-radius: 0.5rem;
+    }
+    .task:hover {
+      cursor: move;
+    }
+    /* small scrollbar styling fallback */
+    .scrollbar-thin::-webkit-scrollbar { height: 8px; width: 8px; }
+    .scrollbar-thumb-gray-400::-webkit-scrollbar-thumb { background: #9CA3AF; border-radius: 9999px;}
+
+    /* Custom styles for the Gantt Chart modal */
+    #modalBackdrop.gantt-modal .modal-content {
+      max-width: 90%;
+      height: 90%;
+      width: 100%;
+    }
+
+    /* Create Project modal size */
+    #modalBackdrop.project-modal #modalContent {
+      width: 65vw;
+      height: 45vw;
+      max-width: 65vw;
+      max-height: 45vw;
+      overflow: auto;
+    }
+
+    /* Edit Project modal size */
+    #modalBackdrop.edit-project-modal #modalContent {
+      width: 65vw;
+      height: 45vw;
+      max-width: 65vw;
+      max-height: 45vw;
+      overflow: auto;
+    }
+
+    /* My Tasks modal size */
+    #modalBackdrop.my-tasks-modal #modalContent {
+      width: 70vw;
+      height: 65vh;
+      max-width: 70vw;
+      max-height: 65vh;
+      overflow: auto;
+    }
+
+    #ganttChartContainer {
+      width: 100%;
+      height: calc(100vh - 200px); /* Adjust based on modal header/footer */
+      overflow: auto;
+    }
+  </style>
+</head>
+<body class="bg-white-100 font-sans text-gray-800 min-h-screen p-6">
+
+  <div class="w3-full login-container mx-auto">
+    <div class="grid grid-cols-1 lg:grid-cols-[280px,1fr] gap-6">
+      <!-- Sidebar: Projects list (desktop) -->
+      <aside id="sidebarPanel" class="hidden lg:block bg-white/80 rounded-2xl p-3 shadow border border-slate-200">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-base font-semibold text-slate-800">Projects</h2>
+          <button id="newProjectBtn2" class="px-2 py-1 text-sm rounded-lg border border-slate-300 hover:bg-slate-50">➕</button>
+        </div>
+        <div id="projectList" class="space-y-1 max-h-[70vh] overflow-auto"></div>
+      </aside>
+
+      <!-- Main content -->
+      <section class="bg-white/70 rounded-2xl shadow border border-slate-200 p-4">
+
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+<h1 class="text-3xl sm:text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-blue-600 to-teal-500 drop-shadow-sm"> Project Board</h1>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <a href="{{url_for('overview')}}" 
+              class="px-5 py-2.5 w3-small text-black font-medium rounded-xl bg-white shadow-md active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-house-heart-fill" viewBox="0 0 16 16">
+                <path d="M7.293 1.5a1 1 0 0 1 1.414 0L11 3.793V2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v3.293l2.354 2.353a.5.5 0 0 1-.708.707L8 2.207 1.354 8.853a.5.5 0 1 1-.708-.707z"/>
+                <path d="m14 9.293-6-6-6 6V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5zm-6-.811c1.664-1.673 5.825 1.254 0 5.018-5.825-3.764-1.664-6.691 0-5.018"/>
+              </svg>
+            </a>
+
+            <div class="flex w3-hide disabled-link flex-col">
+              <select 
+                id="projectSelect" 
+                class="px-4 py-1 border disabled-link w3-hide text-black border-slate-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[200px] text-slate-700"
+              ></select>
+            </div>
+
+            <button 
+id="editProjectBtn" 
+              class="px-4 py-2 w3-small bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl shadow-md active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-amber-300"
+            >
+              ✏️ Edit
+            </button>
+
+            <button 
+id="deleteProjectBtn" 
+              class="px-4 py-2 w3-small bg-rose-500 hover:bg-rose-600 text-white font-medium rounded-xl shadow-md active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-rose-300"
+            >
+              🗑️ Delete
+            </button>
+
+            <button 
+id="newProjectBtn" 
+              class="px-5 py-2 w3-small bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-md active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center gap-2"
+            >
+              ➕ New Project
+            </button>
+
+            <button 
+id="showGanttBtn" 
+              class="px-5 py-2 w3-small bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-xl shadow-md active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-teal-300 flex items-center gap-2"
+            >
+              📊 Show Gantt
+            </button>
+
+            <button 
+id="showMyTasksBtn" 
+              class="px-5 py-2 w3-small bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl shadow-md active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 flex items-center gap-2"
+            >
+              🧾 My Tasks
+            </button>
+          </div>
+        </div>
+
+        <div id="board" class="board flex gap-4 overflow-x-auto pb-6 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"></div>
+
+        <!-- Project Timeline (moved inside Project Board section) -->
+        <div id="timelineSection" class="mt-8">
+          <h2 class="text-2xl sm:text-3xl tracking-tight font-extrabold text-slate-900 mb-4">PROJECT TIMELINE</h2>
+          <div class="border-y-4 border-amber-400 mb-6"></div>
+
+          <!-- Timeline axis -->
+          <div class="bg-white/80 rounded-2xl shadow border border-slate-200 p-4 mb-6">
+            <div id="timelineAxis" class="relative w-full overflow-x-auto" style="min-height: 180px;">
+              <svg id="timelineSVG" class="w-full" viewBox="0 0 1200 180" preserveAspectRatio="none"></svg>
+            </div>
+          </div>
+
+          <!-- Milestones table and tips -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-white/80 rounded-2xl shadow border border-slate-200">
+              <div class="px-4 py-3 border-b border-slate-200">
+                <h3 class="text-xl font-semibold">Project Milestones</h3>
+              </div>
+              <div class="p-4 overflow-auto">
+                <table class="min-w-full text-sm">
+                  <thead class="text-left bg-slate-50">
+                    <tr>
+                      <th class="py-2 px-3 w-28">DATE</th>
+                      <th class="py-2 px-3">MILESTONE</th>
+                      <th class="py-2 px-3 w-56">ASSIGNED TO</th>
+                      <th class="py-2 px-3 w-24">POSITION</th>
+                    </tr>
+                  </thead>
+                  <tbody id="milestoneBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="bg-white/80 rounded-2xl shadow border border-slate-200">
+              <div class="px-4 py-3 border-b border-slate-200">
+                <h3 class="text-xl font-semibold">Project Timeline Tip</h3>
+              </div>
+              <div class="p-4 text-sm text-slate-700">
+                Use the task Position value to nudge milestone labels above or below the timeline. Positive numbers will place the label above the axis; negative numbers will place it below. You can edit the Position directly in the Milestones table; the timeline will refresh automatically.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+<div id="modalBackdrop" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div id="modalContent" class="bg-white p-6 rounded-xl shadow-lg w-full max-w-2xl">
+      <h3 id="modalTitle" class="text-xl font-semibold mb-4"></h3>
+      <div id="modalBody" class="mb-4 text-gray-700"></div>
+
+      <div class="flex justify-end space-x-3">
+        <button id="modalCancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">Cancel</button>
+        <button id="modalConfirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">OK</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ---------- Configuration ---------- */
+const API_BASE = '/api';
+
+/* ---------- Global state ---------- */
+let currentProjectId = null;
+let usersCache = []; // {id, name}
+let projectsCache = {}; // projectId => project object
+let projectMembersCache = {}; // projectId => [{id,name}]
+let lastBoardData = null; // cache of last loaded board for timeline interactions
+let timelineZoom = 1; // 1 = full span. >1 zooms in (smaller span), <1 zooms out
+let timelineCenterTs = null; // milliseconds timestamp; defaults to mid of tasks
+let lastTimelineRows = []; // cached rows used by renderTimeline for panning
+let isTimelinePanning = false;
+let canAccessProject = true; // derived from board access; controls timeline/gantt, etc.
+let panStartClientX = 0;
+let panStartCenterTs = null;
+let timelineDraggingTask = false;
+// Mini-map state
+let isMiniDragging = false;
+let miniDragStartX = 0;
+let miniStartCenterTs = null;
+
+// Coloring
+const COLOR_PALETTE = ['#ef4444','#f59e0b','#10b981','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#84cc16','#f97316','#06b6d4','#f43f5e','#22c55e','#a855f7'];
+let colorMode = 'column'; // 'column' | 'assignee'
+let colorMaps = { column: {}, assignee: {} };
+
+/* ---------- Simple helpers ---------- */
+const $ = (id) => document.getElementById(id);
+const el = (tag, attrs = {}, children = []) => {
+  const d = document.createElement(tag);
+  Object.entries(attrs).forEach(([k, v]) => {
+    if (k === 'class') d.className = v;
+    else if (k === 'text') d.textContent = v;
+    else d.setAttribute(k, v);
+  });
+  children.forEach(c => d.appendChild(c));
+  return d;
+};
+
+async function apiGET(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`GET ${path} failed (${res.status})`);
+  return res.json();
+}
+async function apiPOST(path, payload) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error(`POST ${path} failed (${res.status})`);
+  return res.json();
+}
+async function apiPATCH(path, payload) {
+  const res = await fetch(path, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(()=>null);
+    throw new Error(`PATCH ${path} failed (${res.status}) ${txt||''}`);
+  }
+  return res.json();
+}
+async function apiDELETE(path) {
+  const res = await fetch(path, {method: 'DELETE'});
+  if (!res.ok) throw new Error(`DELETE ${path} failed (${res.status})`);
+  return res.json();
+}
+
+/* ---------- Modal management (reusable) ---------- */
+const modalBackdrop = $('modalBackdrop');
+const modalContent = $('modalContent');
+const modalTitle = $('modalTitle');
+const modalBody = $('modalBody');
+const modalCancel = $('modalCancel');
+const modalConfirm = $('modalConfirm');
+
+function openModal(title, buildBodyFn, onConfirm, wide = false) {
+  modalTitle.textContent = title;
+  modalBody.innerHTML = '';
+  buildBodyFn(modalBody);
+  modalBackdrop.classList.remove('hidden');
+  modalBackdrop.classList.add('flex');
+  
+  if (wide) {
+    modalBackdrop.classList.add('gantt-modal');
+    modalContent.classList.remove('max-w-2xl');
+    modalContent.classList.add('max-w-full');
+  } else {
+    modalBackdrop.classList.remove('gantt-modal');
+    modalContent.classList.add('max-w-2xl');
+    modalContent.classList.remove('max-w-full');
+  }
+
+  modalConfirm.onclick = async () => {
+    try {
+      modalConfirm.disabled = true;
+      await onConfirm();
+      closeModal();
+    } catch (err) {
+      modalConfirm.disabled = false;
+      alert('Error: ' + (err.message || err));
+    }
+  };
+
+  modalCancel.onclick = closeModal;
+}
+
+function closeModal() {
+  modalBackdrop.classList.add('hidden');
+  modalBackdrop.classList.remove('flex');
+  modalBackdrop.classList.remove('project-modal');
+  modalBackdrop.classList.remove('edit-project-modal');
+  modalBackdrop.classList.remove('my-tasks-modal');
+  modalConfirm.disabled = false;
+  modalConfirm.onclick = null;
+  modalCancel.onclick = null;
+  // Clean up any modal-specific classes
+  modalContent.classList.remove('w3-display-middle');
+}
+
+/* ---------- Load users for member selection ---------- */
+async function loadUsers() {
+  if (usersCache.length) return usersCache;
+  try {
+    usersCache = await apiGET(`${API_BASE}/users`);
+    return usersCache;
+  } catch (err) {
+    console.error('Could not load users', err);
+    usersCache = [];
+    return usersCache;
+  }
+}
+
+/* ---------- Load members for a specific project (ids + names) ---------- */
+async function getProjectMembers(projectId) {
+  if (!projectId) return [];
+  if (projectMembersCache[projectId]) return projectMembersCache[projectId];
+  try {
+    const members = await apiGET(`${API_BASE}/projects/${projectId}/members`);
+    projectMembersCache[projectId] = members;
+    return members;
+  } catch (err) {
+    console.warn('Could not load project members for', projectId, err);
+    return [];
+  }
+}
+
+/* ---------- Helpers for project/member normalization ---------- */
+function normalizeMembers(members) {
+  if (!members) return [];
+  return members.map(m => {
+    if (!m && m !== 0) return '';
+    if (typeof m === 'object') {
+      return (m.username || m.name || String(m.id || '')).toString();
+    }
+    return String(m);
+  }).filter(Boolean);
+}
+
+function membersContains(members, username) {
+  if (!members || !username) return false;
+  const low = username.toString().toLowerCase();
+  return normalizeMembers(members).some(m => m.toLowerCase() === low);
+}
+
+/* ---------- Project flows ---------- */
+async function renderProjectSidebar(projects) {
+  const list = document.getElementById('projectList');
+  if (!list) return;
+  list.innerHTML = '';
+  projects.forEach(p => {
+    const item = document.createElement('button');
+    item.className = 'w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 ' + (String(p.id)===String(currentProjectId) ? 'bg-blue-50 border border-blue-200' : '');
+    item.innerHTML = `<div class="text-sm font-medium text-slate-800">${p.name}</div><div class="text-xs text-slate-500">${p.type||p.project_type||'public'}</div>`;
+    item.onclick = async () => {
+      const sel = document.getElementById('projectSelect');
+      if (sel) sel.value = p.id;
+      currentProjectId = p.id;
+      await loadBoard(currentProjectId);
+      renderProjectSidebar(projects);
+    };
+    list.appendChild(item);
+  });
+}
+
+function slugify(s){
+  return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || 'na';
+}
+function assignColor(map, key){
+  if (!map[key]){
+    const used = Object.keys(map).length;
+    map[key] = COLOR_PALETTE[used % COLOR_PALETTE.length];
+  }
+  return map[key];
+}
+function ensureColorMaps(board){
+  if (!board || !board.columns) return;
+  // columns
+  (board.columns||[]).forEach(col => {
+    assignColor(colorMaps.column, col.title || `Column ${col.id}`);
+    (col.tasks||[]).forEach(t => {
+      const assignee = (Array.isArray(t.assignees) && t.assignees.length) ? (t.assignees[0].name || t.assignees[0]) : 'Unassigned';
+      assignColor(colorMaps.assignee, assignee);
+    });
+  });
+}
+
+async function loadProjects() {
+  try {
+    const projects = await apiGET(`${API_BASE}/projects`);
+    const sel = $('projectSelect');
+    sel.innerHTML = '';
+    projectsCache = {}; // reset cache and repopulate
+    if (!projects.length) {
+      sel.appendChild(new Option('— No projects —', ''));
+      $('board').innerHTML = "<p class='text-gray-500'>No projects yet. Create one to get started!</p>";
+      // $('projectMembers').innerHTML = ""; // This element doesn't exist in the new code
+      currentProjectId = null;
+      return;
+    }
+
+    projects.forEach((p) => {
+      // normalize and store
+      projectsCache[p.id] = p;
+      const label = p.name + (p.type || p.project_type ? ` (${p.type||p.project_type})` : '');
+      const option = new Option(label, p.id);
+      sel.appendChild(option);
+    });
+
+    // choose previously selected if still present, otherwise first
+    if (currentProjectId && Array.from(sel.options).some(o => o.value == currentProjectId)) {
+      sel.value = currentProjectId;
+    } else {
+      sel.selectedIndex = 0;
+      currentProjectId = sel.value;
+    }
+    sel.onchange = async (e) => {
+      currentProjectId = e.target.value;
+      await loadBoard(currentProjectId);
+    };
+
+    // render sidebar list
+    renderProjectSidebar(projects);
+
+    // load board for selected project
+    if (currentProjectId) await loadBoard(currentProjectId);
+  } catch (err) {
+    console.error('Error loading projects', err);
+  }
+}
+
+/* If the board endpoint doesn't include members/type, try to get that info from cache or the single-project endpoint */
+async function resolveProjectInfo(projectId, boardData = {}) {
+  let members = [];
+  let type = boardData.project_type || boardData.type || null;
+
+  if (boardData.members && boardData.members.length) {
+    members = normalizeMembers(boardData.members);
+  }
+
+  // fallback to cached project list
+  const cached = projectsCache[projectId];
+  if ((!members || !members.length) && cached && cached.members) {
+    members = normalizeMembers(cached.members);
+  }
+  if (!type && cached) {
+    type = cached.type || cached.project_type || null;
+  }
+
+  // final fallback: try fetching single project if we still have no members/type
+  if ((!members || !members.length) || !type) {
+    try {
+      const single = await apiGET(`${API_BASE}/projects/${projectId}`);
+      if (single) {
+        if (!members.length && single.members) members = normalizeMembers(single.members);
+        if (!type) type = single.type || single.project_type || null;
+        // update cache
+        projectsCache[projectId] = Object.assign({}, projectsCache[projectId] || {}, single);
+      }
+    } catch (err) {
+      // ignore — we already have best-effort data
+      console.warn('Could not fetch single project:', err);
+    }
+  }
+
+  return { members: members || [], type: type || 'public' };
+}
+
+/* ---------- Board rendering and column/task creation ---------- */
+async function loadBoard(projectId) {
+  try {
+const data = await apiGET(`${API_BASE}/projects/${projectId}/board`);
+    lastBoardData = data;
+    const board = $('board');
+    board.innerHTML = '';
+
+    // Resolve members and type robustly
+    const projectInfo = await resolveProjectInfo(projectId, data);
+    const timelineSection = document.getElementById('timelineSection');
+    const timelineAxisEl = document.getElementById('timelineAxis');
+    const milestoneBodyEl = document.getElementById('milestoneBody');
+    const ganttBtn = document.getElementById('showGanttBtn');
+
+    // Show members list
+    // const membersBox = $('projectMembers'); // This element does not exist
+    // if (projectInfo.members && projectInfo.members.length) {
+    //   // show up to 8 names then "+ N"
+    //   const MAX_SHOW = 8;
+    //   const names = projectInfo.members.slice(0, MAX_SHOW).map(n => escapeHtml(n));
+    //   const rest = projectInfo.members.length - names.length;
+    //   membersBox.innerHTML = `👥 Members: <span class="font-medium">${names.join(', ')}${rest>0? `, +${rest}` : ''}</span>`;
+    // } else {
+    //   membersBox.innerHTML = "👥 Members: <span class='italic text-gray-500'>No members assigned</span>";
+    // }
+
+    // Check if the project is private and the user is not a member
+    // Use case-insensitive check as a friendly fallback
+    const username = current_user && current_user.username ? current_user.username.toString() : '';
+    const isMember = membersContains(projectInfo.members, username);
+    if ((projectInfo.type === 'private' || (data.project_type === 'private')) && !isMember) {
+      const denyMsg = `⛔ Access Denied: ${username} You are not a member of this private project.`;
+      canAccessProject = false;
+      if (ganttBtn) { ganttBtn.disabled = true; ganttBtn.title = 'Access denied'; }
+      board.innerHTML = `<p class='text-red-500 text-center mt-8'>${denyMsg}</p>`;
+      if (timelineAxisEl) timelineAxisEl.innerHTML = `<div class=\"p-6 text-red-500 text-center\">${denyMsg}</div>`;
+      if (milestoneBodyEl) milestoneBodyEl.innerHTML = `<tr><td colspan=\"4\" class=\"py-4 text-center text-red-500\">${escapeHtml(denyMsg)}</td></tr>`;
+      if (timelineSection) timelineSection.classList.remove('hidden');
+      return; // Stop the function
+    } else {
+      canAccessProject = true;
+      if (ganttBtn) { ganttBtn.disabled = false; ganttBtn.title = ''; }
+    }
+
+    
+    // render columns (data.columns expected)
+    (data.columns || []).forEach(col => {
+const colDiv = el('div', {class:'column flex-none w-72 bg-white/70 backdrop-blur p-4 rounded-2xl border border-slate-200 shadow-lg flex flex-col', id:`column-${col.id}`});
+      const header = el('div', {class:'flex items-center justify-between mb-3'});
+      const title = el('h3', {class:'text-lg font-semibold', text:col.title});
+      const controls = el('div', {class:'flex items-center space-x-2'});
+
+      // Quick add input (hidden by default)
+      const quickAddWrap = el('div', {class:'mt-2 hidden', id:`qa-${col.id}`});
+      quickAddWrap.innerHTML = `<input class="w-full border p-2 rounded text-sm" placeholder="Type task title and hit Enter" />`;
+      quickAddWrap.querySelector('input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const val = e.target.value.trim();
+          if (val) {
+            apiPOST(`${API_BASE}/columns/${col.id}/tasks`, {title: val}).then(()=>{
+              e.target.value='';
+              loadBoard(projectId);
+            });
+          }
+        }
+      });
+
+const addBtn = el('button', {class:'text-sm px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200', text:'+ Task'});
+      addBtn.onclick = () => {
+        const qa = document.getElementById(`qa-${col.id}`);
+        qa.classList.toggle('hidden');
+        if (!qa.classList.contains('hidden')) qa.querySelector('input').focus();
+      };
+const renameBtn = el('button', {class:'text-sm px-2 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200', text:'Rename'});
+      renameBtn.onclick = () => promptRenameColumn(projectId, col.id, col.title);
+      controls.appendChild(addBtn);
+      controls.appendChild(renameBtn);
+      header.appendChild(title);
+      header.appendChild(controls);
+
+      const taskList = el('div', {class:'task-list flex-1 min-h-[50px] space-y-3 mt-2', id:`col-tasks-${col.id}`});
+      (col.tasks || []).forEach(task => renderTask(task, taskList));
+
+      colDiv.appendChild(header);
+      colDiv.appendChild(quickAddWrap);
+      colDiv.appendChild(taskList);
+      board.appendChild(colDiv);
+    });
+
+    // Add "Add Column" button
+const addColBtn = el('button', {class:'flex-none h-fit px-4 py-2 bg-gradient-to-r from-indigo-500 to-teal-500 text-white rounded-lg shadow hover:from-indigo-600 hover:to-teal-600 transition-colors', text:'+ Add Column'});
+    addColBtn.onclick = () => promptAddColumn(projectId);
+    board.appendChild(addColBtn);
+
+    // Build timeline from tasks across all columns
+    try {
+      ensureTimelineControls();
+      ensureTimelineMiniMap();
+      ensureColorMaps(data);
+      await buildTimelineFromBoard(data);
+    } catch(e){ console.warn('Timeline build failed', e); }
+
+    // initialize Sortable for columns (reorder)
+    new Sortable(board, {
+      animation: 150,
+      ghostClass: 'ghost',
+      draggable: '.column',
+      onEnd: async (evt) => {
+        // gather new order of column ids (ignore add column button)
+        const colEls = Array.from(board.children).filter(ch => ch.id && ch.id.startsWith('column-'));
+        const newOrder = colEls.map(el => parseInt(el.id.replace('column-','')));
+        try {
+          await apiPOST(`${API_BASE}/projects/${projectId}/columns/reorder`, {order: newOrder});
+        } catch (err) {
+          console.error('Failed to reorder columns:', err);
+          // reload board to restore authoritative order
+          await loadBoard(projectId);
+        }
+      }
+    });
+
+    // initialize Sortable for each task-list
+    const lists = board.querySelectorAll('.task-list');
+    lists.forEach(list => {
+      new Sortable(list, {
+        group: 'tasks',
+        animation: 150,
+        ghostClass: 'ghost',
+        onAdd: async (evt) => {
+          // moved from another column
+          const taskId = evt.item.dataset.taskId;
+          const newColumnId = parseInt(evt.to.id.replace('col-tasks-',''));
+          const newPos = evt.newIndex;
+          try {
+            await apiPATCH(`${API_BASE}/tasks/${taskId}`, {column_id: newColumnId, position: newPos});
+            await loadBoard(projectId);
+          } catch (err) {
+            console.error('Move task failed', err);
+            await loadBoard(projectId);
+          }
+        },
+        onUpdate: async (evt) => {
+          // reordering within same column
+          const taskId = evt.item.dataset.taskId;
+          const newPos = evt.newIndex;
+          try {
+            await apiPATCH(`${API_BASE}/tasks/${taskId}`, {position: newPos});
+            await loadBoard(projectId);
+          } catch (err) {
+            console.error('Reorder failed', err);
+            await loadBoard(projectId);
+          }
+        }
+      });
+    });
+
+  } catch (err) {
+    console.error('Error loading board', err);
+    $('board').innerHTML = "<p class='text-red-500'>Failed to load board.</p>";
+    // $('projectMembers').innerHTML = "";
+  }
+}
+
+/* ---------- Column helpers ---------- */
+async function promptAddColumn(projectId) {
+  openModal('Create Column', (c) => {
+    c.innerHTML = `<input id="col_title" class="w-full border p-2 rounded" placeholder="Column title" />`;
+  }, async () => {
+    const title = $('col_title').value.trim() || 'New Column';
+    await apiPOST(`${API_BASE}/projects/${projectId}/columns`, {title});
+    await loadBoard(projectId);
+  });
+}
+
+/* ---------- Updated: Robust Rename Column ---------- */
+async function promptRenameColumn(projectId, columnId, currentTitle) {
+  openModal('Rename Column', (c) => {
+    c.innerHTML = `
+      <label class="block text-sm text-gray-600 mb-2">New title</label>
+      <input id="col_title" class="w-full border p-2 rounded" value="${escapeHtml(currentTitle)}" />
+      <p id="col_rename_help" class="text-xs text-gray-500 mt-2">Press Enter to submit.</p>
+    `;
+    // focus after modal is shown
+    setTimeout(() => {
+      const input = document.getElementById('col_title');
+      if (input) {
+        input.focus();
+        input.select();
+        input.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') {
+            // simulate confirm click
+            modalConfirm.click();
+          }
+        });
+      }
+    }, 20);
+  }, async () => {
+    const title = $('col_title').value.trim();
+    if (!title) throw new Error('Title required');
+
+    // Try common endpoints: first /api/columns/:id (recommended),
+    // then /api/projects/:projectId/columns/:columnId (older pattern).
+    const candidates = [
+      `${API_BASE}/columns/${columnId}`,
+      `${API_BASE}/projects/${projectId}/columns/${columnId}`
+    ];
+
+    let lastErr = null;
+    for (const endpoint of candidates) {
+      try {
+        await apiPATCH(endpoint, {title});
+        // success
+        await loadBoard(projectId);
+        return;
+      } catch (err) {
+        lastErr = err;
+        // try next
+        console.warn('Rename attempt failed for', endpoint, err);
+      }
+    }
+
+    // none worked — throw a helpful error
+    throw new Error(
+      `Rename failed. Frontend tried these endpoints:\n` +
+      candidates.join('\n') +
+      `\n\nPlease ensure your backend exposes one of them (PATCH /api/columns/<id> recommended). Last error: ${lastErr && (lastErr.message||lastErr)}`
+    );
+  });
+}
+
+/* ---------- Task render and flows ---------- */
+function renderTask(task, container) {
+  // task: expected to be task_to_dict shape (id, title, description, progress, start_date, end_date, position, assignees)
+  const div = el('div', {class:'task bg-white p-3 rounded-lg shadow-sm border border-gray-200'});
+  div.dataset.taskId = task.id;
+
+  const title = el('div', {class:'font-bold text-sm mb-1', text: task.title});
+  const desc = el('div', {class:'text-xs text-gray-600 truncate', text: task.description || 'No description'});
+
+  // dates & progress and assignees
+  const meta = el('div', {class:'text-xs text-gray-500 mt-2'});
+  const parts = [];
+  if (task.start_date) parts.push('Start: ' + formatDate(task.start_date));
+  if (task.end_date) parts.push('End: ' + formatDate(task.end_date));
+  const assigneesLabel = (Array.isArray(task.assignees) && task.assignees.length)
+    ? 'Assignees: ' + task.assignees.map(a => a.name).join(', ')
+    : '';
+  if (assigneesLabel) parts.push(assigneesLabel);
+  if (parts.length) meta.textContent = parts.join(' • ');
+
+  const progressWrap = el('div', {class:'w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden'});
+  // Add a background color class to pInner
+  const pInner = el('div', {class:'h-full bg-blue-500 transition-all duration-300', style:`width:${(task.progress||0)}%`});
+  progressWrap.appendChild(pInner);
+
+  const controls = el('div', {class:'flex justify-end space-x-2 mt-3'});
+  const editBtn = el('button',{class:'text-xs text-blue-500 hover:text-blue-700', text:'Edit'});
+  const delBtn = el('button',{class:'text-xs text-red-500 hover:text-red-700', text:'Delete'});
+  editBtn.onclick = () => promptEditTask(task);
+  delBtn.onclick = () => confirmDeleteTask(task.id);
+  controls.appendChild(editBtn);
+  controls.appendChild(delBtn);
+
+  div.appendChild(title);
+  div.appendChild(desc);
+  div.appendChild(meta);
+  div.appendChild(progressWrap);
+  div.appendChild(controls);
+
+  container.appendChild(div);
+}
+
+function formatDate(iso) {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleDateString();
+  } catch { return iso; }
+}
+
+async function promptAddTask(columnId) {
+  openModal('Create Task', (c) => {
+    c.innerHTML = `
+      <div class="grid gap-2">
+        <input id="task_title" class="w-full border p-2 rounded" placeholder="Task title" />
+        <textarea id="task_desc" class="w-full border p-2 rounded" rows="3" placeholder="Description (optional)"></textarea>
+        <div class="flex gap-2">
+          <input id="task_start" type="date" class="border p-2 rounded w-full" />
+          <input id="task_end" type="date" class="border p-2 rounded w-full" />
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-sm text-gray-600">Progress:</label>
+          <input id="task_progress" type="number" min="0" max="100" value="0" class="border p-2 rounded w-24" />
+        </div>
+      </div>
+    `;
+  }, async () => {
+    const title = $('task_title').value.trim();
+    if (!title) throw new Error('Title required');
+    const description = $('task_desc').value.trim();
+    const start_date = $('task_start').value || null;
+    const end_date = $('task_end').value || null;
+    const progress = parseInt($('task_progress').value || 0, 10);
+
+    await apiPOST(`${API_BASE}/columns/${columnId}/tasks`, {
+      title, description, start_date: start_date || undefined, end_date: end_date || undefined, progress
+    });
+    await loadBoard(currentProjectId);
+  });
+}
+
+async function promptEditTask(task) {
+  // task argument is the object returned by project board
+  const members = await getProjectMembers(currentProjectId);
+  openModal('Edit Task', (c) => {
+    const startVal = task.start_date ? task.start_date.slice(0,10) : '';
+    const endVal = task.end_date ? task.end_date.slice(0,10) : '';
+    const selectedIds = new Set((task.assignees||[]).map(a => String(a.id)));
+    c.innerHTML = `
+      <div class="grid gap-2">
+        <input id="task_title" class="w-full border p-2 rounded" value="${escapeHtml(task.title)}" />
+        <textarea id="task_desc" class="w-full border p-2 rounded" rows="3">${escapeHtml(task.description || '')}</textarea>
+        <div class="flex gap-2">
+          <input id="task_start" type="date" class="border p-2 rounded w-full" value="${startVal}" />
+          <input id="task_end" type="date" class="border p-2 rounded w-full" value="${endVal}" />
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-sm text-gray-600">Progress:</label>
+          <input id="task_progress" type="number" min="0" max="100" value="${task.progress||0}" class="border p-2 rounded w-24" />
+        </div>
+        <div class="grid gap-1">
+          <label class="text-sm text-gray-600">Assignees:</label>
+          <select id="task_assignees" class="border p-2 rounded" multiple>
+            ${members.map(m => `<option value="${m.id}" ${selectedIds.has(String(m.id)) ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+          </select>
+          <p class="text-xs text-gray-500">Hold Ctrl/Cmd (or Shift) to select multiple members.</p>
+        </div>
+      </div>
+    `;
+  }, async () => {
+    const title = $('task_title').value.trim();
+    if (!title) throw new Error('Title required');
+    const description = $('task_desc').value.trim();
+    const start_date = $('task_start').value || null;
+    const end_date = $('task_end').value || null;
+    const progress = parseInt($('task_progress').value || 0, 10);
+    const assignees = Array.from(($('task_assignees')||{options:[]}).options).filter(o => o.selected).map(o => parseInt(o.value));
+
+    await apiPATCH(`${API_BASE}/tasks/${task.id}`, {
+      title,
+      description,
+      start_date: start_date || undefined,
+      end_date: end_date || undefined,
+      progress,
+      assignees
+    });
+    await loadBoard(currentProjectId);
+  });
+}
+
+async function confirmDeleteTask(taskId) {
+  openModal('Delete Task', (c) => {
+    c.innerHTML = `<p>Are you sure you want to delete this task?</p>`;
+  }, async () => {
+    await apiDELETE(`${API_BASE}/tasks/${taskId}`);
+    await loadBoard(currentProjectId);
+  });
+}
+
+/* ---------- Utilities ---------- */
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;");
+}
+
+/* ---------- Wire up top buttons ---------- */
+$('newProjectBtn').onclick = promptCreateProject;
+$('newProjectBtn2').onclick = promptCreateProject;
+$('editProjectBtn').onclick = () => {
+  const sel = $('projectSelect');
+  if (!sel.value) return alert('No project selected');
+  promptEditProject(sel.value);
+};
+$('deleteProjectBtn').onclick = () => {
+  const sel = $('projectSelect');
+  if (!sel.value) return alert('No project selected');
+  confirmDeleteProject(sel.value);
+};
+
+// NEW: Wire up the Gantt Chart button
+$('showGanttBtn').onclick = showGanttChart;
+$('showMyTasksBtn').onclick = showMyTasks;
+
+
+/* ---------- Project create/edit/delete flows (unchanged except robust member handling) ---------- */
+async function promptCreateProject() {
+  const users = await loadUsers();
+  openModal('Create Project', (container) => {
+    const nameInput = el('input',{class:' border p-2 rounded mb-3',id:'proj_name', placeholder:'Project name'});
+    const typeSelect = el('select',{class:'w-full border p-2 rounded mb-3', id:'proj_type'});
+    ['private','public'].forEach(t => {
+      const o = new Option(t,t);
+      typeSelect.appendChild(o);
+    });
+
+    const membersWrap = el('div', {class:'mb-3'});
+    membersWrap.appendChild(el('div',{class:'text-sm text-gray-600 mb-1', text:'Members (optional)'}));
+    const list = el('div',{class:'grid grid-cols-2 gap-2'});
+    users.forEach(u => {
+      const id = 'user_' + u.id;
+      const cb = el('input',{type:'checkbox', id, 'data-uid':u.id});
+      const label = el('label',{class:'flex items-center space-x-2 border p-2 rounded'});
+      label.appendChild(cb);
+      label.appendChild(el('span',{text:u.name}));
+      list.appendChild(label);
+    });
+    membersWrap.appendChild(list);
+
+    container.appendChild(nameInput);
+    container.appendChild(typeSelect);
+    container.appendChild(membersWrap);
+  }, async () => {
+    const name = $('proj_name').value.trim();
+    const type = $('proj_type').value;
+    if (!name) throw new Error('Project name required');
+    const created = await apiPOST(`${API_BASE}/projects`, {name, project_type: type});
+    // add members if any
+    const selected = Array.from(modalBody.querySelectorAll('input[type=checkbox]:checked')).map(cb => parseInt(cb.dataset.uid));
+    if (selected.length) {
+      await apiPOST(`${API_BASE}/projects/${created.id}/members`, {user_ids: selected});
+    }
+    await loadProjects();
+  });
+  // Ensure the create project modal uses 85vw dimensions with scroll
+  modalBackdrop.classList.add('project-modal');
+  // Center the modal container to avoid overflow cutting fields
+  modalContent.classList.add('w3-display-middle');
+}
+
+async function promptEditProject(projectId) {
+  // Prefer fetching single project if possible
+  let project;
+  try {
+    project = await apiGET(`${API_BASE}/projects/${projectId}`);
+    projectsCache[projectId] = project;
+  } catch (err) {
+    // fallback to list scan
+    try {
+      const projects = await apiGET(`${API_BASE}/projects`);
+      project = projects.find(p => +p.id === +projectId);
+      if (project) projectsCache[projectId] = project;
+    } catch (e) {
+      console.error('Could not load project for edit', e);
+      return alert('Failed to load project for editing');
+    }
+  }
+  if (!project) return alert('Project not found');
+
+  const users = await loadUsers();
+
+  openModal('Edit Project', (container) => {
+    const nameInput = el('input',{class:'w-full border p-2 rounded mb-3',id:'proj_name', value:project.name});
+    const typeSelect = el('select',{class:'w-full border p-2 rounded mb-3', id:'proj_type'});
+    ['private','public'].forEach(t => {
+      const o = new Option(t,t);
+      if (t === (project.type || project.project_type)) o.selected = true;
+      typeSelect.appendChild(o);
+    });
+
+    const membersWrap = el('div', {class:'mb-3'});
+    membersWrap.appendChild(el('div',{class:'text-sm text-gray-600 mb-1', text:'Members'}));
+    const list = el('div',{class:'grid grid-cols-2 gap-2'});
+    users.forEach(u => {
+      const id = 'user_' + u.id;
+      const cb = el('input',{type:'checkbox', id, 'data-uid':u.id});
+      // mark as checked if already member (project.members may be array of names or ids)
+      if (project.members) {
+        const mems = normalizeMembers(project.members);
+        if (mems.includes(String(u.name)) || mems.includes(String(u.id))) cb.checked = true;
+      }
+      const label = el('label',{class:'flex items-center space-x-2 border p-2 rounded'});
+      label.appendChild(cb);
+      label.appendChild(el('span',{text:u.name}));
+      list.appendChild(label);
+    });
+    membersWrap.appendChild(list);
+
+    container.appendChild(nameInput);
+    container.appendChild(typeSelect);
+    container.appendChild(membersWrap);
+  }, async () => {
+    const name = $('proj_name').value.trim();
+    const type = $('proj_type').value;
+    if (!name) throw new Error('Project name required');
+    
+    // Collect the IDs of all checked users
+    const selectedMembers = Array.from(modalBody.querySelectorAll('input[type=checkbox]:checked')).map(cb => parseInt(cb.dataset.uid));
+    
+    const payload = {
+      name,
+      project_type: type,
+      members: selectedMembers // Include the members list in the PATCH request
+    };
+
+    await apiPATCH(`${API_BASE}/projects/${projectId}`, payload);
+    await loadProjects();
+  });
+  // Ensure the edit project modal uses its custom dimensions
+  modalBackdrop.classList.add('edit-project-modal');
+}
+
+async function confirmDeleteProject(projectId) {
+  openModal('Delete Project', (c) => {
+    c.innerHTML = `<p>Are you sure you want to delete this project? This cannot be undone.</p>`;
+  }, async () => {
+    await apiDELETE(`${API_BASE}/projects/${projectId}`);
+    await loadProjects();
+  });
+}
+
+/* ---------- Timeline builder ---------- */
+async function buildTimelineFromBoard(boardData){
+  const tasks = [];
+  (boardData.columns||[]).forEach(col=>{
+    (col.tasks||[]).forEach(t=>{
+      const d = t.start_date || t.end_date;
+      if(!d) return;
+      const dt = new Date(d);
+      if (isNaN(dt)) return;
+      const assigneesArr = Array.isArray(t.assignees) ? t.assignees : [];
+      tasks.push({
+        id: t.id,
+        title: t.title,
+        date: dt,
+        start_iso: t.start_date || null,
+        end_iso: t.end_date || null,
+        progress: typeof t.progress === 'number' ? t.progress : null,
+        assigned_names: assigneesArr.map(a => a.name),
+        assigned_ids: assigneesArr.map(a => a.id),
+        column_title: col.title || `Column ${col.id}`,
+        position: typeof t.position==='number' ? t.position : 0
+      });
+    });
+  });
+  tasks.sort((a,b)=>a.date-b.date);
+  lastTimelineRows = tasks;
+  renderTimeline(tasks);
+  const members = await getProjectMembers(currentProjectId);
+  renderMilestonesTable(tasks, members);
+  renderTimelineLegend(tasks);
+}
+
+function fmtDMY(d){ return d.toLocaleDateString(); }
+
+function renderMilestonesTable(rows, members){
+  const body = document.getElementById('milestoneBody');
+  if(!body) return;
+  if(!rows.length){ body.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-slate-500">No dated tasks available</td></tr>'; return; }
+
+  const buildSummary = (names=[]) => {
+    const list = names.slice(0, 2);
+    const rest = Math.max(0, names.length - list.length);
+    return list.join(', ') + (rest > 0 ? ` +${rest}` : (list.length ? '' : 'Unassigned'));
+  };
+
+  body.innerHTML = rows.map(r=>{
+    const selected = new Set((r.assigned_ids||[]).map(x => String(x)));
+    const summary = buildSummary(r.assigned_names||[]);
+    const checks = (members||[]).map(m => {
+      const checked = selected.has(String(m.id)) ? 'checked' : '';
+      const id = `assignee-${r.id}-${m.id}`;
+      return `<label for="${id}" class="flex items-center gap-2 text-sm p-1 rounded hover:bg-slate-50">
+        <input id="${id}" type="checkbox" data-uid="${m.id}" class="accent-indigo-600" ${checked} />
+        <span>${escapeHtml(m.name)}</span>
+      </label>`;
+    }).join('');
+
+    return `<tr class="border-b border-slate-100">
+      <td class="py-2 px-3 whitespace-nowrap">${fmtDMY(r.date)}</td>
+      <td class="py-2 px-3">${escapeHtml(r.title)}</td>
+      <td class="py-2 px-3 relative">
+        <div class="flex items-center gap-2">
+          <div class="text-xs text-slate-700 truncate max-w-[180px]" id="assignee-summary-${r.id}">${escapeHtml(summary)}</div>
+          <button type="button" class="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50" onclick="toggleAssigneePanel(${r.id})">Assign</button>
+        </div>
+        <div id="assignee-panel-${r.id}" class="assignee-panel hidden absolute z-20 top-8 left-3 bg-white border border-slate-200 rounded-lg shadow-lg p-3 w-64">
+          <div class="max-h-48 overflow-auto space-y-1">
+            ${checks}
+          </div>
+          <div class="flex justify-end gap-2 mt-2">
+            <button type="button" class="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50" onclick="closeAssigneePanel(${r.id})">Cancel</button>
+            <button type="button" class="px-2 py-1 text-xs rounded bg-indigo-600 text-white hover:bg-indigo-700" onclick="saveAssigneePanel(${r.id})">Save</button>
+          </div>
+        </div>
+      </td>
+      <td class="py-2 px-3 whitespace-nowrap"><input type="number" class="w-20 border rounded p-1" value="${r.position}" onchange="updateMilestonePosition(${r.id}, this.value)" /></td>
+    </tr>`;
+  }).join('');
+}
+
+// Popover helpers for assignee controls
+window.toggleAssigneePanel = function(taskId){
+  // close any open panels first
+  document.querySelectorAll('.assignee-panel').forEach(p => p.classList.add('hidden'));
+  const panel = document.getElementById(`assignee-panel-${taskId}`);
+  if (panel) panel.classList.toggle('hidden');
+};
+window.closeAssigneePanel = function(taskId){
+  const panel = document.getElementById(`assignee-panel-${taskId}`);
+  if (panel) panel.classList.add('hidden');
+};
+window.saveAssigneePanel = async function(taskId){
+  const panel = document.getElementById(`assignee-panel-${taskId}`);
+  if (!panel) return;
+  const ids = Array.from(panel.querySelectorAll('input[type=checkbox][data-uid]'))
+    .filter(cb => cb.checked)
+    .map(cb => parseInt(cb.getAttribute('data-uid')));
+  try {
+    await apiPATCH(`${API_BASE}/tasks/${taskId}`, {assignees: ids});
+    closeAssigneePanel(taskId);
+    await loadBoard(currentProjectId);
+  } catch (e) {
+    alert('Failed to update task assignees');
+  }
+};
+
+// Close panels when clicking outside
+window.addEventListener('click', (e) => {
+  const isPanel = e.target.closest?.('.assignee-panel');
+  const isButton = e.target.closest?.('button[onclick^="toggleAssigneePanel("]');
+  if (!isPanel && !isButton) {
+    document.querySelectorAll('.assignee-panel').forEach(p => p.classList.add('hidden'));
+  }
+});
+
+
+window.updateMilestonePosition = async function(taskId, newVal){
+  try{
+    await apiPATCH(`${API_BASE}/tasks/${taskId}`, {position: Number(newVal)});
+    await loadBoard(currentProjectId);
+  }catch(e){ alert('Failed to update position'); }
+}
+
+function renderTimeline(rows){
+  const svg = document.getElementById('timelineSVG');
+  const axisWrap = document.getElementById('timelineAxis');
+  if(!svg || !axisWrap) return;
+  const W = 1200; const H = 180; const axisY = 90;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = '';
+  if(!rows.length){
+    svg.innerHTML = `<text x="${W/2}" y="${axisY}" text-anchor="middle" fill="#94a3b8" font-size="14">No milestones with dates</text>`;
+    return;
+  }
+  const baseMin = rows[0].date.getTime();
+  const baseMax = rows[rows.length-1].date.getTime();
+  const baseSpan = Math.max(1, (baseMax - baseMin));
+  if (!timelineCenterTs) timelineCenterTs = Math.floor((baseMin + baseMax)/2);
+  const effectiveSpan = Math.max(1, baseSpan / Math.max(0.125, timelineZoom));
+  let effMin = timelineCenterTs - effectiveSpan/2;
+  let effMax = timelineCenterTs + effectiveSpan/2;
+
+  // render/update mini-map overview
+  renderTimelineMiniMap(rows, baseMin, baseMax, effMin, effMax);
+
+  const scaleX = (ts)=> 40 + (W-80) * ((ts - effMin)/(effMax - effMin));
+  const invertScaleX = (x)=> effMin + ((x - 40)/(W-80)) * (effMax - effMin);
+
+  // axis line
+  const axis = document.createElementNS('http://www.w3.org/2000/svg','line');
+  axis.setAttribute('x1','40'); axis.setAttribute('x2', String(W-40));
+  axis.setAttribute('y1', String(axisY)); axis.setAttribute('y2', String(axisY));
+  axis.setAttribute('stroke','#f59e0b'); axis.setAttribute('stroke-width','2');
+  svg.appendChild(axis);
+
+  // background pane for panning
+  const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  bg.setAttribute('x','0'); bg.setAttribute('y','0');
+  bg.setAttribute('width', String(W)); bg.setAttribute('height', String(H));
+  bg.setAttribute('fill','transparent');
+  bg.style.cursor = 'grab';
+  svg.insertBefore(bg, axis); // ensure behind other elements
+
+  const dayMs = 86400000;
+
+  // Pan handlers (drag background to move timeline)
+  const beginPan = (ev) => {
+    if (timelineDraggingTask) return; // don't pan during task drag
+    isTimelinePanning = true;
+    panStartClientX = ev.clientX;
+    panStartCenterTs = timelineCenterTs;
+    bg.style.cursor = 'grabbing';
+    window.addEventListener('mousemove', onPanMove);
+    window.addEventListener('mouseup', endPan);
+  };
+  const onPanMove = (ev) => {
+    if (!isTimelinePanning) return;
+    const deltaPx = ev.clientX - panStartClientX;
+    const deltaTs = ((deltaPx)/(W-80)) * (effMax - effMin);
+    timelineCenterTs = panStartCenterTs - deltaTs;
+    // re-render using cached rows, no rebuild
+    renderTimeline(lastTimelineRows);
+  };
+  const endPan = () => {
+    isTimelinePanning = false;
+    bg.style.cursor = 'grab';
+    window.removeEventListener('mousemove', onPanMove);
+    window.removeEventListener('mouseup', endPan);
+  };
+  bg.addEventListener('mousedown', beginPan);
+
+  rows.forEach((r,idx)=>{
+    const xTs = r.date.getTime();
+    let x = scaleX(xTs);
+    x = Math.max(40, Math.min(W-40, x));
+    const magnitude = 40 + (Math.abs(r.position)||0); // keep "position" as vertical offset magnitude
+    const above = (idx % 2) === 0; // alternate: first above, second below, etc.
+    const dy = above ? -magnitude : magnitude;
+
+    // determine color by mode
+    const groupKey = colorMode === 'assignee'
+      ? ((r.assigned_names && r.assigned_names[0]) || 'Unassigned')
+      : (r.column_title || 'Column');
+    const color = colorMode === 'assignee' ? (colorMaps.assignee[groupKey] || '#3b82f6') : (colorMaps.column[groupKey] || '#3b82f6');
+
+    // marker
+    const circ = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circ.setAttribute('cx', String(x)); circ.setAttribute('cy', String(axisY));
+    circ.setAttribute('r','4'); circ.setAttribute('fill', color);
+    circ.style.cursor = 'pointer';
+    svg.appendChild(circ);
+
+    // guideline
+    const gl = document.createElementNS('http://www.w3.org/2000/svg','line');
+    gl.setAttribute('x1', String(x)); gl.setAttribute('x2', String(x));
+    gl.setAttribute('y1', String(axisY)); gl.setAttribute('y2', String(axisY+dy));
+    gl.setAttribute('stroke', color); gl.setAttribute('stroke-width','1');
+    svg.appendChild(gl);
+
+    // label (name)
+    const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+    text.setAttribute('x', String(x));
+    text.setAttribute('y', String(axisY+dy + (above? -10: 14)));
+    text.setAttribute('text-anchor','middle');
+    text.setAttribute('font-size','11');
+    text.setAttribute('fill','#0f172a');
+    text.style.cursor = 'pointer';
+    text.textContent = r.title;
+    svg.appendChild(text);
+
+    // sub label (assignees)
+    let sub = null;
+    const assignedStr = (r.assigned_names||[]).join(', ');
+    if(assignedStr){
+      sub = document.createElementNS('http://www.w3.org/2000/svg','text');
+      sub.setAttribute('x', String(x));
+      sub.setAttribute('y', String(axisY+dy + (above? -24: 28)));
+      sub.setAttribute('text-anchor','middle');
+      sub.setAttribute('font-size','10');
+      sub.setAttribute('fill','#64748b');
+      sub.style.cursor = 'pointer';
+      sub.textContent = assignedStr;
+      svg.appendChild(sub);
+    }
+
+    // Tooltip content (start/end/progress)
+    const startStr = r.start_iso ? formatDate(r.start_iso) : '—';
+    const endStr = r.end_iso ? formatDate(r.end_iso) : '—';
+    const progStr = (r.progress !== null && r.progress !== undefined) ? `${r.progress}%` : '—';
+
+    const showTip = () => {
+      const html = `<div class='font-semibold'>${escapeHtml(r.title)}</div>`+
+        (assignedStr ? `<div class='text-gray-300'>${escapeHtml(assignedStr)}</div>`:'')+
+        `<div class='mt-0.5'>Start: ${escapeHtml(startStr)} • End: ${escapeHtml(endStr)} • Progress: ${escapeHtml(progStr)}</div>`;
+      const tipX = x + 12; // svg coords within container
+      const tipY = axisY + dy + (above ? -30 : 10);
+      showTimelineTooltip(html, tipX, tipY);
+    };
+    const hideTip = () => hideTimelineTooltip();
+    const open = () => openTaskFromTimeline(r.id);
+
+    [circ, text, sub].filter(Boolean).forEach(elm => {
+      elm.addEventListener('mouseenter', showTip);
+      elm.addEventListener('mouseleave', hideTip);
+      elm.addEventListener('click', open);
+    });
+
+    // Drag-to-reposition horizontally (updates dates)
+    let dragging = false;
+    let startClientX = 0;
+    let startXT = x;
+    const anchorTs = r.start_iso ? new Date(r.start_iso).getTime() : (r.end_iso ? new Date(r.end_iso).getTime() : xTs);
+
+    // ghost preview for duration tasks
+    let ghostRect = null;
+
+    const onMouseMove = (ev) => {
+      if (!dragging) return;
+      const delta = ev.clientX - startClientX;
+      const newX = Math.max(40, Math.min(W-40, startXT + delta));
+      // update visuals while dragging
+      circ.setAttribute('cx', String(newX));
+      gl.setAttribute('x1', String(newX));
+      gl.setAttribute('x2', String(newX));
+      text.setAttribute('x', String(newX));
+      if (sub) sub.setAttribute('x', String(newX));
+      const newTs = invertScaleX(newX);
+      const tmpDate = new Date(newTs);
+
+      // update ghost preview when dragging a duration
+      if (r.start_iso && r.end_iso) {
+        const deltaTs = newTs - anchorTs;
+        const startTs0 = new Date(r.start_iso).getTime();
+        const endTs0 = new Date(r.end_iso).getTime();
+        const sTs = startTs0 + deltaTs;
+        const eTs = endTs0 + deltaTs;
+        const x1 = Math.max(40, Math.min(W-40, scaleX(sTs)));
+        const x2 = Math.max(40, Math.min(W-40, scaleX(eTs)));
+        const rx = Math.min(x1, x2);
+        const rw = Math.abs(x2 - x1);
+        if (!ghostRect){
+          ghostRect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+          ghostRect.setAttribute('y', String(axisY - 6));
+          ghostRect.setAttribute('height', '12');
+          ghostRect.setAttribute('fill', '#93c5fd55');
+          ghostRect.setAttribute('stroke', '#3b82f6');
+          ghostRect.setAttribute('stroke-dasharray', '3,2');
+          svg.appendChild(ghostRect);
+        }
+        ghostRect.setAttribute('x', String(rx));
+        ghostRect.setAttribute('width', String(rw));
+      }
+
+      showTimelineTooltip(`<div class='font-semibold'>${escapeHtml(r.title)}</div><div>New date: ${escapeHtml(tmpDate.toLocaleDateString())}</div>`, newX+12, axisY + (above? dy-30 : dy+10));
+    };
+    const onMouseUp = async (ev) => {
+      if (!dragging) return;
+      dragging = false;
+      timelineDraggingTask = false;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      hideTimelineTooltip();
+      if (ghostRect && ghostRect.parentNode) ghostRect.parentNode.removeChild(ghostRect);
+      const delta = ev.clientX - startClientX;
+      const newX = Math.max(40, Math.min(W-40, startXT + delta));
+      const newTs = invertScaleX(newX);
+      const deltaDays = Math.round((newTs - anchorTs) / dayMs);
+      if (deltaDays === 0) return; // no change
+      try {
+        const payload = {};
+        if (r.start_iso && r.end_iso) {
+          const s = new Date(r.start_iso).getTime() + deltaDays*dayMs;
+          const e = new Date(r.end_iso).getTime() + deltaDays*dayMs;
+          payload.start_date = new Date(s).toISOString().slice(0,10);
+          payload.end_date = new Date(e).toISOString().slice(0,10);
+        } else if (r.start_iso) {
+          const s = new Date(r.start_iso).getTime() + deltaDays*dayMs;
+          payload.start_date = new Date(s).toISOString().slice(0,10);
+        } else if (r.end_iso) {
+          const e = new Date(r.end_iso).getTime() + deltaDays*dayMs;
+          payload.end_date = new Date(e).toISOString().slice(0,10);
+        } else {
+          // no dates, set start_date only
+          payload.start_date = new Date(anchorTs + deltaDays*dayMs).toISOString().slice(0,10);
+        }
+        await apiPATCH(`${API_BASE}/tasks/${r.id}`, payload);
+        await loadBoard(currentProjectId);
+      } catch (err) {
+        console.warn('Failed to update task date via drag', err);
+        await loadBoard(currentProjectId);
+      }
+    };
+    const onMouseDown = (ev) => {
+      dragging = true;
+      timelineDraggingTask = true;
+      startClientX = ev.clientX;
+      startXT = parseFloat(circ.getAttribute('cx')) || x;
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    };
+    [circ, text, sub].filter(Boolean).forEach(elm => {
+      elm.addEventListener('mousedown', onMouseDown);
+    });
+  });
+}
+
+function ensureTimelineTooltip(){
+  const wrap = document.getElementById('timelineAxis');
+  if (!wrap) return null;
+  let tip = document.getElementById('timelineTooltip');
+  if (!tip){
+    tip = document.createElement('div');
+    tip.id = 'timelineTooltip';
+    tip.className = 'absolute bg-slate-900 text-white text-xs rounded px-2 py-1 shadow hidden pointer-events-none';
+    wrap.appendChild(tip);
+  }
+  return tip;
+}
+function showTimelineTooltip(html, x, y){
+  const tip = ensureTimelineTooltip();
+  if (!tip) return;
+  tip.innerHTML = html;
+  tip.style.left = `${x}px`;
+  tip.style.top = `${y}px`;
+  tip.classList.remove('hidden');
+}
+function hideTimelineTooltip(){
+  const tip = document.getElementById('timelineTooltip');
+  if (tip) tip.classList.add('hidden');
+}
+
+function ensureTimelineControls(){
+  const wrap = document.getElementById('timelineAxis');
+  if (!wrap) return;
+  // ensure positioning context for absolute children
+  if (!wrap.style.position || wrap.style.position === 'static') wrap.style.position = 'relative';
+  let bar = document.getElementById('timelineControls');
+  if (!bar){
+    bar = document.createElement('div');
+    bar.id = 'timelineControls';
+    bar.className = 'absolute top-2 right-2 flex items-center gap-2';
+    bar.innerHTML = `
+      <div class=\"hidden sm:flex items-center gap-2\">
+        <span class=\"text-xs text-slate-600\">Color by</span>
+        <select id=\"tlColorBy\" class=\"border rounded px-2 py-1 text-xs\">
+          <option value=\"column\">Column</option>
+          <option value=\"assignee\">Assignee</option>
+        </select>
+      </div>
+      <button id=\"tlZoomOut\" class=\"px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50\">−</button>
+      <button id=\"tlZoomReset\" class=\"px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50\">Reset</button>
+      <button id=\"tlZoomIn\" class=\"px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50\">+</button>
+    `;
+    wrap.appendChild(bar);
+    // Legend container (top-left)
+    let legend = document.getElementById('timelineLegend');
+    if (!legend){
+      legend = document.createElement('div');
+      legend.id = 'timelineLegend';
+      legend.className = 'absolute top-2 left-2 flex flex-wrap gap-2 bg-white/70 backdrop-blur px-2 py-1 rounded border border-slate-200';
+      wrap.appendChild(legend);
+    }
+    const attach = () => {
+      const zoomInBtn = document.getElementById('tlZoomIn');
+      const zoomOutBtn = document.getElementById('tlZoomOut');
+      const zoomResetBtn = document.getElementById('tlZoomReset');
+      const colorBy = document.getElementById('tlColorBy');
+      if (zoomInBtn) zoomInBtn.onclick = () => { timelineZoom = Math.min(16, timelineZoom * 1.5); buildTimelineFromBoard(lastBoardData); };
+      if (zoomOutBtn) zoomOutBtn.onclick = () => { timelineZoom = Math.max(0.125, timelineZoom / 1.5); buildTimelineFromBoard(lastBoardData); };
+      if (zoomResetBtn) zoomResetBtn.onclick = () => { timelineZoom = 1; timelineCenterTs = null; buildTimelineFromBoard(lastBoardData); };
+      if (colorBy) colorBy.onchange = (e) => { colorMode = e.target.value; buildTimelineFromBoard(lastBoardData); };
+    };
+    attach();
+  }
+}
+
+function renderTimelineLegend(rows){
+  const legend = document.getElementById('timelineLegend');
+  if (!legend || !rows || !rows.length) return;
+  const keys = new Map();
+  rows.forEach(r => {
+    const key = colorMode === 'assignee' ? ((r.assigned_names && r.assigned_names[0]) || 'Unassigned') : (r.column_title || 'Column');
+    keys.set(key, (colorMode === 'assignee' ? (colorMaps.assignee[key]||'#3b82f6') : (colorMaps.column[key]||'#3b82f6')));
+  });
+  legend.innerHTML = Array.from(keys.entries()).slice(0,12).map(([k,c]) => `
+    <span class=\"flex items-center gap-1 text-xs text-slate-700\">
+      <span style=\"background:${c}\" class=\"inline-block w-3 h-3 rounded-full border border-slate-300\"></span>
+      ${escapeHtml(k)}
+    </span>
+  `).join('');
+}
+
+function ensureTimelineMiniMap(){
+  const wrap = document.getElementById('timelineAxis');
+  if (!wrap) return;
+  if (!wrap.style.position || wrap.style.position === 'static') wrap.style.position = 'relative';
+  let holder = document.getElementById('timelineMiniWrap');
+  if (!holder){
+    holder = document.createElement('div');
+    holder.id = 'timelineMiniWrap';
+    holder.className = 'mt-2 relative';
+    holder.innerHTML = `<svg id="timelineMiniSVG" viewBox="0 0 1200 56" class="w-full"></svg>`;
+    wrap.appendChild(holder);
+  }
+}
+
+function renderTimelineMiniMap(rows, baseMin, baseMax, effMin, effMax){
+  const mini = document.getElementById('timelineMiniSVG');
+  if (!mini || !rows.length) return;
+  const MW = 1200, MH = 56, AY = 28;
+  mini.setAttribute('viewBox', `0 0 ${MW} ${MH}`);
+  mini.innerHTML = '';
+  const span = Math.max(1, baseMax - baseMin);
+  const scale = (ts) => 10 + (MW-20) * ((ts - baseMin)/span);
+  const inv = (x) => baseMin + ((x - 10)/(MW-20)) * span;
+
+  // background capture
+  const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  bg.setAttribute('x','0'); bg.setAttribute('y','0');
+  bg.setAttribute('width', String(MW)); bg.setAttribute('height', String(MH));
+  bg.setAttribute('fill','transparent');
+  mini.appendChild(bg);
+
+  // axis
+  const axis = document.createElementNS('http://www.w3.org/2000/svg','line');
+  axis.setAttribute('x1','10'); axis.setAttribute('x2', String(MW-10));
+  axis.setAttribute('y1', String(AY)); axis.setAttribute('y2', String(AY));
+  axis.setAttribute('stroke','#cbd5e1'); axis.setAttribute('stroke-width','2');
+  mini.appendChild(axis);
+
+  // markers
+  rows.forEach(r => {
+    const x = Math.max(10, Math.min(MW-10, scale(r.date.getTime())));
+    const mk = document.createElementNS('http://www.w3.org/2000/svg','line');
+    mk.setAttribute('x1', String(x)); mk.setAttribute('x2', String(x));
+    mk.setAttribute('y1', String(AY-6)); mk.setAttribute('y2', String(AY+6));
+    mk.setAttribute('stroke','#94a3b8'); mk.setAttribute('stroke-width','1');
+    mini.appendChild(mk);
+  });
+
+  // viewport window
+  const vx1 = Math.max(10, Math.min(MW-10, scale(effMin)));
+  const vx2 = Math.max(10, Math.min(MW-10, scale(effMax)));
+  const vr = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  vr.setAttribute('x', String(Math.min(vx1, vx2)));
+  vr.setAttribute('y', String(AY-10));
+  vr.setAttribute('width', String(Math.abs(vx2 - vx1)));
+  vr.setAttribute('height', '20');
+  vr.setAttribute('fill', '#22c55e33');
+  vr.setAttribute('stroke', '#16a34a');
+  vr.style.cursor = 'grab';
+  mini.appendChild(vr);
+
+  // interactions
+  const startDrag = (ev) => {
+    isMiniDragging = true;
+    miniDragStartX = ev.clientX;
+    miniStartCenterTs = timelineCenterTs;
+    vr.style.cursor = 'grabbing';
+    const onMove = (ev2) => {
+      if (!isMiniDragging) return;
+      const dx = ev2.clientX - miniDragStartX;
+      const dTs = (dx/(MW-20)) * span;
+      timelineCenterTs = miniStartCenterTs + dTs;
+      renderTimeline(lastTimelineRows);
+    };
+    const onUp = () => {
+      isMiniDragging = false;
+      vr.style.cursor = 'grab';
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+  vr.addEventListener('mousedown', startDrag);
+
+  const onBgClick = (ev) => {
+    const rect = mini.getBoundingClientRect();
+    const x = ev.clientX - rect.left;
+    const ts = inv(x);
+    timelineCenterTs = ts;
+    renderTimeline(lastTimelineRows);
+  };
+  bg.addEventListener('mousedown', onBgClick);
+}
+
+function openTaskFromTimeline(taskId){
+  try{
+    if (!lastBoardData) return;
+    let found = null;
+    (lastBoardData.columns||[]).some(col => {
+      const t = (col.tasks||[]).find(x => String(x.id) === String(taskId));
+      if (t){ found = t; return true; }
+      return false;
+    });
+    if (found){
+      promptEditTask(found);
+    }
+  }catch(e){ console.warn('Failed to open task from timeline', e); }
+}
+
+/* ---------- NEW: Gantt Chart Functionality ---------- */
+async function showGanttChart() {
+  if (!currentProjectId) {
+    alert('Please select a project first.');
+    return;
+  }
+
+  if (!canAccessProject) {
+    const username = current_user && current_user.username ? current_user.username.toString() : 'user';
+    alert(`Access Denied: ${username} You are not a member of this private project.`);
+    return;
+  }
+  try {
+    const boardData = await apiGET(`${API_BASE}/projects/${currentProjectId}/board`);
+    ensureColorMaps(boardData);
+    
+    let tasks = [];
+    let legendMap = new Map();
+    if (boardData && boardData.columns) {
+      boardData.columns.forEach(column => {
+        (column.tasks || []).forEach(task => {
+          if (task.start_date && task.end_date) {
+            const assName = (Array.isArray(task.assignees) && task.assignees.length) ? (task.assignees[0].name || task.assignees[0]) : 'Unassigned';
+            const groupKey = (colorMode === 'assignee') ? assName : (column.title || `Column ${column.id}`);
+            const color = (colorMode === 'assignee') ? (colorMaps.assignee[groupKey]||'#3b82f6') : (colorMaps.column[groupKey]||'#3b82f6');
+            const slug = slugify(groupKey);
+            legendMap.set(groupKey, color);
+            tasks.push({
+              id: `Task-${task.id}`,
+              name: task.title,
+              start: task.start_date.slice(0, 10),
+              end: task.end_date.slice(0, 10),
+              progress: task.progress || 0,
+              custom_class: `color-${slug}`
+            });
+          }
+        });
+      });
+    }
+
+    if (tasks.length === 0) {
+      alert('This project has no tasks with start and end dates to display in a Gantt chart.');
+      return;
+    }
+
+    const title = 'Gantt Chart';
+    openModal(title, (c) => {
+      // Legend + controls
+      const topBar = document.createElement('div');
+      topBar.className = 'flex items-center justify-between mb-2';
+      const left = document.createElement('div');
+      left.className = 'flex items-center gap-2 text-sm';
+      left.innerHTML = `<span class="text-slate-600">Color by</span>
+        <select id="ganttColorBy" class="border rounded px-2 py-1 text-sm">
+          <option value="column" ${colorMode==='column'?'selected':''}>Column</option>
+          <option value="assignee" ${colorMode==='assignee'?'selected':''}>Assignee</option>
+        </select>`;
+      const legend = document.createElement('div');
+      legend.id = 'ganttLegend';
+      legend.className = 'flex flex-wrap gap-2';
+      topBar.appendChild(left);
+      topBar.appendChild(legend);
+      c.appendChild(topBar);
+
+      // Create the container for the chart
+      const chartDiv = document.createElement('div');
+      chartDiv.id = 'ganttChartContainer';
+      c.appendChild(chartDiv);
+    }, () => {
+      // The Gantt chart is for viewing, so confirm button has no action
+      closeModal();
+    }, true); // The `true` argument makes the modal wide
+
+    // Hide the confirm button for this modal
+    modalConfirm.style.display = 'none';
+
+    // Inject style rules for colors
+    const styleEl = document.createElement('style');
+    styleEl.type = 'text/css';
+    styleEl.textContent = Array.from(legendMap.entries()).map(([k,c]) => {
+      const slug = slugify(k);
+      return [
+        `.bar.color-${slug} { fill: ${c} !important; stroke: ${c} !important; }`,
+        `.bar-progress.color-${slug} { fill: ${c} !important; }`,
+        `g.color-${slug} .bar { fill: ${c} !important; stroke: ${c} !important; }`,
+        `g.color-${slug} .bar-progress { fill: ${c} !important; }`,
+        `.bar.color-${slug}:hover, g.color-${slug} .bar:hover { opacity: .9; }`
+      ].join('\n');
+    }).join('\n');
+    document.head.appendChild(styleEl);
+
+    // Build legend
+    const legend = document.getElementById('ganttLegend');
+    if (legend){
+      legend.innerHTML = Array.from(legendMap.entries()).slice(0,16).map(([k,c]) => `
+        <span class="flex items-center gap-1 text-xs text-slate-700">
+          <span style="background:${c}" class="inline-block w-3 h-3 rounded-full border border-slate-300"></span>
+          ${escapeHtml(k)}
+        </span>
+      `).join('');
+    }
+
+    // Initialize the Gantt chart after the container is in the DOM
+    let gantt = new Gantt('#ganttChartContainer', tasks, {
+      bar_height: 20,
+      padding: 18,
+      view_modes: ['Day', 'Week', 'Month'],
+      bar_corner_radius: 3,
+      on_click: (task) => {
+        const id = (task.id || '').replace('Task-','');
+        if (id) {
+          // close modal then open edit
+          closeModal();
+          // Find the task in lastBoardData and open
+          openTaskFromTimeline(id);
+        }
+      }
+    });
+
+    const colorBySel = document.getElementById('ganttColorBy');
+    if (colorBySel){
+      colorBySel.onchange = async () => { colorMode = colorBySel.value; await showGanttChart(); };
+    }
+
+  } catch (err) {
+    console.error('Error loading tasks for Gantt chart', err);
+    alert('Failed to load tasks for Gantt chart.');
+  }
+}
+
+/* ---------- My Tasks Modal (Assigned to me in current project) ---------- */
+async function showMyTasks(){
+  if (!currentProjectId) { alert('Please select a project first.'); return; }
+  if (!canAccessProject) {
+    const uname = current_user && current_user.username ? current_user.username.toString() : 'user';
+    alert(`Access Denied: ${uname} You are not a member of this private project.`);
+    return;
+  }
+  try {
+    let boardData = lastBoardData;
+    if (!boardData || !boardData.columns) {
+      boardData = await apiGET(`${API_BASE}/projects/${currentProjectId}/board`);
+    }
+    const meId = current_user && current_user.id ? String(current_user.id) : null;
+    const meName = (current_user && current_user.username ? current_user.username : '').toLowerCase();
+    const mine = [];
+    (boardData.columns||[]).forEach(col => {
+      (col.tasks||[]).forEach(t => {
+        const assigned = Array.isArray(t.assignees) ? t.assignees : [];
+        const isMine = assigned.some(a => {
+          const aId = (a && a.id !== undefined) ? String(a.id) : null;
+          const aName = (a && a.name) ? a.name.toLowerCase() : '';
+          return (meId && aId === meId) || (aName && aName === meName);
+        });
+        if (isMine) {
+          mine.push({
+            id: t.id,
+            title: t.title || '',
+            description: t.description || '',
+            column: col.title || `Column ${col.id}`,
+            start: t.start_date ? t.start_date.slice(0,10) : '',
+            end: t.end_date ? t.end_date.slice(0,10) : '',
+            progress: (typeof t.progress === 'number') ? t.progress : 0,
+            assignees: assigned.map(a => a && a.name ? a.name : '').filter(Boolean).join(', ')
+          });
+        }
+      });
+    });
+
+    openModal('My Tasks', (c) => {
+      c.innerHTML = `
+        <div class="mb-3">
+          <input id="myTasksSearch" class="w-full border p-2 rounded" placeholder="Search by title, description, column, assignee..." />
+        </div>
+        <div class="max-h-[60vh] overflow-auto">
+          <table class="min-w-full text-sm">
+            <thead class="bg-slate-50 sticky top-0">
+              <tr>
+                <th class="px-3 py-2 text-left">Title</th>
+                <th class="px-3 py-2 text-left">Description</th>
+                <th class="px-3 py-2 text-left">Column</th>
+                <th class="px-3 py-2 text-left">Start</th>
+                <th class="px-3 py-2 text-left">End</th>
+                <th class="px-3 py-2 text-left">Progress</th>
+                <th class="px-3 py-2 text-left">Assignees</th>
+              </tr>
+            </thead>
+            <tbody id="myTasksBody"></tbody>
+          </table>
+        </div>
+      `;
+      const tbody = document.getElementById('myTasksBody');
+      const renderRows = (rows) => {
+        if (!rows || !rows.length) {
+          tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-slate-500">No tasks assigned to you</td></tr>';
+          return;
+        }
+        tbody.innerHTML = rows.map(r => `
+          <tr class="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" data-task-id="${r.id}">
+            <td class="px-3 py-2 font-medium">${escapeHtml(r.title)}</td>
+            <td class="px-3 py-2">${escapeHtml(r.description)}</td>
+            <td class="px-3 py-2">${escapeHtml(r.column)}</td>
+            <td class="px-3 py-2">${escapeHtml(r.start || '—')}</td>
+            <td class="px-3 py-2">${escapeHtml(r.end || '—')}</td>
+            <td class="px-3 py-2">${r.progress}%</td>
+            <td class="px-3 py-2">${escapeHtml(r.assignees)}</td>
+          </tr>
+        `).join('');
+        // Click to open editor
+        Array.from(tbody.querySelectorAll('tr[data-task-id]')).forEach(tr => {
+          tr.addEventListener('click', () => { const id = tr.getAttribute('data-task-id'); closeModal(); openTaskFromTimeline(id); });
+        });
+      };
+      renderRows(mine);
+      const input = document.getElementById('myTasksSearch');
+      if (input){
+        input.addEventListener('input', () => {
+          const q = (input.value||'').toLowerCase();
+          const filtered = mine.filter(r => `${r.title} ${r.description} ${r.column} ${r.assignees}`.toLowerCase().includes(q));
+          renderRows(filtered);
+        });
+      }
+    }, () => { closeModal(); });
+    // Apply custom sizing for My Tasks modal
+    modalBackdrop.classList.add('my-tasks-modal');
+  } catch (err) {
+    console.error('Failed to load my tasks', err);
+    alert('Failed to load tasks assigned to you.');
+  }
+}
+
+/* ---------- Initial load ---------- */
+window.onload = async () => {
+  await loadUsers(); // prefetch users for quick modals
+  await loadProjects();
+};
+</script>
+</body>
+</html>

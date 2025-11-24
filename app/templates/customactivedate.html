@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ASL Active 90</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    form {
+      margin-bottom: 20px;
+    }
+    input {
+      margin: 5px;
+      padding: 5px;
+    }
+    button {
+      padding: 6px 12px;
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 20px;
+      width: 50%;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+    }
+    #result {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>ASL Active 90</h2>
+  <form id="aslForm">
+    <label>Start Date: 
+      <input type="date" id="start_date" name="start_date">
+    </label>
+    <label>End Date: 
+      <input type="date" id="end_date" name="end_date">
+    </label>
+    <button type="submit">Fetch Data</button>
+  </form>
+
+  <div id="result"></div>
+
+  <script>
+    document.getElementById("aslForm").addEventListener("submit", async function(event) {
+      event.preventDefault();
+
+      const start_date = document.getElementById("start_date").value;
+      const end_date = document.getElementById("end_date").value;
+
+      const formData = new FormData();
+      if (start_date) formData.append("start_date", start_date);
+      if (end_date) formData.append("end_date", end_date);
+
+      try {
+        const response = await fetch("/api/asl-active90", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          document.getElementById("result").innerHTML = `<p style="color:red;">Error: ${data.error}</p>`;
+          return;
+        }
+
+        // Build table
+        let tableHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>ASL Active 30</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${data.start_date}</td>
+                <td>${data.end_date}</td>
+                <td>${data.asl_active30}</td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+        document.getElementById("result").innerHTML = tableHTML;
+
+      } catch (err) {
+        document.getElementById("result").innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+      }
+    });
+  </script>
+
+</body>
+</html>

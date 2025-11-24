@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Akello Metrics Dashboard</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 50%;
+            margin: 20px auto;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        h2 {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h2>Akello Metrics from {{ start_date }} to {{ end_date }}</h2>
+    <table>
+        <tr>
+            <th>Metric</th>
+            <th>Value</th>
+        </tr>
+        {% for row in metrics %}
+        <tr>
+            <td>{{ row['Akello Metric'] }}</td>
+            <td>{{ row['Stats'] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.10.0/js/anychart-bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> -->
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+  <style>
+    .asl-color{
+      background-color: yellow !important;
+    }
+    
+  </style>
+</head>
+{% block content %}
+<div class="container" style="margin-top: 50%;">
+  <div class="w3-display-middle w3-padding w3-margin" style="width:85vw; height: 90vh; margin-left: -20%; overflow-y: auto;">
+    <div class="w3-animate-bottom " style="width: 80vw; margin-top: 4%;   height: 86vh;">
+      <div class="w3-bar w3-margin-top w3-center tabs-container w3-round container-fluid image-star-background"
+        style="width: 76vw; height: 85vh; overflow-y: auto;margin-right: 5%; ">
+
+
+          <div id="Overview" class="menu" >
+            
+            <div class="container-fluid">
+
+              <div class="col-sm-12 w3-margin-top w3-round">
+                <span class="w3-center">
+                                <!-- Search input -->
+                                <input type="text" id="userSearchInput" onkeyup="filterUsers()" placeholder="Search for users..." style="border-radius: 25px 25px 25px 25px; width: 60%;" class=" w3-padding w3-input w3-card w3-border w3-round w3-margin" />
+                            </span>
+                            <table class="table table-striped col-sm-12 w3-card w3-border w3-round">
+                                <thead style="background-color: #e6f0ff;">
+                                    <tr>
+                                        <th><b>School</b></th>
+                                        <th><b>Province</b></th>
+                                        <th><b>District</b></th>
+                                        <th><b>ASL MTD</b></th>
+                                        <th><b>AL MTD</b></th>
+                                        <th><b>Total MTD</b></th>
+                                        <th><b>BA</b></th>
+                                    </tr>
+                                </thead>
+                                <tbody style="text-align: left;">
+                                    <tr>
+                                      <td>siun</td>
+                                      <td>asc</td>
+                                      <td>ac</td>
+                                      <td>acasa</td>
+                                      <td>ftjhb</td>
+                                      <td>bmghfh</td>
+                                      <td>nbfdn</td>
+                                    </tr>
+                                    <tr>
+                                      <td>siun</td>
+                                      <td>asc</td>
+                                      <td>ac</td>
+                                      <td>acasa</td>
+                                      <td>ftjhb</td>
+                                      <td>bmghfh</td>
+                                      <td>nbfdn</td>
+                                    </tr>
+                                    <tr>
+                                      <td>siun</td>
+                                      <td>asc</td>
+                                      <td>ac</td>
+                                      <td>acasa</td>
+                                      <td>ftjhb</td>
+                                      <td>bmghfh</td>
+                                      <td>nbfdn</td>
+                                    </tr>
+                                    <tr>
+                                      <td>siun</td>
+                                      <td>asc</td>
+                                      <td>ac</td>
+                                      <td>acasa</td>
+                                      <td>ftjhb</td>
+                                      <td>bmghfh</td>
+                                      <td>nbfdn</td>
+                                    </tr>
+                                    <tr>
+                                      <td>siun</td>
+                                      <td>asc</td>
+                                      <td>ac</td>
+                                      <td>acasa</td>
+                                      <td>ftjhb</td>
+                                      <td>bmghfh</td>
+                                      <td>nbfdn</td>
+                                    </tr>
+                                    <tr>
+                                      <td>siun</td>
+                                      <td>asc</td>
+                                      <td>ac</td>
+                                      <td>acasa</td>
+                                      <td>ftjhb</td>
+                                      <td>bmghfh</td>
+                                      <td>nbfdn</td>
+                                    </tr>
+                                    <tr>
+                                      <td>siun</td>
+                                      <td>asc</td>
+                                      <td>ac</td>
+                                      <td>acasa</td>
+                                      <td>ftjhb</td>
+                                      <td>bmghfh</td>
+                                      <td>nbfdn</td>
+                                    </tr>
+                                    <tr>
+                                      <td>siun</td>
+                                      <td>asc</td>
+                                      <td>ac</td>
+                                      <td>acasa</td>
+                                      <td>ftjhb</td>
+                                      <td>bmghfh</td>
+                                      <td>nbfdn</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+              </div>
+                        
+            </div>
+
+          </div>
+          <!-- <div id="Library" class="menu" style="display:none;">Content for Library</div>
+          <div id="Smartlearning" class="menu" style="display:none;">Content for C4K</div> -->
+
+
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+{% endblock %}

@@ -1,0 +1,195 @@
+<!-- Branding Tracker Modal and scripts (extracted) -->
+<div id="branding_tracker_modal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 95vw; height: 85vh; overflow: auto; position: relative;">
+    <header class="w3-container w3-padding" style="background: linear-gradient(135deg,#1f2937,#4f46e5); color:#fff;">
+      <span onclick="document.getElementById('branding_tracker_modal').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <h5 class="w3-margin-0"><i class="fa fa-tags"></i> Branding Tracker</h5>
+    </header>
+    <div id="brandingToast" class="w3-panel" style="display:none; position:absolute; top:10px; right:10px; z-index:10; border-radius:8px;"></div>
+    <div class="w3-container w3-small w3-margin-top">
+      <div class="w3-row-padding">
+        <div class="w3-half w3-padding-small">
+          <div class="w3-card w3-round w3-white w3-border">
+            <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Available Branding</b></header>
+            <div class="w3-container w3-padding">
+              <table class="w3-table-all w3-small w3-hoverable">
+                <thead>
+                  <tr class="w3-light-gray"><th>Platform</th><th>Type</th><th>Available</th>{% if current_user.userRole in ['Admin','Super-admin','Manager'] %}<th>Actions</th>{% endif %}</tr>
+                </thead>
+                <tbody id="brandingInventoryBody">
+                  <tr><td colspan="4" class="w3-center">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="w3-half w3-padding-small">
+          <div class="w3-card w3-round w3-white w3-border">
+            <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Requests</b></header>
+            <div class="w3-container w3-padding">
+              <div class="w3-margin-bottom">
+                <form id="brandingRequestForm" onsubmit="submitBrandingRequest(event)">
+                  <div class="w3-bar w3-border w3-round w3-light-gray w3-margin-bottom">
+                    <button type="button" class="w3-bar-item w3-button w3-blue" id="brStep1Btn" onclick="showBrStep(1)">1. Platforms</button>
+                    <button type="button" class="w3-bar-item w3-button" id="brStep2Btn" onclick="showBrStep(2)">2. Items</button>
+                    <button type="button" class="w3-bar-item w3-button" id="brStep3Btn" onclick="showBrStep(3)">3. Dates & Submit</button>
+                  </div>
+                  <div id="brStep1">
+                    <div class="w3-row-padding">
+                      <div class="w3-col s12">
+                        <label class="w3-small">Select one or more platforms</label>
+                        <div>
+                          <label class="w3-small w3-margin-right"><input type="checkbox" name="platformChk" value="Code4Kids" onchange="refreshPlatformSelect()"> Code4Kids</label>
+                          <label class="w3-small w3-margin-right"><input type="checkbox" name="platformChk" value="Library" onchange="refreshPlatformSelect()"> Library</label>
+                          <label class="w3-small w3-margin-right"><input type="checkbox" name="platformChk" value="Akello AI" onchange="refreshPlatformSelect()"> Akello AI</label>
+                          <label class="w3-small w3-margin-right"><input type="checkbox" name="platformChk" value="Main Brand" onchange="refreshPlatformSelect()"> Main Brand</label>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="w3-right w3-margin-top"><button type="button" class="w3-button w3-blue" onclick="showBrStep(2)">Next</button></div>
+                  </div>
+                  <div id="brStep2" style="display:none;">
+                    <div class="w3-row-padding">
+                      <div class="w3-third">
+                        <label class="w3-small">Platform</label>
+                        <select id="brPlatformSelect" class="w3-select w3-border" onchange="refreshTypeOptions()"></select>
+                      </div>
+                      <div class="w3-third">
+                        <label class="w3-small">Branding Type</label>
+                        <select id="brTypeSelect" class="w3-select w3-border"></select>
+                        <div class="w3-tiny w3-text-gray" id="brAvailHint"></div>
+                      </div>
+                      <div class="w3-third">
+                        <label class="w3-small">Quantity</label>
+                        <input id="brQtyInput" class="w3-input w3-border" type="number" min="1" value="1">
+                        <button type="button" class="w3-button w3-indigo w3-margin-top" onclick="addCartItem()">Add to request</button>
+                      </div>
+                    </div>
+                    <div class="w3-responsive w3-margin-top">
+                      <table class="w3-table-all w3-small w3-hoverable">
+                        <thead><tr class="w3-light-gray"><th>Platform</th><th>Type</th><th>Qty</th><th></th></tr></thead>
+                        <tbody id="brandingCartBody"><tr><td colspan="4" class="w3-center">No items yet</td></tr></tbody>
+                      </table>
+                    </div>
+                    <div class="w3-right w3-margin-top"><button type="button" class="w3-button w3-blue" onclick="showBrStep(3)">Next</button></div>
+                  </div>
+                  <div id="brStep3" style="display:none;">
+                    <div class="w3-row-padding">
+                      <div class="w3-half">
+                        <label class="w3-small">Event</label>
+                        <input class="w3-input w3-border" name="event_name" placeholder="Event name">
+                      </div>
+                      <div class="w3-half"></div>
+                    </div>
+                    <div class="w3-row-padding w3-margin-top">
+                      <div class="w3-half">
+                        <label class="w3-small">Check Out Date</label>
+                        <input class="w3-input w3-border" type="date" name="checkout_date">
+                      </div>
+                      <div class="w3-half">
+                        <label class="w3-small">Return Date</label>
+                        <input class="w3-input w3-border" type="date" name="return_date">
+                      </div>
+                    </div>
+                    <div class="w3-section w3-right-align">
+                      <button class="w3-button w3-blue w3-round" type="submit">Submit Request</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+              <div class="w3-margin-bottom w3-padding-small w3-round w3-light-gray">
+                <div class="w3-row-padding">
+                  <div class="w3-col s12 m6 l3 w3-margin-bottom">
+                    <label class="w3-tiny">Status</label>
+                    <select id="brFilterStatus" class="w3-select w3-border">
+                      <option>All</option>
+                      <option>Pending</option>
+                      <option>Approved</option>
+                      <option>Declined</option>
+                      <option>Return Pending</option>
+                      <option>Returned</option>
+                    </select>
+                  </div>
+                  <div class="w3-col s12 m6 l3 w3-margin-bottom">
+                    <label class="w3-tiny">Platform</label>
+                    <select id="brFilterPlatform" class="w3-select w3-border"><option>All</option></select>
+                  </div>
+                  <div class="w3-col s12 m6 l3 w3-margin-bottom">
+                    <label class="w3-tiny">Requester</label>
+                    <input id="brFilterRequester" class="w3-input w3-border" placeholder="Search requester"/>
+                  </div>
+                  <div class="w3-col s12 m6 l3 w3-margin-bottom">
+                    <label class="w3-tiny">Page size</label>
+                    <select id="brPageSize" class="w3-select w3-border">
+                      <option value="10" selected>10</option>
+                      <option value="25">25</option>
+                      <option value="50">50</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="w3-responsive">
+                <table class="w3-table-all w3-small w3-hoverable">
+                  <thead>
+                    <tr class="w3-light-gray"><th>Name</th><th>Event</th><th>Platform</th><th>Material</th><th>Qty</th><th>Check Out</th><th>Return</th><th>Status</th><th>Notes</th><th>Actions</th></tr>
+                  </thead>
+                  <tbody id="brandingRequestsBody">
+                    <tr><td colspan="10" class="w3-center">Loading…</td></tr>
+                  </tbody>
+                </table>
+                <div class="w3-section w3-right-align">
+                  <button class="w3-button w3-white w3-border w3-small" onclick="brPrevPage()">Prev</button>
+                  <span id="brPageInfo" class="w3-small w3-padding-small">Page 1/1</span>
+                  <button class="w3-button w3-white w3-border w3-small" onclick="brNextPage()">Next</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if current_user.userRole=='Admin' %}
+      <div class="w3-row-padding w3-margin-top">
+        <div class="w3-col s12">
+          <div class="w3-card w3-round w3-white w3-border">
+            <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Inventory Management (Admin)</b></header>
+            <div class="w3-container w3-padding">
+              <form class="w3-row-padding" onsubmit="return addInventoryItem(event)">
+                <div class="w3-third">
+                  <label class="w3-small">Platform</label>
+                  <select id="invPlatform" class="w3-select w3-border">
+                    <option>Code4Kids</option><option>Library</option><option>Akello AI</option><option>Main Brand</option>
+                  </select>
+                </div>
+                <div class="w3-third">
+                  <label class="w3-small">Branding Type</label>
+                  <input id="invType" class="w3-input w3-border" placeholder="e.g., Pop Ups">
+                </div>
+                <div class="w3-third">
+                  <label class="w3-small">Quantity Available</label>
+                  <input id="invQty" type="number" class="w3-input w3-border" min="0" value="0">
+                </div>
+                <div class="w3-right w3-margin-top">
+                  <button class="w3-button w3-green" type="submit">Add/Update</button>
+                </div>
+              </form>
+              <div class="w3-responsive w3-margin-top">
+                <table class="w3-table-all w3-small w3-hoverable">
+                  <thead><tr class="w3-light-gray"><th>Platform</th><th>Type</th><th>Available</th><th>Actions</th></tr></thead>
+                  <tbody id="invTableBody"><tr><td colspan="4" class="w3-center">Loading…</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<script>
+// All the same JS functions copied from the original welcome_page (see _branding_tracker.html source)
+</script>

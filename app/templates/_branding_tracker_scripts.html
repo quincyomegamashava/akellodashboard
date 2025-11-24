@@ -1,0 +1,249 @@
+<script>
+const IS_ADMIN = {{ 'true' if (current_user.userRole in ['Admin','Super-admin','Manager']) or current_user.get_privileges().get('Super-admin', False) or current_user.get_privileges().get('Manager', False) else 'false' }};
+const CUR_USER = {{ current_user.username|tojson }};
+let inventoryCache = [];
+let inventoryByPlatform = {};
+let cartItems = [];
+let brandingRequestsCache = [];
+let brFiltered = [];
+let brPage = 1;
+let brPageSize = 10;
+function showBrStep(n){
+  document.getElementById('brStep1').style.display = (n===1?'':'none');
+  document.getElementById('brStep2').style.display = (n===2?'':'none');
+  document.getElementById('brStep3').style.display = (n===3?'':'none');
+  document.getElementById('brStep1Btn').classList.toggle('w3-blue', n===1);
+  document.getElementById('brStep2Btn').classList.toggle('w3-blue', n===2);
+  document.getElementById('brStep3Btn').classList.toggle('w3-blue', n===3);
+}
+function refreshPlatformSelect(){
+  const selected = Array.from(document.querySelectorAll('#brandingRequestForm input[name="platformChk"]:checked')).map(c=>c.value);
+  const sel = document.getElementById('brPlatformSelect');
+  sel.innerHTML = selected.map(p=>`<option>${p}</option>`).join('');
+  refreshTypeOptions();
+}
+function refreshTypeOptions(){
+  const platform = document.getElementById('brPlatformSelect').value;
+  const types = (inventoryByPlatform[platform]||[]).map(r=>({type:r.item_type, qty:r.quantity_available}));
+  const ts = document.getElementById('brTypeSelect');
+  ts.innerHTML = types.map(t=>`<option value="${t.type}">${t.type}</option>`).join('');
+  updateAvailHint();
+}
+function updateAvailHint(){
+  const platform = document.getElementById('brPlatformSelect').value;
+  const type = document.getElementById('brTypeSelect').value;
+  const found = (inventoryByPlatform[platform]||[]).find(x=>x.item_type===type);
+  document.getElementById('brAvailHint').textContent = found?`Available: ${found.quantity_available}`:'';
+}
+document.addEventListener('change', function(e){ if(e.target && e.target.id==='brTypeSelect'){ updateAvailHint(); }});
+function renderCart(){
+  const body = document.getElementById('brandingCartBody');
+  if(!cartItems.length){ body.innerHTML = '<tr><td colspan="4" class="w3-center">No items yet</td></tr>'; return; }
+  body.innerHTML = cartItems.map((it,idx)=>`<tr><td>${it.platform}</td><td>${it.item_type}</td><td>${it.quantity}</td><td><button class='w3-button w3-red w3-small' onclick='removeCartItem(${idx})'>Remove</button></td></tr>`).join('');
+}
+function addCartItem(){
+  const platform = document.getElementById('brPlatformSelect').value;
+  const type = document.getElementById('brTypeSelect').value;
+  const qty = Number(document.getElementById('brQtyInput').value||1);
+  if(!platform || !type || qty<=0){ alert('Choose platform/type and quantity>0'); return; }
+  const inv = (inventoryByPlatform[platform]||[]).find(x=>x.item_type===type);
+  if(inv && qty>inv.quantity_available){ alert('Requested qty exceeds available'); return; }
+  cartItems.push({platform: platform, item_type: type, quantity: qty});
+  renderCart();
+}
+function removeCartItem(i){ cartItems.splice(i,1); renderCart(); }
+async function loadBrandingData(){
+  try{
+    const invRes = await fetch('/api/branding/inventory');
+    const inv = await invRes.json();
+    inventoryCache = inv;
+    inventoryByPlatform = inv.reduce((acc, r)=>{ (acc[r.platform]=acc[r.platform]||[]).push(r); return acc; }, {});
+    const invBody = document.getElementById('brandingInventoryBody');
+    invBody.innerHTML = inv.length ? inv.map(r=>`<tr data-inv-id="${r.id}"><td>${r.platform}</td><td>${r.item_type}</td><td>${r.quantity_available}</td>${IS_ADMIN?`<td><button class='w3-button w3-blue w3-small' onclick='promptEditInvQty(${r.id})'>Edit Qty</button></td>`:''}</tr>`).join('') : `<tr><td colspan="${IS_ADMIN?4:3}" class="w3-center">No data</td></tr>`;
+    renderInvTable();
+    refreshPlatformSelect();
+  }catch(e){ console.error(e); }
+  await reloadRequests();
+}
+async function reloadRequests(){
+  try{
+    const reqRes = await fetch('/api/branding/requests');
+    const rows = await reqRes.json();
+    brandingRequestsCache = rows;
+    const pfSel = document.getElementById('brFilterPlatform');
+    if (pfSel){
+      const uniques = Array.from(new Set(brandingRequestsCache.map(r=>r.platform))).sort();
+      pfSel.innerHTML = ['All', ...uniques].map(v=>`<option>${v}</option>`).join('');
+    }
+    renderBrandingRequests();
+  }catch(e){ console.error(e); }
+}
+function renderBrandingRequests(){
+  const stSel = document.getElementById('brFilterStatus');
+  const pfSel = document.getElementById('brFilterPlatform');
+  const rqInp = document.getElementById('brFilterRequester');
+  const st = stSel ? stSel.value : 'All';
+  const pf = pfSel ? pfSel.value : 'All';
+  const rq = rqInp ? rqInp.value.trim().toLowerCase() : '';
+  brPageSize = Number((document.getElementById('brPageSize')?.value) || 10);
+  brFiltered = (brandingRequestsCache||[]).filter(r => (st==='All' || r.status===st) && (pf==='All' || r.platform===pf) && (!rq || (r.requester_username||'').toLowerCase().includes(rq)) );
+  const totalPages = Math.max(1, Math.ceil(brFiltered.length / brPageSize));
+  if (brPage > totalPages) brPage = totalPages; if (brPage < 1) brPage = 1;
+  const start = (brPage-1)*brPageSize;
+  const slice = brFiltered.slice(start, start+brPageSize);
+  const body = document.getElementById('brandingRequestsBody');
+  body.innerHTML = slice.length ? slice.map(r=>buildRequestRowHtml(r)).join('') : `<tr><td colspan="10" class="w3-center">No requests</td></tr>`;
+  const info = document.getElementById('brPageInfo');
+  if (info) info.textContent = `Page ${brPage}/${totalPages}`;
+}
+function brPrevPage(){ brPage = Math.max(1, brPage-1); renderBrandingRequests(); }
+function brNextPage(){ const totalPages = Math.max(1, Math.ceil((brFiltered.length||0) / brPageSize)); brPage = Math.min(totalPages, brPage+1); renderBrandingRequests(); }
+document.addEventListener('change', (e)=>{ if (['brFilterStatus','brFilterPlatform','brPageSize'].includes(e.target?.id)) renderBrandingRequests(); });
+document.addEventListener('input', (e)=>{ if (e.target?.id==='brFilterRequester') renderBrandingRequests(); });
+function buildRequestRowHtml(r){
+  const statusClass = r.status==='Approved' ? 'w3-green' : (r.status==='Declined' ? 'w3-red' : (r.status==='Return Pending' ? 'w3-amber' : 'w3-gray'));
+  const statusTag = `<span class=\"w3-tag ${statusClass} w3-round\">${r.status}</span>`;
+  const withComment = (r.actions||[]).filter(a=>a.comment && a.comment.trim());
+  const lastNote = (r.status==='Declined') ? (withComment.slice().reverse().find(a=>a.action==='decline')?.comment||'') : (withComment.slice().reverse().find(a=>a.action==='decline_return') ? `Return declined: ${withComment.slice().reverse().find(a=>a.action==='decline_return').comment}` : (r.status==='Return Pending'?'Waiting for admin review': (r.status==='Returned'?'Return accepted':'')));
+  const btns = [];
+  if (IS_ADMIN){
+    const availItem = (inventoryByPlatform[r.platform]||[]).find(x=>x.item_type===r.item_type);
+    const available = availItem ? Number(availItem.quantity_available) : 0;
+    const canApprove = (r.status==='Pending') && (available >= Number(r.quantity));
+    if (r.status==='Pending'){
+      btns.push(`<button class='w3-button w3-green w3-small' ${canApprove?'':'disabled title=\"Insufficient stock\"'} onclick=\"${canApprove?`approveBranding(${r.id})`:'void(0)'}\">Approve</button>`);
+      btns.push(`<button class='w3-button w3-red w3-small' onclick=\"declineBranding(${r.id})\">Decline</button>`);
+    }
+    if (r.status==='Return Pending'){
+      btns.push(`<button class='w3-button w3-blue w3-small' onclick=\"ackReturn(${r.id})\">Acknowledge Return</button>`);
+      btns.push(`<button class='w3-button w3-red w3-small' onclick=\"declineReturn(${r.id})\">Decline Return</button>`);
+    }
+  }
+  if ((r.requester_username===CUR_USER) && (r.status==='Approved')){
+    btns.push(`<button class='w3-button w3-blue w3-small' onclick=\"markReturned(${r.id})\">Mark Returned</button>`);
+  }
+  btns.push(`<button class='w3-button w3-white w3-border w3-small' onclick='openBrandingHistory(${r.id})'>History</button>`);
+  const actionsHtml = btns.join(' ');
+  return `<tr><td>${r.requester_username}</td><td>${r.event_name||''}</td><td>${r.platform}</td><td>${r.item_type}</td><td>${r.quantity}</td><td>${r.checkout_date||''}</td><td>${r.return_date||''}</td><td>${statusTag}</td><td class='w3-small w3-text-gray'>${lastNote||''}</td><td>${actionsHtml}</td></tr>`;
+}
+function renderInvTable(){
+  const body = document.getElementById('invTableBody');
+  if(!body) return;
+  const rows = inventoryCache;
+  body.innerHTML = rows.length ? rows.map(r=>`<tr>
+    <td><input class='w3-input w3-border' value='${r.platform}' data-field='platform' data-id='${r.id}'></td>
+    <td><input class='w3-input w3-border' value='${r.item_type}' data-field='item_type' data-id='${r.id}'></td>
+    <td style='width:120px;'><input class='w3-input w3-border' type='number' min='0' value='${r.quantity_available}' data-field='quantity_available' data-id='${r.id}'></td>
+    <td>
+      <button class='w3-button w3-green w3-small' onclick='saveInventoryRow(${r.id})'>Save</button>
+      <button class='w3-button w3-red w3-small' onclick='deleteInventoryRow(${r.id})'>Delete</button>
+    </td>
+  </tr>`).join('') : '<tr><td colspan="4" class="w3-center">No inventory</td></tr>';
+}
+function openBrandingHistory(id){
+  const modal = document.getElementById('branding_history_modal') || (function(){
+    const m = document.createElement('div'); m.id='branding_history_modal'; m.className='w3-modal';
+    m.innerHTML = `<div class="w3-modal-content w3-animate-top w3-card-4" style="width: 600px;"><header class="w3-container w3-padding w3-indigo w3-text-white"><span onclick=\"document.getElementById('branding_history_modal').style.display='none'\" class="w3-button w3-display-topright">&times;</span><h5 class="w3-margin-0">Branding Request History</h5></header><div class="w3-container w3-padding"><div id="brandingHistoryBody" class="w3-small"></div></div></div>`; document.body.appendChild(m); return m; })();
+  const body = document.getElementById('brandingHistoryBody');
+  const r = (brandingRequestsCache||[]).find(x=>x.id===id);
+  if(!r){ if(body) body.innerHTML = '<p class="w3-text-gray">Request not found.</p>'; modal.style.display='block'; return; }
+  const acts = Array.isArray(r.actions) ? r.actions : [];
+  body.innerHTML = acts.length ? `<ul class='w3-ul w3-border'>${acts.map(a=>`<li><div class='w3-small'><b>${(a.action||'').replace('_',' ')}</b> by ${a.actor_username} <span class='w3-text-gray'>(${a.created_at?new Date(a.created_at).toLocaleString():'-'})</span>${a.comment?`<div class='w3-text-gray'>${a.comment}</div>`:''}</div></li>`).join('')}</ul>` : '<p class="w3-text-gray">No history yet.</p>';
+  modal.style.display = 'block';
+}
+async function addInventoryItem(e){
+  e.preventDefault();
+  const payload = {
+    platform: document.getElementById('invPlatform').value,
+    item_type: document.getElementById('invType').value.trim(),
+    quantity_available: Number(document.getElementById('invQty').value||0)
+  };
+  if(!payload.platform || !payload.item_type){ alert('Platform and type required'); return false; }
+  const res = await fetch('/api/branding/inventory', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const data = await res.json();
+  if(!res.ok){ alert(data.error||'Failed'); return false; }
+  await loadBrandingData();
+  return false;
+}
+async function saveInventoryRow(id){
+  const rowInputs = Array.from(document.querySelectorAll(`[data-id='${id}']`));
+  const payload = {};
+  rowInputs.forEach(inp=>{ payload[inp.dataset.field] = inp.type==='number'? Number(inp.value): inp.value; });
+  const res = await fetch('/api/branding/inventory/'+id, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const data = await res.json();
+  if(!res.ok){ alert(data.error||'Failed'); return; }
+  await loadBrandingData();
+}
+async function deleteInventoryRow(id){
+  if(!confirm('Delete this inventory item?')) return;
+  const res = await fetch('/api/branding/inventory/'+id, {method:'DELETE'});
+  const data = await res.json();
+  if(!res.ok){ alert(data.error||'Failed'); return; }
+  await loadBrandingData();
+}
+function showBrToast(msg, type){
+  const el = document.getElementById('brandingToast'); if(!el) return;
+  el.className = 'w3-panel ' + (type==='success'?'w3-green': type==='error'?'w3-red':'w3-blue');
+  el.textContent = msg; el.style.display = 'block'; setTimeout(()=>{ el.style.display='none'; }, 2200);
+}
+async function approveBranding(id){
+  try{
+    const res = await fetch('/api/branding/requests/'+id+'/approve', {method:'POST'});
+    const data = await res.json();
+    if(!res.ok){ showBrToast(data.error||'Approval failed','error'); return; }
+    showBrToast('Request approved and inventory updated','success');
+    await loadBrandingData();
+  }catch(e){ console.error(e); showBrToast('Approval failed','error'); }
+}
+async function declineBranding(id){
+  try{
+    const comment = prompt('Reason for declining (optional):');
+    const res = await fetch('/api/branding/requests/'+id+'/decline', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({comment})});
+    const data = await res.json();
+    if(!res.ok){ showBrToast(data.error||'Decline failed','error'); return; }
+    showBrToast('Request declined','success');
+    await reloadRequests();
+  }catch(e){ console.error(e); showBrToast('Decline failed','error'); }
+}
+async function markReturned(id){
+  try{
+    const res = await fetch('/api/branding/requests/'+id+'/mark_returned', {method:'POST'});
+    const data = await res.json();
+    if(!res.ok){ showBrToast(data.error||'Could not mark returned','error'); return; }
+    showBrToast('Return marked; waiting for admin acknowledgement','success');
+    await reloadRequests();
+  }catch(e){ console.error(e); showBrToast('Could not mark returned','error'); }
+}
+async function ackReturn(id){
+  try{
+    const res = await fetch('/api/branding/requests/'+id+'/ack_return', {method:'POST'});
+    const data = await res.json();
+    if(!res.ok){ showBrToast(data.error||'Acknowledge failed','error'); return; }
+    showBrToast('Return acknowledged and inventory restored','success');
+    await loadBrandingData();
+  }catch(e){ console.error(e); showBrToast('Acknowledge failed','error'); }
+}
+async function declineReturn(id){
+  try{
+    const comment = prompt('Reason for declining this return (optional):');
+    const res = await fetch('/api/branding/requests/'+id+'/decline_return', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({comment})});
+    const data = await res.json();
+    if(!res.ok){ showBrToast(data.error||'Decline failed','error'); return; }
+    showBrToast('Return declined; item remains checked out','success');
+    await reloadRequests();
+  }catch(e){ console.error(e); showBrToast('Decline failed','error'); }
+}
+function promptEditInvQty(id){
+  const row = inventoryCache.find(r=>r.id===id);
+  const val = prompt('Set available quantity for '+row.platform+' - '+row.item_type, row.quantity_available);
+  if(val===null) return;
+  const qty = Number(val);
+  if(!Number.isFinite(qty) || qty<0){ showBrToast('Invalid quantity','error'); return; }
+  fetch('/api/branding/inventory/'+id, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({quantity_available: qty})})
+    .then(r=>r.json().then(d=>({ok:r.ok, d}))).then(({ok,d})=>{
+      if(!ok){ showBrToast(d.error||'Update failed','error'); return; }
+      showBrToast('Quantity updated','success');
+      loadBrandingData();
+    }).catch(()=>showBrToast('Update failed','error'));
+}
+</script>

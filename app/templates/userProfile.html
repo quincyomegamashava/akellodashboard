@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css" />
+  <link
+    rel="stylesheet"
+    href="https://www.w3schools.com/lib/w3-theme-blue-grey.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css?family=Open+Sans"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
+  />
+
+  <link
+    rel="stylesheet"
+    href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
+  />
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+  <style>
+    html,
+    body,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5 {
+      font-family: "Open Sans", sans-serif;
+    }
+  </style>
+</head>
+{% block content %}
+<style>
+  /* Modern, responsive layout */
+  .profile-wrapper {
+    max-width: 1200px;
+    margin: 60px auto 40px;
+    padding: 0 16px;
+  }
+
+  .profile-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr 320px;
+    gap: 20px;
+  }
+
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 6px 18px rgba(10, 31, 68, 0.08);
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 16px 18px;
+    border-bottom: 1px solid #eef2f7;
+    background: linear-gradient(180deg, #f7faff 0%, #ffffff 100%);
+  }
+
+  .card-body {
+    padding: 18px;
+  }
+
+  .soft {
+    color: #6b7a90;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #edf4ff;
+    color: #0b5ed7;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .stat {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 12px;
+    background: #f9fbff;
+    border: 1px solid #eef2f7;
+  }
+
+  .stat .icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+  }
+
+  .stat .value {
+    font: 700 1.35rem/1.1 system-ui, -apple-system, Segoe UI, Roboto;
+    color: #0b213f;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #e9f7f7;
+    color: #116a6a;
+    border-radius: 999px;
+    border: 1px solid #cdeaea;
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+  }
+
+  .chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+  }
+
+  .profile-avatar {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid #fff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  }
+
+  .kv {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 20px;
+  }
+
+  .kv .k {
+    font: 600 0.75rem/1 system-ui;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #77849a;
+  }
+
+  .kv .v {
+    font: 600 1rem/1.4 system-ui;
+    color: #0f2547;
+    background: #f9fbff;
+    border: 1px solid #eef2f7;
+    border-radius: 10px;
+    padding: 8px 12px;
+  }
+
+  @media (max-width: 1100px) {
+    .profile-grid {
+      grid-template-columns: 3200px 1fr;
+    }
+
+    .profile-right {
+      order: 3;
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 780px) {
+    .profile-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .profile-left,
+    .profile-main,
+    .profile-right {
+      grid-column: 1 / -1;
+    }
+
+    .kv {
+      grid-template-columns: 1fr;
+    }
+
+    .profile-avatar {
+      width: 84px;
+      height: 84px;
+    }
+
+    .profile-wrapper {
+      max-width: 85vw;
+    }
+  }
+</style>
+
+<div class="profile-wrapper w3-small">
+  <div class="profile-grid" style="width: 65vw">
+    <!-- Left: Profile summary -->
+    <section class="profile-left card">
+      <div class="card-body" style="text-align: center">
+        <img src="{{ user.avatar(128) }}" alt="Avatar" class="profile-avatar" />
+        <div style="margin-top: 12px">
+          <span class="pill"
+            ><i class="fa fa-user"></i>{{ user.username }}</span
+          >
+        </div>
+        <div class="soft" style="margin-top: 10px">
+          <i class="fa fa-map-marker soft"></i> {{ user.province }}
+        </div>
+        <div class="soft" style="margin-top: 6px">
+          <i class="fa fa-clock-o soft"></i> Last seen: {{
+          user.last_seen.strftime('%Y-%m-%d') }}
+        </div>
+      </div>
+      <div
+        id="profile"
+        class="w3-hide"
+        data-firstname="{{ user.firstname }}"
+        data-lastname="{{ user.lastname }}"
+      ></div>
+    </section>
+
+    <!-- Main: General information + Schools -->
+    <main class="profile-main card">
+      <header class="card-header"><strong>General Information</strong></header>
+      <div class="card-body">
+        <div class="kv">
+          <div>
+            <div class="k">First Name</div>
+            <div class="v">{{ user.firstname }}</div>
+          </div>
+          <div>
+            <div class="k">Last Name</div>
+            <div class="v">{{ user.lastname }}</div>
+          </div>
+          <div>
+            <div class="k">Username</div>
+            <div class="v">{{ user.username }}</div>
+          </div>
+          <div>
+            <div class="k">Role</div>
+            <div class="v">{{ user.userRole }}</div>
+          </div>
+          <div>
+            <div class="k">Department</div>
+            <div class="v">{{ user.department }}</div>
+          </div>
+          <div>
+            <div class="k">Province</div>
+            <div class="v">{{ user.province }}</div>
+          </div>
+        </div>
+      </div>
+
+      {% if champ and schools_for_template %}
+      <header class="card-header"><strong>Schools</strong></header>
+      <div class="card-body">
+        <div class="chips">
+          {% for school in schools_for_template %}
+          <a
+            class="chip"
+            href="{{ url_for('school_profile_usage', school_id=school.id) }}"
+          >
+            <i class="fa fa-university"></i> {{ school.name }}
+          </a>
+          {% endfor %}
+        </div>
+        {% elif champ %}
+        <span class="soft">No schools assigned</span>
+        {% else %}
+        <span class="soft">No Champion School record found.</span>
+      </div>
+      {% endif %}
+    </main>
+
+    {% if user.userRole == 'Brand Ambassador' %}
+    <!-- Right: Key stats -->
+    <aside class="profile-right">
+      <!-- Date Range Filter -->
+      <div class="card" style="margin-bottom: 20px">
+        <header class="card-header"><strong>Date Range Filter</strong></header>
+        <div class="card-body">
+          <form id="date-filter-form" style="display: grid; gap: 10px">
+            <div>
+              <label for="start-date" style="display: block; font-size: 0.85rem; color: #6b7a90; margin-bottom: 4px;">Start Date</label>
+              <input type="date" id="start-date" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #eef2f7; border-radius: 8px;" />
+            </div>
+            <div>
+              <label for="end-date" style="display: block; font-size: 0.85rem; color: #6b7a90; margin-bottom: 4px;">End Date</label>
+              <input type="date" id="end-date" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #eef2f7; border-radius: 8px;" />
+            </div>
+            <button type="submit" class="w3-button w3-blue" style="border-radius: 8px; padding: 10px;">Apply Filter</button>
+            <button type="button" id="reset-filter" class="w3-button w3-light-grey" style="border-radius: 8px; padding: 10px;">Reset to MTD</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 20px">
+        <header class="card-header"><strong>Quick Stats</strong></header>
+        <div class="card-body" style="display: grid; gap: 12px">
+          <div class="stat">
+            <div class="icon" style="background: #6f42c1">
+              <i class="fa fa-school"></i>
+            </div>
+            <div>
+              <div class="soft" style="font-size: 0.8rem">
+                Number of schools
+              </div>
+              <div class="value">{{ count_user_schools }}</div>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="icon" style="background: #0d6efd">
+              <i class="fa fa-laptop"></i>
+            </div>
+            <div>
+              <div class="soft" style="font-size: 0.8rem">ASL MTD</div>
+              <div class="value" id="asl-count">{{ smartlearning_champ_mtd }}</div>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="icon" style="background: #14a199">
+              <i class="fa fa-book"></i>
+            </div>
+            <div>
+              <div class="soft" style="font-size: 0.8rem">AL MTD</div>
+              <div class="value" id="libstudent-count">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  // Initialize default date range (MTD)
+  function getDefaultDates() {
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    return {
+      startDate: startOfMonth.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0]
+    };
+  }
+
+  // Fetch stats with date range
+  async function fetchStats(startDate = null, endDate = null) {
+    try {
+      const profileEl = document.querySelector("#profile");
+      if (!profileEl) return;
+      const firstname = profileEl.dataset.firstname;
+      const lastname = profileEl.dataset.lastname;
+      if (!firstname || !lastname) return;
+
+      // Build query string for date range
+      let dateParams = '';
+      if (startDate && endDate) {
+        dateParams = `start_date=${startDate}&end_date=${endDate}`;
+      }
+
+      // Fetch AL (Library) stats
+      const alQueryParams = `firstname=${encodeURIComponent(firstname)}&lastname=${encodeURIComponent(lastname)}${
+        dateParams ? '&' + dateParams : ''
+      }`;
+      const alResponse = await fetch(`/api/champ-library-usage?${alQueryParams}`);
+      const alData = await alResponse.json();
+      if (alResponse.ok) {
+        const alTargetEl = document.querySelector("#libstudent-count");
+        if (alTargetEl) alTargetEl.textContent = alData.library_student_count ?? 0;
+      }
+
+      // Fetch ASL (SmartLearning) stats
+      // Get username from the URL
+      const pathSegments = window.location.pathname.split('/');
+      const username = pathSegments[pathSegments.length - 1];
+      
+      const aslQueryParams = dateParams ? `?${dateParams}` : '';
+      const aslResponse = await fetch(`/api/champion/${username}/asl_active${aslQueryParams}`);
+      const aslData = await aslResponse.json();
+      if (aslResponse.ok) {
+        const aslTargetEl = document.querySelector("#asl-count");
+        if (aslTargetEl) aslTargetEl.textContent = aslData.asl_student_count ?? 0;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // Initialize on page load
+  document.addEventListener("DOMContentLoaded", () => {
+    // Set default dates
+    const { startDate, endDate } = getDefaultDates();
+    const startInput = document.querySelector("#start-date");
+    const endInput = document.querySelector("#end-date");
+    
+    if (startInput && endInput) {
+      startInput.value = startDate;
+      endInput.value = endDate;
+    }
+
+    // Fetch initial stats
+    fetchStats();
+
+    // Handle filter form submission
+    const filterForm = document.querySelector("#date-filter-form");
+    if (filterForm) {
+      filterForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const start = startInput.value;
+        const end = endInput.value;
+        if (start && end) {
+          fetchStats(start, end);
+        }
+      });
+    }
+
+    // Handle reset button
+    const resetBtn = document.querySelector("#reset-filter");
+    if (resetBtn) {
+      resetBtn.addEventListener("click", () => {
+        const { startDate, endDate } = getDefaultDates();
+        startInput.value = startDate;
+        endInput.value = endDate;
+        fetchStats();
+      });
+    }
+  });
+</script>
+{% endblock %}

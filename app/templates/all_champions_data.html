@@ -1,0 +1,878 @@
+{% extends "base.html" %}
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <style>
+    body {
+      font-family: "Open Sans", sans-serif;
+      background-color: #f5f7fa;
+      color: #333;
+    }
+    .card-custom {
+      border-radius: 1rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      border: none;
+    }
+    .sidebar-badge {
+      font-size: 0.85rem;
+      border-radius: 50px;
+      padding: 6px 12px;
+    }
+    .table-container {
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    table th {
+      background-color: #f8f9fa;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    table td {
+      font-size: 0.85rem;
+      color: #555;
+    }
+    .search-input, .date-input {
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+    }
+    .search-input:focus, .date-input:focus {
+      border-color: #0d6efd;
+      box-shadow: 0 0 0 0.2rem rgba(13,110,253,.1);
+      outline: none;
+    }
+    .btn-primary {
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 0.9rem;
+    }
+    .accordion-button:not(.collapsed) {
+      background-color: #e9f2ff;
+      color: #0d6efd;
+    }
+
+    /* Skeleton loading */
+    .skeleton {
+      background: linear-gradient(90deg, #eee 25%, #f5f5f5 37%, #eee 63%);
+      background-size: 400% 100%;
+      animation: shimmer 1.2s ease-in-out infinite;
+      border-radius: 6px;
+      display: inline-block;
+      height: 12px;
+      width: 100%;
+    }
+    @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+    .skeleton-row td { padding: 10px; }
+
+    /* Mobile table cards */
+    @media (max-width: 768px) {
+      .table-container table thead { display: none; }
+      .table-container table tbody tr { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 10px; border-bottom: 1px solid #eef2f7; }
+      .table-container table tbody td { display: grid; grid-template-columns: 140px 1fr; align-items: center; }
+      .table-container table tbody td::before { content: attr(data-label); font-weight: 600; color: #44536b; }
+      .container-fluid { max-width: 85vw; margin-left: auto; margin-right: auto; }
+    }
+    /* Ensure main content is 95% width on small screens */
+    @media (max-width: 600px) {
+      .main-content { width: 95vw; margin-left: auto; margin-right: auto; }
+    }
+  </style>
+  <style>
+    /* Modern button styles for opening modals */
+    .modal-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+      transition: transform .05s ease, box-shadow .2s ease, filter .2s ease;
+    }
+    .modal-trigger:hover { filter: brightness(0.98); box-shadow: 0 8px 22px rgba(0,0,0,0.16); }
+    .modal-trigger:active { transform: translateY(1px); }
+    .modal-trigger.modal-analytics {
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+    }
+    .modal-trigger.modal-champions {
+      background: linear-gradient(135deg, #6366f1, #22c55e);
+    }
+
+    /* Modal polish */
+    .w3-modal-content { border-radius: 16px; overflow: hidden; }
+    .w3-modal header.w3-container { position: sticky; top: 0; z-index: 5; }
+    .modal-body-scroll { max-height: 75vh; overflow: auto; }
+
+    /* Date range card */
+    .range-card .range-header { 
+      background: linear-gradient(135deg, #f0f6ff 0%, #ffffff 100%);
+      border-bottom: 1px solid #dfe8f5;
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+    }
+    .range-card .range-icon {
+      width: 36px; height: 36px; display: inline-flex; align-items:center; justify-content:center;
+      background: #eaf2ff; color:#1e40af; border-radius: 10px;
+    }
+    .pill-input { border-radius: 10px; }
+    .btn-gradient { 
+      display: inline-flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg,#0ea5e9,#14b8a6);
+      border: 0; color:#fff; border-radius: 12px; padding: 10px 16px;
+      box-shadow: 0 8px 20px rgba(20,184,166,0.25);
+      background-size: 200% 200%;
+      transition: transform .05s ease, box-shadow .2s ease, filter .2s ease, background-position .8s ease;
+    }
+    .btn-gradient:hover { filter: brightness(0.98); background-position: 100% 0; box-shadow: 0 10px 24px rgba(20,184,166,0.3); }
+    .btn-gradient:active { transform: translateY(1px); }
+    .chip { 
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid #dbe7ff; background:#f7faff; color:#0f172a; 
+      padding: 6px 12px; border-radius: 999px; font-size: 12px;
+      transition: background .2s ease, color .2s ease, box-shadow .2s ease;
+    }
+    .chip:hover { background:#eef5ff; box-shadow: 0 3px 10px rgba(13,110,253,0.08); }
+    .chip-clear { background:#fff; }
+    .chip-active { background: linear-gradient(135deg,#3b82f6,#06b6d4); color:#fff; border-color: transparent; box-shadow: 0 6px 18px rgba(59,130,246,0.25); }
+    .chip i { opacity: .85; }
+  </style>
+</head>
+
+{% block content %}
+<body>
+
+<div class="container-fluid col-md-12  py-4 w3-small">
+  <div class="row g-4" style="width: 70vw;">
+    
+    <!-- Sidebar -->
+    <div class="col-md-3 " style="height: fit-content;">
+      <div class="p-3 text-center">
+        <div class="d-flex align-items-center justify-content-center bg-light w3-border w3-card rounded-circle mx-auto mb-3" style="width:100px;height:100px;">
+          <!-- <i class="fa-solid fa-graduation-cap fa-2xl " style="color: #00407d;"></i> -->
+           <span>
+                <img class="w3-card w3-circle w3-white" style="width: 100%; height: 100%;" src="{{ url_for('static', filename='smartlearning.webp') }}">
+            </span>
+        </div>
+        <h6 class="fw-bold">Akello Champions</h6>
+        <p class="text-muted"><i class="fa fa-map-marker-alt me-1"></i> Zimbabwe</p>
+        <span onclick="document.getElementById('downloadModalW3').style.display='block'" class=" btn btn-outline-secondary  w3-small w3-indigo"><i class="fa fa-chart-line me-1"></i> Download Statistics</span>
+      </div>
+
+      <div class="accordion w3-small w3-hide mt-4 card card-custom" id="sidebarAccordion">
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button w3-small collapsed" data-bs-toggle="collapse" data-bs-target="#smartlearning">
+              <i class="fa fa-circle-notch me-2"></i> Smartlearning
+            </button>
+          </h2>
+          <div id="smartlearning" class="accordion-collapse collapse" data-bs-parent="#sidebarAccordion">
+            <div class="accordion-body">Some text..</div>
+          </div>
+        </div>
+
+        <div class="accordion-item w3-small">
+          <h2 class="accordion-header">
+            <button class="accordion-button w3-small collapsed" data-bs-toggle="collapse" data-bs-target="#library">
+              <i class="fa fa-calendar-check me-2"></i> Library
+            </button>
+          </h2>
+          <div id="library" class="accordion-collapse collapse" data-bs-parent="#sidebarAccordion">
+            <div class="accordion-body">Some other text..</div>
+          </div>
+        </div>
+
+        <div class="accordion-item w3-small">
+          <h2 class="accordion-header">
+            <button class="accordion-button w3-small collapsed" data-bs-toggle="collapse" data-bs-target="#askAkello">
+              <i class="fa fa-users me-2"></i> Ask Akello
+            </button>
+          </h2>
+          <div id="askAkello" class="accordion-collapse collapse" data-bs-parent="#sidebarAccordion">
+            <div class="accordion-body">Content with images here...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="col-md-9 main-content" style="height:80vh; overflow:auto;">
+      <div class=" btn btn-outline-secondary  w3-small w3-white w3-card w3-border-indigo w3-text-indigo p-3 mb-4">
+        <h5 class="fw-bold mb-0">Champion Schools Usage Analytics</h5>
+      </div>
+
+      <!-- Date Range -->
+      <div class="card card-custom w3-border w3-border-light-gray range-card mb-4">
+        <div class="range-header p-3 d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center gap-2">
+            <span class="range-icon"><i class="fa fa-calendar-alt"></i></span>
+            <div>
+              <div class="fw-semibold">Filter by Date Range</div>
+              <div class="text-muted small">Pick a period and load analytics</div>
+            </div>
+          </div>
+          <div class="d-none d-md-flex gap-2">
+            <button class="chip chip-preset btn btn-outline-secondary  w3-small w3-indigo" data-preset="this_month" onclick="setRangePreset('this_month')"><i class="fa fa-calendar-day"></i> This Month</button>
+            <button class="chip chip-preset btn btn-outline-secondary  w3-small w3-indigo" data-preset="last_30" onclick="setRangePreset('last_30')"><i class="fa fa-clock-rotate-left"></i> Last 30 Days</button>
+            <button class="chip chip-preset btn btn-outline-secondary  w3-small w3-indigo" data-preset="ytd" onclick="setRangePreset('ytd')"><i class="fa fa-calendar-check"></i> Year to Date</button>
+            <button class="chip chip-clear chip-preset btn btn-outline-secondary  w3-small w3-indigo" data-preset="clear" onclick="setRangePreset('clear')"><i class="fa fa-broom"></i> Clear</button>
+          </div>
+        </div>
+        <div class="p-3">
+          <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label small">Start Date</label>
+              <input type="date" id="startDate" class="form-control w3-small pill-input">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small">End Date</label>
+              <input type="date" id="endDate" class="form-control w3-small pill-input">
+            </div>
+            <div class="col-md-4">
+              <button id="loadData" class=" btn btn-outline-secondary  w3-small w3-teal"><i class="fa w3-small fa-sync-alt me-1"></i> Load Data</button>
+            </div>
+          </div>
+          <div class="d-flex d-md-none gap-2 mt-3 flex-wrap">
+            <button class="chip chip-preset btn btn-outline-secondary w-10 w3-small w3-indigo" data-preset="this_month" onclick="setRangePreset('this_month')"><i class="fa fa-calendar-day"></i> This Month</button>
+            <button class="chip chip-preset btn btn-outline-secondary w-10 w3-small w3-indigo" data-preset="last_30" onclick="setRangePreset('last_30')"><i class="fa fa-clock-rotate-left"></i> Last 30 Days</button>
+            <button class="chip chip-preset btn btn-outline-secondary w-10 w3-small w3-indigo" data-preset="ytd" onclick="setRangePreset('ytd')"><i class="fa fa-calendar-check"></i> Year to Date</button>
+            <button class="chip chip-clear chip-preset btn btn-outline-secondary w-10 w3-small w3-indigo" data-preset="clear" onclick="setRangePreset('clear')"><i class="fa fa-broom"></i> Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- tabs begin below -->
+      <div class="w3-container card card-custom w3-card w3-border w3-border-indigo w3-padding w3-round">
+        <div class="w3-row w3-center w3-border w3-border-light-gray">
+        <a href="javascript:void(0)" onclick="openMenu(event, 'overview');" id="myLink">
+          <div class="w3-col s6 tablink w3-padding w3-hover-indigo w3-small rounded-2xl  p-6">Overview</div>
+        </a>
+        <a href="javascript:void(0)" onclick="openMenu(event, 'askakello');">
+          <div class="w3-col s6 tablink w3-padding w3-hover-indigo w3-small rounded-2xl  p-6">Ask Akello</div>
+        </a>
+      </div>
+
+      <div id="overview" class="w3-container menu w3-padding-32 w3-white">
+        <div class="w3-container w3-padding modal-body-scroll">
+            <div class="w3-row-padding w3-padding-small">
+              <div class="w3-col s12 m6 l4">
+                <input type="text" id="search" placeholder="🔍 Search by Champion or Province" class="form-control w3-small search-input">
+              </div>
+            </div>
+            <div id="analytics-status" class="text-muted small mb-2"></div>
+            <div class="table-container">
+              <table class="table table-striped w3-small table-bordered table-hover mb-0" id="analytics-table">
+                <thead>
+                  <tr>
+                    <th>Champion</th>
+                    <th>Username</th>
+                    <th>Province</th>
+                    <th>School Count</th>
+                    <th>ASL Students</th>
+                    <th>Library Students</th>
+                    <th>Overall Students</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+      </div>
+
+      <div id="askakello" class="w3-container menu w3-padding-32 w3-white">
+        <div class="w3-container w3-padding modal-body-scroll">
+            <input type="text" id="searchChampions" placeholder="🔍 Search champions or province..." class="form-control w3-small search-input mb-3">
+            <div id="champions-status" class="text-muted small mb-2"></div>
+            <div class="table-container">
+              <table class="table table-striped w3-small table-bordered table-hover mb-0" id="champions-table">
+                <thead>
+                  <tr>
+                    <th>Champion</th>
+                    <th>Username</th>
+                    <th>Province</th>
+                    <th>School Count</th>
+                    <th>Chatlog Count</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+      </div>
+      </div>
+
+      <!-- tabs end above -->
+
+
+      <script>
+// Tabbed Menu
+function openMenu(evt, menuName) {
+  var i, x, tablinks;
+  x = document.getElementsByClassName("menu");
+  for (i = 0; i < x.length; i++) {
+     x[i].style.display = "none";
+  }
+  tablinks = document.getElementsByClassName("tablink");
+  for (i = 0; i < x.length; i++) {
+     tablinks[i].className = tablinks[i].className.replace(" w3-indigo", "");
+  }
+  document.getElementById(menuName).style.display = "block";
+  evt.currentTarget.firstElementChild.className += " w3-indigo";
+  // Lazy-load champions data when the tab is opened the first time
+  if (menuName === 'askakello') {
+    if (typeof loadChampions === 'function') {
+      loadChampions();
+    }
+  }
+}
+document.getElementById("myLink").click();
+</script>
+
+      <!-- Analytics Table Modal trigger -->
+      <div class="row g-3 mb-4">
+        <div class="w3-col w3-hide l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="document.getElementById('analyticsModalW3').style.display='block'">
+            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>View Analytics</b></div>
+<div class="w3-container w3-padding-small"><div class="value" id="mon-ask">—</div><div class="w3-text-gray w3-tiny">Champion Usage</div></div>
+          </div>
+        </div>
+        <!-- <div class="col-md-6">
+          <div class="card card-custom p-4 h-100 text-center">
+            <button class="modal-trigger modal-analytics w-100" onclick="document.getElementById('analyticsModalW3').style.display='block'">
+              <i class="fa fa-chart-line"></i> View Analytics
+            </button>
+          </div>
+        </div> -->
+        <div class="w3-col l3 w3-hide m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="document.getElementById('championsModalW3').style.display='block'">
+            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>View Champions</b></div>
+<div class="w3-container w3-padding-small"><div class="value" id="mon-ask">—</div><div class="w3-text-gray w3-tiny">Ask akello Usage</div></div>
+          </div>
+        </div>
+
+        <div class="w3-col w3-hide l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="document.getElementById('downloadModalW3').style.display='block'">
+            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Download Usage Statistics</b></div>
+<div class="w3-container w3-padding-small"><div class="value" id="mon-ask">—</div><div class="w3-text-gray w3-tiny">PDF or Excel Files</div></div>
+          </div>
+        </div>
+        <!-- <div class="col-md-6">
+          <div class="card card-custom p-4 h-100 text-center">
+            <button class="modal-trigger modal-champions w-100" onclick="document.getElementById('championsModalW3').style.display='block'">
+              <i class="fa fa-users"></i> View Champions
+            </button>
+          </div>
+        </div> -->
+      </div>
+      <!-- W3 Analytics Modal -->
+      <div id="analyticsModalW3" class="w3-modal" style="z-index:3000;">
+        <div class="w3-modal-content w3-animate-top w3-card-4" style="width:96vw; max-width: 1400px;">
+          <header class="w3-container w3-padding" style="background:linear-gradient(135deg,#e6f0ff,#ffffff); color:#00407d; border-bottom:1px solid #d8e7ff;">
+            <span onclick="document.getElementById('analyticsModalW3').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+            <h6 class="w3-margin-0"><i class="fa fa-chart-line"></i> Champion Schools Usage Analytics</h6>
+          </header>
+          
+          <footer class="w3-container w3-padding w3-light-grey">
+            <button class="w3-button w3-teal w3-small" onclick="document.getElementById('analyticsModalW3').style.display='none'">Close</button>
+          </footer>
+        </div>
+      </div>
+
+      <!-- Champions Table Modal trigger -->
+
+      <!-- W3 Champions Modal -->
+      <div id="championsModalW3" class="w3-modal" style="z-index:3000;">
+        <div class="w3-modal-content w3-animate-top w3-card-4" style="width:92vw; max-width: 1100px;">
+          <header class="w3-container w3-padding" style="background:linear-gradient(135deg,#e6f0ff,#ffffff); color:#00407d; border-bottom:1px solid #d8e7ff;">
+            <span onclick="document.getElementById('championsModalW3').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+            <h6 class="w3-margin-0"><i class="fa fa-users"></i> Champions Table</h6>
+          </header>
+          
+          <footer class="w3-container w3-padding w3-light-grey">
+            <button class="w3-button w3-teal w3-small" onclick="document.getElementById('championsModalW3').style.display='none'">Close</button>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="col-md-2 w3-small">
+      <div class="card w3-hide card-custom text-center p-3">
+        <button class="btn btn-outline-secondary w-100" >
+          <i class="fa fa-download me-1"></i> Download
+        </button>
+      </div>
+
+      <!-- W3 Download Modal -->
+      <div id="downloadModalW3" class="w3-modal" style="z-index:3000;">
+        <div class="w3-modal-content w3-animate-top w3-card-4" style="max-width: 520px;">
+          <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
+            <span onclick="document.getElementById('downloadModalW3').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+            <h6 class="w3-margin-0">Export Tables</h6>
+          </header>
+          <div class="w3-container w3-padding">
+            <p class="w3-small">Choose a format to download both tables:</p>
+            <ul class="w3-small w3-text-grey">
+              <li>Champion Schools Usage Analytics</li>
+              <li>Champions Table</li>
+            </ul>
+            <div class="w3-margin-top">
+              <button class="w3-button w3-teal w3-round w3-small" onclick="exportBothAsExcel(); document.getElementById('downloadModalW3').style.display='none'">
+                <i class="fa fa-file-excel me-1"></i> Download as Excel (.xlsx)
+              </button>
+              <button class="w3-button w3-white w3-border w3-round w3-small" onclick="exportBothAsPDF(); document.getElementById('downloadModalW3').style.display='none'">
+                <i class="fa fa-file-pdf me-1"></i> Download as PDF (.pdf)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Analytics + Champions JS -->
+<script>
+// ---- Small helpers ----
+const TTL_MS = 5 * 60 * 1000; // cache TTL: 5 minutes
+const analyticsCacheKey = 'allChampions_analytics_v1';
+const championsCacheKey = 'allChampions_champions_v1';
+
+// In-memory state for fast filtering and virtualization
+let analyticsVT = null, analyticsAllRows = [], analyticsFilteredRows = [];
+let championsVT = null, championsAllRows = [], championsFilteredRows = [];
+let analyticsController = null, championsLoaded = false;
+
+function setStatus(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text || '';
+}
+
+function getCache(key) {
+  try {
+    const s = localStorage.getItem(key);
+    if (!s) return null;
+    const obj = JSON.parse(s);
+    if (!obj || !obj.ts || !obj.data) return null;
+    if (Date.now() - obj.ts > TTL_MS) return null;
+    return obj;
+  } catch { return null; }
+}
+
+function setCache(key, data) {
+  try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
+}
+
+function showSkeleton(tableId, rows = 10, cols = 7) {
+  const tbody = document.querySelector(`#${tableId} tbody`);
+  if (!tbody) return;
+  let html = '';
+  for (let i = 0; i < rows; i++) {
+    html += '<tr class="skeleton-row">';
+    for (let c = 0; c < cols; c++) {
+      html += '<td><span class="skeleton" style="height:12px;width:100%"></span></td>';
+    }
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+function renderRowsChunked(tbody, rows, renderRow, chunkSize = 600) {
+  // Kept for reference; virtualization below supersedes chunked rendering
+  tbody.innerHTML = rows.map(renderRow).join('');
+}
+
+// ---- Virtualized table rendering ----
+function getScrollParent(node) {
+  let p = node.parentElement;
+  while (p) {
+    const style = getComputedStyle(p);
+    const isScrollable = /(auto|scroll)/.test(style.overflow + style.overflowY + style.overflowX);
+    if (isScrollable) return p;
+    p = p.parentElement;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+
+function mountVirtualTable(tableId, rows, renderRow, cols, options = {}) {
+  const rowHeight = options.rowHeight || 38; // px
+  const buffer = options.buffer || 10;       // rows
+
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const tbody = table.querySelector('tbody');
+  const container = getScrollParent(table);
+
+  function getTopOffset(el, ancestor) {
+    let y = 0, n = el;
+    while (n && n !== ancestor) { y += n.offsetTop || 0; n = n.offsetParent; }
+    return y;
+  }
+
+  const tableTop = getTopOffset(table, container);
+
+  function render() {
+    const viewportH = container.clientHeight || window.innerHeight;
+    const scrollY = container.scrollTop;
+
+    const visibleCount = Math.ceil(viewportH / rowHeight) + buffer * 2;
+    let start = Math.floor((scrollY - tableTop) / rowHeight) - buffer;
+    if (start < 0) start = 0;
+    let end = start + visibleCount;
+    if (end > rows.length) end = rows.length;
+
+    const topPad = start * rowHeight;
+    const bottomPad = (rows.length - end) * rowHeight;
+
+    let html = '';
+    if (topPad > 0) {
+      html += `<tr><td colspan="${cols}" style="padding:0; height:${topPad}px"></td></tr>`;
+    }
+    for (let i = start; i < end; i++) html += renderRow(rows[i], i);
+    if (bottomPad > 0) {
+      html += `<tr><td colspan="${cols}" style="padding:0; height:${bottomPad}px"></td></tr>`;
+    }
+    tbody.innerHTML = html;
+  }
+
+  // Initial render, then on scroll/resize
+  render();
+  container.addEventListener('scroll', render, { passive: true });
+  window.addEventListener('resize', render);
+
+  // Return an API to update data or teardown if needed later
+  return {
+    update(newRows) { rows = newRows || []; render(); },
+    destroy() {
+      container.removeEventListener('scroll', render);
+      window.removeEventListener('resize', render);
+    }
+  };
+}
+
+async function fetchAnalytics(startDate, endDate, opts = {}) {
+  let url = "/api/champion-schools-smartlearning-usage-analytics";
+  if (startDate && endDate) {
+    url += `?start_date=${startDate}&end_date=${endDate}`;
+  }
+  const response = await fetch(url, { signal: opts.signal });
+  if (!response.ok) throw new Error(`API error ${response.status}`);
+  return await response.json();
+}
+
+function renderAnalytics(data) {
+  const rows = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+  const renderRow = (row) => `
+    <tr>
+      <td>${row.champion}</td>
+      <td><a href="/profile/${row.username || ""}"> ${row.username || ""} </a></td>
+      <td>${row.province}</td>
+      <td>${row.school_count}</td>
+      <td>${row.asl_student_count}</td>
+      <td>${row.library_student_count}</td>
+      <td>${row.overall_student_count}</td>
+    </tr>`;
+  // Keep a copy for fast filtering
+  analyticsAllRows = rows;
+  analyticsFilteredRows = rows;
+  if (!analyticsVT) {
+    analyticsVT = mountVirtualTable('analytics-table', rows, renderRow, 7, { rowHeight: 38, buffer: 12 });
+  } else {
+    analyticsVT.update(rows);
+  }
+}
+
+// Lazy-load Champions table on first open or with date range
+async function loadChampions(forceReload = false) {
+  if (championsLoaded && !forceReload) return;
+  championsLoaded = true;
+  setStatus('champions-status', 'Loading…');
+
+  const champsRenderRow = (c) => `
+    <tr>
+      <td>${c.champion}</td>
+      <td><a href="/profile/${c.username || ""}"> ${c.username || ""} </a></td>
+      <td>${c.province}</td>
+      <td>${c.school_count}</td>
+      <td>${c.chatlog_count}</td>
+    </tr>`;
+
+  // Only use cache if not forcing reload
+  if (!forceReload) {
+    const cachedChampions = getCache(championsCacheKey);
+    if (cachedChampions && Array.isArray(cachedChampions.data)) {
+      championsAllRows = cachedChampions.data;
+      championsFilteredRows = championsAllRows;
+      championsVT = mountVirtualTable('champions-table', championsAllRows, champsRenderRow, 5, { rowHeight: 38, buffer: 12 });
+      setStatus('champions-status', `Loaded from cache • updating…`);
+    }
+  }
+
+  try {
+    // Get date range from inputs
+    const startDate = document.querySelector("#startDate").value;
+    const endDate = document.querySelector("#endDate").value;
+    
+    // Build URL with date parameters if present
+    let url = "/api/all-champions-ask-data";
+    if (startDate && endDate) {
+      url += `?start_date=${startDate}&end_date=${endDate}`;
+    }
+    
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`API error ${resp.status}`);
+    const champions = await resp.json();
+    championsAllRows = Array.isArray(champions) ? champions : [];
+    championsFilteredRows = championsAllRows;
+    if (!championsVT) {
+      championsVT = mountVirtualTable('champions-table', championsAllRows, champsRenderRow, 5, { rowHeight: 38, buffer: 12 });
+    } else {
+      championsVT.update(championsAllRows);
+    }
+    setCache(championsCacheKey, championsAllRows);
+    setStatus('champions-status', `Updated just now (${championsAllRows.length} rows)`);
+  } catch (e) {
+    console.error(e);
+    setStatus('champions-status', 'Failed to load champions data.');
+  }
+}
+
+// Export helpers
+function buildRangeLabel() {
+  const s = (document.getElementById('startDate')||{}).value || '';
+  const e = (document.getElementById('endDate')||{}).value || '';
+  if (s && e) return `${s} to ${e}`;
+  if (s) return `${s}`;
+  if (e) return `${e}`;
+  return 'all';
+}
+
+function sanitizeSheetName(name) {
+  // Remove invalid Excel sheet name chars and trim length
+  return name.replace(/[\\\/*?:\[\]]/g, '_').slice(0, 28);
+}
+
+function exportBothAsExcel() {
+  try {
+    const wb = XLSX.utils.book_new();
+    const t1 = document.getElementById('analytics-table');
+    const t2 = document.getElementById('champions-table');
+    if (!t1 || !t2) { alert('Tables not found'); return; }
+
+    const range = buildRangeLabel();
+    const sheet1 = sanitizeSheetName(`Analytics_${range}`);
+    const sheet2 = sanitizeSheetName(`Champions_${range}`);
+    const filename = `akello_champions_reports_${range.replace(/\s+/g,'_')}.xlsx`;
+
+    const s1 = XLSX.utils.table_to_sheet(t1);
+    const s2 = XLSX.utils.table_to_sheet(t2);
+    XLSX.utils.book_append_sheet(wb, s1, sheet1 || 'Analytics');
+    XLSX.utils.book_append_sheet(wb, s2, sheet2 || 'Champions');
+    XLSX.writeFile(wb, filename);
+  } catch (e) {
+    console.error(e);
+    alert('Failed to export Excel');
+  }
+}
+
+function exportBothAsPDF() {
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'pt');
+
+    const range = buildRangeLabel();
+    const title = `Akello Champions Reports (${range})`;
+
+    // Title
+    doc.setFontSize(14);
+    doc.text(title, 40, 40);
+
+    // First table
+    const t1 = document.getElementById('analytics-table');
+    if (t1) {
+      doc.autoTable({ html: '#analytics-table', startY: 60, styles: { fontSize: 8 } });
+    }
+
+    // Second table, start after previous table
+    const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 20 : 60;
+    const t2 = document.getElementById('champions-table');
+    if (t2) {
+      doc.text('Champions', 40, finalY);
+      doc.autoTable({ html: '#champions-table', startY: finalY + 10, styles: { fontSize: 8 } });
+    }
+
+    const filename = `akello_champions_reports_${range.replace(/\s+/g,'_')}.pdf`;
+    doc.save(filename);
+  } catch (e) {
+    console.error(e);
+    alert('Failed to export PDF');
+  }
+}
+
+function ymd(d){
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+function setRangePreset(p){
+  const s = document.getElementById('startDate');
+  const e = document.getElementById('endDate');
+  const today = new Date();
+  if(p==='clear'){
+    s.value=''; e.value=''; updatePresetActive(p); return;
+  }
+  if(p==='this_month'){
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    const end = new Date(today.getFullYear(), today.getMonth()+1, 0);
+    s.value = ymd(start); e.value = ymd(end); updatePresetActive(p); return;
+  }
+  if(p==='last_30'){
+    const start = new Date(today); start.setDate(start.getDate()-29);
+    s.value = ymd(start); e.value = ymd(today); updatePresetActive(p); return;
+  }
+  if(p==='ytd'){
+    const start = new Date(today.getFullYear(), 0, 1);
+    s.value = ymd(start); e.value = ymd(today); updatePresetActive(p); return;
+  }
+}
+// Ensure inline onclick can find it
+window.setRangePreset = setRangePreset;
+
+function updatePresetActive(p){
+  document.querySelectorAll('.chip-preset').forEach(b => b.classList.remove('chip-active'));
+  if(p && p !== 'clear'){
+    document.querySelectorAll(`.chip-preset[data-preset="${p}"]`).forEach(b => b.classList.add('chip-active'));
+  }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  // Immediate skeletons so UI doesn't look empty
+  showSkeleton('analytics-table', 12, 7);
+  showSkeleton('champions-table', 12, 5);
+  setStatus('analytics-status', 'Loading…');
+  setStatus('champions-status', 'Load Champions tab to fetch data');
+
+  // Default to a smaller range by default to avoid massive initial payloads
+  try { setRangePreset('last_30'); } catch {}
+
+  // Render cached analytics immediately if present
+  const cachedAnalytics = getCache(analyticsCacheKey);
+  if (cachedAnalytics) {
+    try {
+      renderAnalytics(cachedAnalytics.data);
+      setStatus('analytics-status', `Loaded from cache • updating…`);
+    } catch { /* ignore */ }
+  }
+
+// Kick off live analytics fetch (default to last 30 days)
+  try {
+    const startDate = document.querySelector("#startDate").value;
+    const endDate = document.querySelector("#endDate").value;
+    const liveAnalytics = await fetchAnalytics(startDate, endDate);
+    // Some routes return {data: [...]}, handle both
+    const payload = Array.isArray(liveAnalytics) ? { data: liveAnalytics } : liveAnalytics;
+    renderAnalytics(payload);
+    setCache(analyticsCacheKey, payload);
+    setStatus('analytics-status', `Updated just now (${(payload.data||[]).length} rows)`);
+  } catch (e) {
+    console.error(e);
+    if (!cachedAnalytics) setStatus('analytics-status', 'Failed to load data. Please retry.');
+  }
+
+// Search filter for analytics (debounced, filters in-memory dataset)
+  const searchInput = document.querySelector("#search");
+  let analyticsSearchTimer = null;
+  searchInput.addEventListener("input", () => {
+    clearTimeout(analyticsSearchTimer);
+    analyticsSearchTimer = setTimeout(() => {
+      const term = searchInput.value.trim().toLowerCase();
+      if (!term) {
+        analyticsFilteredRows = analyticsAllRows;
+      } else {
+        analyticsFilteredRows = (analyticsAllRows || []).filter(r => {
+          const champ = String(r.champion || '').toLowerCase();
+          const prov  = String(r.province || '').toLowerCase();
+          return champ.includes(term) || prov.includes(term);
+        });
+      }
+      if (analyticsVT) analyticsVT.update(analyticsFilteredRows);
+      setStatus('analytics-status', `Filtered (${(analyticsFilteredRows||[]).length} of ${(analyticsAllRows||[]).length})`);
+    }, 250);
+  });
+
+// Date filter with cancellation support for rapid requests
+  document.querySelector("#loadData").addEventListener("click", async () => {
+    const startDate = document.querySelector("#startDate").value;
+    const endDate = document.querySelector("#endDate").value;
+    if (analyticsController) try { analyticsController.abort(); } catch {}
+    analyticsController = new AbortController();
+
+    showSkeleton('analytics-table', 8, 7);
+    setStatus('analytics-status', 'Loading filtered data…');
+    try {
+      const filteredData = await fetchAnalytics(startDate, endDate, { signal: analyticsController.signal });
+      const payload = Array.isArray(filteredData) ? { data: filteredData } : filteredData;
+      renderAnalytics(payload); // updates in-memory arrays and table
+      setStatus('analytics-status', `Updated (${(payload.data||[]).length} rows)`);
+    } catch (e) {
+      if (e.name === 'AbortError') return; // user triggered new search quickly
+      console.error(e);
+      setStatus('analytics-status', 'Failed to load filtered data.');
+    }
+    
+    // Also reload champions data if it has been loaded
+    if (championsLoaded) {
+      showSkeleton('champions-table', 8, 5);
+      await loadChampions(true); // force reload with new date range
+    }
+  });
+
+// Champions table will be loaded on-demand when its tab is opened
+
+// Search filter for champions (debounced, filters in-memory dataset)
+  const searchChampions = document.querySelector("#searchChampions");
+  let championsSearchTimer = null;
+  searchChampions.addEventListener("input", () => {
+    clearTimeout(championsSearchTimer);
+    championsSearchTimer = setTimeout(() => {
+      const term = searchChampions.value.trim().toLowerCase();
+      if (!term) {
+        championsFilteredRows = championsAllRows;
+      } else {
+        championsFilteredRows = (championsAllRows || []).filter(c => {
+          const champ = String(c.champion || '').toLowerCase();
+          const prov  = String(c.province || '').toLowerCase();
+          return champ.includes(term) || prov.includes(term);
+        });
+      }
+      if (championsVT) championsVT.update(championsFilteredRows);
+      setStatus('champions-status', `Filtered (${(championsFilteredRows||[]).length} of ${(championsAllRows||[]).length})`);
+    }, 250);
+  });
+});
+</script>
+
+</body>
+{% endblock %}

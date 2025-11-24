@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<style>
+  .contract-wrapper { max-width: 1200px; margin: 40px auto; padding: 0 16px; }
+  .card { background:#fff; border-radius:14px; box-shadow:0 8px 20px rgba(10,31,68,.08); overflow:hidden }
+  .card-header { padding:14px 16px; border-bottom:1px solid #eef2f7; font-weight:700; background:linear-gradient(180deg,#f7faff,#fff) }
+  .card-body { padding:14px 16px }
+  .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px }
+  .btn-chip { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; border:1px solid #dbe4f0; background:#fff; box-shadow:0 3px 10px rgba(10,31,68,.06) }
+  .btn-chip:hover { background:#0d6efd; color:#fff; border-color:#0d6efd }
+  table { width:100% }
+  thead th { background:#f1f5fb; position: sticky; top: 0; z-index: 1; }
+  th, td { padding:10px 8px; vertical-align: middle; }
+  input[type="text"], select { width:100%; border:1px solid #dbe4f0; border-radius:8px; padding:6px 8px }
+  #totalWeight { font-weight:700; color:#0b213f }
+  @media (max-width: 780px) {
+    .contract-wrapper { max-width: 85vw; }
+    .table-container { overflow:auto }
+    .table-container table thead { display:none }
+    .table-container table tbody tr { display:grid; grid-template-columns:1fr; gap:6px; padding:10px; border-bottom:1px solid #eef2f7 }
+    .table-container table tbody td { display:grid; grid-template-columns: 160px 1fr; align-items:center }
+    .table-container table tbody td::before { content: attr(data-label); font-weight:600; color:#44536b }
+  }
+</style>
+
+<div class="contract-wrapper">
+  <div class="card">
+    <div class="card-header">Scorecard</div>
+    <div class="card-body">
+      <div class="toolbar">
+        <button type="button" id="addRow" class="btn-chip"><i class="fa fa-plus-circle"></i> Add Row</button>
+        <span id="totalWeight">Total Weight: 0</span>
+      </div>
+      <div class="table-container" style="max-height: 65vh; overflow: auto;">
+        <table class="table table-striped" id="scorecardTable">
+          <thead>
+            <tr>
+              <th>Key Focus Area</th>
+              <th>Strategic Objective</th>
+              <th>Performance Measure</th>
+              <th>Unit Of Measure</th>
+              <th>Target</th>
+              <th>Weight</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody class="w3-small">
+            {% for scorecard in scorecards %}
+            <tr class="w3-border" data-id="{{ scorecard.id }}">
+              <td data-label="Key Focus Area">
+                <select name="keyFocusArea" class="key-focus-area">
+                  <option value="Strategy" {% if scorecard.key_focus_area == 'Strategy' %}selected{% endif %}>Strategy</option>
+                  <option value="Customer" {% if scorecard.key_focus_area == 'Customer' %}selected{% endif %}>Customer</option>
+                  <option value="Innovation" {% if scorecard.key_focus_area == 'Innovation' %}selected{% endif %}>Innovation</option>
+                  <option value="Operations" {% if scorecard.key_focus_area == 'Operations' %}selected{% endif %}>Operations</option>
+                  <option value="Functional" {% if scorecard.key_focus_area == 'Functional' %}selected{% endif %}>Functional</option>
+                </select>
+              </td>
+              <td data-label="Strategic Objective"><input type="text" name="strategicObjective" class="strategic-objective" value="{{ scorecard.strategic_objective }}"></td>
+              <td data-label="Performance Measure"><input type="text" name="performanceMeasure" class="performance-measure" value="{{ scorecard.performance_measure }}"></td>
+              <td data-label="Unit Of Measure">
+                <select name="unitOfMeasure" class="unit-of-measure">
+                  <option value="Yes / No" {% if scorecard.unit_of_measure == 'Yes / No' %}selected{% endif %}>Yes / No</option>
+                  <option value="Percentage" {% if scorecard.unit_of_measure == 'Percentage' %}selected{% endif %}>Percentage</option>
+                  <option value="Numeric" {% if scorecard.unit_of_measure == 'Numeric' %}selected{% endif %}>Numeric</option>
+                </select>
+              </td>
+              <td data-label="Target"><input type="text" name="target" class="target" value="{{ scorecard.target }}"></td>
+              <td data-label="Weight"><input type="text" name="weight" class="weight" value="{{ scorecard.weight }}"></td>
+              <td data-label="Action">
+                <button type="button" class="save-row btn-chip"><i class="fa fa-save"></i> Save</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p id="errorMsg" class="error"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+  function calculateTotalWeight() {
+    let total = 0;
+    document.querySelectorAll('.weight').forEach(input => {
+      const val = parseFloat(input.value) || 0;
+      total += val;
+    });
+    const el = document.getElementById('totalWeight');
+    if (el) el.textContent = `Total Weight: ${total}`;
+  }
+
+  document.addEventListener('input', function (event) {
+    if (event.target.classList.contains('weight')) {
+      calculateTotalWeight();
+    }
+  });
+
+  window.addEventListener('DOMContentLoaded', calculateTotalWeight);
+</script>
+
+<script>
+  $(document).ready(function () {
+    // Add new row
+    $('#addRow').click(function () {
+      let newRow = `<tr data-id="new">
+          <td data-label="Key Focus Area">
+            <select name="keyFocusArea" class="key-focus-area">
+              <option value="Strategy">Strategy</option>
+              <option value="Customer">Customer</option>
+              <option value="Innovation">Innovation</option>
+              <option value="Operations">Operations</option>
+              <option value="Functional">Functional</option>
+            </select>
+          </td>
+          <td data-label="Strategic Objective"><input type="text" name="strategicObjective" class="strategic-objective"></td>
+          <td data-label="Performance Measure"><input type="text" name="performanceMeasure" class="performance-measure"></td>
+          <td data-label="Unit Of Measure">
+            <select name="unitOfMeasure" class="unit-of-measure">
+              <option value="Yes / No">Yes / No</option>
+              <option value="Percentage">Percentage</option>
+              <option value="Numeric">Numeric</option>
+            </select>
+          </td>
+          <td data-label="Target"><input type="text" name="target" class="target"></td>
+          <td data-label="Weight"><input type="text" name="weight" class="weight"></td>
+          <td data-label="Action">
+            <button type="button" class="save-row btn-chip"><i class="fa fa-save"></i> Save</button>
+          </td>
+        </tr>`;
+      $('#scorecardTable tbody').append(newRow);
+    });
+
+    // Save row to database
+    $(document).on('click', '.save-row', function () {
+      let row = $(this).closest('tr');
+      let data = {
+        id: row.data('id') === 'new' ? null : row.data('id'),
+        keyFocusArea: row.find('.key-focus-area').val(),
+        strategicObjective: row.find('.strategic-objective').val(),
+        performanceMeasure: row.find('.performance-measure').val(),
+        unitOfMeasure: row.find('.unit-of-measure').val(),
+        target: row.find('.target').val(),
+        weight: row.find('.weight').val()
+      };
+
+      $.ajax({
+        url: "{{ url_for('save_scorecard_row') }}",
+        method: "POST",
+        contentType: "application/json",
+        data: JSON.stringify(data),
+        success: function (response) {
+          alert(response.message);
+          if (response.new_id) {
+            row.attr('data-id', response.new_id);
+          }
+          calculateTotalWeight();
+        },
+        error: function (xhr) {
+          alert('Error saving row: ' + (xhr.responseJSON?.error || 'Unknown error'));
+        }
+      });
+    });
+  });
+</script>
+
+{% endblock %}

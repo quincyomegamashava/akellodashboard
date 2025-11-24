@@ -1,0 +1,189 @@
+<div class="container-fluid px-3 px-md-4">
+
+
+  <!-- User info -->
+  <section class="row g-3 g-md-4 mb-4">
+    <div class="col-12 col-lg-4">
+      <div class="w3-card w3-margin-top h-100 shadow-sm w3-padding" style="border-radius: 16px;">
+        <div class="card-body w3-padding">
+          <h5 class="card-title mb-3" style="color:#00407d;">Your account</h5>
+          <div class="d-flex align-items-center mb-3">
+            <img src="{{ current_user.avatar(128) }}" class="rounded-circle me-3" alt="Avatar" style="width:56px; height:56px; object-fit:cover;">
+            <div>
+              <div class="fw-semibold">{{ current_user.username }}</div>
+              <div class="text-muted small">{{ current_user.userRole }}</div>
+            </div>
+          </div>
+          <ul class="list-unstyled small mb-0">
+            {% if current_user.department %}
+            <li class=""><p><i class="fa fa-building me-2 text-secondary"></i> Department: <b>{{ current_user.department }}</b></p></li>
+            {% endif %}
+            {% if current_user.province %}
+            <li class=""><p><i class="fa fa-map-marker me-2 text-secondary"></i> Province: <b>{{ current_user.province }}</b></p></li>
+            {% endif %}
+            {% if current_user.email %}
+            <li class=""><i class="fa fa-envelope me-2 text-secondary"></i> Email: <b>{{ current_user.email }}</b></li>
+            {% endif %}
+          </ul>
+        </div>
+
+        <h5 class="card-title w3-margin-left mb-3" style="color:#00407d;">How to use this platform</h5>
+      <div class="row small g-3">
+        <div class="col-12 col-md-6 col-lg-4">
+          <div class="p-3  w3-indigo h-100 rounded-3">
+            <b>Create and manage tasks</b>
+            <ol class="mb-0 mt-2">
+              <li>Open Workspaces</li>
+              <li>Create a workspace and add members</li>
+              <li>Create projects and tasks, set dates and progress</li>
+            </ol>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-4">
+          <div class="p-3  w3-indigo h-100 rounded-3">
+            <b>Submit weekly reports</b>
+            <ol class="mb-0 mt-2">
+              <li>Go to Reports</li>
+              <li>Fill in the week start date (Monday)</li>
+              <li>Describe work done, next week, and challenges</li>
+            </ol>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-4">
+          <div class="p-3  w3-indigo h-100 rounded-3">
+            <b>Get support</b>
+            <ol class="mb-0 mt-2">
+              <li>Open Help Desk</li>
+              <li>Describe your issue (optionally include an image)</li>
+              <li>Track responses and status updates</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      </div>
+    </div>
+
+
+    
+    <!-- Quick navigation W3 cards -->
+    <div class="col-12 col-lg-8">
+      <div class="w3-row-padding">
+        <!-- Analytics -->
+        {% if current_user.userRole != 'Brand Ambassador' %}
+        <div class="w3-col l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="window.location='{{ url_for('akello_monitor') }}'">
+            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Analytics</b></div>
+            <div class="w3-container w3-padding-small">
+              <div class="value">→</div>
+              <div class="w3-text-gray w3-tiny">KPIs & Targets</div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Champions -->
+        <div class="w3-col l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="window.location='{{ url_for('all_champion_details') }}'">
+            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Champions</b></div>
+            <div class="w3-container w3-padding-small">
+              <div class="value">→</div>
+              <div class="w3-text-gray w3-tiny">Usage & Schools</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Workspaces -->
+        {% if current_user.userRole != 'Brand Ambassador' %}
+        <div class="w3-col l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="window.location='{{ url_for('workspaces') }}'">
+            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Workspaces</b></div>
+            <div class="w3-container w3-padding-small">
+              <div class="value">→</div>
+              <div class="w3-text-gray w3-tiny">Projects & Tasks</div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Reports -->
+        <div class="w3-col l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="window.location='{{ url_for('akello_weekly_reports') }}'">
+            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Reports</b></div>
+            <div class="w3-container w3-padding-small">
+              <div class="value">→</div>
+              <div class="w3-text-gray w3-tiny">Weekly Updates</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Book Allocations -->
+        {% if current_user.userRole != 'Brand Ambassador' %}
+        <div class="w3-col l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="window.location='{{ url_for('bookallocations') }}'">
+            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Allocations</b></div>
+            <div class="w3-container w3-padding-small">
+              <div class="value">→</div>
+              <div class="w3-text-gray w3-tiny">Books & Provinces</div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Help Desk -->
+        <div class="w3-col l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="window.location='{{ url_for('help_desk') }}'">
+            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Help Desk</b></div>
+            <div class="w3-container w3-padding-small">
+              <div class="value">→</div>
+              <div class="w3-text-gray w3-tiny">Support Tickets</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Administration -->
+        {% if current_user.userRole == 'Admin' %}
+        <div class="w3-col l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="window.location='{{ url_for('administration') }}'">
+            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Administration</b></div>
+            <div class="w3-container w3-padding-small">
+              <div class="value">→</div>
+              <div class="w3-text-gray w3-tiny">Users & Settings</div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Profile -->
+        <div class="w3-col l3 m6 s12 w3-padding-small">
+          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="window.location='{{ url_for('profile', username=current_user.username) }}'">
+            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Profile</b></div>
+            <div class="w3-container w3-padding-small">
+              <div class="value">→</div>
+              <div class="w3-text-gray w3-tiny">Your Account</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Branding Tracker Card -->
+  <section class="w3-container w3-margin-bottom">
+    <div class="w3-row-padding">
+      <div class="w3-col l3 m6 s12 w3-padding-small">
+        <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="document.getElementById('branding_tracker_modal').style.display='block'; loadBrandingData();">
+          <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Branding Tracker</b></div>
+          <div class="w3-container w3-padding-small">
+            <div class="value">→</div>
+            <div class="w3-text-gray w3-tiny">Inventory & Requests</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Branding Tracker Modal -->
+  {% include '_branding_tracker.html' %}
+</div>

@@ -1,0 +1,756 @@
+{% extends "base.html" %}
+
+{% block head_extra %}
+    <!-- Monitoring Dashboard Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Dedicated Monitoring Dashboard CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/monitoring-dashboard.css') }}">
+
+    <style>
+      /* Page hero and quick chips (lightweight augment) */
+      .dashboard-hero { display:flex; align-items:center; justify-content:space-between; gap:16px; background: linear-gradient(135deg,#e8f0ff,#ffffff); border:1px solid #e6ecf7; border-radius:16px; padding:16px 18px; box-shadow:0 6px 18px rgba(13,38,76,.06); margin-bottom: 20px; }
+      .hero-left { display:flex; align-items:center; gap:12px; }
+      .hero-icon { width:44px; height:44px; border-radius:12px; background: linear-gradient(135deg,#3b82f6,#06b6d4); color:#fff; display:grid; place-items:center; font-size:18px; }
+      .hero-title { margin:0; color:#0b213f; font-weight:700; font-size:1.15rem; }
+      .hero-sub { margin:2px 0 0; color:#55657d; font-size:.9rem; }
+      .hero-actions { display:flex; align-items:center; gap:8px; }
+      .btn-ghost { background:#fff; border:1px solid #dfe7f5; color:#1f3161; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:.9rem; transition:all .2s ease; }
+      .btn-ghost:hover { background:#f7faff; box-shadow:0 4px 10px rgba(13,38,76,.06); }
+      .chips-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+      .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; font-size:.78rem; border:1px solid #dfe7f5; background:#f7faff; color:#1f3161; cursor:pointer; transition:all .15s; }
+      .chip:hover { background:#eef5ff; }
+      .chip.active { background: linear-gradient(135deg,#6366f1,#22c55e); color:#fff; border-color:transparent; box-shadow:0 6px 18px rgba(59,130,246,.18); }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="monitoring-container">
+    <div class="connection-status" id="connectionStatus">
+        <span class="status-indicator online"></span>
+        Connected to monitoring
+    </div>
+    
+    <div class="dashboard-hero">
+      <div class="hero-left">
+        <div class="hero-icon">📈</div>
+        <div>
+          <p class="hero-title">Real-time User Activity Monitoring</p>
+          <p class="hero-sub">Track active users, sessions, and activities across your platform</p>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <button class="btn-ghost" onclick="loadInitialData()">Refresh</button>
+      </div>
+    </div>
+    
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card active-users">
+            <div class="stat-number" id="activeUsersCount">-</div>
+            <div class="stat-label">Active Users</div>
+        </div>
+        <div class="stat-card recent-activities">
+            <div class="stat-number" id="recentActivitiesCount">-</div>
+            <div class="stat-label">Activities (Last Hour)</div>
+        </div>
+        <div class="stat-card popular-pages">
+            <div class="stat-number" id="totalPagesTracked">-</div>
+            <div class="stat-label">Pages Tracked</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="activeSessionsCount">-</div>
+            <div class="stat-label">Active Sessions</div>
+        </div>
+    </div>
+    
+    <!-- Filters -->
+    <div class="filters-section">
+        <h3>Filter Activities</h3>
+        <div class="chips-row" aria-label="Quick ranges">
+          <span class="chip" onclick="setRangePreset('15m')">Last 15m</span>
+          <span class="chip active" onclick="setRangePreset('1h')">Last 1h</span>
+          <span class="chip" onclick="setRangePreset('24h')">Last 24h</span>
+          <span class="chip" onclick="setRangePreset('7d')">Last 7d</span>
+          <span class="chip" onclick="setRangePreset('clear')">Clear</span>
+        </div>
+        <div class="filter-row">
+            <div class="filter-group">
+                <label class="filter-label">Username</label>
+                <input type="text" class="filter-input" id="filterUsername" placeholder="Enter username">
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Activity Type</label>
+                <select class="filter-input" id="filterActivityType">
+                    <option value="">All Types</option>
+                    <option value="page_visit">Page Visits</option>
+                    <option value="login">Logins</option>
+                    <option value="logout">Logouts</option>
+                    <option value="form_submit">Form Submissions</option>
+                    <option value="api_call">API Calls</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Start Date</label>
+                <input type="datetime-local" class="filter-input" id="filterStartDate">
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">End Date</label>
+                <input type="datetime-local" class="filter-input" id="filterEndDate">
+            </div>
+            <div class="filter-group">
+                <button class="btn-filter" onclick="applyFilters()">Apply Filters</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Dashboard Panels -->
+    <div class="dashboard-grid">
+        <!-- Live Activity Feed -->
+        <div class="dashboard-panel">
+            <div class="panel-header">
+                <h3 class="panel-title">Live Activity Feed</h3>
+                <small id="lastUpdate" class="last-update-text">Never updated</small>
+            </div>
+            <div class="activity-feed" id="activityFeed">
+                <div class="loading-state">
+                    Loading activities...
+                </div>
+            </div>
+        </div>
+        
+        <!-- Active Sessions -->
+        <div class="dashboard-panel">
+            <div class="panel-header">
+                <h3 class="panel-title">Active Sessions</h3>
+                <small class="last-update-text">Last 15 minutes</small>
+            </div>
+            <div class="sessions-grid" id="activeSessions">
+                <div class="loading-state">
+                    Loading sessions...
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Activity Charts -->
+    <div class="dashboard-panel">
+        <div class="panel-header">
+            <h3 class="panel-title">Activity Overview</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="activityChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- User Journey Modal -->
+<div id="journeyModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">User Journey</h2>
+            <button class="close-modal" onclick="closeJourneyModal()">&times;</button>
+        </div>
+        <div id="journeyContent">
+            <div class="loading-state">
+                Loading journey...
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Global variables
+let socket = null;
+let activityChart = null;
+let isConnected = false;
+
+// Initialize the dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    initializeSocketConnection();
+    loadInitialData();
+    setupPeriodicUpdates();
+    initializeChart();
+});
+
+// Socket.IO connection
+function initializeSocketConnection() {
+    socket = io('/monitoring');
+    
+    socket.on('connect', function() {
+        console.log('Connected to monitoring namespace');
+        isConnected = true;
+        updateConnectionStatus(true);
+    });
+    
+    socket.on('disconnect', function() {
+        console.log('Disconnected from monitoring');
+        isConnected = false;
+        updateConnectionStatus(false);
+    });
+    
+    socket.on('connected', function(data) {
+        console.log('Monitoring connection established:', data);
+    });
+    
+    socket.on('new_activity', function(activity) {
+        console.log('New activity:', activity);
+        addActivityToFeed(activity);
+        updateStats();
+    });
+    
+    socket.on('stats_update', function(data) {
+        console.log('Stats update:', data);
+        updateDashboardStats(data);
+    });
+    
+    socket.on('initial_stats', function(data) {
+        console.log('Initial stats:', data);
+        updateDashboardStats(data);
+    });
+    
+    socket.on('error', function(error) {
+        console.error('Socket error:', error);
+        showNotification('Error: ' + error.message, 'error');
+    });
+}
+
+// Update connection status indicator
+function updateConnectionStatus(connected) {
+    const statusEl = document.getElementById('connectionStatus');
+    if (!statusEl) return;
+    
+    const indicator = statusEl.querySelector('.status-indicator');
+    
+    if (connected) {
+        statusEl.classList.remove('disconnected');
+        if (indicator) indicator.className = 'status-indicator online';
+        statusEl.innerHTML = '<span class="status-indicator online"></span> Connected to monitoring';
+    } else {
+        statusEl.classList.add('disconnected');
+        if (indicator) indicator.className = 'status-indicator offline';
+        statusEl.innerHTML = '<span class="status-indicator offline"></span> Disconnected from monitoring';
+    }
+}
+
+// Load initial data
+async function loadInitialData() {
+    try {
+        await Promise.all([
+            loadStats(),
+            loadActivities(),
+            loadActiveSessions()
+        ]);
+    } catch (error) {
+        console.error('Error loading initial data:', error);
+        showNotification('Error loading dashboard data', 'error');
+    }
+}
+
+// Smooth number animation helper
+function animateNumber(el, to, duration=600){
+  if (!el) return;
+  const text = (el.textContent||'').replace(/[^0-9.]/g,'');
+  const from = parseFloat(text) || 0;
+  const start = performance.now();
+  const diff = to - from;
+  el.classList.add('bump');
+  function step(ts){
+    const p = Math.min(1, (ts - start)/duration);
+    const eased = 0.5 - Math.cos(Math.PI * p)/2; // easeInOut
+    const val = from + diff * eased;
+    el.textContent = Math.round(val);
+    if (p < 1) requestAnimationFrame(step); else setTimeout(()=>el.classList.remove('bump'), 80);
+  }
+  requestAnimationFrame(step);
+}
+
+// Load statistics
+async function loadStats() {
+    try {
+        const response = await fetch('/api/monitoring/stats');
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        animateNumber(document.getElementById('activeUsersCount'), Number(data.active_users||0));
+        const lastHour = (data.activity_counts && (data.activity_counts.last_hour||data.activity_counts.lastHour)) || 0;
+        animateNumber(document.getElementById('recentActivitiesCount'), Number(lastHour));
+        const pagesTracked = Array.isArray(data.popular_pages) ? data.popular_pages.length : Number(data.total_pages_tracked||0);
+        animateNumber(document.getElementById('totalPagesTracked'), pagesTracked);
+        
+        updateActivityChart(data);
+        
+    } catch (error) {
+        console.error('Error loading stats:', error);
+        document.getElementById('activeUsersCount').textContent = '0';
+        document.getElementById('recentActivitiesCount').textContent = '0';
+        document.getElementById('totalPagesTracked').textContent = '0';
+    }
+}
+
+// Load activities
+async function loadActivities() {
+    try {
+        const response = await fetch('/api/monitoring/activities?limit=20');
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        const feedEl = document.getElementById('activityFeed');
+        feedEl.innerHTML = '';
+        
+        if (!data.activities || data.activities.length === 0) {
+            feedEl.innerHTML = '<div class="empty-state">No recent activities</div>';
+            return;
+        }
+        
+        data.activities.forEach(activity => {
+            addActivityToFeed(activity, false);
+        });
+        
+        updateLastUpdateTime();
+        
+    } catch (error) {
+        console.error('Error loading activities:', error);
+        document.getElementById('activityFeed').innerHTML = '<div class="error-state">Error loading activities</div>';
+    }
+}
+
+// Load active sessions
+async function loadActiveSessions() {
+    try {
+        const response = await fetch('/api/monitoring/sessions');
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        animateNumber(document.getElementById('activeSessionsCount'), Number(data.active_count||0));
+        
+        const sessionsEl = document.getElementById('activeSessions');
+        sessionsEl.innerHTML = '';
+        
+        if (!data.sessions || data.sessions.length === 0) {
+            sessionsEl.innerHTML = '<div class="empty-state">No active sessions</div>';
+            return;
+        }
+        
+        data.sessions.forEach(session => {
+            const sessionEl = document.createElement('div');
+            sessionEl.className = 'session-item';
+            sessionEl.innerHTML = `
+                <div>
+                    <div class="session-user">${session.username || 'Anonymous'}</div>
+                    <div class="session-details">${session.ip_address} • ${formatRelativeTime(session.last_seen)}</div>
+                </div>
+                <div class="session-duration">${session.duration_minutes || 0}min</div>
+            `;
+            sessionEl.onclick = () => showUserJourney(session.session_id);
+            sessionEl.style.cursor = 'pointer';
+            sessionsEl.appendChild(sessionEl);
+        });
+        
+    } catch (error) {
+        console.error('Error loading sessions:', error);
+        document.getElementById('activeSessions').innerHTML = '<div class="error-state">Error loading sessions</div>';
+    }
+}
+
+// Add activity to feed
+function addActivityToFeed(activity, prepend = true) {
+    const feedEl = document.getElementById('activityFeed');
+    const activityEl = document.createElement('div');
+    activityEl.className = 'activity-item';
+    
+    const icon = getActivityIcon(activity.activity_type);
+    const time = formatRelativeTime(activity.timestamp);
+    
+    activityEl.innerHTML = `
+        <div class="activity-icon ${activity.activity_type}">${icon}</div>
+        <div class="activity-details">
+            <div class="activity-user">${activity.username || 'Anonymous'}</div>
+            <div class="activity-action">${formatActivityAction(activity)}</div>
+            <div class="activity-time">${time}</div>
+        </div>
+    `;
+    
+    if (prepend) {
+        feedEl.insertBefore(activityEl, feedEl.firstChild);
+        // Remove old items to keep feed manageable
+        while (feedEl.children.length > 50) {
+            feedEl.removeChild(feedEl.lastChild);
+        }
+    } else {
+        feedEl.appendChild(activityEl);
+    }
+}
+
+// Get activity icon
+function getActivityIcon(type) {
+    const icons = {
+        'page_visit': '👁',
+        'login': '🔑',
+        'logout': '🚪',
+        'form_submit': '📝',
+        'api_call': '🔌'
+    };
+    return icons[type] || '❓';
+}
+
+// Format activity action
+function formatActivityAction(activity) {
+    const actions = {
+        'page_visit': `visited ${activity.url_path}`,
+        'login': 'logged in',
+        'logout': 'logged out',
+        'form_submit': `submitted form at ${activity.url_path}`,
+        'api_call': `called API ${activity.url_path}`
+    };
+    return actions[activity.activity_type] || `performed ${activity.activity_type}`;
+}
+
+// Format relative time
+function formatRelativeTime(timestamp) {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffMs = now - time;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    
+    if (diffSec < 60) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHour < 24) return `${diffHour}h ago`;
+    return time.toLocaleDateString();
+}
+
+// Update last update time
+function updateLastUpdateTime() {
+    const updateEl = document.getElementById('lastUpdate');
+    if (updateEl) {
+        updateEl.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+    }
+}
+
+// Setup periodic updates
+function setupPeriodicUpdates() {
+    // Update stats every 30 seconds
+    setInterval(() => {
+        if (isConnected) {
+            updateStats();
+        }
+    }, 30000);
+    
+    // Refresh sessions every minute
+    setInterval(() => {
+        loadActiveSessions();
+    }, 60000);
+}
+
+// Update stats via socket
+function updateStats() {
+    if (socket && isConnected) {
+        socket.emit('request_stats');
+    }
+}
+
+// Update dashboard stats
+function extractTimeseries(data){
+    // Flexible extractor: support several payload shapes
+    // 1) data.activity_timeseries: [{timestamp,count}]
+    if (Array.isArray(data.activity_timeseries)){
+        const labels = data.activity_timeseries.map(p=> new Date(p.timestamp));
+        const values = data.activity_timeseries.map(p=> Number(p.count||0));
+        return {labels, values};
+    }
+    // 2) data.activity_counts.per_hour: [{hour,count}] or {"YYYY-MM-DDTHH":count}
+    if (data.activity_counts && data.activity_counts.per_hour){
+        const ph = data.activity_counts.per_hour;
+        if (Array.isArray(ph)){
+            const labels = ph.map(p=> p.hour);
+            const values = ph.map(p=> Number(p.count||0));
+            return {labels, values};
+        }
+        if (typeof ph === 'object'){
+            const entries = Object.entries(ph).sort((a,b)=> new Date(a[0]) - new Date(b[0]));
+            return {labels: entries.map(e=>e[0]), values: entries.map(e=>Number(e[1]||0))};
+        }
+    }
+    // 3) data.activity_counts_by_hour: {label:count}
+    if (data.activity_counts_by_hour && typeof data.activity_counts_by_hour === 'object'){
+        const entries = Object.entries(data.activity_counts_by_hour).sort((a,b)=> new Date(a[0]) - new Date(b[0]));
+        return {labels: entries.map(e=>e[0]), values: entries.map(e=>Number(e[1]||0))};
+    }
+    return null;
+}
+
+function updateDashboardStats(data) {
+    if (data.active_users !== undefined) {
+        animateNumber(document.getElementById('activeUsersCount'), Number(data.active_users||0));
+    }
+    
+    if (data.active_sessions) {
+        animateNumber(document.getElementById('activeSessionsCount'), data.active_sessions.length);
+    }
+    
+    if (data.recent_activities) {
+        animateNumber(document.getElementById('recentActivitiesCount'), data.recent_activities.length);
+    }
+    
+    // Update chart
+    const ts = extractTimeseries(data);
+    if (ts){ updateActivityChart(ts); }
+    updateLastUpdateTime();
+}
+
+// Initialize activity chart
+function initializeChart() {
+    const ctx = document.getElementById('activityChart');
+    if (!ctx) return;
+    
+    activityChart = new Chart(ctx.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Activities per Hour',
+                data: [],
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Update activity chart
+function formatLabel(x){
+    if (x instanceof Date) return x.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    // try parse
+    const d = new Date(x);
+    if (!isNaN(d)) return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    return String(x);
+}
+function updateActivityChart(ts) {
+    if (!activityChart || !ts) return;
+    const labels = ts.labels.map(formatLabel);
+    const data = ts.values;
+    activityChart.data.labels = labels;
+    activityChart.data.datasets[0].data = data;
+    activityChart.update();
+}
+
+// Apply filters
+function applyFilters() {
+    const filters = {
+        username: document.getElementById('filterUsername').value,
+        activity_type: document.getElementById('filterActivityType').value,
+        start_date: document.getElementById('filterStartDate').value,
+        end_date: document.getElementById('filterEndDate').value
+    };
+    
+    // Build query string
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach(key => {
+        if (filters[key]) {
+            if (key.includes('date') && filters[key]) {
+                // Convert datetime-local to ISO string
+                params.append(key, new Date(filters[key]).toISOString());
+            } else {
+                params.append(key, filters[key]);
+            }
+        }
+    });
+    
+    // Load filtered activities
+    loadFilteredActivities(params.toString());
+}
+
+// Load filtered activities
+async function loadFilteredActivities(queryString) {
+    try {
+        const response = await fetch(`/api/monitoring/activities?${queryString}&limit=50`);
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        const feedEl = document.getElementById('activityFeed');
+        feedEl.innerHTML = '';
+        
+        if (data.activities.length === 0) {
+            feedEl.innerHTML = '<div class="empty-state">No activities found matching the filters</div>';
+            return;
+        }
+        
+        data.activities.forEach(activity => {
+            addActivityToFeed(activity, false);
+        });
+        
+        updateLastUpdateTime();
+        showNotification(`Found ${data.activities.length} activities`, 'success');
+        
+    } catch (error) {
+        console.error('Error loading filtered activities:', error);
+        showNotification('Error applying filters', 'error');
+    }
+}
+
+// Show user journey
+async function showUserJourney(sessionId) {
+    const modal = document.getElementById('journeyModal');
+    const content = document.getElementById('journeyContent');
+    const title = modal.querySelector('.modal-title');
+    
+    // Show modal
+    modal.classList.add('show');
+    
+    // Set loading state
+    content.innerHTML = '<div class="loading-state">Loading journey...</div>';
+    title.textContent = 'User Journey';
+    
+    try {
+        const response = await fetch(`/api/monitoring/user-journey/${sessionId}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Update modal title with user info
+        title.textContent = `User Journey - ${data.username || 'Anonymous User'}`;
+        
+        // Render journey timeline
+        renderJourneyTimeline(data.activities, content);
+        
+    } catch (error) {
+        console.error('Error loading user journey:', error);
+        content.innerHTML = '<div class="error-state">Error loading user journey</div>';
+    }
+}
+
+// Close journey modal
+function closeJourneyModal() {
+    const modal = document.getElementById('journeyModal');
+    modal.classList.remove('show');
+}
+
+// Render journey timeline
+function renderJourneyTimeline(activities, container) {
+    if (!activities || activities.length === 0) {
+        container.innerHTML = '<div class="empty-state">No activities found for this session</div>';
+        return;
+    }
+    
+    const timeline = document.createElement('div');
+    timeline.className = 'journey-timeline';
+    
+    activities.forEach((activity, index) => {
+        const step = document.createElement('div');
+        step.className = `journey-step ${activity.activity_type}`;
+        
+        const metadata = activity.metadata || {};
+        const metadataHtml = Object.keys(metadata).length > 0 ? 
+            `<div class="journey-metadata">${Object.entries(metadata).map(([k, v]) => `<strong>${k}:</strong> ${v}`).join(' • ')}</div>` : '';
+        
+        step.innerHTML = `
+            <div class="journey-step-header">
+                <div class="journey-step-action">${formatActivityAction(activity)}</div>
+                <div class="journey-step-time">${formatTimestamp(activity.timestamp)}</div>
+            </div>
+            <div class="journey-step-details">
+                <strong>URL:</strong> ${activity.url_path}<br>
+                <strong>IP:</strong> ${activity.ip_address}<br>
+                <strong>User Agent:</strong> ${activity.user_agent || 'N/A'}
+            </div>
+            ${metadataHtml}
+        `;
+        
+        timeline.appendChild(step);
+    });
+    
+    container.innerHTML = '';
+    container.appendChild(timeline);
+}
+
+// Format timestamp for journey
+function formatTimestamp(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleString();
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('journeyModal');
+    if (event.target === modal) {
+        closeJourneyModal();
+    }
+});
+
+// Send heartbeat every 30 seconds
+setInterval(() => {
+    if (socket && isConnected) {
+        socket.emit('heartbeat');
+    }
+}, 30000);
+
+// Quick range presets for filters
+function setRangePreset(preset){
+  const s = document.getElementById('filterStartDate');
+  const e = document.getElementById('filterEndDate');
+  const now = new Date();
+  let start = null, end = new Date(now);
+  function toLocalInput(dt){
+    const pad = n => String(n).padStart(2,'0');
+    return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  }
+  if(preset==='clear'){
+    s.value=''; e.value='';
+  } else if(preset==='15m'){
+    start = new Date(now.getTime()-15*60*1000);
+  } else if(preset==='1h'){
+    start = new Date(now.getTime()-60*60*1000);
+  } else if(preset==='24h'){
+    start = new Date(now.getTime()-24*60*60*1000);
+  } else if(preset==='7d'){
+    start = new Date(now.getTime()-7*24*60*60*1000);
+  }
+  if(start){ s.value = toLocalInput(start); e.value = toLocalInput(end); }
+  document.querySelectorAll('.chips-row .chip').forEach(c=>c.classList.remove('active'));
+  const map = { '15m':0,'1h':1,'24h':2,'7d':3,'clear':4 };
+  const idx = map[preset];
+  if(idx!=null){ const el = document.querySelectorAll('.chips-row .chip')[idx]; if(el) el.classList.add('active'); }
+  applyFilters();
+}
+</script>
+{% endblock %}

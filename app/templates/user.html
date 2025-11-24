@@ -1,0 +1,742 @@
+
+
+{% extends "base.html" %}
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.10.0/js/anychart-bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+
+  <!-- jsPDF & html2pdf for PDF generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+
+    
+  </style>
+</head>
+{% block content %}
+
+
+<div class="w3-container w3-center w3-row-padding">
+  <div class="w3-display w3-margin-top w3-padding" style="width: 85vw;">
+    <div class="col-md-3 col-sm-12  mb-4" style="border-radius: 20px 20px 20px 20px;">
+    <div class="card shadow-sm border-0 h-100 transition-transform hover:shadow-md" style="border-radius: 16px; overflow: hidden;">
+  <!-- Profile Header Background (Optional Accent) -->
+  <div class="w-100" style="height: 5px; background: linear-gradient(to right, #00407d, #007bff);"></div>
+
+  <div class="card-body text-center p-4">
+    
+    <!-- Avatar -->
+    <div class="mb-3">
+      <img class="rounded-circle border border-light shadow-sm" 
+           src="{{ user.avatar(128) }}" 
+           alt="{{ user.username }}"
+           style="width: 100px; height: 100px; object-fit: cover; box-shadow: 0 4px 10px rgba(0, 64, 125, 0.15);">
+    </div>
+
+    <!-- Divider -->
+    <hr class="my-3 w-75 mx-auto" style="border-color: #e0e8f0;">
+
+    <!-- User Info -->
+    <h5 class="card-title fw-bold text-dark mb-1">
+      <i class="fas fa-user-circle text-primary me-2"></i>{{ user.username }}
+    </h5>
+
+    <p class="card-text text-muted mb-1 small">
+      <i class="fas fa-envelope me-2"></i>{{ user.email }}
+    </p>
+
+    <p class="card-text text-muted mb-3 small">
+      <i class="fas fa-clock me-2"></i>Last seen: {{ user.last_seen.strftime('%Y-%m-%d') }}
+    </p>
+
+    <!-- Role Badge -->
+    <div class="mt-2">
+      <span class="badge bg-primary bg-gradient px-3 py-2" style="font-size: 0.85rem; border-radius: 50px;">
+        <i class="fas fa-user-tag me-1"></i>{{ user.userRole }}
+      </span>
+    </div>
+
+    <!-- Optional Action Button (e.g., View Profile) -->
+    <div class="mt-4 w3-hide">
+      <a href="{{ url_for('user', username=user.username) }}" 
+         class="btn btn-outline-primary btn-sm w-100 py-2 rounded-pill" 
+         style="font-size: 0.85rem;">
+        <i class="fas fa-eye me-1"></i> View Profile
+      </a>
+    </div>
+  </div>
+</div>
+    </div>
+    <div class="w3-twothird w3-card w3-round w3-margin w3-padding " style="max-height: 75vh; overflow-y: auto;">
+      <!-- Section Header -->
+<header class="w3-container w3-card w3-padding w3-small w3-center" style="background-color: #e6f0ff; border-bottom: 1px solid #cce0ff;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="currentColor" class="bi bi-award" viewBox="0 0 16 16">
+  <path d="M9.669.864 8 0 6.331.864l-1.858.282-.842 1.68-1.337 1.32L2.6 6l-.306 1.854 1.337 1.32.842 1.68 1.858.282L8 12l1.669-.864 1.858-.282.842-1.68 1.337-1.32L13.4 6l.306-1.854-1.337-1.32-.842-1.68zm1.196 1.193.684 1.365 1.086 1.072L12.387 6l.248 1.506-1.086 1.072-.684 1.365-1.51.229L8 10.874l-1.355-.702-1.51-.229-.684-1.365-1.086-1.072L3.614 6l-.25-1.506 1.087-1.072.684-1.365 1.51-.229L8 1.126l1.356.702z"/>
+  <path d="M4 11.794V16l4-1 4 1v-4.206l-2.018.306L8 13.126 6.018 12.1z"/>
+</svg>
+  <h4 class="w3-text-dark-gray w3-margin-top" style="font-weight: 600;"><b>General Information</b></h4>
+</header>
+
+<!-- Profile Details Body -->
+<div class="w3-container w3-white w3-padding-24 w3-round-large w3-margin-top" style="box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+  <div class="w3-row w3-padding w3-small">
+
+    <!-- First Name & Last Name -->
+    <div class="w3-col l6 m6 s12 w3-padding-small">
+      <label class="w3-opacity w3-small">First Name</label>
+      <p class="w3-large w3-text-dark-gray w3-margin-top" style="font-weight: 500;">{{ user.firstname }}</p>
+    </div>
+    <div class="w3-col l6 m6 s12 w3-padding-small">
+      <label class="w3-opacity w3-small">Last Name</label>
+      <p class="w3-large w3-text-dark-gray w3-margin-top" style="font-weight: 500;">{{ user.lastname }}</p>
+    </div>
+
+    <!-- Username & Role -->
+    <div class="w3-col l6 m6 s12 w3-padding-small">
+      <label class="w3-opacity w3-small">Username</label>
+      <p class="w3-large w3-text-dark-gray w3-margin-top" style="font-weight: 500;">{{ user.username }}</p>
+    </div>
+    <div class="w3-col l6 m6 s12 w3-padding-small">
+      <label class="w3-opacity w3-small">Role</label>
+      <!-- Role Badge -->
+    <div class="mt-2">
+      <span class="badge bg-primary bg-gradient px-3 py-2" style="font-size: 0.85rem; border-radius: 50px;">
+        <i class="fas fa-user-tag me-1"></i>{{ user.userRole }}
+      </span>
+    </div>
+    </div>
+
+    <!-- Department & Province -->
+    <div class="w3-col l6 m6 s12 w3-padding-small">
+      <label class="w3-opacity w3-small">Department</label>
+      <p class="w3-large w3-text-dark-gray w3-margin-top" style="font-weight: 500;">{{ user.department }}</p>
+    </div>
+    <div class="w3-col l6 m6 s12 w3-padding-small">
+      <label class="w3-opacity w3-small">Province</label>
+      <p class="w3-large w3-text-dark-gray w3-margin-top" style="font-weight: 500;">{{ user.province }}</p>
+    </div>
+
+  </div>
+</div>
+
+
+              {% if user.userRole == 'Brand Ambassador' %}
+
+              <header class="w3-container w3-padding w3-center bg-gradient-primary text-white" style="border-radius: 10px 10px 0 0;">
+    <h2 class="w3-large mb-0">
+        <i class="fas fa-info-circle me-3"></i>
+        More Info
+    </h2>
+</header>
+
+<div class="w3-container w3-round w3-small w3-padding w3-center bg-white shadow-sm">
+
+
+
+    <!-- custom date quick summary Stats - Clean Card Layout -->
+<div class="w3-row-padding  w3-margin-top">
+
+
+  <!-- Total Schools -->
+  <div class="w3-col l3 m6 w3-padding">
+    <div class="w3-border-light-gray w3-card-4 w3-round-large w3-white w3-hover-shadow">
+      <div class="w3-container w3-purple w3-text-white w3-padding w3-round-top">
+        <h6 class="w3-margin-0">
+          <div class="">
+            <i class="fas fa-school fa-2x w3-text-white"></i>
+        </div>
+            <small class=" w3-text-white">Number of schools</small>
+        </h6>
+      </div>
+      <div class="w3-container w3-center w3-padding">
+        <p class="w3-large w3-text-gray ">
+          <span id="total-ask">{{count_user_schools}}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ASL Students -->
+  <div class="w3-col l3 m6 w3-padding">
+    <div class="w3-border-light-gray w3-card-4 w3-round-large w3-white w3-hover-shadow">
+      <div class="w3-container w3-blue w3-text-white w3-padding w3-round-top">
+        <h6 class="w3-margin-0">
+          <div class="">
+                <i class="fas fa-laptop fa-2x w3-text-white"></i>
+            </div>
+            <small class=" w3-text-white">ASL MTD</small>
+        </h6>
+      </div>
+      <div class="w3-container w3-center w3-padding">
+        <p class="w3-large w3-text-gray w3-margin-0">
+          <span id="total-asl">{{ smartlearning_champ_mtd }}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Library Students -->
+  <div class="w3-col l3 m6 w3-padding">
+    <div class="w3-border-light-gray w3-card-4 w3-round-large w3-white w3-hover-shadow">
+      <div class="w3-container w3-teal w3-text-white w3-padding w3-round-top">
+        <h6 class="w3-margin-0">
+          <div class="">
+                <i class="fas fa-book fa-2x tw3-text-white"></i>
+            </div>
+            <small class="w3-text-white">AL MTD</small>
+        </h6>
+      </div>
+      <div class="w3-container w3-center w3-padding">
+        <p class="w3-large w3-text-gray w3-margin-0">
+          <span id="alActiveTotal">0</span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+
+    
+    <div class="mt-4">
+        <ul class="list-group w3-hide" id="alActiveBreakdown"></ul>
+    </div>
+</div>
+
+              <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    const username = "{{ user.username }}";
+
+                    fetch(`/api/champion/${username}/al_active`)
+                        .then(res => res.json())
+                        .then(data => {
+                            document.getElementById("alActiveTotal").innerText = data.al_active_total;
+
+                            let breakdownHtml = "";
+                            data.school_breakdown.forEach(school => {
+                                breakdownHtml += `<li>${school.school_name}: ${school.al_active}</li>`;
+                            });
+                            document.getElementById("alActiveBreakdown").innerHTML = breakdownHtml;
+                        });
+                });
+                </script>
+
+              <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                  <span class="w3-large"><b>Schools for {{ user.username }}</b></span>
+                  <br>
+              </header>
+
+              <p class="w3-half">
+                <span class="w3-small w3-right w3-margin">
+                    <button class="w3-small w3-button w3-white w3-card w3-border w3-round" onclick="document.getElementById('attach_schools').style.display='block'">Attach_schools</button>
+                    <button class="w3-small w3-button w3-white w3-card w3-border w3-round" onclick="exportToExcel()">Export to Excel</button>
+                    <button class="w3-small w3-button w3-white w3-card w3-border w3-round" onclick="exportToPDF()">Export to PDF</button>
+                </span>
+            </p>
+
+    <!-- <p class="w3-half">
+                                <input type="text" id="schoolSearchInput" onkeyup="filterSchools()" placeholder="Search schools & their info..." style="border-radius: 25px 25px 25px 25px; width: 60%;" class=" w3-padding w3-input w3-border w3-round w3-margin" />
+ 
+    </p> -->
+
+
+    <div class="w3-container w3-padding w3-margin">
+  {% if champ and schools_for_template %}
+    {% for school in schools_for_template %}
+      <span class="w3-tag w3-teal w3-small w3-round-large w3-margin-right w3-margin-bottom w3-card-2 w3-transition"
+            style="position: relative; padding: 8px 32px 8px 12px; font-weight: 500; display: inline-flex; align-items: center;"
+            data-asl-id="{{ school.asl_school_id or '' }}"
+            data-lib-id="{{ school.library_school_id or '' }}">
+
+        <!-- School Name -->
+        <a href="{{ url_for('school_profile', school_id=school.id) if school.id else '#' }}"
+           class="w3-text-white"
+           style="text-decoration: none; flex-grow: 1;">
+          {{ school.name }}
+        </a>
+
+        <!-- Remove Button (❌ as icon) -->
+        <button class="w3-button w3-teal w3-circle w3-small w3-hover-red w3-hover-text-white"
+                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 4px; line-height: 1;"
+                onclick="removeSchool(this)"
+                title="Remove school">
+          <i class="fas fa-times"></i>
+        </button>
+      </span>
+    {% endfor %}
+  {% else %}
+    <p class="w3-text-gray w3-small"><em>No schools assigned yet.</em></p>
+  {% endif %}
+</div>
+<script>
+async function removeSchool(button) {
+    if (!confirm("Are you sure you want to remove this school?")) {
+        return; // Cancel if user says "No"
+    }
+
+    const schoolDiv = button.closest(".school-entry");
+    const aslId = schoolDiv.getAttribute("data-asl-id");
+    const libId = schoolDiv.getAttribute("data-lib-id");
+
+    const params = new URLSearchParams();
+    if (aslId) params.append("asl_school_id", aslId);
+    if (libId) params.append("library_school_id", libId);
+
+    try {
+        const response = await fetch(`/api/champion/{{ user.username }}/remove_school?${params.toString()}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" }
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            // ✅ Remove the school from DOM
+            schoolDiv.remove();
+            alert("School removed successfully!");
+        } else {
+            alert(result.error || "Failed to remove school");
+        }
+    } catch (err) {
+        console.error("Error removing school:", err);
+        alert("An error occurred while removing the school.");
+    }
+}
+</script>
+
+
+
+
+    <div class="w3-container w3-padding w3-margin">
+    {% if champ and schools_for_template %}
+        {% for school in schools_for_template %}
+            <div class="w3-left w3-small" style="display: flex; margin: 1px;">
+                <a class="w3-teal w3-small w3-padding w3-hover-shadow"
+                   style="border-radius: 25px; text-decoration: none; width: fit-content;"
+                   href="{{ url_for('school_profile', school_id=school.id) }}">
+                    {{ school.name }}
+                </a>
+            </div>
+        {% endfor %}
+    {% elif champ %}
+        <span class="text-muted">No schools assigned</span>
+    {% else %}
+        <span class="text-muted">No Champion School record found.</span>
+    {% endif %}
+</div>
+
+
+    <!-- <table class="table table-striped w3-small table-bordered w3-card w3-border w3-round">
+    <thead style="background: #f0f7ff;">
+        <tr>
+            <th class="w3-hide">Name</th>
+            <th>Schools</th>
+            <th class="w3-hide">Province</th>
+        </tr>
+    </thead>
+    <tbody style="background-color: white !important;">
+        {% if champ %}
+            <tr class="w3-white">
+                <td class="w3-hide">{{ champ.firstname }} {{ champ.lastname }}</td>
+                <td class="w3-white" style="overflow-x: auto;">
+                    {% for school in existing_schools %}
+                        <div class=" w3-margin">
+                            <a class="w3-teal w3-margin w3-padding w3-hover-shadow"
+                            style="border-radius: 25px; text-decoration: none;  width: fit-content;"
+                            href="{{ url_for('school_profile', school_id=school.id) }}">
+                                {{ school.name }} 
+                            </a>
+                        </div>
+                    {% else %}
+                        <span class="text-muted">No schools assigned</span>
+                    {% endfor %}
+                </td>
+                <td class="w3-hide">{{ champ.province }}</td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="4" class="text-muted">No Champion School record found.</td>
+            </tr>
+        {% endif %}
+    </tbody>
+</table> -->
+
+
+
+    
+
+<!-- JS Libraries for PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<!-- JS Library for Excel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- EXPORT SCRIPT -->
+<script>
+function exportToExcel() {
+    const wb = XLSX.utils.book_new();
+    const ws_data = [];
+    const table = document.getElementById('institutionsTable');
+    const rows = table.getElementsByTagName('tr');
+
+    for (let i = 0; i < rows.length; i++) {
+        if (rows[i].style.display === 'none') continue;
+        const cells = rows[i].getElementsByTagName('th').length ?
+                      rows[i].getElementsByTagName('th') :
+                      rows[i].getElementsByTagName('td');
+        const rowData = Array.from(cells).map(cell => cell.textContent.trim());
+        ws_data.push(rowData);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    XLSX.utils.book_append_sheet(wb, ws, "Institutions");
+    XLSX.writeFile(wb, "schools-for-{{user.username}}.csv");
+}
+
+async function exportToPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape');
+
+    const table = document.getElementById('institutionsTable');
+    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
+    const rows = Array.from(table.querySelectorAll('tbody tr')).map(tr =>
+        Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim())
+    );
+
+    doc.text("schools-for-{{user.username}}", 14, 15);
+    doc.autoTable({
+        head: [headers],
+        body: rows,
+        startY: 20,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [22, 160, 133] }
+    });
+
+    doc.save("schools-for-{{user.username}}.pdf");
+}
+</script>
+
+
+
+
+
+
+
+
+                            
+                            <script>
+                            function filterSchools() {
+                            const input = document.getElementById("schoolSearchInput");
+                            const filter = input.value.toLowerCase();
+                            const table = document.getElementById("institutionsTable");
+                            const trs = table.getElementsByTagName("tr");
+
+                            for (let i = 1; i < trs.length; i++) {
+                                const rowText = trs[i].textContent.toLowerCase();
+                                trs[i].style.display = rowText.includes(filter) ? "" : "none";
+                            }
+                            }
+                            </script>
+
+              </header>
+
+
+              
+              
+
+    {% endif %}
+              
+
+    </div>
+    
+  </div>
+</div>
+
+
+
+      <!-- view user modal -->
+                <div id="new_user" class="w3-modal w3-white w3-card w3-border">
+                    <div class="w3-modal-content w3-white w3-card w3-border" style="width: 85vw; height: 80vh;">
+                        <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                            <span onclick="document.getElementById('new_user').style.display='none'" 
+                            class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                            <span class="w3-large"><b>Schools under {{ user.username }}</b></span>
+
+                            <div class="mb-3">
+    <button class="btn btn-success" onclick="downloadCSV()">Download CSV</button>
+    <button class="btn btn-danger" onclick="downloadPDF()">Download PDF</button>
+</div>
+
+
+                            <br>
+                        </header>
+                        <div class="w3-container w3-margin-top">
+                            
+                          <!-- Search input -->
+                                <input type="text" id="schoolSearchInput" onkeyup="filterSchools()" placeholder="Search schools & their info..." style="border-radius: 25px 25px 25px 25px; width: 40%;" class=" w3-padding w3-input w3-border w3-round w3-margin" />
+                            </span>
+                            {% if institutions %}
+                            <div id="pdfTableContainer">
+    <table class="table table-striped col-sm-12 w3-card w3-border w3-round" id="institutionsTable">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Level</th>
+            <th>Number of Users</th>
+            <th>Province</th>
+            <th><b>ASL MTD</b></th>
+            <th><b>AL MTD</b></th>
+            <th><b>Total MTD</b></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in institutions %}
+        <tr>
+            <td>
+                {% if row.name %}
+                    <a class="w3-text-teal" style="text-decoration: none;" href="{{ url_for('school_profile', schoolname=row.name) }}">{{ row.name }}</a>
+                {% else %}
+                    <span class="text-muted">No name</span>
+                {% endif %}
+            </td>
+            <td>{{ row.level }}</td>
+            <td>{{ row.number_of_users }}</td>
+            <td>{{ row.province }}</td>
+            <td>682</td>
+            <td>5623</td>
+            <td>95493</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+                            </div>
+
+    {% else %}
+        <p>No institutions found.</p>
+    {% endif %}
+
+
+
+<script>
+function downloadCSV() {
+    const table = document.getElementById("institutionsTable");
+    let csv = [];
+    for (let row of table.rows) {
+        let rowData = [];
+        for (let cell of row.cells) {
+            rowData.push('"' + cell.innerText.replace(/"/g, '""') + '"');
+        }
+        csv.push(rowData.join(","));
+    }
+    const csvString = csv.join("\n");
+    const blob = new Blob([csvString], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "institutions_data.csv";
+    a.click();
+}
+
+</script>
+
+<script>
+function downloadPDF() {
+    const element = document.getElementById("pdfTableContainer");
+    const opt = {
+        margin:       0.3,
+        filename:     'institutions_data.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2 },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+    };
+    html2pdf().set(opt).from(element).save();
+}
+</script>
+
+
+
+
+
+                            
+                            <script>
+                            function filterSchools() {
+                            const input = document.getElementById("schoolSearchInput");
+                            const filter = input.value.toLowerCase();
+                            const table = document.getElementById("institutionsTable");
+                            const trs = table.getElementsByTagName("tr");
+
+                            for (let i = 1; i < trs.length; i++) {
+                                const rowText = trs[i].textContent.toLowerCase();
+                                trs[i].style.display = rowText.includes(filter) ? "" : "none";
+                            }
+                            }
+                            </script>
+                            
+                        </div>
+
+                    </div>
+                </div>
+                 <!-- view user ends here -->
+
+
+
+<!-- view user modal -->
+                <div id="attach_schools" class="w3-modal w3-white w3-card w3-border">
+                    <div class="w3-modal-content w3-white w3-card w3-border" style="width: 85vw; height: 80vh; overflow: auto;">
+                        <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                            <span onclick="document.getElementById('attach_schools').style.display='none'" 
+                            class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                            <span class="w3-large"><b>Attach schools to Champion</b></span>
+                            <br>
+                        </header>
+                        <div class="w3-container w3-margin-top">
+                            <p>Preselected IDs: {{ preselected_school_ids }}</p>
+<!-- Selected Schools Display -->
+<div class="mb-3">
+    <label><strong>Selected Schools:</strong></label>
+    <span id="selected-schools-display" class="w3-text-teal w3-padding"></span>
+
+</div>
+
+<div class="w3-container">
+    <form class="w3-small" action="/user/{{ user.username }}" method="POST">
+        {{ form.hidden_tag() }}
+
+        <div class="w3-third w3-padding">
+            <!-- First name -->
+            <div class="mb-3">
+                {{ form.firstname.label }}
+                {{ form.firstname(class="form-control") }}
+            </div>
+
+            <!-- Last name -->
+            <div class="mb-3">
+                {{ form.lastname.label }}
+                {{ form.lastname(class="form-control") }}
+            </div>
+
+            <!-- Province (hidden input used by backend) -->
+            <input type="hidden" name="province" value="{{ user.province }}">
+        </div>
+
+        <div class="w3-third w3-padding w3-card" style="height: 55vh; overflow: auto;">
+            <!-- School checkboxes (loaded via JavaScript) -->
+            <div class="mb-3">
+                <label>Select Schools</label>
+
+                <!-- 🔍 Search Filter -->
+                <input type="text" id="school-search" class="form-control mb-2" placeholder="Search for a school...">
+
+                <!-- ✅ Checkboxes Container -->
+                <div id="school-checkboxes">
+                    <!-- Populated by JS -->
+                </div>
+
+                <input type="hidden" name="selected_school_data" id="selected_school_data">
+            </div>
+        </div>
+
+        <div class="w3-third w3-padding">
+            {{ form.submit(class="btn btn-primary") }}
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const checkboxesContainer = document.getElementById('school-checkboxes');
+    const selectedDisplay = document.getElementById('selected-schools-display');
+    const hiddenInput = document.getElementById('selected_school_data');
+    const preselectedIds = new Set({{ preselected_school_ids | tojson }});
+
+    // 🔍 Reference to search input
+    const searchInput = document.getElementById('school-search');
+
+    function updateSelectedDisplay() {
+        const checked = checkboxesContainer.querySelectorAll('input[type="checkbox"]:checked');
+        const schoolList = [];
+        selectedDisplay.innerHTML = '';
+
+        checked.forEach(cb => {
+            const label = cb.nextElementSibling.innerText;
+            const id = parseInt(cb.value);
+            selectedDisplay.innerHTML += `<div>${label}</div>`;
+            schoolList.push({ id: id, name: label.replace(/ \(ID: \d+\)/, '') });
+        });
+
+        hiddenInput.value = JSON.stringify(schoolList);
+    }
+
+    fetch('/api/schools/{{ user.province }}')
+        .then(response => response.json())
+        .then(data => {
+            data.forEach(school => {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.name = 'schools';
+                checkbox.value = school.id;
+                checkbox.id = `school${school.id}`;
+                checkbox.className = 'form-check-input';
+                if (preselectedIds.has(school.id)) checkbox.checked = true;
+
+                const label = document.createElement('label');
+                label.htmlFor = `school${school.id}`;
+                label.className = 'form-check-label';
+                label.innerText = `${school.name} (ID: ${school.id})`;
+
+                const div = document.createElement('div');
+                div.className = 'form-check school-checkbox-item'; // ✳️ Add class for filtering
+                div.setAttribute('data-name', school.name.toLowerCase()); // ✳️ Store searchable name
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                checkboxesContainer.appendChild(div);
+            });
+
+            updateSelectedDisplay();
+        });
+
+    // 🔍 Live filter checkboxes based on search input
+    searchInput.addEventListener('input', function () {
+        const searchValue = this.value.toLowerCase();
+        const items = checkboxesContainer.querySelectorAll('.school-checkbox-item');
+        items.forEach(item => {
+            const schoolName = item.getAttribute('data-name');
+            if (schoolName.includes(searchValue)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+
+    checkboxesContainer.addEventListener('change', updateSelectedDisplay);
+});
+</script>
+
+
+
+
+
+
+    
+                        </div>
+
+                    </div>
+                </div>
+                 <!-- view user ends here -->
+
+
+<!-- <script src="{{ url_for('static', filename='schools-by-province.js') }}"></script> -->
+
+
+{% endblock %}

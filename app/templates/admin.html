@@ -1,0 +1,972 @@
+{% extends "base.html" %}
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.10.0/js/anychart-bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> -->
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+    <style>
+        .top-champion {
+            background-color: teal !important;
+            border-radius: 25px;
+            padding: 10px;
+            border: 1px solid teal;
+        }
+    </style>
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+
+</head>
+{% block content %}
+
+
+
+
+
+<div class="w3-full w3-hide-medium w3-hide-small w3-small w3-small w3-container w3-margin-top">
+    <!-- row padding below -->
+    <div class="w3-row-padding w3-margin-top">
+
+    <div class="w3-quarter w3-round" style="height: 73vh; overflow-y: auto;">
+        <!-- Accordion -->
+      <div class="w3-round-bottom w3-white  ">
+        <div class="w3-padding w3-border-light-gray">
+
+            <div class="w3-margin w3-round w3-padding w3-white w3-hover-shadow w3-hover-border-indigo w3-border w3-border-light-gray"
+                            style="cursor: pointer; transition: all 0.3s ease;">
+                <button onclick="myFunction('userAccord')" class="w3-button w3-text-indigo w3-hover-white w3-block  w3-left-align">
+                    <i class="fas fa-brain w3-margin-right w3-text-indigo"></i>Users
+                </button>
+                <div id="userAccord" class="w3-hide w3-text-indigo w3-container">
+                    <button onclick="document.getElementById('new_user').style.display='block'" class="w3-button w3-hover-shadow w3-text-indigo w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-circle-o-notch fa-fw w3-margin-right"></i>Add new user</button>
+                    <button onclick="document.getElementById('view_users').style.display='block'" class="w3-button w3-hover-shadow w3-text-indigo w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-calendar-check-o fa-fw w3-margin-right"></i> View all users</button>
+                    <button onclick="document.getElementById('set_new_priviledges').style.display='block'" class="w3-button w3-hover-shadow w3-text-indigo w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-calendar-check-o fa-fw w3-margin-right"></i> Set priviledges</button>
+                    <button onclick="document.getElementById('grant_priviledges').style.display='block'" class="w3-button w3-hover-shadow w3-text-indigo w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-calendar-check-o fa-fw w3-margin-right"></i> Grant user priviledges</button>
+                </div>
+            </div>
+
+
+            <div class="w3-round w3-margin w3-padding w3-white w3-hover-shadow w3-hover-border-green w3-border w3-border-light-gray"
+                            style="cursor: pointer; transition: all 0.3s ease;">
+                <button onclick="myFunction('championsAccord')" class="w3-button w3-text-teal w3-hover-white w3-block  w3-left-align">
+                    <i class="fas fa-book-open w3-margin-right w3-text-teal"></i>Akello Champions
+                </button>
+                <div id="championsAccord" class="w3-hide w3-text-teal w3-container">
+                    <button onclick="document.getElementById('new_champion').style.display='block'" class="w3-button w3-hover-shadow w3-text-teal w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-circle-o-notch fa-fw w3-margin-right"></i>Add new champion</button>
+                    <button onclick="document.getElementById('view_championschools').style.display='block'" class="w3-button w3-hover-shadow w3-text-teal w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-calendar-check-o fa-fw w3-margin-right"></i> View champions & schools</button>
+                    <button onclick="document.getElementById('library').style.display='block'" class="w3-button w3-hover-shadow w3-text-teal w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-calendar-check-o fa-fw w3-margin-right"></i> More</button>
+                    <button onclick="document.getElementById('library').style.display='block'" class="w3-button w3-hover-shadow w3-text-teal w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-calendar-check-o fa-fw w3-margin-right"></i> Other stuff</button>
+                </div>
+            </div>
+
+
+            <div class="w3-round w3-margin w3-padding w3-white w3-hover-shadow w3-hover-border-blue w3-border w3-border-light-gray"
+                            style="cursor: pointer; transition: all 0.3s ease;">
+                <button onclick="myFunction('askAccord')" class="w3-button w3-text-blue w3-hover-white w3-block  w3-left-align">
+                    <i class="fas fa-book-open w3-margin-right w3-text-blue"></i>System Admin Panel
+                </button>
+                <div id="askAccord" class="w3-hide w3-text-blue w3-container">
+                    <button onclick="document.getElementById('askakello').style.display='block'" class="w3-button w3-hover-shadow w3-text-blue w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-circle-o-notch fa-fw w3-margin-right"></i> Admin things</button>
+                    <button onclick="document.getElementById('askakello').style.display='block'" class="w3-button w3-hover-shadow w3-text-blue w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-calendar-check-o fa-fw w3-margin-right"></i> Something about admin</button>
+                    <button onclick="document.getElementById('askakello').style.display='block'" class="w3-button w3-hover-shadow w3-text-blue w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-calendar-check-o fa-fw w3-margin-right"></i> Blh blah</button>
+                    <button onclick="document.getElementById('askakello').style.display='block'" class="w3-button w3-hover-shadow w3-text-blue w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-calendar-check-o fa-fw w3-margin-right"></i> sfouwefno</button>
+                </div>
+            </div>
+            
+
+            <div class="w3-round w3-margin w3-padding w3-white w3-hover-shadow w3-hover-border-purple w3-border w3-border-light-gray"
+                            style="cursor: pointer; transition: all 0.3s ease;">
+                <button onclick="myFunction('revenueAccord')" class="w3-button w3-text-purple w3-hover-white w3-block  w3-left-align">
+                    <i class="fas fa-book-open w3-margin-right w3-text-purple"></i>Revenue Statistics
+                </button>
+                <div id="revenueAccord" class="w3-hide w3-text-purple w3-container">
+                    <button onclick="document.getElementById('smartlearningdailyrevenue').style.display='block'" class="w3-button w3-hover-shadow w3-text-purple w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-circle-o-notch fa-fw w3-margin-right"></i>Smartlearning Daily Revenue</button>
+                    <button onclick="document.getElementById('librarydailyrevenue').style.display='block'" class="w3-button w3-hover-shadow w3-text-purple w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-circle-o-notch fa-fw w3-margin-right"></i>Library Weekly Revenue </button>
+                    <button onclick="document.getElementById('askakello').style.display='block'" class="w3-button w3-hover-shadow w3-text-purple w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-calendar-check-o fa-fw w3-margin-right"></i> Monthly Revenue </button>
+                    <button onclick="document.getElementById('askakello').style.display='block'" class="w3-button w3-hover-shadow w3-text-purple w3-hover-border-orange w3-block w3-hover-white w3-left-align"><i class="fa fa-calendar-check-o fa-fw w3-margin-right"></i> Yearly Revenue</button>
+                </div>
+            </div>
+            
+
+          
+        </div>      
+      </div>
+      <br>
+
+      <script>
+// Accordion
+function myFunction(id) {
+  var x = document.getElementById(id);
+  if (x.className.indexOf("w3-show") == -1) {
+    x.className += " w3-show";
+    x.previousElementSibling.className += " w3-theme-d1";
+  } else { 
+    x.className = x.className.replace("w3-show", "");
+    x.previousElementSibling.className = 
+    x.previousElementSibling.className.replace(" w3-theme-d1", "");
+  }
+}
+
+// Used to toggle the menu on smaller screens when clicking on the menu button
+function openNav() {
+  var x = document.getElementById("navDemo");
+  if (x.className.indexOf("w3-show") == -1) {
+    x.className += " w3-show";
+  } else { 
+    x.className = x.className.replace(" w3-show", "");
+  }
+}
+</script>
+
+
+
+
+            </div>
+
+
+
+
+    </div>
+</div>
+
+
+
+
+
+
+<!-- view aslhome modal -->
+  <div id="new_champion" class="w3-modal w3-white w3-card w3-border">
+    <div class="w3-modal-content w3-white w3-card w3-border" style="width: 95vw; height: 85vh; overflow-y: auto;">
+      <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;">
+        <span onclick="document.getElementById('new_champion').style.display='none'"
+          class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+        <span class="w3-large w3-text-indigo"> <i class="fas fa-brain w3-margin-right w3-text-indigo"></i> <b>Smartlearning</b></span>
+        <br>
+
+      </header>
+      <div class="w3-container w3-margin-top" style="height: 75vh; overflow-y: auto;">
+
+        <div class="w3-border-light-gray w3-third w3-padding w3-border w3-hover-border-indigo w3-border-indigo w3-small w3-hover-shadow w3-round w3-white w3-margin-bottom">
+            <h4 class="w3-large mb-3">
+  <i class="fas fa-file-upload me-2 text-success"></i>
+  <strong>Bulk Upload Champions</strong>
+</h4>
+<div class="alert w3-small w3-indigo mt-4">
+                                    <strong>CSV Format Required:</strong><br>
+                                    The CSV should have the following columns:
+                                    <ul>
+                                        <li><code>firstname</code></li>
+                                        <li><code>lastname</code></li>
+                                        <li><code>province</code></li>
+                                        <li><code>school_name</code> </li>
+                                        <li><code>asl_school_id</code></li>
+                                        <li><code>library_school_id</code></li>
+                                    </ul>
+                                </div>
+
+<form id="bulkUploadForm" class="mb-3">
+  <input type="file" id="championFile" name="file" class="form-control mb-2" accept=".csv, .xlsx" required>
+  <button type="submit" class="btn w3-indigo w-100">
+    <i class="fas fa-upload me-2"></i>Upload File
+  </button>
+</form>
+<script>
+async function bulkUploadChampions(e) {
+  e.preventDefault();
+  const fileInput = document.getElementById("championFile");
+  if (!fileInput.files.length) return alert("Please select a file.");
+
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+
+  const res = await fetch(`${apiUrl}/bulk_upload`, {
+    method: "POST",
+    body: formData
+  });
+
+  const result = await res.json();
+  if (res.ok) {
+    alert("Bulk upload successful!");
+    loadChampions();
+  } else {
+    alert("Error: " + result.error);
+  }
+}
+
+document.getElementById("bulkUploadForm").addEventListener("submit", bulkUploadChampions);
+</script>
+
+
+        </div>
+
+
+        <div class="w3-half w3-padding" style="height: 65vh; overflow-y: auto;">
+                                <!-- Add Champion -->
+                                <div class="w3-margin w3-padding w3-hover-shadow border rounded shadow-sm">
+    <h4 class="w3-large mb-3">
+        <i class="fas fa-user-plus me-2 text-primary"></i>
+        <strong>Add New Champion</strong>
+    </h4>
+    
+    <form class="w3-small w3-padding" id="addChampionForm">
+        <div class="mb-3">
+            <label class="form-label fw-bold text-primary">
+                <i class="fas fa-user me-2"></i>First Name:
+            </label>
+            <input type="text" class="form-control form-control-sm" name="firstname" placeholder="Enter first name" required>
+        </div>
+        
+        <div class="mb-3">
+            <label class="form-label fw-bold text-primary">
+                <i class="fas fa-user me-2"></i>Last Name:
+            </label>
+            <input type="text" class="form-control form-control-sm" name="lastname" placeholder="Enter last name" required>
+        </div>
+        
+        <div class="mb-3">
+            <label class="form-label fw-bold text-primary">
+                <i class="fas fa-map-marker-alt me-2"></i>Province:
+            </label>
+            <input type="text" class="form-control form-control-sm" name="province" placeholder="Enter province" required>
+        </div>
+        
+        <button type="submit" class="btn btn-primary w-100">
+            <i class="fas fa-plus-circle me-2"></i>Add Champion
+        </button>
+    </form>
+</div>
+
+  <script>
+    const apiUrl = "/api/champions";
+
+    async function loadChampions() {
+      const res = await fetch(apiUrl);
+      const data = await res.json();
+      const tbody = document.querySelector("#championsTable tbody");
+      tbody.innerHTML = "";
+      data.forEach(champ => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${champ.id}</td>
+          <td>${champ.firstname} ${champ.lastname}</td>
+          <td>${champ.province}</td>
+          <td>
+            ${champ.schools.map(s => `${s.school_name} (ASL: ${s.asl_school_id}, LIB: ${s.library_school_id})`).join("<br>")}
+          </td>
+          <td>
+            <button class="btn btn-sm btn-success" onclick="addSchool(${champ.id})">Add School</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteChampion(${champ.id})">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    async function addChampion(e) {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        firstname: form.firstname.value,
+        lastname: form.lastname.value,
+        province: form.province.value
+      };
+      await fetch(apiUrl, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+      });
+      form.reset();
+      loadChampions();
+    }
+
+    async function addSchool(champId) {
+      const asl_id = prompt("Enter ASL School ID:");
+      const lib_id = prompt("Enter Library School ID:");
+      const name = prompt("Enter School Name:");
+      if (!asl_id || !lib_id || !name) return;
+      await fetch(`${apiUrl}/${champId}/add_school`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          asl_school_id: asl_id,
+          library_school_id: lib_id,
+          school_name: name
+        })
+      });
+      loadChampions();
+    }
+
+    async function deleteChampion(id) {
+      if (!confirm("Delete this champion?")) return;
+      await fetch(`${apiUrl}/${id}`, {method: "DELETE"});
+      loadChampions();
+    }
+
+    document.getElementById("addChampionForm").addEventListener("submit", addChampion);
+
+    // Initial load
+    loadChampions();
+  </script></div>
+
+      </div>
+
+    </div>
+  </div>
+  <!-- view aslhome ends here -->
+
+
+
+
+  <!-- view aslhome modal -->
+  <div id="view_championschools" class="w3-modal w3-white w3-card w3-border">
+    <div class="w3-modal-content w3-white w3-card w3-border" style="width: 95vw; height: 85vh; overflow-y: auto;">
+      <header class="w3-container w3-padding w3-center modal-gradient-header">
+        <span onclick="document.getElementById('view_championschools').style.display='none'"
+          class="w3-button w3-card w3-red w3-display-topright w3-large" title="Close">&times;</span>
+        <div class="w3-xlarge w3-text-white">
+          <i class="fas fa-user-shield w3-margin-right"></i> <b>Akello Champions</b>
+        </div>
+        <div class="w3-text-white w3-small">Manage champions and their associated schools</div>
+      </header>
+      <div class="w3-container w3-margin-top" style="height: 75vh; overflow-y: auto;">
+
+        <div class="w3-container w3-padding-32">
+  <h2 class="w3-text-teal">
+    <i class="fas fa-star"></i> Champion Schools Management
+  </h2>
+
+  <!-- Toolbar -->
+  <div class="w3-row w3-margin-bottom toolbar">
+    <div class="w3-col s12 m6">
+      <button class="w3-button w3-teal w3-round" onclick="openAddChampionModal()">
+        <i class="fas fa-plus"></i> Add New Champion
+      </button>
+    </div>
+    <div class="w3-col s12 m6 w3-right-align w3-margin-top-small">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input id="championSearchInput" class="w3-input" type="text" placeholder="Search champions or schools..." oninput="applyChampionFilter()"/>
+        <span class="count-badge"><span id="championCount">0</span> champions</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Champions Table -->
+  <div class="w3-card w3-white w3-round w3-padding">
+    <table class="w3-table-all w3-hoverable w3-bordered w3-small" id="championsTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Province</th>
+          <th>Schools</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="championsList">
+        <tr><td colspan="4" class="w3-center">Loading champions...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+  /* Champions & Schools modal UI tweaks */
+  .modal-gradient-header {
+    background: linear-gradient(135deg, #0ea5e9, #22d3ee);
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+  }
+  #championsTable thead { position: sticky; top: 0; background: #00407d !important; color: #fff; z-index: 1; }
+  #championsTable tbody tr:hover { background: #f5faff; }
+  .w3-tag { margin-left: 6px; margin-top: 2px; }
+  .modal-content { width: 95%; max-width: 1000px; border-radius: 10px; overflow: hidden; }
+
+  /* Toolbar */
+  .toolbar .search-box { position: relative; display: inline-flex; align-items: center; gap: 8px; }
+  .toolbar .search-box i { color: #2563eb; }
+  .toolbar .search-box input { padding-left: 8px; max-width: 320px; border: 1px solid #dbeafe; border-radius: 8px; background: #f8fbff; }
+  .count-badge { background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; border-radius: 999px; padding: 4px 10px; font-size: 12px; margin-left: 8px; }
+
+  /* School chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 160px; overflow: auto; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: #f0f9ff; border: 1px solid #bae6fd; color: #075985; }
+  .chip .ids { color: #334155; font-size: 11px; background: #e2e8f0; border-radius: 999px; padding: 2px 6px; }
+  .chip-btn { border: none; background: #fff; color: #0369a1; border: 1px solid #c7e5ff; padding: 2px 6px; border-radius: 999px; cursor: pointer; }
+  .chip-btn:hover { background: #e0f2fe; }
+
+  @media (max-width: 768px) {
+    .modal-content { width: 98%; }
+    .toolbar .search-box input { max-width: 100%; }
+  }
+</style>
+
+<!-- Add Champion Modal -->
+<div id="addChampionModal" class="w3-modal">
+  <div class="w3-modal-content w3-card-4 modal-content">
+    <header class="w3-container w3-teal">
+      <span class="w3-button w3-display-topright w3-large" onclick="document.getElementById('addChampionModal').style.display='none'">&times;</span>
+      <h3>Add New Champion</h3>
+    </header>
+    <div class="w3-container w3-padding-24">
+      <form id="addChampionForm">
+        <label>First Name</label>
+        <input type="text" id="firstName" class="form-control" required>
+
+        <label>Last Name</label>
+        <input type="text" id="lastName" class="form-control" required>
+
+        <label>Province</label>
+        <input type="text" id="province" class="form-control" required>
+
+        <div class="w3-margin-top">
+          <button type="submit" class="w3-button w3-green w3-round">Add Champion</button>
+          <button type="button" class="w3-button w3-red w3-round w3-margin-left" onclick="document.getElementById('addChampionModal').style.display='none'">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Add School Modal -->
+<div id="addSchoolModal" class="w3-modal">
+  <div class="w3-modal-content w3-card-4 modal-content">
+    <header class="w3-container w3-blue">
+      <span class="w3-button w3-display-topright w3-large" onclick="document.getElementById('addSchoolModal').style.display='none'">&times;</span>
+      <h3>Add School to <span id="championNameForSchool"></span></h3>
+    </header>
+    <div class="w3-container w3-padding-24">
+      <form id="addSchoolForm">
+        <input type="hidden" id="champIdForSchool">
+        
+        <label>School Name</label>
+        <input type="text" id="schoolName" class="form-control" required>
+
+        <label>ASL School ID</label>
+        <input type="text" id="aslSchoolId" class="form-control">
+
+        <label>Library School ID</label>
+        <input type="text" id="librarySchoolId" class="form-control">
+
+        <div class="w3-margin-top">
+          <button type="submit" class="w3-button w3-green w3-round">Add School</button>
+          <button type="button" class="w3-button w3-red w3-round w3-margin-left" onclick="document.getElementById('addSchoolModal').style.display='none'">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit School Modal -->
+<div id="editSchoolModal" class="w3-modal">
+  <div class="w3-modal-content w3-card-4 modal-content">
+    <header class="w3-container w3-orange">
+      <span class="w3-button w3-display-topright w3-large" onclick="document.getElementById('editSchoolModal').style.display='none'">&times;</span>
+      <h3>Edit School</h3>
+    </header>
+    <div class="w3-container w3-padding-24">
+      <form id="editSchoolForm">
+        <input type="hidden" id="editChampId">
+        <input type="hidden" id="editSchoolId">
+
+        <label>School Name</label>
+        <input type="text" id="editSchoolName" class="form-control" required>
+
+        <label>ASL School ID</label>
+        <input type="text" id="editAslSchoolId" class="form-control">
+
+        <label>Library School ID</label>
+        <input type="text" id="editLibrarySchoolId" class="form-control">
+
+        <div class="w3-margin-top">
+          <button type="submit" class="w3-button w3-green w3-round">Update</button>
+          <button type="button" class="w3-button w3-red w3-round w3-margin-left" onclick="document.getElementById('editSchoolModal').style.display='none'">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// === Global Variables ===
+let champions = [];
+
+// === Load Champions on Page Load ===
+window.onload = function () {
+  fetchChampions();
+};
+
+// === Fetch All Champions ===
+async function fetchChampions() {
+  try {
+    const res = await fetch("/api/champions");
+    champions = await res.json();
+    renderChampions();
+  } catch (err) {
+    alert("Failed to load champions: " + err.message);
+  }
+}
+
+// === Render Champions List ===
+function applyChampionFilter() {
+  const input = document.getElementById('championSearchInput');
+  const filter = (input && input.value ? input.value.toLowerCase() : '').trim();
+  const rows = document.querySelectorAll('#championsTable tbody tr');
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = filter === '' || text.includes(filter) ? '' : 'none';
+  });
+}
+
+function renderChampions() {
+  const tbody = document.getElementById("championsList");
+  const countEl = document.getElementById("championCount");
+  if (countEl) countEl.textContent = champions.length || 0;
+  if (champions.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="w3-center">No champions found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = champions.map(champ => {
+    const schools = champ.schools || [];
+    return `
+      <tr>
+        <td>${champ.firstname} ${champ.lastname}</td>
+        <td>${champ.province}</td>
+        <td>
+          <div class="chips">
+            ${schools.length ? schools.map(s => `
+              <span class="chip" title="ASL: ${s.asl_school_id || '—'} | LIB: ${s.library_school_id || '—'}">
+                ${s.school_name || 'Unnamed School'}
+                <span class="ids">A:${s.asl_school_id || '—'} L:${s.library_school_id || '—'}</span>
+                <button class="chip-btn" onclick="openEditSchoolModal(${champ.id}, ${s.asl_school_id || 'null'}, ${s.library_school_id || 'null'})"><i class="fas fa-edit"></i></button>
+              </span>
+            `).join('') : '<span class="w3-text-gray w3-small">No schools</span>'}
+          </div>
+        </td>
+        <td class="w3-center" style="white-space: nowrap;">
+          <button class="btn btn-warning btn-sm w3-margin-bottom" 
+                  onclick="openAddSchoolModal(${champ.id}, '${champ.firstname} ${champ.lastname}')">
+            <i class="fas fa-school"></i> Add School
+          </button>
+          <button class="btn btn-danger btn-sm" 
+                  onclick="deleteChampion(${champ.id}, '${champ.firstname} ${champ.lastname}')">
+            <i class="fas fa-trash"></i> Delete
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // Ensure any active filter is applied after rendering
+  applyChampionFilter();
+}
+
+
+// === Open Add Champion Modal ===
+function openAddChampionModal() {
+  document.getElementById("addChampionForm").reset();
+  document.getElementById("addChampionModal").style.display = "block";
+}
+
+// === Submit New Champion ===
+document.getElementById("addChampionForm").onsubmit = async function (e) {
+  e.preventDefault();
+  const data = {
+    firstname: document.getElementById("firstName").value,
+    lastname: document.getElementById("lastName").value,
+    province: document.getElementById("province").value
+  };
+
+  try {
+    const res = await fetch("/api/champions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+
+    if (res.ok) {
+      document.getElementById("addChampionModal").style.display = "none";
+      fetchChampions(); // Refresh list
+    } else {
+      const err = await res.json();
+      alert("Error: " + err.message);
+    }
+  } catch (err) {
+    alert("Network error: " + err.message);
+  }
+};
+
+// === Open Add School Modal ===
+function openAddSchoolModal(champId, fullName) {
+  document.getElementById("champIdForSchool").value = champId;
+  document.getElementById("championNameForSchool").textContent = fullName;
+  document.getElementById("addSchoolForm").reset();
+  document.getElementById("addSchoolModal").style.display = "block";
+}
+
+// === Submit Add School ===
+document.getElementById("addSchoolForm").onsubmit = async function (e) {
+  e.preventDefault();
+  const champId = document.getElementById("champIdForSchool").value;
+  const data = {
+    school_name: document.getElementById("schoolName").value,
+    asl_school_id: document.getElementById("aslSchoolId").value || null,
+    library_school_id: document.getElementById("librarySchoolId").value || null
+  };
+
+  try {
+    const res = await fetch(`/api/champions/${champId}/add_school`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+
+    if (res.ok) {
+      document.getElementById("addSchoolModal").style.display = "none";
+      fetchChampions(); // Refresh
+    } else {
+      alert("Failed to add school.");
+    }
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+};
+
+// === Open Edit School Modal ===
+function openEditSchoolModal(champId, asl_school_id, library_school_id) {
+  // Normalize ids to strings for reliable comparison, allow nulls
+  const champ = champions.find(c => String(c.id) === String(champId));
+  if (!champ) { alert('Champion not found.'); return; }
+  const list = Array.isArray(champ.schools) ? champ.schools : [];
+
+  let school = list.find(s => String(s.asl_school_id) === String(asl_school_id) && String(s.library_school_id) === String(library_school_id));
+  if (!school && asl_school_id != null) {
+    school = list.find(s => String(s.asl_school_id) === String(asl_school_id));
+  }
+  if (!school && library_school_id != null) {
+    school = list.find(s => String(s.library_school_id) === String(library_school_id));
+  }
+  if (!school) { alert('School not found.'); return; }
+
+  // Use library id as primary key if present, else ASL id
+  const schoolKey = school.library_school_id != null && school.library_school_id !== ''
+    ? school.library_school_id
+    : (school.asl_school_id != null ? school.asl_school_id : '');
+
+  document.getElementById('editChampId').value = champId;
+  document.getElementById('editSchoolId').value = schoolKey;
+  document.getElementById('editSchoolName').value = school.school_name || '';
+  document.getElementById('editAslSchoolId').value = school.asl_school_id || '';
+  document.getElementById('editLibrarySchoolId').value = school.library_school_id || '';
+
+  document.getElementById('editSchoolModal').style.display = 'block';
+}
+
+
+// === Submit Edit School ===
+document.getElementById("editSchoolForm").onsubmit = async function (e) {
+  e.preventDefault();
+  const champId = document.getElementById("editChampId").value;
+  const schoolId = document.getElementById("editSchoolId").value;
+  const data = {
+    school_name: document.getElementById("editSchoolName").value,
+    asl_school_id: document.getElementById("editAslSchoolId").value || null,
+    library_school_id: document.getElementById("editLibrarySchoolId").value || null
+  };
+
+  try {
+    const res = await fetch(`/api/champions/${champId}/schools/${schoolId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+
+    if (res.ok) {
+      document.getElementById("editSchoolModal").style.display = "none";
+      fetchChampions(); // Refresh
+    } else {
+      let msg = 'Failed to update school.';
+      try { const err = await res.json(); if (err && err.error) msg = msg + ' ' + err.error; } catch(_) {}
+      alert(msg);
+    }
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+};
+
+// === Delete Champion ===
+async function deleteChampion(champId, fullName) {
+  if (!confirm(`Are you sure you want to delete ${fullName}? This action cannot be undone.`)) return;
+
+  try {
+    const res = await fetch(`/api/champions/${champId}`, {
+      method: "DELETE"
+    });
+
+    if (res.ok) {
+      fetchChampions(); // Refresh list
+    } else {
+      alert("Failed to delete champion.");
+    }
+  } catch (err) {
+    alert("Network error: " + err.message);
+  }
+}
+</script>
+
+      </div>
+
+    </div>
+  </div>
+  <!-- view aslhome ends here -->
+
+
+
+
+  <!-- View Users Modal -->
+<div id="view_users" class="w3-modal" style="display: none;">
+  <div class="w3-modal-content w3-white w3-card-4 w3-round" style="width: 85vw; max-width: 1200px; height: 80vh; overflow: hidden;">
+    
+    <!-- Header -->
+    <header class="w3-container w3-center w3-padding-24" style="background-color: #e6f0ff; border-bottom: 1px solid #cce0ff;">
+      <span 
+        onclick="document.getElementById('view_users').style.display='none'"
+        class="w3-button w3-red w3-round w3-display-topright w3-hover-red w3-large"
+        style="margin: 8px; width: 40px; height: 40px; padding: 0; line-height: 1.5;"
+        title="Close">
+        &times;
+      </span>
+      <h3 class="w3-text-dark-gray w3-large" style="font-weight: 600; margin: 0;">
+        <i class="fas fa-users w3-text-teal"></i> All Users in the System
+      </h3>
+    </header>
+
+    <!-- Body -->
+    <div class="w3-container" style="padding: 16px; height: calc(80vh - 120px); overflow-y: auto;">
+
+      <!-- Search Bar -->
+      <div class="w3-center w3-margin-bottom">
+        <div class="w3-bar w3-light-gray w3-round" style="max-width: 1000px; margin: 0 auto; padding: 4px;">
+          <span class="w3-bar-item" style="background: #d9e8ff;">
+            <i class="fas fa-search w3-text-blue"></i>
+          </span>
+          <input 
+            type="text" 
+            id="userSearchInput" 
+            onkeyup="filterUsers()" 
+            placeholder="Search users..." 
+            class="w3-input w3-border-0 w3-transparent"
+            style="padding: 8px; width: 100%;">
+        </div>
+      </div>
+
+      <!-- Responsive Table -->
+      <div class="w3-responsive w3-small">
+        <table id="userTable" class="w3-table-all w3-small w3-hoverable w3-bordered w3-striped w3-card-4" style="font-size: 14px;">
+          <thead class="table-light w3-text-indigo" style="background-color: #00407d !important; color: white;">
+            <tr>
+              <th class="w3-center">User</th>
+              <th class="w3-center">Role</th>
+              <th class="w3-center">Department</th>
+              <th class="w3-center">Province</th>
+              <th class="w3-center">Privileges</th>
+              <th class="w3-center">Last Seen</th>
+              <th class="w3-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="userTableBody">
+            {% for user in all_users %}
+            <tr>
+              <!-- Username with Avatar -->
+              <td class="w3-center">
+                <div class="w3-cell w3-cell-middle w3-center" style="width: 100%;">
+                  <img src="{{ user.avatar(64) }}" 
+                       alt="{{ user.username }}" 
+                       class="w3-circle w3-border" 
+                       style="width: 40px; height: 40px; object-fit: cover; margin-right: 12px;">
+                  <a href="{{ url_for('user', username=user.username) }}" 
+                     class="w3-text-black w3-hover-text-blue" 
+                     style="text-decoration: none; font-weight: 500;">
+                    {{ user.username }}
+                  </a>
+                </div>
+              </td>
+              <td class="w3-center">{{ user.userRole }}</td>
+              <td class="w3-center">{{ user.department }}</td>
+              <td class="w3-center">{{ user.province }}</td>
+              <td class="w3-center"><span class="w3-tag w3-light-gray w3-small">None</span></td>
+              <td class="w3-center">{{ user.last_seen }}</td>
+              <td class="w3-center">
+                <button class="w3-button w3-tiny w3-blue w3-round w3-hover-shadow" 
+                        onclick="sendPasswordEmail('{{ user.username }}')">
+                  <i class="fas fa-envelope w3-margin-right"></i>Send
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+
+            <!-- Empty State -->
+            {% if not all_users %}
+            <tr>
+              <td colspan="7" class="w3-center w3-padding-32">
+                <div class="w3-center">
+                  <i class="fas fa-users-slash w3-text-gray" style="font-size: 3rem;"></i>
+                  <p class="w3-large w3-text-gray">No users found</p>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+      <script>
+function filterUsers() {
+  const input = document.getElementById("userSearchInput");
+  const filter = input.value.toLowerCase().trim();
+  const table = document.getElementById("userTable");
+  const trs = table.getElementsByTagName("tr");
+
+  for (let i = 1; i < trs.length; i++) {
+    const row = trs[i];
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(filter) ? "" : "none";
+  }
+}
+</script>
+
+    </div>
+
+    <!-- Footer (Optional) -->
+    <footer class="w3-container w3-light-gray w3-padding-12 w3-border-top">
+      <small class="w3-text-gray">Total users: <strong>{{ all_users|length }}</strong></small>
+    </footer>
+  </div>
+</div>
+<!-- End View Users Modal -->
+
+
+
+
+
+<!-- view aslhome modal -->
+  <div id="grant_priviledges" class="w3-modal w3-white w3-card w3-border">
+    <div class="w3-modal-content w3-white w3-card w3-border" style="width: 95vw; height: 85vh; overflow-y: auto;">
+      <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;">
+        <span onclick="document.getElementById('grant_priviledges').style.display='none'"
+          class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+        <span class="w3-large w3-text-indigo"> <i class="fas fa-brain w3-margin-right w3-text-indigo"></i> <b>User administration</b></span>
+        <br>
+
+      </header>
+      <div class="w3-container w3-margin-top" style="height: 75vh; overflow-y: auto;">
+
+        <div class="w3-border-light-gray w3-twothird w3-padding w3-border w3-hover-border-indigo w3-border-indigo w3-small w3-hover-shadow w3-round w3-white w3-margin-bottom">
+          <!-- 🔍 Search Bar -->
+  <div class="row mb-3">
+    <div class="col-md-6">
+      <input type="text" id="userSearch" class="form-control" placeholder="Search by name, email, role, or province...">
+    </div>
+  </div>
+            <table id="usersTable" class="table table-bordered">
+    <thead class="w3-purple">
+      <tr>
+        <th>User</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Province</th>
+        <th>Privileges</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      {% set privs = user.get_privileges() %}
+      <tr>
+        <td>{{ user.firstname }} {{ user.lastname }}</td>
+        <td>{{ user.email }}</td>
+        <td>{{ user.userRole }}</td>
+        <td>{{ user.province or "N/A" }}</td>
+        <td>
+          {% for priv in ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife"] %}
+          <div class="form-check form-check-inline">
+            <input class="form-check-input privilege-checkbox"
+                   type="checkbox"
+                   data-user-id="{{ user.id }}"
+                   data-privilege="{{ priv }}"
+                   {% if privs[priv] %}checked{% endif %}>
+            <label class="form-check-label">{{ priv }}</label>
+          </div>
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // ✅ Privilege toggle AJAX
+  document.querySelectorAll(".privilege-checkbox").forEach(cb => {
+    cb.addEventListener("change", function() {
+      const userId = this.dataset.userId;
+      const privilege = this.dataset.privilege;
+      const value = this.checked;
+
+      fetch(`/admin/users/${userId}/toggle_privilege`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ privilege: privilege, value: value })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          alert("Error: " + data.error);
+          this.checked = !value; // rollback
+        } else {
+          console.log(data.message);
+        }
+      })
+      .catch(err => {
+        alert("Error updating privilege");
+        this.checked = !value;
+      });
+    });
+  });
+
+  // ✅ User search filter
+  const searchInput = document.getElementById("userSearch");
+  searchInput.addEventListener("keyup", function() {
+    const filter = searchInput.value.toLowerCase();
+    const rows = document.querySelectorAll("#usersTable tbody tr");
+
+    rows.forEach(row => {
+      const text = row.innerText.toLowerCase();
+      if (text.includes(filter)) {
+        row.style.display = "";
+      } else {
+        row.style.display = "none";
+      }
+    });
+  });
+});
+</script>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+  <!-- view aslhome ends here -->
+
+
+
+
+
+
+            {% endblock %}

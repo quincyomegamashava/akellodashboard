@@ -1,0 +1,35 @@
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_login import LoginManager
+from flask_socketio import SocketIO
+from config import Config
+
+
+app = Flask(__name__)
+app.config.from_object(Config)
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+login = LoginManager(app)
+login.login_view = 'login'
+
+# Initialize SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+
+# Initialize activity tracking
+from app.activity_tracker import ActivityTracker
+activity_tracker = ActivityTracker(app)
+
+# Initialize SocketIO handlers
+from app.socketio_handlers import init_socketio_handlers
+init_socketio_handlers(socketio)
+
+# Setup logging before importing routes
+from app.logging_config import setup_logging
+logger = setup_logging(app)
+
+from app import routes, models, monitoring_routes
+
+# Import and register database routes
+from app.database_routes import database_bp
+app.register_blueprint(database_bp)

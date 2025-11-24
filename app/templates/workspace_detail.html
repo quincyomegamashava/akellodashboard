@@ -1,0 +1,861 @@
+{% extends "base.html" %}
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.10.0/js/anychart-bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> -->
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+  <style>
+
+
+  </style>
+</head>
+{% block content %}
+<a href="#" class="w3-bar-item w3-right w3-large w3-button">
+  <!-- <span class="w3-card w3-white w3-light-grey w3-border w3-padding" onclick="document.getElementById('new_project').style.display='block'" class="w3-button w3-black" style="cursor: pointer; border-radius: 25px 25px 25px 25px;" >
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="bi bi-ui-radios-grid" viewBox="0 0 16 16">
+                <path d="M3.5 15a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5m9-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5m0 9a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5M16 3.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0m-9 9a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0m5.5 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m-9-11a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m0 2a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7"/>
+            </svg> {{ workspace.name }}
+          </span> -->
+  <p class="" style="  color: #00407d;">
+    <b class="w3-left w3-large w3-padding"
+      style="border-bottom: 5px solid #00407d; border-radius: 20px 20px 20px 20px;">
+      {{ workspace.name }}
+    </b>
+  </p>
+</a>
+
+<div class="w3-container w3-row-padding w3-center">
+
+
+  <!-- Header -->
+<header class="w3-panel w3-small w3-center">
+  <div class="w3-padding">
+    <div class="w3-bar w3-border w3-card w3-round-large shadow-sm">
+
+      <!-- Add Project -->
+      <a href="#" onclick="document.getElementById('new_project').style.display='block'" 
+         class="w3-bar-item w3-button w3-hover-light-grey" style="text-decoration: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-folder-plus" viewBox="0 0 16 16">
+  <path d="m.5 3 .04.87a2 2 0 0 0-.342 1.311l.637 7A2 2 0 0 0 2.826 14H9v-1H2.826a1 1 0 0 1-.995-.91l-.637-7A1 1 0 0 1 2.19 4h11.62a1 1 0 0 1 .996 1.09L14.54 8h1.005l.256-2.819A2 2 0 0 0 13.81 3H9.828a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 6.172 1H2.5a2 2 0 0 0-2 2m5.672-1a1 1 0 0 1 .707.293L7.586 3H2.19q-.362.002-.683.12L1.5 2.98a1 1 0 0 1 1-.98z"/>
+  <path d="M13.5 9a.5.5 0 0 1 .5.5V11h1.5a.5.5 0 1 1 0 1H14v1.5a.5.5 0 1 1-1 0V12h-1.5a.5.5 0 0 1 0-1H13V9.5a.5.5 0 0 1 .5-.5"/>
+</svg>
+        Add Project
+      </a>
+
+      <!-- Project Visuals -->
+      <a href="#" onclick="document.getElementById('projectvisuals').style.display='block'" 
+         class="w3-bar-item w3-button w3-hover-light-grey" style="text-decoration: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eyeglasses" viewBox="0 0 16 16">
+  <path d="M4 6a2 2 0 1 1 0 4 2 2 0 0 1 0-4m2.625.547a3 3 0 0 0-5.584.953H.5a.5.5 0 0 0 0 1h.541A3 3 0 0 0 7 8a1 1 0 0 1 2 0 3 3 0 0 0 5.959.5h.541a.5.5 0 0 0 0-1h-.541a3 3 0 0 0-5.584-.953A2 2 0 0 0 8 6c-.532 0-1.016.208-1.375.547M14 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0"/>
+</svg>
+        Project Visuals
+      </a>
+
+      <!-- Members -->
+      <a href="#" onclick="document.getElementById('Members').style.display='block'" 
+         class="w3-bar-item w3-button w3-hover-light-grey" style="text-decoration: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-people" viewBox="0 0 16 16">
+  <path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1zm-7.978-1L7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002-.014.002zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4m3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0M6.936 9.28a6 6 0 0 0-1.23-.247A7 7 0 0 0 5 9c-4 0-5 3-5 4q0 1 1 1h4.216A2.24 2.24 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816M4.92 10A5.5 5.5 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275ZM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0m3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4"/>
+</svg>
+        Members
+      </a>
+
+      <!-- More -->
+      <a href="#" onclick="document.getElementById('new_user').style.display='block'" 
+         class="w3-bar-item w3-button w3-hover-light-grey w3-hide-small" style="text-decoration: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle" viewBox="0 0 16 16">
+  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+  <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+</svg>
+        More
+      </a>
+
+    </div>
+  </div>
+</header>
+
+
+
+
+  <div class="w3-full ">
+
+    <!-- Toggle Gantt -->
+<div class="d-flex gap-2 my-3">
+  <a href="{{ url_for('view_workspace', workspace_id=workspace.id, gantt='1') }}" 
+     class="btn btn-sm btn-primary shadow-sm rounded-pill">
+    <i class="bi bi-bar-chart-steps me-1"></i> Show Gantt
+  </a>
+  <a href="{{ url_for('view_workspace', workspace_id=workspace.id) }}" 
+     class="btn btn-sm btn-outline-secondary shadow-sm rounded-pill">
+    <i class="bi bi-eye-slash me-1"></i> Hide Gantt
+  </a>
+</div>
+
+{% if show_gantt %}
+<div class="card my-4 w3-twothird shadow-sm border-0">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="card-title mb-0 d-flex align-items-center text-primary">
+        <i class="bi bi-diagram-3 me-2"></i> Gantt Chart
+      </h5>
+      <div class="d-flex align-items-center">
+        <label for="view-select" class="me-2 fw-semibold small text-muted">View:</label>
+        <select id="view-select" class="form-select form-select-sm" onchange="updateView()">
+          <option value="month">Monthly</option>
+          <option value="week">Weekly</option>
+          <option value="day">Daily</option>
+        </select>
+      </div>
+    </div>
+    <div id="gantt-chart" style="height: 500px;"></div>
+  </div>
+</div>
+
+<!-- Plotly.js -->
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script>
+  const ganttData = {{ gantt_data | tojson }};
+  const traces = ganttData.map(item => ({
+    x: [item.Start, item.Finish],
+    y: [item.Task, item.Task],
+    type: 'scatter',
+    mode: 'lines',
+    line: { width: 18, color: item.Color },
+    name: item.Resource,
+    hovertemplate: `${item.Task}<br><b>Start:</b> ${item.StartLabel}<br><b>End:</b> ${item.FinishLabel}<extra></extra>`
+  }));
+
+  const baseLayout = {
+    title: { text: '📊 Project Gantt Chart', font: { size: 18 } },
+    xaxis: { type: 'date', title: 'Date', tickfont: { size: 12 } },
+    yaxis: {
+      type: 'category',
+      title: 'Tasks',
+      automargin: true,
+      categoryorder: 'array',
+      categoryarray: ganttData.map(item => item.Task),
+      tickfont: { size: 12 }
+    },
+    height: 500,
+    margin: { l: 100, r: 30, t: 50, b: 50 },
+    showlegend: true,
+    legend: { orientation: 'h', y: -0.2 }
+  };
+
+  function updateView() {
+    const view = document.getElementById('view-select').value;
+    const layout = JSON.parse(JSON.stringify(baseLayout));
+
+    if (view === 'week') {
+      layout.xaxis.dtick = 86400000 * 7; // 7 days
+    } else if (view === 'day') {
+      layout.xaxis.dtick = 86400000; // 1 day
+    } else {
+      layout.xaxis.dtick = 'M1'; // 1 month
+    }
+
+    Plotly.newPlot('gantt-chart', traces, layout);
+  }
+
+  // Initial render
+  Plotly.newPlot('gantt-chart', traces, baseLayout);
+</script>
+{% endif %}
+
+
+    <!-- List view fallback -->
+    <div class="accordion mt-4 w3-third w3-card" id="projectAccordion" style="height: 62vh; overflow: auto;">
+      {% for project in workspace.projects %}
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="heading{{ loop.index }}">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse"
+            data-bs-target="#collapse{{ loop.index }}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+              class="w3-margin-right bi bi-diagram-3" viewBox="0 0 16 16">
+              <path fill-rule="evenodd"
+                d="M6 3.5A1.5 1.5 0 0 1 7.5 2h1A1.5 1.5 0 0 1 10 3.5v1A1.5 1.5 0 0 1 8.5 6v1H14a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 2 7h5.5V6A1.5 1.5 0 0 1 6 4.5zM8.5 5a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5zM0 11.5A1.5 1.5 0 0 1 1.5 10h1A1.5 1.5 0 0 1 4 11.5v1A1.5 1.5 0 0 1 2.5 14h-1A1.5 1.5 0 0 1 0 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5A1.5 1.5 0 0 1 7.5 10h1a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 8.5 14h-1A1.5 1.5 0 0 1 6 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5a1.5 1.5 0 0 1 1.5-1.5h1a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z" />
+            </svg>
+            {{ project.title }} —
+            <span class="badge 
+            {% if project.status == 'Completed' %}bg-success
+            {% elif project.status == 'In Progress' %}bg-primary
+            {% else %}bg-secondary
+            {% endif %}">
+              {{ project.status }}
+            </span>
+          </button>
+        </h2>
+        <div id="collapse{{ loop.index }}" class="accordion-collapse collapse show" data-bs-parent="#projectAccordion">
+          <div class="accordion-body">
+            <p><strong>Start:</strong> {{ project.start_date.strftime('%Y-%m-%d') }} | <strong>End:</strong> {{
+              project.end_date.strftime('%Y-%m-%d') }}</p>
+            <p>
+              {{ project.description }}
+
+              <svg onclick="document.getElementById('view_project_{{ project.title }}').style.display='block'"
+                xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                class="bi w3-margin-left bi-arrows-angle-expand" viewBox="0 0 16 16" style="cursor: pointer;">
+                <path fill-rule="evenodd"
+                  d="M5.828 10.172a.5.5 0 0 0-.707 0l-4.096 4.096V11.5a.5.5 0 0 0-1 0v3.975a.5.5 0 0 0 .5.5H4.5a.5.5 0 0 0 0-1H1.732l4.096-4.096a.5.5 0 0 0 0-.707m4.344-4.344a.5.5 0 0 0 .707 0l4.096-4.096V4.5a.5.5 0 1 0 1 0V.525a.5.5 0 0 0-.5-.5H11.5a.5.5 0 0 0 0 1h2.768l-4.096 4.096a.5.5 0 0 0 0 .707" />
+              </svg>
+
+
+              <!-- edit project  modal -->
+            <div id="edit_project_{{ project.title }}" class="w3-modal w3-white w3-card w3-border">
+              <div class="w3-modal-content w3-white w3-card w3-border">
+                <header class="w3-container w3-padding" style="background-color: #e6f0ff;">
+                  <span onclick="document.getElementById('edit_project_{{ project.title }}').style.display='none'"
+                    class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                  <span class="w3-card w3-margin w3-white w3-padding" class="w3-button w3-black"
+                    style=" border-radius: 25px 25px 25px 25px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                      class="bi bi-diagram-3" viewBox="0 0 16 16">
+                      <path fill-rule="evenodd"
+                        d="M6 3.5A1.5 1.5 0 0 1 7.5 2h1A1.5 1.5 0 0 1 10 3.5v1A1.5 1.5 0 0 1 8.5 6v1H14a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 2 7h5.5V6A1.5 1.5 0 0 1 6 4.5zM8.5 5a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5zM0 11.5A1.5 1.5 0 0 1 1.5 10h1A1.5 1.5 0 0 1 4 11.5v1A1.5 1.5 0 0 1 2.5 14h-1A1.5 1.5 0 0 1 0 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5A1.5 1.5 0 0 1 7.5 10h1a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 8.5 14h-1A1.5 1.5 0 0 1 6 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5a1.5 1.5 0 0 1 1.5-1.5h1a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z" />
+                    </svg> {{ project.title }} — <span class="text-muted ms-2">{{ project.status }}</span>
+                  </span>
+                  <br>
+                </header>
+                <div class="w3-container w3-margin-top">
+                  <form class="w3-small" method="POST" action="{{ url_for('edit_project', project_id=project.id) }}">
+                    {{ projectform.hidden_tag() }}
+                    <div class="">
+                      <div class="">
+                        <div class="mb-3">
+                          {{ projectform.title.label(class="form-label") }}
+                          {{ projectform.title(class="form-control", value=project.title) }}
+                        </div>
+
+                        <div class="mb-3">
+                          {{ projectform.description.label(class="form-label") }}
+                          <textarea name="{{ projectform.description.name }}"
+                            class="form-control">{{ project.description }}</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                          {{ projectform.status.label(class="form-label") }}
+                          <select name="status" class="form-select">
+                            {% for value, label in projectform.status.choices %}
+                            <option value="{{ value }}" {% if value==project.status %}selected{% endif %}>{{ label }}
+                            </option>
+                            {% endfor %}
+                          </select>
+                        </div>
+
+                        <div class="mb-3">
+                          {{ projectform.start_date.label(class="form-label") }}
+                          {{ projectform.start_date(class="form-control", value=project.start_date.strftime('%Y-%m-%d'))
+                          }}
+                        </div>
+
+                        <div class="mb-3">
+                          {{ projectform.end_date.label(class="form-label") }}
+                          {{ projectform.end_date(class="form-control", value=project.end_date.strftime('%Y-%m-%d')) }}
+                        </div>
+                      </div>
+
+                      <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                      </div>
+                    </div>
+                  </form>
+
+                </div>
+                <footer class="w3-container w3-teal">
+                  <p><strong>Start:</strong> {{ project.start_date.strftime('%Y-%m-%d') }} | <strong>End:</strong> {{
+                    project.end_date.strftime('%Y-%m-%d') }}</p>
+                  <p>{{ project.description }} </p>
+                </footer>
+              </div>
+            </div>
+            <!-- edit project ends here -->
+
+
+
+
+
+
+
+
+            <!-- view project  modal -->
+            <div id="view_project_{{ project.title }}" class="w3-modal w3-white w3-card w3-border">
+              <div class="w3-modal-content w3-white w3-card w3-border" style="width: 95vw; height: 80vh;">
+                <header class="w3-container w3-padding" style="background-color: #e6f0ff;">
+                  <span onclick="document.getElementById('view_project_{{ project.title }}').style.display='none'"
+                    class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                  <span class="w3-card w3-margin w3-white w3-padding" class="w3-button w3-black"
+                    style=" border-radius: 25px 25px 25px 25px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                      class="bi bi-diagram-3" viewBox="0 0 16 16">
+                      <path fill-rule="evenodd"
+                        d="M6 3.5A1.5 1.5 0 0 1 7.5 2h1A1.5 1.5 0 0 1 10 3.5v1A1.5 1.5 0 0 1 8.5 6v1H14a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 2 7h5.5V6A1.5 1.5 0 0 1 6 4.5zM8.5 5a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5zM0 11.5A1.5 1.5 0 0 1 1.5 10h1A1.5 1.5 0 0 1 4 11.5v1A1.5 1.5 0 0 1 2.5 14h-1A1.5 1.5 0 0 1 0 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5A1.5 1.5 0 0 1 7.5 10h1a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 8.5 14h-1A1.5 1.5 0 0 1 6 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5a1.5 1.5 0 0 1 1.5-1.5h1a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z" />
+                    </svg> {{ project.title }} — <span class="text-muted ms-2">{{ project.status }}</span>
+
+                  </span>
+                  <br>
+                </header>
+                <div class="w3-container w3-margin-top">
+                  {% for gantt in gantt_projects_data %}
+                  {% if gantt.project_id == project.id %}
+                  <div id="gantt-chart-{{ gantt.project_id }}" style="height: 500px;"></div>
+                  <script>
+                    const ganttData{{ gantt.project_id }} = { { gantt.gantt_data | tojson } };
+                    const traces{{ gantt.project_id }} = ganttData{ { gantt.project_id } }.map(item => ({
+                      x: [item.Start, item.Finish],
+                      y: [item.Task, item.Task],
+                      type: 'scatter',
+                      mode: 'lines',
+                      line: { width: 20, color: item.Color },
+                      name: item.Resource,
+                      hovertemplate: `${item.Task}<br>Start: ${item.StartLabel}<br>End: ${item.FinishLabel}<extra></extra>`,
+                      taskId: item.TaskID || null
+                    }));
+
+                    const layout{{ gantt.project_id }} = {
+                      title: 'Gantt Chart for {{ gantt.project_title }}',
+                        xaxis: { type: 'date', title: 'Date' },
+                      yaxis: {
+                        type: 'category',
+                          title: 'Tasks',
+                            automargin: true,
+                              categoryorder: 'array',
+                                categoryarray: ganttData{ { gantt.project_id } }.map(item => item.Task)
+                      },
+                      height: 500,
+                        showlegend: true
+                    };
+
+                    Plotly.newPlot('gantt-chart-{{ gantt.project_id }}', traces{{ gantt.project_id }}, layout{{ gantt.project_id }});
+                  </script>
+                  {% endif %}
+                  {% endfor %}
+
+                </div>
+                <footer class="w3-container w3-teal">
+                  <p><strong>Start:</strong> {{ project.start_date.strftime('%Y-%m-%d') }} | <strong>End:</strong> {{
+                    project.end_date.strftime('%Y-%m-%d') }}</p>
+                  <p>{{ project.description }} </p>
+                  <p>
+                    <svg onclick="document.getElementById('edit_project_{{ project.title }}').style.display='block'"
+                      xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                      class="bi w3-margin-left w3-margin-right bi-pen" viewBox="0 0 16 16" style="cursor: pointer;">
+                      <path
+                        d="m13.498.795.149-.149a1.207 1.207 0 1 1 1.707 1.708l-.149.148a1.5 1.5 0 0 1-.059 2.059L4.854 14.854a.5.5 0 0 1-.233.131l-4 1a.5.5 0 0 1-.606-.606l1-4a.5.5 0 0 1 .131-.232l9.642-9.642a.5.5 0 0 0-.642.056L6.854 4.854a.5.5 0 1 1-.708-.708L9.44.854A1.5 1.5 0 0 1 11.5.796a1.5 1.5 0 0 1 1.998-.001m-.644.766a.5.5 0 0 0-.707 0L1.95 11.756l-.764 3.057 3.057-.764L14.44 3.854a.5.5 0 0 0 0-.708z" />
+                    </svg>
+                  <form method="POST" action="{{ url_for('delete_project', project_id=project.id) }}"
+                    onsubmit="return confirm('Are you sure you want to delete this project?');" class="d-inline">
+                    <button class=" w3-red w3-card w3-round" style="border: none;" type="submit">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="bi bi-trash3" viewBox="0 0 16 16" style="cursor: pointer;">
+                        <path
+                          d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5M11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47M8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5" />
+                      </svg>
+                    </button>
+                  </form>
+                  </p>
+                </footer>
+              </div>
+            </div>
+            <!-- view project ends here -->
+            </p>
+            <a onclick="document.getElementById('new_task_{{ project.id }}').style.display='block'"
+              class="btn btn-sm btn-outline-success">+ Add Task</a>
+            <ul class="list-group list-group-flush mt-3" style="overflow: auto;">
+              {% for task in project.tasks %}
+              <li class="list-group-item d-flex w3-border w3-round justify-content-between align-items-center">
+                <div>
+                  <strong>{{ task.title }}</strong>
+
+                  <span class="" style="width: fit-content;">
+                    <svg onclick="document.getElementById('edit_task_{{ task.id }}').style.display='block'"
+                      xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                      class="bi w3-margin-right w3-margin-left bi-pen" viewBox="0 0 16 16" style="cursor: pointer;">
+                      <path
+                        d="m13.498.795.149-.149a1.207 1.207 0 1 1 1.707 1.708l-.149.148a1.5 1.5 0 0 1-.059 2.059L4.854 14.854a.5.5 0 0 1-.233.131l-4 1a.5.5 0 0 1-.606-.606l1-4a.5.5 0 0 1 .131-.232l9.642-9.642a.5.5 0 0 0-.642.056L6.854 4.854a.5.5 0 1 1-.708-.708L9.44.854A1.5 1.5 0 0 1 11.5.796a1.5 1.5 0 0 1 1.998-.001m-.644.766a.5.5 0 0 0-.707 0L1.95 11.756l-.764 3.057 3.057-.764L14.44 3.854a.5.5 0 0 0 0-.708z" />
+                    </svg>
+                    <!-- edit task  modal -->
+                    <div id="edit_task_{{ task.id }}" class="w3-modal w3-white w3-card w3-border">
+                      <div class="w3-modal-content w3-white w3-card w3-border">
+                        <header class="w3-container w3-padding" style="background-color: #e6f0ff;">
+                          <span onclick="document.getElementById('edit_task_{{ task.id }}').style.display='none'"
+                            class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                          <span class="w3-card w3-margin w3-white w3-padding" class="w3-button w3-black"
+                            style=" border-radius: 25px 25px 25px 25px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                              class="bi bi-diagram-3" viewBox="0 0 16 16">
+                              <path fill-rule="evenodd"
+                                d="M6 3.5A1.5 1.5 0 0 1 7.5 2h1A1.5 1.5 0 0 1 10 3.5v1A1.5 1.5 0 0 1 8.5 6v1H14a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 2 7h5.5V6A1.5 1.5 0 0 1 6 4.5zM8.5 5a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5zM0 11.5A1.5 1.5 0 0 1 1.5 10h1A1.5 1.5 0 0 1 4 11.5v1A1.5 1.5 0 0 1 2.5 14h-1A1.5 1.5 0 0 1 0 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5A1.5 1.5 0 0 1 7.5 10h1a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 8.5 14h-1A1.5 1.5 0 0 1 6 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5a1.5 1.5 0 0 1 1.5-1.5h1a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z" />
+                            </svg> Edit Task {{ task.title }}
+                          </span>
+                          <br>
+                        </header>
+                        <div class="w3-container w3-margin-top">
+                          <form method="POST" action="{{ url_for('edit_task', task_id=task.id) }}">
+                            {{ taskform.csrf_token }} <div class="mb-3">
+                              {{ taskform.title.label(class="form-label w3-left") }}
+                              {{ taskform.title(class="form-control", value=task.title) }}
+                              {% if taskform.title.errors %}
+                              {% for error in taskform.title.errors %}<span class="text-danger">{{ error }}</span>{%
+                              endfor %}
+                              {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                              {{ taskform.description.label(class="form-label w3-left") }}
+                              <textarea name="{{ taskform.description.name }}"
+                                class="form-control">{{ task.description }}</textarea>
+                              <!-- {{ taskform.description(class="form-control", value=task.description) }} -->
+                              {% if taskform.description.errors %}
+                              {% for error in taskform.description.errors %}<span class="text-danger">{{ error
+                                }}</span>{% endfor %}
+                              {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                              {{ taskform.start_date.label(class="form-label w3-left") }}
+                              {{ taskform.start_date(class="form-control",value=task.start_date.strftime('%Y-%m-%d'),
+                              type="date") }} {# Add type="date" for HTML5 date picker #}
+                              {% if taskform.start_date.errors %}
+                              {% for error in taskform.start_date.errors %}<span class="text-danger">{{ error
+                                }}</span>{% endfor %}
+                              {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                              {{ taskform.due_date.label(class="form-label w3-left") }}
+                              {{ taskform.due_date(class="form-control",value=task.due_date.strftime('%Y-%m-%d'),
+                              type="date") }} {# Add type="date" #}
+                              {% if taskform.due_date.errors %}
+                              {% for error in taskform.due_date.errors %}<span class="text-danger">{{ error }}</span>{%
+                              endfor %}
+                              {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                              {{ taskform.status.label(class="form-label w3-left") }}
+                              <select name="status" class="form-select">
+                                {% for value, label in taskform.status.choices %}
+                                <option value="{{ value }}" {% if value==task.status %}selected{% endif %}>{{ label }}
+                                </option>
+                                {% endfor %}
+                              </select>
+                              <!-- {{ taskform.status(class="form-control",value=task.status) }} -->
+                              {% if taskform.status.errors %}
+                              {% for error in taskform.status.errors %}<span class="text-danger">{{ error }}</span>{%
+                              endfor %}
+                              {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                              {{ taskform.progress.label(class="form-label w3-left") }}
+                              {{ taskform.progress(class="form-control",value=task.progress) }}
+                              {% if taskform.progress.errors %}
+                              {% for error in taskform.progress.errors %}<span class="text-danger">{{ error }}</span>{%
+                              endfor %}
+                              {% endif %}
+                            </div>
+
+                            {{ taskform.submit(class="btn btn-primary") }}
+                          </form>
+                        </div>
+                        <footer class="w3-container w3-teal">
+                          <p>You are about to add new channel to system</p>
+                        </footer>
+                      </div>
+                    </div>
+                    <!-- edit task ends here -->
+
+                    <form action="{{ url_for('delete_task', task_id=task.id) }}" method="POST" class="d-inline"
+                      onsubmit="return confirm('Delete this task?');">
+                      <button class=" w3-red w3-card w3-round" style="border: none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                          class="bi bi-trash3" viewBox="0 0 16 16" style="cursor: pointer;">
+                          <path
+                            d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5M11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47M8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5" />
+                        </svg>
+                      </button>
+                    </form>
+
+
+                  </span>
+                  <br>
+                  <small class="text-muted">from {{ task.start_date.strftime('%Y-%m-%d') }} to {{
+                    task.due_date.strftime('%Y-%m-%d') }} |
+                    <span class="badge 
+                        {% if task.status == 'Done' %} bg-success
+                        {% elif task.status == 'In Progress' %} bg-primary
+                        {% elif task.status == 'To Do' %} bg-secondary
+                        {% else %} bg-light text-dark {% endif %}">
+                      {{ task.progress }}% {{ task.status }}
+                    </span>
+                  </small>
+                </div>
+              </li>
+              {% else %}
+              <li class="list-group-item text-muted">No tasks yet.</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+      <!-- add new task modal -->
+      <div id="new_task_{{ project.id }}" class="w3-modal w3-white w3-card w3-border">
+        <div class="w3-modal-content w3-white w3-card w3-border">
+          <header class="w3-container w3-padding" style="background-color: #e6f0ff;">
+            <span onclick="document.getElementById('new_task_{{ project.id }}').style.display='none'"
+              class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+            <span class="w3-card w3-margin w3-white w3-padding" class="w3-button w3-black"
+              style=" border-radius: 25px 25px 25px 25px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="currentColor"
+                class="bi bi-person-add" viewBox="0 0 16 16">
+                <path
+                  d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4" />
+                <path
+                  d="M8.256 14a4.5 4.5 0 0 1-.229-1.004H3c.001-.246.154-.986.832-1.664C4.484 10.68 5.711 10 8 10q.39 0 .74.025c.226-.341.496-.65.804-.918Q8.844 9.002 8 9c-5 0-6 3-6 4s1 1 1 1z" />
+              </svg> Add new task to {{ project.title }}
+            </span>
+            <br>
+          </header>
+          <div class="w3-container w3-margin-top">
+            <form method="POST" action="{{ url_for('create_task', project_id=project.id) }}">
+              {{ taskform.hidden_tag() }}
+
+              <!-- Title -->
+              <div class="mb-3">
+                {{ taskform.title.label(class="form-label") }}
+                {{ taskform.title(class="form-control", placeholder="Enter task title") }}
+              </div>
+
+              <!-- Description -->
+              <div class="mb-3">
+                {{ taskform.description.label(class="form-label") }}
+                {{ taskform.description(class="form-control", placeholder="Enter task description") }}
+              </div>
+
+              <!-- Start Date -->
+              <div class="mb-3">
+                {{ taskform.start_date.label(class="form-label") }}
+                {{ taskform.start_date(class="form-control", type="date") }}
+              </div>
+
+              <!-- Due Date -->
+              <div class="mb-3">
+                {{ taskform.due_date.label(class="form-label") }}
+                {{ taskform.due_date(class="form-control", type="date") }}
+              </div>
+
+              <!-- Status -->
+              <div class="mb-3">
+                {{ taskform.status.label(class="form-label") }}
+                {{ taskform.status(class="form-select") }}
+              </div>
+
+              <!-- Progress -->
+              <div class="mb-3">
+                {{ taskform.progress.label(class="form-label") }}
+                {{ taskform.progress(class="form-control", type="number", min="1", max="100", step="1", placeholder="1
+                to 100") }}
+              </div>
+
+              <!-- Submit Button -->
+              <div class="modal-footer">
+                <button type="submit" class="btn btn-primary">Save Task</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              </div>
+            </form>
+
+          </div>
+          <footer class="w3-container w3-teal">
+            <p>You are about to add new task to system</p>
+          </footer>
+        </div>
+      </div>
+      <!-- new task ends here -->
+      {% else %}
+      <p class="text-muted">No projects created yet in this workspace.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+
+
+
+</div>
+
+<!-- add new project modal -->
+<div id="new_project" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border">
+    <header class="w3-container w3-padding" style="background-color: #e6f0ff;">
+      <span onclick="document.getElementById('new_project').style.display='none'"
+        class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-card w3-margin w3-white w3-padding" class="w3-button w3-black"
+        style=" border-radius: 25px 25px 25px 25px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="currentColor" class="bi bi-person-add"
+          viewBox="0 0 16 16">
+          <path
+            d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4" />
+          <path
+            d="M8.256 14a4.5 4.5 0 0 1-.229-1.004H3c.001-.246.154-.986.832-1.664C4.484 10.68 5.711 10 8 10q.39 0 .74.025c.226-.341.496-.65.804-.918Q8.844 9.002 8 9c-5 0-6 3-6 4s1 1 1 1z" />
+        </svg> Add new project
+      </span>
+      <br>
+    </header>
+    <div class="w3-container w3-margin">
+      <!-- Create Project Form -->
+<div class="card shadow-sm border-0 my-4">
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('create_project', workspace_id=workspace.id) }}">
+      {{ projectform.hidden_tag() }}
+
+      <div class="mb-3">
+        {{ projectform.title.label(class="form-label fw-semibold") }}
+        {{ projectform.title(class="form-control", placeholder="Enter project title") }}
+      </div>
+
+      <div class="mb-3">
+        {{ projectform.description.label(class="form-label fw-semibold") }}
+        {{ projectform.description(class="form-control", placeholder="Enter project description") }}
+      </div>
+
+      <div class="mb-3">
+        {{ projectform.status.label(class="form-label fw-semibold") }}
+        {{ projectform.status(class="form-select") }}
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          {{ projectform.start_date.label(class="form-label fw-semibold") }}
+          {{ projectform.start_date(class="form-control") }}
+        </div>
+        <div class="col-md-6 mb-3">
+          {{ projectform.end_date.label(class="form-label fw-semibold") }}
+          {{ projectform.end_date(class="form-control") }}
+        </div>
+      </div>
+
+      <div class="d-grid">
+        {{ projectform.submit(class="btn btn-success btn-lg shadow-sm") }}
+      </div>
+    </form>
+  </div>
+  <div class="card-footer bg-light text-muted small">
+    <i class="bi bi-info-circle me-1"></i>
+    You are about to add a new channel to the system.
+  </div>
+</div>
+
+  </div>
+</div>
+<!-- new project ends here -->
+
+
+
+
+<!-- view project visuals modal -->
+<div id="view_all_project" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 85vw; height: 80vh;">
+    <header class="w3-container w3-padding" style="background-color: #e6f0ff;">
+      <span onclick="document.getElementById('view_all_project').style.display='none'"
+        class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-card w3-margin w3-white w3-padding" class="w3-button w3-black"
+        style=" border-radius: 25px 25px 25px 25px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-diagram-3"
+          viewBox="0 0 16 16">
+          <path fill-rule="evenodd"
+            d="M6 3.5A1.5 1.5 0 0 1 7.5 2h1A1.5 1.5 0 0 1 10 3.5v1A1.5 1.5 0 0 1 8.5 6v1H14a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 2 7h5.5V6A1.5 1.5 0 0 1 6 4.5zM8.5 5a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5zM0 11.5A1.5 1.5 0 0 1 1.5 10h1A1.5 1.5 0 0 1 4 11.5v1A1.5 1.5 0 0 1 2.5 14h-1A1.5 1.5 0 0 1 0 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5A1.5 1.5 0 0 1 7.5 10h1a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 8.5 14h-1A1.5 1.5 0 0 1 6 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5a1.5 1.5 0 0 1 1.5-1.5h1a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z" />
+        </svg> Project Visuals
+      </span>
+      <br>
+    </header>
+    <div class="w3-container w3-margin-top">
+      <div class="w3-third w3-margin">
+        <table class="table table-striped w3-margin">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Item</th>
+              <th>Item</th>
+              <th>Item</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>col</td>
+              <td>col</td>
+              <td>col</td>
+              <td>col</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="w3-third w3-margin">
+        <table class="table table-striped w3-margin">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Item</th>
+              <th>Item</th>
+              <th>Item</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>col</td>
+              <td>col</td>
+              <td>col</td>
+              <td>col</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <footer class="w3-container w3-teal">
+      <p>Projects Visuals</p>
+    </footer>
+  </div>
+</div>
+<!-- view all project ends here -->
+
+
+
+
+
+<!-- Members  modal -->
+<div id="Members" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border">
+    <header class="w3-container w3-padding" style="background-color: #e6f0ff;">
+      <span onclick="document.getElementById('Members').style.display='none'"
+        class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-card w3-margin w3-white w3-padding" class="w3-button w3-black"
+        style=" border-radius: 25px 25px 25px 25px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-diagram-3"
+          viewBox="0 0 16 16">
+          <path fill-rule="evenodd"
+            d="M6 3.5A1.5 1.5 0 0 1 7.5 2h1A1.5 1.5 0 0 1 10 3.5v1A1.5 1.5 0 0 1 8.5 6v1H14a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 2 7h5.5V6A1.5 1.5 0 0 1 6 4.5zM8.5 5a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5zM0 11.5A1.5 1.5 0 0 1 1.5 10h1A1.5 1.5 0 0 1 4 11.5v1A1.5 1.5 0 0 1 2.5 14h-1A1.5 1.5 0 0 1 0 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5A1.5 1.5 0 0 1 7.5 10h1a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 8.5 14h-1A1.5 1.5 0 0 1 6 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5a1.5 1.5 0 0 1 1.5-1.5h1a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z" />
+        </svg> Members in workspace
+      </span>
+      </span>
+      <br>
+    </header>
+    <div class="w3-container w3-margin-top">
+     <div class="row g-4">
+
+  <!-- Invite Member Form -->
+  <div class="col-md-4">
+    <div class="card shadow-sm rounded-3">
+      <div class="card-body">
+        <h6 class="card-title mb-3 text-primary fw-bold">Invite Member</h6>
+
+        <form method="POST" action="{{ url_for('invite_user_to_workspace', workspace_id=workspace.id) }}">
+          <div class="mb-3">
+            <label for="email" class="form-label">Select User</label>
+            <select name="email" id="email" class="form-select" required>
+              <option value="" disabled selected>Search users...</option>
+              {% for user in available_users %}
+                <option value="{{ user.email }}">{{ user.username }} ({{ user.email }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary w-100">
+            <i class="bi bi-person-plus me-1"></i> Invite
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Existing Members -->
+  <div class="col-md-8">
+    <div class="card shadow-sm rounded-3">
+      <div class="card-body">
+        <h6 class="card-title mb-3 text-success fw-bold">
+          Members in {{ workspace.title }}
+        </h6>
+
+        {% if workspace.members %}
+          <ul class="list-group list-group-flush">
+            {% for member in workspace.members %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>
+                  <i class="bi bi-person-circle me-2 text-secondary"></i>
+                  {{ member.username }} <small class="text-muted">({{ member.email }})</small>
+                </span>
+                {% if member.id == workspace.created_by %}
+                  <span class="badge bg-info text-dark">Creator</span>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-muted fst-italic mb-0">No members yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Select2 (enhanced dropdown) -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    $('#email').select2({
+      placeholder: 'Search users to invite',
+      allowClear: true,
+      width: '100%'
+    });
+  });
+</script>
+
+
+    </div>
+    <footer class="w3-container w3-teal">
+      <p><strong>Add new member to this workspace</strong></p>
+    </footer>
+  </div>
+</div>
+<!-- Members ends here -->
+
+
+
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script>
+  const ganttProjects = {{ gantt_projects_data| tojson }};
+
+  ganttProjects.forEach(project => {
+    const chartId = 'gantt-chart-' + project.project_id;
+    const traces = project.gantt_data.map(item => ({
+      x: [item.Start, item.Finish],
+      y: [item.Task, item.Task],
+      type: 'scatter',
+      mode: 'lines',
+      line: { width: 20, color: item.Color },
+      name: item.Resource,
+      hovertemplate: `%{y}<br>Start: %{x[0]}<br>End: %{x[1]}<extra></extra>`
+    }));
+
+    const layout = {
+      title: '',
+      xaxis: { type: 'date', tickformat: '%b %d', title: 'Week', tick0: new Date(), dtick: 7 * 24 * 60 * 60 * 1000 },
+      yaxis: { type: 'category', automargin: true, title: 'Tasks' },
+      height: 450,
+      showlegend: true
+    };
+
+    Plotly.newPlot(chartId, traces, layout);
+  });
+</script>
+
+{% endblock %}

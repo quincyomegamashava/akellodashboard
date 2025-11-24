@@ -1,0 +1,1727 @@
+{% extends 'base.html' %}
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+{% block title %}Overview • Akello{% endblock %}
+<style>
+    body {
+      font-family: "Inter", sans-serif;
+      background-color: #f8f9fb;
+      color: #333;
+      margin: 0;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #3b28cc;
+      font-size: 2rem;
+      margin-bottom: 10px;
+    }
+
+    p.subtitle {
+      text-align: center;
+      color: #555;
+      margin-bottom: 40px;
+    }
+
+    .accordion {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    details {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 20px;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+    }
+
+    details[open] {
+      border-color: #3b28cc;
+      box-shadow: 0 4px 10px rgba(59, 40, 204, 0.08);
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1.05rem;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    summary::after {
+      content: "➕";
+      font-size: 1.2rem;
+      color: #3b28cc;
+      transition: transform 0.3s ease;
+    }
+
+    details[open] summary::after {
+      content: "➖";
+    }
+
+    details p {
+      margin-top: 15px;
+      color: #555;
+      line-height: 1.6;
+    }
+
+    /* How-to modern styles */
+    .howto-hero { background: linear-gradient(135deg,#e8f0ff,#ffffff); border:1px solid #e6ecf7; border-radius:16px; padding:18px 18px; box-shadow:0 6px 18px rgba(13,38,76,.06); display:flex; align-items:center; gap:14px; }
+    .howto-hero .icon { width:44px; height:44px; border-radius:12px; background: linear-gradient(135deg,#6366f1,#22c55e); color:#fff; display:grid; place-items:center; font-size:18px; }
+    .howto-hero .title { font-weight:700; color:#0b213f; margin:0; font-size:1.05rem; }
+    .howto-hero .desc { margin:2px 0 0; color:#55657d; font-size:.9rem; }
+
+    .step-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap:14px; }
+    .step-card { background:#fff; border:1px solid #e9eef5; border-radius:14px; padding:14px 16px; box-shadow:0 6px 16px rgba(13,38,76,.06); transition:transform .05s ease, box-shadow .2s ease; }
+    .step-card:hover { transform: translateY(-1px); box-shadow:0 10px 24px rgba(13,38,76,.10); }
+    .step-card .icon { width:36px; height:36px; border-radius:10px; display:grid; place-items:center; color:#fff; font-size:16px; margin-bottom:8px; background: linear-gradient(135deg,#3b82f6,#06b6d4); }
+    .step-card h4 { margin:0 0 6px; font-size:1rem; color:#0b213f; }
+    .step-card ul { margin: 0; padding-left: 18px; color:#56627a; font-size:.92rem; }
+    .step-card li { margin: 4px 0; }
+
+    .contact-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap:12px; }
+    .contact-card { background:#fff; border:1px solid #e9eef5; border-radius:14px; padding:12px 14px; box-shadow:0 6px 16px rgba(13,38,76,.06); display:flex; align-items:center; gap:10px; }
+    .contact-card .avatar { width:40px; height:40px; border-radius:10px; display:grid; place-items:center; color:#fff; font-size:16px; background: linear-gradient(135deg,#10b981,#14b8a6); }
+    .contact-card .name { font-weight:600; color:#0b213f; margin:0; }
+    .contact-card .email { font-size:.9rem; color:#55657d; margin:0; word-break: break-all; }
+
+    .badge-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; font-size:.75rem; border:1px solid #dfe7f5; background:#f7faff; color:#1f3161; }
+
+    @media (max-width: 640px){ .howto-hero { flex-direction: column; align-items: flex-start; } }
+    
+    /* Chart loading animations */
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    @keyframes progress {
+        0% { width: 0%; }
+        100% { width: 100%; }
+    }
+    
+    /* 60-second progress bar */
+    .progress-60s {
+        animation: progress 60s linear;
+    }
+    
+    /* Chart container improvements */
+    .chart-container {
+        position: relative;
+        min-height: 300px;
+    }
+    
+    /* Loading state improvements */
+    .chart-loading-overlay {
+        backdrop-filter: blur(2px);
+    }
+    
+    .chart-error {
+        backdrop-filter: blur(1px);
+    }
+  </style>
+{% block content %}
+<div class=" w3-display-container  w3-small rounded-2xl  p-6 " style="height: 65vh; width: 75vw; overflow: auto;">
+  <div class="w3-display-middle bg-white " style="height: 63vh; width: 73vw; overflow: auto;">
+    
+
+    <!-- Menu Container -->
+<div class="w3-padding  " id="menu">
+  <div class="w3-card rounded-2xl soft-shadow p-6 w3-small" style="width: 69vw;">
+  
+    <div  class="text-slate-500 w3-center uppercase w3-text-indigo font-bold tracking-wider text-2xl px-2 mt-6" style="">AKELLO iNTERNAL dASHBOARD</div>
+    <div class="w3-row w3-center w3-border w3-border-light-gray">
+      <a href="javascript:void(0)" onclick="openMenu(event, 'how-to');" id="myLink">
+        <div class="w3-col s4 tablink w3-padding w3-hover-indigo w3-small rounded-2xl  p-6">Overview</div>
+      </a>
+      <a href="javascript:void(0)" class="{% if current_user.userRole =='Brand Ambassador' %} w3-hide {% endif %}" onclick="openMenu(event, 'branding');">
+        <div class="w3-col s4 tablink w3-padding w3-hover-indigo w3-small rounded-2xl  p-6">Branding Tracker</div>
+      </a>
+      <a href="javascript:void(0)" onclick="openMenu(event, 'brandmanager');" class="{% if current_user.userRole =='Admin' or current_user.userRole == 'Brand Manager' %}{% else %} w3-hide {% endif %}">
+        <div class="w3-col s4 tablink w3-padding w3-hover-indigo w3-small rounded-2xl  p-6">Brand Manager</div>
+      </a>
+    </div>
+
+    <div id="how-to" class="w3-container menu w3-padding-32 w3-white">
+      
+      <div class="max-w-7xl mx-auto space-y-8">
+
+    <!-- Yearly Totals -->
+    <div id="totals" class="bg-white w3-hide p-4 rounded-2xl shadow mb-6 text-center">
+      <h2 class="text-xl font-semibold text-gray-700 mb-2">
+        Yearly Totals (<span id="year"></span>)
+      </h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div><span class="font-bold text-blue-600">ASL:</span> <span id="asl_total">0</span></div>
+        <div><span class="font-bold text-green-600">Library:</span> <span id="library_total">0</span></div>
+        <div><span class="font-bold text-yellow-600">Ask Akello:</span> <span id="ask_total">0</span></div>
+        <div><span class="font-bold text-purple-600">Overall:</span> <span id="overall_total">0</span></div>
+      </div>
+    </div>
+
+    <!-- Charts - Buttons to open modals -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div class="bg-white shadow-lg rounded-2xl p-6 text-center">
+        <h2 class="text-lg font-semibold mb-3 text-blue-700">Overall Monthly Usage</h2>
+        <p class="text-gray-600 mb-4">View detailed monthly usage statistics</p>
+        <button onclick="openChartModal('monthlyUsageModal')" class="w3-button w3-blue w3-round">View Chart</button>
+      </div>
+
+      <div class="bg-white shadow-lg rounded-2xl p-6 text-center">
+        <h2 class="text-lg font-semibold mb-3 text-green-700">Platform Comparison</h2>
+        <p class="text-gray-600 mb-4">Compare platform usage across months</p>
+        <button onclick="openChartModal('platformComparisonModal')" class="w3-button w3-green w3-round">View Chart</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Include the script here -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Paste the JS script block here -->
+        
+    </div>
+
+    <script>
+// Chart loading with timeout and error handling
+document.addEventListener('DOMContentLoaded', async () => {
+    // Add loading indicators
+    showChartLoading(true);
+    
+    try {
+        // Create a timeout promise (60 seconds for slow queries)
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Chart data loading timeout after 60 seconds')), 60000);
+        });
+        
+        // Create fetch promise with timeout
+        const fetchPromise = fetch('/api/platforms_overall_yearly', {
+            method: 'GET',
+            headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        });
+        
+        // Race between fetch and timeout
+        const res = await Promise.race([fetchPromise, timeoutPromise]);
+        
+        // Handle specific HTTP status codes
+        if (!res.ok) {
+            if (res.status === 408) {
+                // Server timeout - show timeout UI instead of error
+                const timeoutData = await res.json().catch(() => ({}));
+                console.log('Server timeout detected (408)');
+                showChartTimeout(
+                    timeoutData.error || 'Charts are taking longer than expected to load. This might be due to heavy server load.',
+                    timeoutData.retry_recommended
+                );
+                return;
+            } else {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+        }
+        
+        const data = await res.json();
+
+        if (data.error) {
+            console.error("API Error:", data.error);
+            showChartError(`Error fetching data: ${data.error}`);
+            return;
+        }
+        const { monthly_usage, yearly_totals, year } = data;
+
+        // Update yearly totals section
+        document.getElementById("year").textContent = year;
+        document.getElementById("asl_total").textContent = yearly_totals.asl.toLocaleString();
+        document.getElementById("library_total").textContent = yearly_totals.library.toLocaleString();
+        document.getElementById("ask_total").textContent = yearly_totals.ask_akello.toLocaleString();
+        document.getElementById("overall_total").textContent = yearly_totals.overall.toLocaleString();
+
+        // Prepare data for charts
+        const labels = monthly_usage.map(d => d.month);
+        const overall = monthly_usage.map(d => d.overall);
+        const asl = monthly_usage.map(d => d.asl);
+        const library = monthly_usage.map(d => d.library);
+        const ask = monthly_usage.map(d => d.ask_akello);
+
+        // Destroy existing charts if reloading
+        if (window.lineChartInstance) window.lineChartInstance.destroy();
+        if (window.barChartInstance) window.barChartInstance.destroy();
+
+        // --- LINE CHART: Overall Monthly Usage ---
+        const lineCtx = document.getElementById('lineChart').getContext('2d');
+        window.lineChartInstance = new Chart(lineCtx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: `Overall Usage (${year})`,
+                    data: overall,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37,99,235,0.15)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Total Users' }
+                    }
+                }
+            }
+        });
+
+        // --- BAR CHART: Platform Comparison ---
+        const barCtx = document.getElementById('barChart').getContext('2d');
+        window.barChartInstance = new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'ASL',
+                        data: asl,
+                        backgroundColor: '#f59e0b',
+                        stack: 'combined'
+                    },
+                    {
+                        label: 'Library',
+                        data: library,
+                        backgroundColor: '#10b981',
+                        stack: 'combined'
+                    },
+                    {
+                        label: 'Ask Akello',
+                        data: ask,
+                        backgroundColor: '#3b82f6',
+                        stack: 'combined'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff'
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        title: { display: true, text: 'Month' }
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        title: { display: true, text: 'Active Users' }
+                    }
+                }
+            }
+        });
+        
+        // Hide loading indicators and show charts
+        showChartLoading(false);
+        
+        // Check if this is sample data and show notification
+        if (data._sample_data) {
+            showSampleDataNotification(data._note || 'Sample data is being used due to database performance issues.');
+        }
+        
+        // Show success message with load time
+        console.log('Charts loaded successfully', data._debug || {});
+
+    } catch (err) {
+        console.error("Error loading chart data:", err);
+        showChartLoading(false);
+        
+        // Show user-friendly error message based on error type
+        if (err.message.includes('timeout')) {
+            showChartTimeout('Charts are taking longer than expected to load. The server might be processing a large amount of data.');
+        } else if (err.message.includes('Failed to fetch')) {
+            showChartError('Unable to connect to the server. Please check your internet connection and try again.');
+        } else {
+            showChartError(`An error occurred while loading chart data: ${err.message}`);
+        }
+        
+        // Show fallback message with retry button
+        showRetryOption();
+    }
+});
+
+// Helper functions for loading states and error handling
+function showChartLoading(show) {
+    const lineChartContainer = document.getElementById('lineChart').parentElement;
+    const barChartContainer = document.getElementById('barChart').parentElement;
+    
+    if (show) {
+        // Add loading overlay to chart containers
+        addLoadingOverlay(lineChartContainer, 'Loading Overall Monthly Usage...');
+        addLoadingOverlay(barChartContainer, 'Loading Platform Comparison...');
+    } else {
+        // Remove loading overlays
+        removeLoadingOverlay(lineChartContainer);
+        removeLoadingOverlay(barChartContainer);
+    }
+}
+
+function addLoadingOverlay(container, message) {
+    const overlay = document.createElement('div');
+    overlay.className = 'chart-loading-overlay';
+    overlay.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        border-radius: 1rem;
+    `;
+    
+    overlay.innerHTML = `
+        <div class="spinner" style="
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        "></div>
+        <p id="loading-message-${Date.now()}" style="color: #6b7280; font-size: 14px; margin: 0; text-align: center;">${message}</p>
+        <div style="width: 200px; height: 4px; background: #e5e7eb; border-radius: 2px; margin-top: 12px; overflow: hidden;">
+            <div class="progress-bar" style="
+                height: 100%;
+                background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+                border-radius: 2px;
+                width: 0;
+                animation: progress 60s linear;
+            "></div>
+        </div>
+        <p style="color: #9ca3af; font-size: 12px; margin: 8px 0 0 0;">Maximum wait time: 60 seconds</p>
+        <div id="progress-messages" style="margin-top: 12px; text-align: center;">
+            <p id="msg-15s" style="color: #10b981; font-size: 11px; margin: 2px 0; display: none;">📊 Processing data...</p>
+            <p id="msg-30s" style="color: #f59e0b; font-size: 11px; margin: 2px 0; display: none;">⏳ Still loading (this may take a moment)...</p>
+            <p id="msg-45s" style="color: #ef4444; font-size: 11px; margin: 2px 0; display: none;">🔄 Almost there, please wait...</p>
+        </div>
+    `;
+    
+    container.style.position = 'relative';
+    container.appendChild(overlay);
+    
+    // Start progressive message updates
+    startProgressiveMessages();
+}
+
+function startProgressiveMessages() {
+    // Show different messages at different time intervals
+    setTimeout(() => {
+        const msg15s = document.getElementById('msg-15s');
+        if (msg15s) msg15s.style.display = 'block';
+    }, 15000); // 15 seconds
+    
+    setTimeout(() => {
+        const msg30s = document.getElementById('msg-30s');
+        if (msg30s) msg30s.style.display = 'block';
+    }, 30000); // 30 seconds
+    
+    setTimeout(() => {
+        const msg45s = document.getElementById('msg-45s');
+        if (msg45s) msg45s.style.display = 'block';
+    }, 45000); // 45 seconds
+}
+
+function removeLoadingOverlay(container) {
+    const overlay = container.querySelector('.chart-loading-overlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+function showChartError(message) {
+    const lineChartContainer = document.getElementById('lineChart').parentElement;
+    const barChartContainer = document.getElementById('barChart').parentElement;
+    
+    [lineChartContainer, barChartContainer].forEach(container => {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'chart-error';
+        errorDiv.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            border-radius: 1rem;
+            padding: 20px;
+            text-align: center;
+        `;
+        
+        errorDiv.innerHTML = `
+            <div style="
+                width: 48px;
+                height: 48px;
+                border-radius: 50%;
+                background: #fee2e2;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 16px;
+            ">
+                <svg style="width: 24px; height: 24px; color: #dc2626;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.732 19.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+            </div>
+            <h4 style="color: #dc2626; margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">Chart Loading Failed</h4>
+            <p style="color: #7f1d1d; margin: 0; font-size: 14px; line-height: 1.5;">${message}</p>
+        `;
+        
+        container.style.position = 'relative';
+        container.appendChild(errorDiv);
+    });
+}
+
+function showChartTimeout(message, showRetry = true) {
+    const lineChartContainer = document.getElementById('lineChart').parentElement;
+    const barChartContainer = document.getElementById('barChart').parentElement;
+    
+    [lineChartContainer, barChartContainer].forEach(container => {
+        const timeoutDiv = document.createElement('div');
+        timeoutDiv.className = 'chart-timeout';
+        timeoutDiv.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #fffbeb;
+            border: 1px solid #fed7aa;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            border-radius: 1rem;
+            padding: 20px;
+            text-align: center;
+        `;
+        
+        timeoutDiv.innerHTML = `
+            <div style="
+                width: 48px;
+                height: 48px;
+                border-radius: 50%;
+                background: #fef3c7;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 16px;
+            ">
+                <svg style="width: 24px; height: 24px; color: #d97706;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h4 style="color: #d97706; margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">Charts Taking Longer</h4>
+            <p style="color: #92400e; margin: 0 0 16px 0; font-size: 14px; line-height: 1.5;">${message}</p>
+            ${showRetry ? `
+                <div style="margin-top: 12px;">
+                    <button onclick="retryChartLoad()" style="
+                        background: #3b82f6;
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        font-size: 14px;
+                        cursor: pointer;
+                        margin-right: 8px;
+                    ">Try Again</button>
+                    <button onclick="location.reload()" style="
+                        background: transparent;
+                        color: #3b82f6;
+                        border: 1px solid #3b82f6;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        font-size: 14px;
+                        cursor: pointer;
+                    ">Refresh Page</button>
+                </div>
+            ` : ''}
+        `;
+        
+        container.style.position = 'relative';
+        container.appendChild(timeoutDiv);
+    });
+}
+
+function showRetryOption() {
+    const chartsContainer = document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2');
+    const retryDiv = document.createElement('div');
+    retryDiv.className = 'retry-section';
+    retryDiv.style.cssText = `
+        grid-column: 1 / -1;
+        background: #fffbeb;
+        border: 1px solid #fed7aa;
+        border-radius: 1rem;
+        padding: 20px;
+        text-align: center;
+        margin-top: 16px;
+    `;
+    
+    retryDiv.innerHTML = `
+        <h4 style="color: #d97706; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">Unable to Load Charts</h4>
+        <p style="color: #92400e; margin: 0 0 16px 0; font-size: 14px;">You can try refreshing the page or contact support if the problem persists.</p>
+        <button onclick="location.reload()" style="
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-right: 8px;
+        ">Refresh Page</button>
+        <button onclick="window.open('/help_desk', '_blank')" style="
+            background: transparent;
+            color: #3b82f6;
+            border: 1px solid #3b82f6;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        ">Contact Support</button>
+    `;
+    
+    chartsContainer.appendChild(retryDiv);
+}
+
+// Retry chart loading function
+function retryChartLoad() {
+    console.log('Retrying chart load...');
+    
+    // Clear existing overlays
+    clearChartOverlays();
+    
+    // Restart the chart loading process
+    location.reload();
+}
+
+// Clear all chart overlays
+function clearChartOverlays() {
+    const lineChartContainer = document.getElementById('lineChart').parentElement;
+    const barChartContainer = document.getElementById('barChart').parentElement;
+    
+    [lineChartContainer, barChartContainer].forEach(container => {
+        const overlays = container.querySelectorAll('.chart-loading-overlay, .chart-error, .chart-timeout');
+        overlays.forEach(overlay => overlay.remove());
+    });
+}
+
+// Show sample data notification
+function showSampleDataNotification(message) {
+    const chartsContainer = document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2');
+    
+    // Remove existing notification if present
+    const existingNotification = document.getElementById('sample-data-notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+    
+    const notificationDiv = document.createElement('div');
+    notificationDiv.id = 'sample-data-notification';
+    notificationDiv.style.cssText = `
+        grid-column: 1 / -1;
+        background: #fef3c7;
+        border: 1px solid #f59e0b;
+        border-radius: 1rem;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    `;
+    
+    notificationDiv.innerHTML = `
+        <div style="
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #fbbf24;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        ">
+            <svg style="width: 14px; height: 14px; color: white;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <div style="flex-grow: 1;">
+            <h4 style="color: #d97706; margin: 0 0 4px 0; font-size: 14px; font-weight: 600;">Sample Data Notice</h4>
+            <p style="color: #92400e; margin: 0; font-size: 13px; line-height: 1.4;">${message}</p>
+        </div>
+        <button onclick="this.parentElement.style.display='none'" style="
+            background: none;
+            border: none;
+            color: #d97706;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        ">&times;</button>
+    `;
+    
+    chartsContainer.insertBefore(notificationDiv, chartsContainer.firstChild);
+    
+    // Auto-hide after 10 seconds
+    setTimeout(() => {
+        if (notificationDiv && notificationDiv.parentElement) {
+            notificationDiv.style.display = 'none';
+        }
+    }, 10000);
+}
+</script>
+
+      <!-- <div class="howto-hero w3-margin-bottom">
+        <div class="icon"><i class="fa fa-rocket"></i></div>
+        <div>
+          <p class="title">Welcome to Akello Internal Dashboard</p>
+          <p class="desc">Follow the steps below to request branding collateral and track your requests smoothly.</p>
+          <span class="badge-chip" title="Tip">
+            <i class="fa fa-lightbulb-o"></i>
+            You can edit or filter your requests anytime in the Branding tab.
+          </span>
+        </div>
+      </div>
+
+      <div class="step-grid w3-margin-bottom">
+        <div class="step-card">
+          <div class="icon"><i class="fa fa-list-ul"></i></div>
+          <h4>1. Request Branding Collateral</h4>
+          <ul>
+            <li>Open the <strong>Branding Tracker</strong> tab.</li>
+            <li>Review available branding items and quantities.</li>
+            <li>In the Requests panel, choose the branding <em>platform</em> and click <strong>Next</strong>.</li>
+            <li>Select the branding <em>type</em> and <em>quantity</em>, then click <strong>Add to request</strong>.</li>
+            <li>Click <strong>Next</strong> and add your <em>Event</em>, <em>Check Out</em>, and <em>Return</em> dates.</li>
+            <li>Click <strong>Submit request</strong> to finalize.</li>
+          </ul>
+          <details class="w3-margin-top">
+            <summary class="w3-small"><i class="fa fa-lightbulb-o"></i> Advanced tips</summary>
+            <ul class="w3-small" style="margin-top:6px">
+              <li>Use clear, descriptive <em>Event</em> names to make tracking easier.</li>
+              <li>If you’re requesting for multiple platforms, add items per platform in separate steps to keep quantities accurate.</li>
+              <li>Double-check stock availability hints under the <strong>Branding Type</strong> field.</li>
+            </ul>
+          </details>
+        </div>
+
+        <div class="step-card">
+          <div class="icon" style="background:linear-gradient(135deg,#f59e0b,#ef4444)"><i class="fa fa-shield"></i></div>
+          <h4>2. Rules for Requesting</h4>
+          <ul>
+            <li>Submit requests within the timeframe specified by the Brand Manager.</li>
+            <li>Ensure you’ve selected accurate dates for collection and return.</li>
+            <li>Keep track of the <strong>Status</strong> in the Branding Trackers table.</li>
+          </ul>
+          <details class="w3-margin-top">
+            <summary class="w3-small"><i class="fa fa-info-circle"></i> Advanced tips</summary>
+            <ul class="w3-small" style="margin-top:6px">
+              <li>Group similar items in one request to simplify approvals.</li>
+              <li>Plan returns a day after the event to allow for logistics.</li>
+              <li>Use the filters above the table to quickly find your requests by status or platform.</li>
+            </ul>
+          </details>
+        </div>
+
+        <div class="step-card">
+          <div class="icon" style="background:linear-gradient(135deg,#10b981,#14b8a6)"><i class="fa fa-undo"></i></div>
+          <h4>3. After Your Event</h4>
+          <ul>
+            <li>When your event is done, your request status will update automatically.</li>
+            <li>Click <strong>Mark returned</strong> in the Actions column after returning collateral.</li>
+            <li>The Brand Manager will acknowledge or provide feedback on the return.</li>
+          </ul>
+          <details class="w3-margin-top">
+            <summary class="w3-small"><i class="fa fa-check-circle"></i> Advanced tips</summary>
+            <ul class="w3-small" style="margin-top:6px">
+              <li>Attach notes on the request if items were lost or damaged to speed up resolution.</li>
+              <li>Check your email notifications for approval/return confirmations.</li>
+              <li>Need a repeat? Duplicate the request by reusing the same items list and updating the dates.</li>
+            </ul>
+          </details>
+        </div>
+      </div>
+
+      <div class="w3-margin-top">
+        <p class="desc" style="margin-bottom:10px">Need help? Reach out to the right contact below.</p>
+        <div class="contact-grid">
+          <div class="contact-card">
+            <div class="avatar" style="background:linear-gradient(135deg,#6366f1,#22c55e)"><i class="fa fa-user"></i></div>
+            <div>
+              <p class="name">Branding Requests</p>
+              <p class="email">Christina.Arufandika@akello.co</p>
+            </div>
+          </div>
+          <div class="contact-card">
+            <div class="avatar" style="background:linear-gradient(135deg,#3b82f6,#06b6d4)"><i class="fa fa-cogs"></i></div>
+            <div>
+              <p class="name">Platform Processes</p>
+              <p class="email">Quincy.Mashava@akello.co</p>
+            </div>
+          </div>
+        </div>
+      </div> -->
+    </div>
+
+    <div id="branding" class="w3-container menu w3-padding w3-white {% if current_user.userRole =='Brand Ambassador' %} w3-hide {% endif %}">
+      
+
+
+       <div id="brandingToast" class="w3-panel" style="display:none; position:absolute; top:10px; right:10px; z-index:10; border-radius:8px;"></div>
+      <div class="w3-container w3-small w3-margin-top">
+        <!-- Button Cards to Open Modals -->
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <div class="bg-white shadow-lg rounded-2xl p-6 text-center">
+            <h2 class="text-lg font-semibold mb-3 text-blue-700">Available Branding</h2>
+            <p class="text-gray-600 mb-4">View available branding inventory</p>
+            <button onclick="openBrandingModal('availableBrandingModal')" class="w3-button w3-blue w3-round">View Inventory</button>
+          </div>
+
+          <div class="bg-white shadow-lg rounded-2xl p-6 text-center">
+            <h2 class="text-lg font-semibold mb-3 text-green-700">Make Request</h2>
+            <p class="text-gray-600 mb-4">Create a new branding request</p>
+            <button onclick="openBrandingModal('requestsModal')" class="w3-button w3-green w3-round">New Request</button>
+          </div>
+
+          <div class="bg-white shadow-lg rounded-2xl p-6 text-center">
+            <h2 class="text-lg font-semibold mb-3 text-purple-700">Branding Trackers</h2>
+            <p class="text-gray-600 mb-4">Track and manage all requests</p>
+            <button onclick="openBrandingModal('brandingTrackersModal')" class="w3-button w3-indigo w3-round">View Trackers</button>
+          </div>
+
+          <div class="bg-white shadow-lg rounded-2xl p-6 text-center">
+            <h2 class="text-lg font-semibold mb-3 text-teal-700">Collateral Items</h2>
+            <p class="text-gray-600 mb-4">View all collateral items</p>
+            <button onclick="openBrandingModal('collateralViewModal')" class="w3-button w3-teal w3-round">View Collateral</button>
+          </div>
+
+          <div class="bg-white shadow-lg rounded-2xl p-6 text-center">
+            <h2 class="text-lg font-semibold mb-3 text-orange-700">My Requests</h2>
+            <p class="text-gray-600 mb-4">View my collateral requests</p>
+            <button onclick="openMyCollateralRequests()" class="w3-button w3-orange w3-round">My Requests</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="brandmanager" class="w3-container menu w3-padding-32 w3-white" style="display:none;">
+      
+
+
+      {% if current_user.userRole=='Admin' or current_user.userRole=='Brand Manager' %}
+
+        <div class="w3-row-padding w3-margin-top">
+          <div class="w3-third">
+            <div class="w3-card w3-round w3-white w3-border">
+              <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Inventory Management (Admin)</b></header>
+              <div class="w3-container w3-padding w3-center" style="padding: 40px 20px;">
+                <p class="text-gray-600 mb-4">Manage branding inventory items</p>
+                <button onclick="openInventoryModal()" class="w3-button w3-indigo w3-round">Manage Inventory</button>
+              </div>
+            </div>
+          </div>
+          <div class="w3-third">
+            <div class="w3-card w3-round w3-white w3-border">
+              <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Collateral Management</b></header>
+              <div class="w3-container w3-padding w3-center" style="padding: 40px 20px;">
+                <p class="text-gray-600 mb-4">Manage collateral items</p>
+                <button onclick="openCollateralModal()" class="w3-button w3-teal w3-round">Manage Collateral</button>
+              </div>
+            </div>
+          </div>
+          <div class="w3-third">
+            <div class="w3-card w3-round w3-white w3-border">
+              <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Collateral Requests</b></header>
+              <div class="w3-container w3-padding w3-center" style="padding: 40px 20px;">
+                <p class="text-gray-600 mb-4">Approve/Decline requests</p>
+                <button onclick="openManageRequestsModal()" class="w3-button w3-orange w3-round">Manage Requests</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr>
+        
+        {% endif %}
+
+
+
+    </div><br>
+
+  </div>
+</div>
+
+
+
+
+<!-- Chart Modals -->
+<!-- Monthly Usage Modal -->
+<div id="monthlyUsageModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-zoom" style="width: 80vw; max-width: 80vw; height: 75vh; max-height: 75vh;">
+    <div class="w3-container">
+      <span onclick="closeChartModal('monthlyUsageModal')" class="w3-button w3-display-topright w3-large">&times;</span>
+      <div class="bg-white shadow-lg rounded-2xl p-4 chart-container" style="margin-top: 40px; height: 65vh;">
+        <h2 class="text-lg font-semibold mb-3 text-blue-700">Overall Monthly Usage</h2>
+        <canvas id="lineChart" height="100"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Platform Comparison Modal -->
+<div id="platformComparisonModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-zoom" style="width: 80vw; max-width: 80vw; height: 75vh; max-height: 75vh;">
+    <div class="w3-container">
+      <span onclick="closeChartModal('platformComparisonModal')" class="w3-button w3-display-topright w3-large">&times;</span>
+      <div class="bg-white shadow-lg rounded-2xl p-4 chart-container" style="margin-top: 40px; height: 65vh;">
+        <h2 class="text-lg font-semibold mb-3 text-green-700">Platform Comparison</h2>
+        <canvas id="barChart" style="width: auto;" height="100"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Inventory Management Modal -->
+<div id="inventoryModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-zoom" style="width: 80vw; max-width: 80vw;">
+    <div class="w3-container">
+      <span onclick="closeInventoryModal()" class="w3-button w3-display-topright w3-large">&times;</span>
+      <div class="w3-card w3-round w3-white w3-border" style="margin-top: 40px; margin-bottom: 20px;">
+        <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Inventory Management (Admin)</b></header>
+        <div class="w3-container w3-padding">
+          <form class="w3-row-padding" onsubmit="return addInventoryItem(event)">
+            <div class="w3-third">
+              <label class="w3-small">Platform</label>
+              <select id="invPlatform" class="w3-select w3-border">
+                <option>Code4Kids</option><option>Library</option><option>Akello ASL</option><option>Main Brand</option>
+              </select>
+            </div>
+            <div class="w3-third">
+              <label class="w3-small">Branding Type</label>
+              <input id="invType" class="w3-input w3-border" placeholder="e.g., Pop Ups">
+            </div>
+            <div class="w3-third">
+              <label class="w3-small">Quantity Available</label>
+              <input id="invQty" type="number" class="w3-input w3-border" min="0" value="0">
+            </div>
+            <div class="w3-right w3-margin-top">
+              <button class="w3-button w3-green" type="submit">Add/Update</button>
+            </div>
+          </form>
+          <div class="w3-responsive w3-margin-top">
+            <table id="set-collateral" class="w3-table-all w3-small w3-hoverable">
+              <thead><tr class="w3-light-gray"><th>Platform</th><th>Type</th><th>Available</th><th>Actions</th></tr></thead>
+              <tbody id="invTableBody"><tr><td colspan="4" class="w3-center">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Available Branding Modal -->
+<div id="availableBrandingModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-zoom" style="width: 80vw; max-width: 80vw;">
+    <div class="w3-container">
+      <span onclick="closeBrandingModal('availableBrandingModal')" class="w3-button w3-display-topright w3-large">&times;</span>
+      <div class="w3-card w3-round w3-white w3-border" style="margin-top: 40px; margin-bottom: 20px;">
+        <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Available Branding</b></header>
+        <div class="w3-container w3-padding">
+          <table class="w3-table-all w3-small w3-hoverable">
+            <thead>
+              <tr class="w3-light-gray"><th>Platform</th><th>Type</th><th>Available</th>{% if current_user.userRole in ['Admin','Super-admin','Manager'] %}<th>Actions</th>{% endif %}</tr>
+            </thead>
+            <tbody id="brandingInventoryBody">
+              <tr><td colspan="4" class="w3-center">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Requests Modal -->
+<div id="requestsModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-zoom" style="width: 80vw; max-width: 80vw;">
+    <div class="w3-container">
+      <span onclick="closeBrandingModal('requestsModal')" class="w3-button w3-display-topright w3-large">&times;</span>
+      <div class="w3-card w3-round w3-white w3-border" style="margin-top: 40px; margin-bottom: 20px;">
+        <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Requests</b></header>
+        <div class="w3-container w3-padding">
+          <div class="w3-margin-bottom">
+            <form id="brandingRequestForm" onsubmit="submitBrandingRequest(event)">
+              <!-- Step navigation -->
+              <div class="w3-bar w3-border w3-round w3-light-gray w3-margin-bottom">
+                <button type="button" class="w3-bar-item w3-button w3-blue" id="brStep1Btn" onclick="showBrStep(1)">1. Platforms</button>
+                <button type="button" class="w3-bar-item w3-button" id="brStep2Btn" onclick="showBrStep(2)">2. Items</button>
+                <button type="button" class="w3-bar-item w3-button" id="brStep3Btn" onclick="showBrStep(3)">3. Dates & Submit</button>
+              </div>
+
+              <!-- Step 1: choose platforms -->
+              <div id="brStep1">
+                <div class="w3-row-padding">
+                  <div class="w3-col s12">
+                    <label class="w3-small">Select one or more platforms</label>
+                    <div>
+                      <label class="w3-small w3-margin-right"><input type="checkbox" name="platformChk" value="Code4Kids" onchange="refreshPlatformSelect()"> Code4Kids</label>
+                      <label class="w3-small w3-margin-right"><input type="checkbox" name="platformChk" value="Library" onchange="refreshPlatformSelect()"> Library</label>
+                      <label class="w3-small w3-margin-right"><input type="checkbox" name="platformChk" value="Akello AI" onchange="refreshPlatformSelect()"> Akello AI</label>
+                      <label class="w3-small w3-margin-right"><input type="checkbox" name="platformChk" value="Main Brand" onchange="refreshPlatformSelect()"> Main Brand</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="w3-right w3-margin-top"><button type="button" class="w3-button w3-blue" onclick="showBrStep(2)">Next</button></div>
+              </div>
+
+              <!-- Step 2: select items per platform into a cart -->
+              <div id="brStep2" style="display:none;">
+                <div class="w3-row-padding">
+                  <div class="w3-third">
+                    <label class="w3-small">Platform</label>
+                    <select id="brPlatformSelect" class="w3-select w3-border" onchange="refreshTypeOptions()"></select>
+                  </div>
+                  <div class="w3-third">
+                    <label class="w3-small">Branding Type</label>
+                    <select id="brTypeSelect" class="w3-select w3-border"></select>
+                    <div class="w3-tiny w3-text-gray" id="brAvailHint"></div>
+                  </div>
+                  <div class="w3-third">
+                    <label class="w3-small">Quantity</label>
+                    <input id="brQtyInput" class="w3-input w3-border" type="number" min="1" value="1">
+                    <button type="button" class="w3-button w3-indigo w3-margin-top" onclick="addCartItem()">Add to request</button>
+                  </div>
+                </div>
+                <div class="w3-responsive w3-margin-top">
+                  <table class="w3-table-all w3-small w3-hoverable">
+                    <thead><tr class="w3-light-gray"><th>Platform</th><th>Type</th><th>Qty</th><th></th></tr></thead>
+                    <tbody id="brandingCartBody"><tr><td colspan="4" class="w3-center">No items yet</td></tr></tbody>
+                  </table>
+                </div>
+                <div class="w3-right w3-margin-top"><button type="button" class="w3-button w3-blue" onclick="showBrStep(3)">Next</button></div>
+              </div>
+
+              <!-- Step 3: event and dates -->
+              <div id="brStep3" style="display:none;">
+                <div class="w3-row-padding">
+                  <div class="w3-half">
+                    <label class="w3-small">Event</label>
+                    <input class="w3-input w3-border" name="event_name" placeholder="Event name">
+                  </div>
+                  <div class="w3-half"></div>
+                </div>
+                <div class="w3-row-padding w3-margin-top">
+                  <div class="w3-half">
+                    <label class="w3-small">Check Out Date</label>
+                    <input class="w3-input w3-border" type="date" name="checkout_date">
+                  </div>
+                  <div class="w3-half">
+                    <label class="w3-small">Return Date</label>
+                    <input class="w3-input w3-border" type="date" name="return_date">
+                  </div>
+                </div>
+                <div class="w3-section w3-right-align">
+                  <button class="w3-button w3-blue w3-round" type="submit">Submit Request</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Branding Trackers Modal -->
+<div id="brandingTrackersModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-zoom" style="width: 80vw; max-width: 80vw;">
+    <div class="w3-container">
+      <span onclick="closeBrandingModal('brandingTrackersModal')" class="w3-button w3-display-topright w3-large">&times;</span>
+      <div style="margin-top: 40px; margin-bottom: 20px;">
+        <div class="w3-margin-bottom w3-padding-small w3-round w3-light-gray">
+          <div class="w3-row-padding">
+            <div class="w3-col s12 m6 l3 w3-margin-bottom">
+              <label class="w3-tiny">Status</label>
+              <select id="brFilterStatus" class="w3-select w3-border">
+                <option>All</option>
+                <option>Pending</option>
+                <option>Approved</option>
+                <option>Declined</option>
+                <option>Return Pending</option>
+                <option>Returned</option>
+              </select>
+            </div>
+            <div class="w3-col s12 m6 l3 w3-margin-bottom">
+              <label class="w3-tiny">Platform</label>
+              <select id="brFilterPlatform" class="w3-select w3-border"><option>All</option></select>
+            </div>
+            <div class="w3-col s12 m6 l3 w3-margin-bottom">
+              <label class="w3-tiny">Requester</label>
+              <input id="brFilterRequester" class="w3-input w3-border" placeholder="Search requester"/>
+            </div>
+            <div class="w3-col s12 m6 l3 w3-margin-bottom">
+              <label class="w3-tiny">Page size</label>
+              <select id="brPageSize" class="w3-select w3-border">
+                <option value="10" selected>10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="w3-card w3-round w3-white w3-border">
+          <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Branding Trackers</b></header>
+          <div class="w3-responsive">
+            <table class="w3-table-all w3-small w3-hoverable">
+              <thead>
+                <tr class="w3-light-gray"><th>Name</th><th>Event</th><th>Platform</th><th>Material</th><th>Qty</th><th>Check Out</th><th>Return</th><th>Status</th><th>Notes</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="brandingRequestsBody">
+                <tr><td colspan="10" class="w3-center">Loading…</td></tr>
+              </tbody>
+            </table>
+            <div class="w3-section w3-right-align">
+              <button class="w3-button w3-white w3-border w3-small" onclick="brPrevPage()">Prev</button>
+              <span id="brPageInfo" class="w3-small w3-padding-small">Page 1/1</span>
+              <button class="w3-button w3-white w3-border w3-small" onclick="brNextPage()">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Collateral Management Modal (Admin) -->
+<div id="collateralModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-zoom" style="width: 80vw; max-width: 80vw;">
+    <div class="w3-container">
+      <span onclick="closeCollateralModal()" class="w3-button w3-display-topright w3-large">&times;</span>
+      <div class="w3-card w3-round w3-white w3-border" style="margin-top: 40px; margin-bottom: 20px;">
+        <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Collateral Management</b></header>
+        <div class="w3-container w3-padding">
+          <form class="w3-row-padding" onsubmit="return addCollateralItem(event)">
+            <div class="w3-half">
+              <label class="w3-small">Collateral Name</label>
+              <input id="collateralName" class="w3-input w3-border" placeholder="e.g., Marketing Flyers" required>
+            </div>
+            <div class="w3-half">
+              <label class="w3-small">Status</label>
+              <select id="collateralStatus" class="w3-select w3-border">
+                <option value="available">Available</option>
+                <option value="unavailable">Unavailable</option>
+              </select>
+            </div>
+            <div class="w3-right w3-margin-top">
+              <button class="w3-button w3-green" type="submit">Add Item</button>
+            </div>
+          </form>
+          <div class="w3-responsive w3-margin-top">
+            <table class="w3-table-all w3-small w3-hoverable">
+              <thead><tr class="w3-light-gray"><th>Collateral Name</th><th>Status</th><th>Added By</th><th>Created At</th><th>Actions</th></tr></thead>
+              <tbody id="collateralTableBody"><tr><td colspan="5" class="w3-center">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Collateral View Modal (Branding Tracker Tab) -->
+<div id="collateralViewModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-zoom" style="width: 80vw; max-width: 80vw;">
+    <div class="w3-container">
+      <span onclick="closeBrandingModal('collateralViewModal')" class="w3-button w3-display-topright w3-large">&times;</span>
+      <div class="w3-card w3-round w3-white w3-border" style="margin-top: 40px; margin-bottom: 20px;">
+        <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Collateral Items</b></header>
+        <div class="w3-container w3-padding">
+          <div class="w3-responsive">
+            <table class="w3-table-all w3-small w3-hoverable">
+              <thead><tr class="w3-light-gray"><th>Collateral Name</th><th>Status</th><th>Added By</th><th>Created At</th><th>Actions</th></tr></thead>
+              <tbody id="collateralViewTableBody"><tr><td colspan="5" class="w3-center">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Request Collateral Modal -->
+<div id="requestCollateralModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-zoom" style="width: 60vw; max-width: 60vw;">
+    <div class="w3-container">
+      <span onclick="closeRequestCollateralModal()" class="w3-button w3-display-topright w3-large">&times;</span>
+      <div class="w3-card w3-round w3-white w3-border" style="margin-top: 40px; margin-bottom: 20px;">
+        <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Request Collateral Item</b></header>
+        <div class="w3-container w3-padding">
+          <form id="requestCollateralForm" onsubmit="return submitCollateralRequest(event)">
+            <input type="hidden" id="requestItemId" />
+            <div class="w3-margin-bottom">
+              <label class="w3-small"><b>Collateral Item:</b></label>
+              <p id="requestItemName" class="w3-text-blue" style="margin: 5px 0;"></p>
+            </div>
+            <div class="w3-margin-bottom">
+              <label class="w3-small"><b>Event Details / Reason for Request:</b></label>
+              <textarea id="eventDetails" class="w3-input w3-border" rows="4" placeholder="Describe the event or reason for requesting this collateral" required></textarea>
+            </div>
+            <div class="w3-margin-bottom">
+              <label class="w3-small"><b>Needed By Date:</b></label>
+              <input type="date" id="neededByDate" class="w3-input w3-border" required />
+            </div>
+            <div class="w3-section w3-right-align">
+              <button type="button" class="w3-button w3-gray" onclick="closeRequestCollateralModal()">Cancel</button>
+              <button type="submit" class="w3-button w3-green">Submit Request</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- My Collateral Requests Modal -->
+<div id="myCollateralRequestsModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-zoom" style="width: 80vw; max-width: 80vw;">
+    <div class="w3-container">
+      <span onclick="closeBrandingModal('myCollateralRequestsModal')" class="w3-button w3-display-topright w3-large">&times;</span>
+      <div class="w3-card w3-round w3-white w3-border" style="margin-top: 40px; margin-bottom: 20px;">
+        <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>My Collateral Requests</b></header>
+        <div class="w3-container w3-padding">
+          <div class="w3-responsive">
+            <table class="w3-table-all w3-small w3-hoverable">
+              <thead><tr class="w3-light-gray"><th>Collateral</th><th>Event Details</th><th>Needed By</th><th>Status</th><th>Requested</th><th>Decline Reason</th></tr></thead>
+              <tbody id="myRequestsTableBody"><tr><td colspan="6" class="w3-center">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Collateral Requests Modal (Admin) -->
+<div id="manageCollateralRequestsModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-zoom" style="width: 80vw; max-width: 80vw;">
+    <div class="w3-container">
+      <span onclick="closeManageRequestsModal()" class="w3-button w3-display-topright w3-large">&times;</span>
+      <div class="w3-card w3-round w3-white w3-border" style="margin-top: 40px; margin-bottom: 20px;">
+        <header class="w3-container w3-padding w3-light-gray w3-round-top"><b>Manage Collateral Requests</b></header>
+        <div class="w3-container w3-padding">
+          <div class="w3-responsive">
+            <table class="w3-table-all w3-small w3-hoverable">
+              <thead><tr class="w3-light-gray"><th>Requester</th><th>Collateral</th><th>Event Details</th><th>Needed By</th><th>Status</th><th>Requested</th><th>Actions</th></tr></thead>
+              <tbody id="allRequestsTableBody"><tr><td colspan="7" class="w3-center">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- modals and scripts come here -->
+{% include '_branding_tracker_scripts.html' %}
+<script>
+  document.addEventListener('DOMContentLoaded', function(){
+    try { loadBrandingData(); } catch(e) { console.error(e); }
+    try { showBrStep(1); } catch(e) {}
+  });
+</script>
+<script>
+  async function submitBrandingRequest(ev){
+    ev.preventDefault();
+    const form = ev.target;
+    if(!cartItems.length){ alert('Add at least one item'); return; }
+    const payload = {
+      event_name: form.event_name.value.trim(),
+      checkout_date: form.checkout_date.value || null,
+      return_date: form.return_date.value || null,
+      items: cartItems
+    };
+    const res = await fetch('/api/branding/requests/bulk', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    const data = await res.json();
+    if(!res.ok){ alert(data.error||'Failed'); return; }
+    cartItems = [];
+    renderCart();
+    showBrStep(1);
+    await loadBrandingData();
+  }
+</script>
+
+<script>
+// Modal functions
+function openChartModal(modalId) {
+  document.getElementById(modalId).style.display = 'block';
+}
+
+function closeChartModal(modalId) {
+  document.getElementById(modalId).style.display = 'none';
+}
+
+function openInventoryModal() {
+  document.getElementById('inventoryModal').style.display = 'block';
+}
+
+function closeInventoryModal() {
+  document.getElementById('inventoryModal').style.display = 'none';
+}
+
+function openBrandingModal(modalId) {
+  document.getElementById(modalId).style.display = 'block';
+  // Load collateral data when opening view modal
+  if (modalId === 'collateralViewModal') {
+    loadCollateralViewData();
+  } else if (modalId === 'myCollateralRequestsModal') {
+    loadMyCollateralRequests();
+  }
+}
+
+function closeBrandingModal(modalId) {
+  document.getElementById(modalId).style.display = 'none';
+}
+
+function openCollateralModal() {
+  document.getElementById('collateralModal').style.display = 'block';
+  loadCollateralData();
+}
+
+function closeCollateralModal() {
+  document.getElementById('collateralModal').style.display = 'none';
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+  const modals = ['monthlyUsageModal', 'platformComparisonModal', 'inventoryModal', 'availableBrandingModal', 'requestsModal', 'brandingTrackersModal', 'collateralModal', 'collateralViewModal', 'requestCollateralModal', 'myCollateralRequestsModal', 'manageCollateralRequestsModal'];
+  modals.forEach(modalId => {
+    const modal = document.getElementById(modalId);
+    if (event.target == modal) {
+      modal.style.display = 'none';
+    }
+  });
+}
+
+// Collateral Management Functions
+async function loadCollateralData() {
+  try {
+    const res = await fetch('/api/collateral/items');
+    const data = await res.json();
+    const tbody = document.getElementById('collateralTableBody');
+    if (!data.items || data.items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="w3-center">No collateral items found</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.items.map(item => `
+      <tr>
+        <td>${item.collateral_name}</td>
+        <td>
+          <span class="w3-tag ${item.status === 'available' ? 'w3-green' : 'w3-red'} w3-small">
+            ${item.status}
+          </span>
+        </td>
+        <td>${item.added_by}</td>
+        <td>${new Date(item.created_at).toLocaleString()}</td>
+        <td>
+          <button class="w3-button w3-small ${item.status === 'available' ? 'w3-orange' : 'w3-green'}" 
+                  onclick="toggleCollateralStatus(${item.id}, '${item.status}')">
+            ${item.status === 'available' ? 'Mark Unavailable' : 'Mark Available'}
+          </button>
+          <button class="w3-button w3-small w3-red" onclick="deleteCollateral(${item.id})">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Error loading collateral:', err);
+    document.getElementById('collateralTableBody').innerHTML = '<tr><td colspan="5" class="w3-center w3-text-red">Error loading data</td></tr>';
+  }
+}
+
+async function loadCollateralViewData() {
+  try {
+    const res = await fetch('/api/collateral/items');
+    const data = await res.json();
+    const tbody = document.getElementById('collateralViewTableBody');
+    if (!data.items || data.items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="w3-center">No collateral items found</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.items.map(item => `
+      <tr>
+        <td>${item.collateral_name}</td>
+        <td>
+          <span class="w3-tag ${item.status === 'available' ? 'w3-green' : 'w3-red'} w3-small">
+            ${item.status}
+          </span>
+        </td>
+        <td>${item.added_by}</td>
+        <td>${new Date(item.created_at).toLocaleString()}</td>
+        <td>
+          ${item.status === 'available' ? 
+            `<button class="w3-button w3-small w3-blue" onclick="openRequestForm(${item.id}, '${item.collateral_name}')">Request</button>` : 
+            '<span class="w3-text-gray">Unavailable</span>'
+          }
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Error loading collateral:', err);
+    document.getElementById('collateralViewTableBody').innerHTML = '<tr><td colspan="5" class="w3-center w3-text-red">Error loading data</td></tr>';
+  }
+}
+
+async function addCollateralItem(event) {
+  event.preventDefault();
+  const name = document.getElementById('collateralName').value.trim();
+  const status = document.getElementById('collateralStatus').value;
+  
+  if (!name) {
+    alert('Please enter a collateral name');
+    return false;
+  }
+  
+  try {
+    const res = await fetch('/api/collateral/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ collateral_name: name, status: status })
+    });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      alert(data.error || 'Failed to add collateral item');
+      return false;
+    }
+    
+    // Clear form
+    document.getElementById('collateralName').value = '';
+    document.getElementById('collateralStatus').value = 'available';
+    
+    // Reload data
+    await loadCollateralData();
+    alert('Collateral item added successfully!');
+  } catch (err) {
+    console.error('Error adding collateral:', err);
+    alert('Error adding collateral item');
+  }
+  return false;
+}
+
+async function toggleCollateralStatus(id, currentStatus) {
+  const newStatus = currentStatus === 'available' ? 'unavailable' : 'available';
+  try {
+    const res = await fetch(`/api/collateral/items/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      alert(data.error || 'Failed to update status');
+      return;
+    }
+    
+    await loadCollateralData();
+  } catch (err) {
+    console.error('Error toggling status:', err);
+    alert('Error updating status');
+  }
+}
+
+async function deleteCollateral(id) {
+  if (!confirm('Are you sure you want to delete this collateral item?')) {
+    return;
+  }
+  
+  try {
+    const res = await fetch(`/api/collateral/items/${id}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      alert(data.error || 'Failed to delete item');
+      return;
+    }
+    
+    await loadCollateralData();
+    alert('Collateral item deleted successfully!');
+  } catch (err) {
+    console.error('Error deleting collateral:', err);
+    alert('Error deleting item');
+  }
+}
+
+// Collateral Request Functions
+function openRequestForm(itemId, itemName) {
+  document.getElementById('requestItemId').value = itemId;
+  document.getElementById('requestItemName').textContent = itemName;
+  document.getElementById('eventDetails').value = '';
+  document.getElementById('neededByDate').value = '';
+  document.getElementById('requestCollateralModal').style.display = 'block';
+}
+
+function closeRequestCollateralModal() {
+  document.getElementById('requestCollateralModal').style.display = 'none';
+}
+
+async function submitCollateralRequest(event) {
+  event.preventDefault();
+  const itemId = document.getElementById('requestItemId').value;
+  const eventDetails = document.getElementById('eventDetails').value.trim();
+  const neededByDate = document.getElementById('neededByDate').value;
+  
+  if (!eventDetails || !neededByDate) {
+    alert('Please fill in all fields');
+    return false;
+  }
+  
+  try {
+    const res = await fetch('/api/collateral/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        collateral_item_id: parseInt(itemId),
+        event_details: eventDetails,
+        needed_by_date: neededByDate
+      })
+    });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      alert(data.error || 'Failed to submit request');
+      return false;
+    }
+    
+    alert('Collateral request submitted successfully!');
+    closeRequestCollateralModal();
+    // Reload collateral view if it's open
+    if (document.getElementById('collateralViewModal').style.display === 'block') {
+      await loadCollateralViewData();
+    }
+  } catch (err) {
+    console.error('Error submitting request:', err);
+    alert('Error submitting request');
+  }
+  return false;
+}
+
+function openMyCollateralRequests() {
+  document.getElementById('myCollateralRequestsModal').style.display = 'block';
+  loadMyCollateralRequests();
+}
+
+async function loadMyCollateralRequests() {
+  try {
+    const res = await fetch('/api/collateral/requests');
+    const data = await res.json();
+    const tbody = document.getElementById('myRequestsTableBody');
+    
+    if (!data.requests || data.requests.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="w3-center">No requests found</td></tr>';
+      return;
+    }
+    
+    tbody.innerHTML = data.requests.map(req => `
+      <tr>
+        <td>${req.collateral_name || 'N/A'}</td>
+        <td>${req.event_details}</td>
+        <td>${new Date(req.needed_by_date).toLocaleDateString()}</td>
+        <td>
+          <span class="w3-tag ${
+            req.status === 'Pending' ? 'w3-orange' : 
+            req.status === 'Approved' ? 'w3-green' : 'w3-red'
+          } w3-small">
+            ${req.status}
+          </span>
+        </td>
+        <td>${new Date(req.created_at).toLocaleDateString()}</td>
+        <td>${req.decline_reason || '-'}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Error loading my requests:', err);
+    document.getElementById('myRequestsTableBody').innerHTML = '<tr><td colspan="6" class="w3-center w3-text-red">Error loading data</td></tr>';
+  }
+}
+
+function openManageRequestsModal() {
+  document.getElementById('manageCollateralRequestsModal').style.display = 'block';
+  loadAllCollateralRequests();
+}
+
+function closeManageRequestsModal() {
+  document.getElementById('manageCollateralRequestsModal').style.display = 'none';
+}
+
+async function loadAllCollateralRequests() {
+  try {
+    const res = await fetch('/api/collateral/requests');
+    const data = await res.json();
+    const tbody = document.getElementById('allRequestsTableBody');
+    
+    if (!data.requests || data.requests.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="w3-center">No requests found</td></tr>';
+      return;
+    }
+    
+    tbody.innerHTML = data.requests.map(req => `
+      <tr>
+        <td>${req.requester_username}</td>
+        <td>${req.collateral_name || 'N/A'}</td>
+        <td>${req.event_details}</td>
+        <td>${new Date(req.needed_by_date).toLocaleDateString()}</td>
+        <td>
+          <span class="w3-tag ${
+            req.status === 'Pending' ? 'w3-orange' : 
+            req.status === 'Approved' ? 'w3-green' : 'w3-red'
+          } w3-small">
+            ${req.status}
+          </span>
+        </td>
+        <td>${new Date(req.created_at).toLocaleDateString()}</td>
+        <td>
+          ${req.status === 'Pending' ? `
+            <button class="w3-button w3-small w3-green" onclick="approveCollateralRequest(${req.id})">Approve</button>
+            <button class="w3-button w3-small w3-red" onclick="declineCollateralRequest(${req.id})">Decline</button>
+          ` : `<span class="w3-text-gray">${req.status}</span>`}
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Error loading requests:', err);
+    document.getElementById('allRequestsTableBody').innerHTML = '<tr><td colspan="7" class="w3-center w3-text-red">Error loading data</td></tr>';
+  }
+}
+
+async function approveCollateralRequest(requestId) {
+  if (!confirm('Are you sure you want to approve this request?')) {
+    return;
+  }
+  
+  try {
+    const res = await fetch(`/api/collateral/requests/${requestId}/approve`, {
+      method: 'POST'
+    });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      alert(data.error || 'Failed to approve request');
+      return;
+    }
+    
+    alert('Request approved successfully!');
+    await loadAllCollateralRequests();
+  } catch (err) {
+    console.error('Error approving request:', err);
+    alert('Error approving request');
+  }
+}
+
+async function declineCollateralRequest(requestId) {
+  const reason = prompt('Please enter reason for declining:');
+  if (!reason || !reason.trim()) {
+    alert('Decline reason is required');
+    return;
+  }
+  
+  try {
+    const res = await fetch(`/api/collateral/requests/${requestId}/decline`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decline_reason: reason.trim() })
+    });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      alert(data.error || 'Failed to decline request');
+      return;
+    }
+    
+    alert('Request declined successfully!');
+    await loadAllCollateralRequests();
+  } catch (err) {
+    console.error('Error declining request:', err);
+    alert('Error declining request');
+  }
+}
+
+// Tabbed Menu
+function openMenu(evt, menuName) {
+  var i, x, tablinks;
+  x = document.getElementsByClassName("menu");
+  for (i = 0; i < x.length; i++) {
+     x[i].style.display = "none";
+  }
+  tablinks = document.getElementsByClassName("tablink");
+  for (i = 0; i < tablinks.length; i++) {
+     tablinks[i].className = tablinks[i].className.replace(" w3-indigo", "");
+  }
+  document.getElementById(menuName).style.display = "block";
+  evt.currentTarget.firstElementChild.className += " w3-indigo";
+}
+document.getElementById("myLink").click();
+</script>
+
+
+
+  </div>
+</div>
+{% endblock %}

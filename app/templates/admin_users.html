@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>User Privileges Management</h2>
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Privileges</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      {% set privs = user.get_privileges() %}
+      <tr>
+        <td>{{ user.firstname }} {{ user.lastname }}</td>
+        <td>{{ user.email }}</td>
+        <td>{{ user.userRole }}</td>
+        <td>
+          {% for priv in ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife"] %}
+          <div class="form-check form-check-inline">
+            <input class="form-check-input privilege-checkbox"
+                   type="checkbox"
+                   data-user-id="{{ user.id }}"
+                   data-privilege="{{ priv }}"
+                   {% if privs[priv] %}checked{% endif %}>
+            <label class="form-check-label">{{ priv }}</label>
+          </div>
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  document.querySelectorAll(".privilege-checkbox").forEach(cb => {
+    cb.addEventListener("change", function() {
+      const userId = this.dataset.userId;
+      const privilege = this.dataset.privilege;
+      const value = this.checked;
+
+      fetch(`/admin/users/${userId}/toggle_privilege`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ privilege: privilege, value: value })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          alert("Error: " + data.error);
+          this.checked = !value; // rollback if failed
+        } else {
+          console.log(data.message);
+        }
+      })
+      .catch(err => {
+        alert("Error updating privilege");
+        this.checked = !value;
+      });
+    });
+  });
+});
+</script>
+{% endblock %}

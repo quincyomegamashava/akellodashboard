@@ -1,0 +1,821 @@
+
+
+{% extends "base.html" %}
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.10.0/js/anychart-bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> -->
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+  <style>
+
+    
+  </style>
+</head>
+{% block content %}
+
+<!-- <div class="w3-container w3-row-padding w3-center">
+
+  <header class="w3-panel w3-center w3-opacity" >    
+    <div class="w3-padding-16">
+      <div class="w3-bar w3-card">
+        <a href="#" class="w3-bar-item w3-border w3-button">
+          <span class="w3-white w3-padding" onclick="document.getElementById('new_user').style.display='block'" class="w3-button w3-black" style="cursor: pointer;" >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-add" viewBox="0 0 16 16">
+              <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4"/>
+              <path d="M8.256 14a4.5 4.5 0 0 1-.229-1.004H3c.001-.246.154-.986.832-1.664C4.484 10.68 5.711 10 8 10q.39 0 .74.025c.226-.341.496-.65.804-.918Q8.844 9.002 8 9c-5 0-6 3-6 4s1 1 1 1z"/>
+              </svg> Add new
+          </span>
+        </a>
+        <a href="#" class="w3-bar-item w3-border w3-button ">
+          <span class="w3-white w3-padding" onclick="document.getElementById('view_users').style.display='block'" class="w3-button w3-black" style="cursor: pointer; " >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-people" viewBox="0 0 16 16">
+                  <path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1h8Zm-7.978-1A.261.261 0 0 1 7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002a.274.274 0 0 1-.014.002H7.022ZM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM6.936 9.28a5.88 5.88 0 0 0-1.23-.247A7.35 7.35 0 0 0 5 9c-4 0-5 3-5 4 0 .667.333 1 1 1h4.216A2.238 2.238 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816ZM4.92 10A5.493 5.493 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275ZM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0Zm3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/>
+              </svg>
+              View all users ({{ number_of_users }})
+          </span>
+        </a>
+        <a href="#" class="w3-bar-item w3-border w3-button">
+          <span class="w3-white w3-padding" onclick="document.getElementById('new_user').style.display='block'" class="w3-button w3-black" style="cursor: pointer; " >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear" viewBox="0 0 16 16">
+              <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/>
+              <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z"/>
+            </svg> Priviledges
+          </span>
+        </a>
+        <a href="#" class="w3-bar-item w3-border w3-button w3-hide-small">
+          <span class="w3-white w3-padding" onclick="document.getElementById('add_champions').style.display='block'" class="w3-button w3-black" style="cursor: pointer;" >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle" viewBox="0 0 16 16">
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+              <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+            </svg> More
+          </span>
+        </a>
+      </div>
+    </div>
+  </header>
+</div> -->
+
+<div class="w3-container w3-full ">
+    <div class="w3-quarter w3-small w3-card w3-round w3-hover-shadow w3-margin">
+            <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                <span class="w3-large"><b>Users</b></span>
+                <br>
+            </header>
+
+                <div class="w3-margin">
+                    <span class="w3-white w3-round w3-border w3-margin w3-hover-shadow w3-padding" onclick="document.getElementById('new_user').style.display='block'" style="cursor: pointer;" >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-add" viewBox="0 0 16 16">
+                        <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4"/>
+                        <path d="M8.256 14a4.5 4.5 0 0 1-.229-1.004H3c.001-.246.154-.986.832-1.664C4.484 10.68 5.711 10 8 10q.39 0 .74.025c.226-.341.496-.65.804-.918Q8.844 9.002 8 9c-5 0-6 3-6 4s1 1 1 1z"/>
+                        </svg> Add new
+                    </span>
+
+
+
+                    <span class="w3-white w3-round w3-border w3-margin w3-hover-shadow w3-padding" onclick="document.getElementById('view_users').style.display='block'" style="cursor: pointer;" >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle" viewBox="0 0 16 16">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                        </svg> View all users
+                    </span>
+                </div>
+
+
+             <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                <span class="w3-large"><b>Priviledges</b></span>
+                <br>
+            </header>
+
+
+                <div class="w3-margin">
+                    <span class="w3-white w3-round w3-border w3-margin w3-hover-shadow w3-padding" onclick="document.getElementById('UsersAndPriviledges').style.display='block'" style="cursor: pointer;" >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle" viewBox="0 0 16 16">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                        </svg> Users and Priviledges
+                    </span>
+
+
+
+                    <span class="w3-white w3-round w3-border w3-margin w3-hover-shadow w3-padding" onclick="document.getElementById('UsersAndPriviledges').style.display='block'" style="cursor: pointer;" >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle" viewBox="0 0 16 16">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                        </svg> Set new Priviledges
+                    </span>
+                </div>
+
+
+    </div>
+
+
+    <div class="w3-third w3-small w3-card w3-round w3-hover-shadow w3-margin">
+        <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                <span class="w3-large"><b>Akello Champions</b></span>
+                <br>
+            </header>
+
+
+            <div class="w3-margin">
+                <span class="w3-white w3-round w3-border w3-margin w3-hover-shadow w3-padding" onclick="document.getElementById('add_champions').style.display='block'" style="cursor: pointer;" >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-add" viewBox="0 0 16 16">
+                        <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4"/>
+                        <path d="M8.256 14a4.5 4.5 0 0 1-.229-1.004H3c.001-.246.154-.986.832-1.664C4.484 10.68 5.711 10 8 10q.39 0 .74.025c.226-.341.496-.65.804-.918Q8.844 9.002 8 9c-5 0-6 3-6 4s1 1 1 1z"/>
+                        </svg> Add new champion
+                    </span>
+
+
+                <span class="w3-white w3-round w3-border w3-margin w3-hover-shadow w3-padding" onclick="document.getElementById('view_champions').style.display='block'" style="cursor: pointer;" >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle" viewBox="0 0 16 16">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                    <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                    </svg> View Champions and Schools
+                </span>
+
+
+
+                <span class="w3-white w3-round w3-border w3-margin w3-hover-shadow w3-padding" onclick="document.getElementById('view_champions').style.display='block'" style="cursor: pointer;" >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle" viewBox="0 0 16 16">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                    <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                    </svg> More
+                </span>
+
+
+            </div>
+
+             <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                    <span class="w3-large"><b>All schools</b></span>
+                    <br>
+                </header>
+
+
+                <div class="w3-margin">
+                    <span class="w3-white w3-round w3-border w3-margin w3-hover-shadow w3-padding" onclick="document.getElementById('view_champions').style.display='block'" style="cursor: pointer;" >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle" viewBox="0 0 16 16">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                        </svg> View all schools
+                    </span>
+                </div>
+
+
+
+        
+    </div>
+
+    <div class="w3-third w3-card w3-round w3-hover-shadow w3-margin">
+        <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                <span class="w3-large"><b>System Admin Panel</b></span>
+                <br>
+        </header>
+
+        <div class="w3-margin">
+            <span class="w3-white w3-round w3-border w3-margin w3-hover-shadow w3-padding" onclick="document.getElementById('view_champions').style.display='block'" style="cursor: pointer;" >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle" viewBox="0 0 16 16">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                </svg> Edit
+            </span>
+        </div>
+
+    </div>
+
+
+
+    
+
+</div>
+
+
+
+
+ <!-- view user modal -->
+                <div id="view_champions" class="w3-modal w3-white w3-card w3-border">
+                    <div class="w3-modal-content w3-white w3-card w3-border" style="width: 85vw; height: 80vh;">
+                        <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                            <span onclick="document.getElementById('view_champions').style.display='none'" 
+                            class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                            <span class="w3-large"><b>View Schools and Champions</b></span>
+                            <br>
+                        </header>
+                        <div class="w3-container w3-margin-top" style="width: 83vw; height: 70vh; overflow-y: auto;">
+
+                            <div class="w3-full w3-round w3-margin">
+                                <header class="w3-container w3-padding w3-center bg-gradient-primary w3-text-black" style="border-radius: 10px 10px 0 0;">
+    <div class="d-flex flex-column align-items-center">
+        <h1 class="w3-large mb-2">
+            <i class="fas fa-shield-alt me-3"></i>
+            System Admin Panel For BA & Schools
+        </h1>
+        <div class="badge bg-light text-primary px-4 py-2 rounded-pill">
+            <i class="fas fa-lock me-2"></i>
+            Administrator Access
+        </div>
+    </div>
+</header>
+
+<!-- Table -->
+<div class="table-responsive">
+    <table class="table table-bordered table-striped table-hover" id="championsTable">
+        <thead class="table-light">
+            <tr>
+                <th class="text-center">
+                    <i class="fas fa-hashtag me-1"></i>ID
+                </th>
+                <th>
+                    <i class="fas fa-user me-1"></i>Champion
+                </th>
+                <th>
+                    <i class="fas fa-map-marker-alt me-1"></i>Province
+                </th>
+                <th class="text-center">
+                    <i class="fas fa-school me-1"></i>Schools
+                </th>
+                <th class="text-center">
+                    <i class="fas fa-cogs me-1"></i>Action
+                </th>
+            </tr>
+        </thead>
+        <tbody id="championsTableBody">
+            <tr>
+                <td colspan="5" class="text-center py-4">
+                    <div class="d-flex flex-column align-items-center">
+                        <i class="fas fa-spinner fa-spin text-primary mb-2"></i>
+                        <span>Loading champions...</span>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+                        
+
+                            </div>
+                            
+
+
+                        </div>
+
+                    </div>
+                </div>
+                 <!-- view user ends here -->
+
+
+
+                <!-- add new user modal -->
+                <div id="new_user" class="w3-modal w3-white w3-card w3-border">
+                    <div class="w3-modal-content w3-white w3-card w3-border">
+                        <header class="w3-container w3-padding" style="background-color: #e6f0ff;"> 
+                            <span onclick="document.getElementById('new_user').style.display='none'" 
+                            class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                            <span class="w3-card w3-margin w3-white w3-padding" class="w3-button w3-black" style=" border-radius: 25px 25px 25px 25px;" >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="currentColor" class="bi bi-person-add" viewBox="0 0 16 16">
+                                    <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4"/>
+                                    <path d="M8.256 14a4.5 4.5 0 0 1-.229-1.004H3c.001-.246.154-.986.832-1.664C4.484 10.68 5.711 10 8 10q.39 0 .74.025c.226-.341.496-.65.804-.918Q8.844 9.002 8 9c-5 0-6 3-6 4s1 1 1 1z"/>
+                                    </svg> Add new User
+                            </span>
+                            <br>
+                        </header>
+
+
+                        <div class="container mt-4">
+    <form method="POST" action="/upload_users" enctype="multipart/form-data">
+        {{ csvform.hidden_tag() }}
+
+        <div class="form-group">
+            {{ csvform.csv_file.label(class="form-label") }}
+            {{ csvform.csv_file(class="form-control") }}
+            {% if csvform.csv_file.errors %}
+                <div class="text-danger">
+                    {% for error in csvform.csv_file.errors %}
+                        <span>{{ error }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group mt-3">
+            {{ csvform.submit(class="btn btn-primary") }}
+        </div>
+    </form>
+
+    <div class="alert w3-small alert-info mt-4">
+        <strong>CSV Format Required:</strong><br>
+        The CSV should have the following columns:
+        <ul>
+            <li><code>firstname</code></li>
+            <li><code>lastname</code></li>
+            <li><code>email</code></li>
+            <li><code>userRole</code> (must match one of the defined roles)</li>
+            <li><code>department</code></li>
+            <li><code>province</code></li>
+        </ul>
+    </div>
+</div>
+
+
+
+                        <div class="w3-container w3-small w3-margin-top">
+                            <form action="" method="post">
+                            {{ form.hidden_tag() }}
+                            
+                            <span class="w3-third w3-margin">
+                                <p>
+                                    {{ form.username.label }}<br>
+                                    {{ form.username(class="w3-input w3-border",size=32) }}<br>
+                                    {% for error in form.username.errors %}
+                                    <span style="color: red;">[{{ error }}]</span>
+                                    {% endfor %}
+                                </p>
+                                
+                                <p>
+                                    {{ form.email.label }}<br>
+                                    {{ form.email(class="w3-input w3-border",size=64) }}<br>
+                                    {% for error in form.email.errors %}
+                                    <span style="color: red;">[{{ error }}]</span>
+                                    {% endfor %}
+                                </p>
+
+                                <p>
+                                    {{ form.firstname.label }}<br>
+                                    {{ form.firstname(class="w3-input w3-border",size=32) }}<br>
+                                    {% for error in form.firstname.errors %}
+                                    <span style="color: red;">[{{ error }}]</span>
+                                    {% endfor %}
+                                </p>
+
+                                <p>
+                                    {{ form.lastname.label }}<br>
+                                    {{ form.lastname(class="w3-input w3-border",size=32) }}<br>
+                                    {% for error in form.lastname.errors %}
+                                    <span style="color: red;">[{{ error }}]</span>
+                                    {% endfor %}
+                                </p>
+                            </span>
+
+                            <span class="w3-third w3-margin">
+                                <p>
+                                    {{ form.userRole.label }}<br>
+                                    {{ form.userRole(class="w3-select w3-border") }}<br>
+                                    {% for error in form.userRole.errors %}
+                                    <span style="color: red;">[{{ error }}]</span>
+                                    {% endfor %}
+                                </p>
+
+                                <p>
+                                    {{ form.department.label }}<br>
+                                    {{ form.department(class="w3-select w3-border") }}<br>
+                                    {% for error in form.department.errors %}
+                                    <span style="color: red;">[{{ error }}]</span>
+                                    {% endfor %}
+                                </p>
+
+                                <p>
+                                    {{ form.province.label }}<br>
+                                    {{ form.province(class="w3-select w3-border") }}<br>
+                                    {% for error in form.province.errors %}
+                                    <span style="color: red;">[{{ error }}]</span>
+                                    {% endfor %}
+                                </p>
+
+                                <p>
+                                    {{ form.password.label }}<br>
+                                    {{ form.password(class="w3-input w3-border",size=32) }}<br>
+                                    {% for error in form.password.errors %}
+                                    <span style="color: red;">[{{ error }}]</span>
+                                    {% endfor %}
+                                </p>
+                                
+                                <p>
+                                    {{ form.password2.label }}<br>
+                                    {{ form.password2(class="w3-input w3-border",size=32) }}<br>
+                                    {% for error in form.password2.errors %}
+                                    <span style="color: red;">[{{ error }}]</span>
+                                    {% endfor %}
+                                </p>
+                            </span>
+                            <br>
+
+                            <p>{{ form.submit(class="w3-button w3-teal w3-card", style="width:fit-content;") }}</p>
+                        </form>
+                        </div>
+                        <footer class="w3-container w3-teal">
+                            <p>You are about to add new user to system</p>
+                        </footer>
+                    </div>
+                </div>
+                 <!-- new user ends here -->
+
+
+
+                 <!-- view user modal -->
+                <div id="view_users" class="w3-modal w3-white w3-card w3-border">
+                    <div class="w3-modal-content w3-white w3-card w3-border" style="width: 85vw; height: 80vh;">
+                        <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                            <span onclick="document.getElementById('view_users').style.display='none'" 
+                            class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                            <span class="w3-large"><b>All users in the system</b></span>
+                            <br>
+                        </header>
+                        <div class="w3-container w3-margin-top" style="width: 83vw; height: 70vh; overflow-y: auto;">
+                            <div class="w3-center mb-4">
+    <!-- Search input -->
+    <div class="input-group" style="max-width: 60%; margin: 0 auto;">
+        <span class="input-group-text bg-light border-end-0">
+            <i class="fas fa-search text-muted"></i>
+        </span>
+        <input type="text" 
+               id="userSearchInput" 
+               onkeyup="filterUsers()" 
+               placeholder="Search for users..." 
+               class="form-control form-control-sm border-start-0" />
+    </div>
+</div>
+
+<div class="table-responsive w3-small">
+    <table id="userTable" class="table table-striped table-hover table-bordered">
+        <thead class="table-dark">
+            <tr>
+                <th class="text-center">
+                    <i class="fas fa-user me-2"></i>Username
+                </th>
+                <th class="text-center">
+                    <i class="fas fa-user-tag me-2"></i>Role
+                </th>
+                <th class="text-center">
+                    <i class="fas fa-building me-2"></i>Department
+                </th>
+                <th class="text-center">
+                    <i class="fas fa-map-marker-alt me-2"></i>Province
+                </th>
+                <th class="text-center">
+                    <i class="fas fa-key me-2"></i>Privileges
+                </th>
+                <th class="text-center">
+                    <i class="fas fa-clock me-2"></i>Last seen
+                </th>
+                <th class="text-center">
+                    <i class="fas fa-envelope me-2"></i>Password link
+                </th>
+            </tr>
+        </thead>
+        <tbody id="userTableBody">
+            {% for user in all_users %}
+            <tr>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <img class="rounded-circle me-2" 
+                             style="width: 40px; height: 40px; object-fit: cover;" 
+                             src="{{ user.avatar(128) }}" 
+                             alt="{{ user.username }}">
+                        <a href="{{ url_for('user', username=user.username) }}" 
+                           class="text-decoration-none text-dark fw-medium">
+                            {{ user.username }}
+                        </a>
+                    </div>
+                </td>
+                <td class="text-center">{{ user.userRole }}</td>
+                <td class="text-center">{{ user.department }}</td>
+                <td class="text-center">{{ user.province }}</td>
+                <td class="text-center">None</td>
+                <td class="text-center">{{ user.last_seen }}</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-outline-primary" 
+                            onclick="sendPasswordEmail('{{ user.username }}')">
+                        <i class="fas fa-envelope me-1"></i>Send email
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not all_users %}
+            <tr>
+                <td colspan="7" class="text-center py-4">
+                    <div class="d-flex flex-column align-items-center">
+                        <i class="fas fa-users-slash text-muted mb-2" style="font-size: 2rem;"></i>
+                        <span>No users found</span>
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+                            <script>
+                            function filterUsers() {
+                            const input = document.getElementById("userSearchInput");
+                            const filter = input.value.toLowerCase();
+                            const table = document.getElementById("userTable");
+                            const trs = table.getElementsByTagName("tr");
+
+                            for (let i = 1; i < trs.length; i++) {
+                                const rowText = trs[i].textContent.toLowerCase();
+                                trs[i].style.display = rowText.includes(filter) ? "" : "none";
+                            }
+                            }
+                            </script>
+                        </div>
+
+                    </div>
+                </div>
+                 <!-- view user ends here -->
+
+
+
+
+<!-- view user modal -->
+                <div id="add_champions" class="w3-modal w3-white w3-card w3-border">
+                    <div class="w3-modal-content w3-white w3-card w3-border" style="width: 85vw; height: 80vh; overflow: auto;">
+                        <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                            <span onclick="document.getElementById('add_champions').style.display='none'" 
+                            class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+                            <span class="w3-large"><b>Add champions in the system</b></span>
+                            <br>
+                        </header>
+                        <div class="w3-container w3-margin-top">
+                            <div class="w3-half w3-padding">
+                                <div class="alert w3-small alert-info mt-4">
+                                    <strong>CSV Format Required:</strong><br>
+                                    The CSV should have the following columns:
+                                    <ul>
+                                        <li><code>firstname</code></li>
+                                        <li><code>lastname</code></li>
+                                        <li><code>email</code></li>
+                                        <li><code>userRole</code> (must match one of the defined roles)</li>
+                                        <li><code>department</code></li>
+                                        <li><code>province</code></li>
+                                    </ul>
+                                </div>
+                                <form method="POST" class="w3-small w3-card w3-padding" action="/upload_csv" enctype="multipart/form-data">
+                                    {{ championcsvform.hidden_tag() }}
+
+                                    <div class="mb-3">
+                                        {{ championcsvform.file.label(class="form-label") }}
+                                        {{ championcsvform.file(class="form-control") }}
+                                    </div>
+
+                                    {{ championcsvform.submit(class="btn btn-success") }}
+                                </form>
+
+                            </div>
+
+                             <div class="w3-half w3-padding" style="height: 65vh; overflow-y: auto;">
+                                <!-- Add Champion -->
+                                <div class="w3-margin w3-padding w3-hover-shadow border rounded shadow-sm">
+    <h4 class="w3-large mb-3">
+        <i class="fas fa-user-plus me-2 text-primary"></i>
+        <strong>Add New Champion</strong>
+    </h4>
+    
+    <form class="w3-small w3-padding" id="addChampionForm">
+        <div class="mb-3">
+            <label class="form-label fw-bold text-primary">
+                <i class="fas fa-user me-2"></i>First Name:
+            </label>
+            <input type="text" class="form-control form-control-sm" name="firstname" placeholder="Enter first name" required>
+        </div>
+        
+        <div class="mb-3">
+            <label class="form-label fw-bold text-primary">
+                <i class="fas fa-user me-2"></i>Last Name:
+            </label>
+            <input type="text" class="form-control form-control-sm" name="lastname" placeholder="Enter last name" required>
+        </div>
+        
+        <div class="mb-3">
+            <label class="form-label fw-bold text-primary">
+                <i class="fas fa-map-marker-alt me-2"></i>Province:
+            </label>
+            <input type="text" class="form-control form-control-sm" name="province" placeholder="Enter province" required>
+        </div>
+        
+        <button type="submit" class="btn btn-primary w-100">
+            <i class="fas fa-plus-circle me-2"></i>Add Champion
+        </button>
+    </form>
+</div>
+
+  <script>
+    const apiUrl = "/api/champions";
+
+    async function loadChampions() {
+      const res = await fetch(apiUrl);
+      const data = await res.json();
+      const tbody = document.querySelector("#championsTable tbody");
+      tbody.innerHTML = "";
+      data.forEach(champ => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${champ.id}</td>
+          <td>${champ.firstname} ${champ.lastname}</td>
+          <td>${champ.province}</td>
+          <td>
+            ${champ.schools.map(s => `${s.school_name} (ASL: ${s.asl_school_id}, LIB: ${s.library_school_id})`).join("<br>")}
+          </td>
+          <td>
+            <button class="btn btn-sm btn-success" onclick="addSchool(${champ.id})">Add School</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteChampion(${champ.id})">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    async function addChampion(e) {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        firstname: form.firstname.value,
+        lastname: form.lastname.value,
+        province: form.province.value
+      };
+      await fetch(apiUrl, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+      });
+      form.reset();
+      loadChampions();
+    }
+
+    async function addSchool(champId) {
+      const asl_id = prompt("Enter ASL School ID:");
+      const lib_id = prompt("Enter Library School ID:");
+      const name = prompt("Enter School Name:");
+      if (!asl_id || !lib_id || !name) return;
+      await fetch(`${apiUrl}/${champId}/add_school`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          asl_school_id: asl_id,
+          library_school_id: lib_id,
+          school_name: name
+        })
+      });
+      loadChampions();
+    }
+
+    async function deleteChampion(id) {
+      if (!confirm("Delete this champion?")) return;
+      await fetch(`${apiUrl}/${id}`, {method: "DELETE"});
+      loadChampions();
+    }
+
+    document.getElementById("addChampionForm").addEventListener("submit", addChampion);
+
+    // Initial load
+    loadChampions();
+  </script>
+                                <!-- <h4 class="w3-center w3-small"><b>Add Champion Manually</b></h4>
+                                
+                                <form class="w3-small" action="/add_champion_form" method="POST">
+    {{ manual_form.hidden_tag() }}
+
+    <div class="w3-third w3-padding">
+
+        <div class="mb-3">
+            {{ manual_form.firstname.label }}
+            {{ manual_form.firstname(class="form-control") }}
+        </div>
+
+
+        <div class="mb-3">
+            {{ manual_form.lastname.label }}
+            {{ manual_form.lastname(class="form-control") }}
+        </div>
+
+
+        <div class="mb-3">
+            {{ manual_form.province.label }}
+            {{ manual_form.province(class="form-control") }}
+        </div>
+    </div>
+
+    <div class="w3-half w3-padding  w3-hover-shadow" style="height: 60vh;">
+
+        <div class="mb-3">
+            <label>Select Schools</label>
+            <input type="text" id="school-search" class="form-control mb-2" placeholder="Search for a school...">
+
+            <div id="school-checkboxes-container" style="height: 400px; overflow-y: auto; border: 1px solid #ccc; position: relative;">
+                <div id="school-checkboxes" style="position: absolute; top: 0; left: 0; right: 0;"></div>
+            </div>
+
+            <input type="hidden" name="selected_school_data" id="selected_school_data">
+        </div>
+
+        <div class="mb-3 w3-margin">
+            {{ manual_form.submit(class="btn btn-primary") }}
+        </div>
+    </div>
+
+
+</form> -->
+
+<!-- ✅ Virtualization & Filtering Script -->
+<script>
+const schools = {{ all_schools | tojson }};
+const container = document.getElementById('school-checkboxes-container');
+const inner = document.getElementById('school-checkboxes');
+const rowHeight = 40;
+let filteredSchools = [...schools];
+
+// 👇 Track which checkboxes are selected (persist across filters)
+const selectedMap = new Map();
+
+// Re-render checkboxes within viewport
+function renderVisibleRows() {
+    const scrollTop = container.scrollTop;
+    const startIdx = Math.floor(scrollTop / rowHeight);
+    const visibleCount = Math.ceil(container.clientHeight / rowHeight);
+    const endIdx = Math.min(startIdx + visibleCount + 10, filteredSchools.length);
+
+    inner.style.height = `${filteredSchools.length * rowHeight}px`;
+    inner.innerHTML = '';
+
+    for (let i = startIdx; i < endIdx; i++) {
+        const school = filteredSchools[i];
+        const isChecked = selectedMap.has(school.id);
+        const div = document.createElement('div');
+        div.className = 'form-check';
+        div.style.position = 'absolute';
+        div.style.top = `${i * rowHeight}px`;
+        div.style.left = 0;
+        div.style.right = 0;
+
+        div.innerHTML = `
+            <input class="form-check-input" type="checkbox" value='${JSON.stringify(school)}' name="school-checkbox" id="school${school.id}" ${isChecked ? 'checked' : ''}>
+            <label class="form-check-label" for="school${school.id}">
+                ${school.name} (ID: ${school.id})
+            </label>
+        `;
+
+        // 👇 Track checked state on interaction
+        div.querySelector('input').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                selectedMap.set(school.id, school);
+            } else {
+                selectedMap.delete(school.id);
+            }
+        });
+
+        inner.appendChild(div);
+    }
+}
+
+// 🔁 Scroll: Re-render only visible items
+container.addEventListener('scroll', () => {
+    requestAnimationFrame(renderVisibleRows);
+});
+
+// 🔍 Search input with debounce
+let debounceTimer;
+document.getElementById('school-search').addEventListener('input', function () {
+    const query = this.value.toLowerCase();
+    clearTimeout(debounceTimer);
+
+    debounceTimer = setTimeout(() => {
+        filteredSchools = schools.filter(s => s.name.toLowerCase().includes(query));
+        container.scrollTop = 0;
+        renderVisibleRows();
+    }, 200);
+});
+
+// ✅ On form submit, collect selected schools
+document.querySelector("form").addEventListener("submit", function () {
+    const selected = Array.from(selectedMap.values());
+    document.getElementById("selected_school_data").value = JSON.stringify(selected);
+});
+
+// 🔄 Initial render
+renderVisibleRows();
+</script>
+
+
+
+
+                             </div>
+
+
+
+    
+                        </div>
+
+                    </div>
+                </div>
+                 <!-- view user ends here -->
+
+
+
+
+
+{% endblock %}

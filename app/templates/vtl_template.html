@@ -1,0 +1,142 @@
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Upload Excel Template</title>
+  <style>
+    :root { --border:#e5e7eb; --muted:#6b7280; --bg:#ffffff; --bg2:#f9fafb; --bg3:#f3f4f6; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; background: var(--bg); }
+    .card { max-width: 760px; border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem 1.25rem 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    h2 { margin: 0 0 .25rem; font-weight: 650; }
+    p.muted { color: var(--muted); margin-top: .25rem; }
+    .row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+    .space { height: 1rem; }
+    .divider { height: 1px; background: var(--border); margin: 1rem 0; }
+    button { padding: .6rem 1rem; border-radius: 10px; border: 1px solid #d1d5db; background: var(--bg2); cursor: pointer; font-weight: 600; }
+    button:hover { background: var(--bg3); }
+    input[type="file"] { padding: .4rem; }
+    code { background: #f6f8fa; padding: .1rem .3rem; border-radius: 6px; }
+    .right { margin-left: auto; }
+    .hint { font-size: 12px; color: var(--muted); }
+    .success { color: #065f46; }
+    .error { color: #991b1b; }
+    .badge { display: inline-block; padding: .2rem .5rem; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--muted); }
+    label.switch { display: inline-flex; align-items: center; gap: .4rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Excel Template</h2>
+    <p class="muted">
+      Upload the <code>.xlsx</code> template to be populated daily.
+      Current expected template name: <strong id="tmplName">{{ template_filename }}</strong>
+    </p>
+
+    <form id="uploadForm" action="/vtl_template" method="post" enctype="multipart/form-data">
+      <div class="row">
+        <input type="file" name="file" accept=".xlsx" required />
+        <button type="submit">Upload</button>
+        <span class="hint">The file will be stored server-side under <code>instance/uploaded_template.xlsx</code>.</span>
+      </div>
+    </form>
+
+    <div class="divider"></div>
+
+    <div class="row">
+      <label class="switch">
+        <input type="checkbox" id="emailToggle" />
+        <span>Send email after generation</span>
+      </label>
+      <button id="runNow">Run Report Now</button>
+      <button id="downloadLatest" class="right">Download Latest</button>
+    </div>
+
+    <div class="space"></div>
+    <p id="msg" class="muted"></p>
+
+    <div id="recent" style="display:none">
+      <div class="divider"></div>
+      <h3 style="margin:0 0 .5rem">Latest Report</h3>
+      <div id="recentItem" class="row"></div>
+    </div>
+  </div>
+
+  <script>
+  const msg = document.getElementById('msg');
+  const emailToggle = document.getElementById('emailToggle');
+  const recent = document.getElementById('recent');
+  const recentItem = document.getElementById('recentItem');
+
+  function setMessage(text, ok=true){
+    msg.textContent = text;
+    msg.className = ok ? 'success' : 'error';
+  }
+
+  // Upload template
+  document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setMessage('Uploading…');
+    try {
+      const formData = new FormData(e.target);
+      const res = await fetch('/vtl_template', { method: 'POST', body: formData });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Upload failed');
+      setMessage(`✅ ${json.message}. Stored as: ${json.stored_as}`);
+      document.getElementById('tmplName').textContent = json.stored_as;
+    } catch (err) {
+      setMessage('❌ ' + err.message, false);
+    }
+  });
+
+  // Run report now (auto download)
+  document.getElementById('runNow').addEventListener('click', async () => {
+    setMessage('Running… This may take a moment.');
+    try {
+      const res = await fetch(`/api/run-report`, { method: 'POST' });
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || 'Report generation failed');
+      }
+
+      // Convert response into a downloadable file
+      const blob = await res.blob();
+      const filename = res.headers.get("Content-Disposition")
+        ?.split("filename=")[1]?.replace(/['"]/g, "") || "report.xlsx";
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      setMessage(`✅ Generated and downloaded \`${filename}\`.`);
+
+      // Update latest section
+      recent.style.display = '';
+      recentItem.innerHTML = '';
+      const name = document.createElement('span');
+      name.className = 'badge';
+      name.textContent = filename;
+      const time = document.createElement('span');
+      time.className = 'hint';
+      time.textContent = new Date().toLocaleString();
+      recentItem.append(name, time);
+
+    } catch (err) {
+      setMessage('❌ ' + err.message, false);
+    }
+  });
+
+  // Download latest (fallback to server route)
+  document.getElementById('downloadLatest').addEventListener('click', () => {
+    window.location.href = '/api/download-latest';
+  });
+</script>
+
+</body>
+</html>

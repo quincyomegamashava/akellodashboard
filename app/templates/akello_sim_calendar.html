@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- FullCalendar CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
+
+<style>
+  /* Page layout */
+  .calendar-page { max-width: 1200px; margin: 16px auto; padding: 0 8px; }
+  .calendar-card { background: #fff; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); padding: 12px; }
+  .calendar-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .calendar-title { font-weight: 700; color: #00407d; }
+  /* Ensure the calendar area has visible height */
+  #sim-calendar { min-height: 720px; }
+  /* Improve FullCalendar look a touch */
+  .fc .fc-toolbar-title { font-size: 1.25rem; color: #00407d; }
+  .fc .fc-button-primary { background-color: #00407d; border-color: #00407d; }
+  .fc .fc-button-primary:hover { background-color: #003561; border-color: #003561; }
+  /* Ensure modal is above any app overlays */
+  .modal { z-index: 2000; }
+  .modal-backdrop { z-index: 1990; }
+</style>
+</head>
+<body>
+
+<div class="calendar-page">
+  <div class="calendar-toolbar">
+    <h4 class="calendar-title mb-0">Akello SIM Calendar</h4>
+    <button class="btn btn-primary" id="btnNewEvent">
+      <i class="fa fa-plus me-1"></i>
+      New Event
+    </button>
+  </div>
+  <div class="calendar-card">
+    <div id="sim-calendar"></div>
+  </div>
+
+  <!-- Events List -->
+  <div class="calendar-card mt-3">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <h6 class="mb-0">Events (upcoming first)</h6>
+      <button class="btn btn-outline-primary btn-sm" id="refreshEvents">Refresh</button>
+    </div>
+    <div id="eventsList">
+      <div class="text-muted">Loading events…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Create/Edit Event Modal (Bootstrap 5) -->
+<div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="eventModalLabel">New Event</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="eventForm">
+          <input type="hidden" id="eventId" />
+          <div class="mb-3">
+            <label for="eventTitle" class="form-label">Title</label>
+            <input type="text" class="form-control" id="eventTitle" placeholder="Event title" required />
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="eventDate" class="form-label">Date & Time</label>
+              <input type="datetime-local" class="form-control" id="eventDate" required />
+            </div>
+            <div class="col-md-6">
+              <label for="eventStatus" class="form-label">Status</label>
+              <select id="eventStatus" class="form-select">
+                <option value="Confirmed">Confirmed</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-check mt-3">
+            <input class="form-check-input" type="checkbox" id="eventRequestCollateral" />
+            <label class="form-check-label" for="eventRequestCollateral">
+              Request collateral?
+            </label>
+          </div>
+          <div id="collateralItems" class="mt-2" style="display: none;">
+            <div class="form-text mb-2">Select items</div>
+            <div class="d-flex flex-wrap gap-2">
+              <div class="form-check">
+                <input class="form-check-input collateral-item" type="checkbox" value="Branding" id="ciBranding" />
+                <label class="form-check-label" for="ciBranding">Branding</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input collateral-item" type="checkbox" value="T-Shirts" id="ciTShirts" />
+                <label class="form-check-label" for="ciTShirts">T-Shirts</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input collateral-item" type="checkbox" value="Diaries" id="ciDiaries" />
+                <label class="form-check-label" for="ciDiaries">Diaries</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input collateral-item" type="checkbox" value="Pens" id="ciPens" />
+                <label class="form-check-label" for="ciPens">Pens</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input collateral-item" type="checkbox" value="Key Holders" id="ciKeyHolders" />
+                <label class="form-check-label" for="ciKeyHolders">Key Holders</label>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3">
+            <label for="eventDesc" class="form-label">Description</label>
+            <textarea id="eventDesc" class="form-control" rows="3" placeholder="Optional description"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-danger me-auto d-none" id="deleteEvent">Delete</button>
+        <button type="button" class="btn btn-primary" id="saveEvent">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FullCalendar JS -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script>
+(function(){
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+  // Bootstrap modal helpers (support BS5 or jQuery BS3)
+  const modalEl = $('#eventModal');
+  function showModal() {
+    try {
+      if (window.bootstrap && bootstrap.Modal) {
+        new bootstrap.Modal(modalEl).show();
+      } else if (window.$ && typeof $(modalEl).modal === 'function') {
+        $(modalEl).modal('show');
+      } else {
+        console.error('No Bootstrap modal available');
+        alert('Modal library not loaded.');
+      }
+    } catch (e) {
+      console.error('Modal show error:', e);
+    }
+  }
+  function hideModal() {
+    try {
+      if (window.bootstrap && bootstrap.Modal) {
+        const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        inst.hide();
+      } else if (window.$ && typeof $(modalEl).modal === 'function') {
+        $(modalEl).modal('hide');
+      }
+    } catch (e) {
+      console.error('Modal hide error:', e);
+    }
+  }
+
+  // Form fields
+  const eventId = $('#eventId');
+  const eventTitle = $('#eventTitle');
+  const eventDate = $('#eventDate');
+  const eventStatus = $('#eventStatus');
+  const eventRequest = $('#eventRequestCollateral');
+  const eventDesc = $('#eventDesc');
+  const collateralWrap = $('#collateralItems');
+  const collateralBoxes = $$('.collateral-item');
+
+  // Show/Hide collateral selection
+  eventRequest.addEventListener('change', () => {
+    collateralWrap.style.display = eventRequest.checked ? 'block' : 'none';
+  });
+
+  function resetForm() {
+    $('#eventForm').reset();
+    eventId.value = '';
+    collateralBoxes.forEach(cb => cb.checked = false);
+    collateralWrap.style.display = 'none';
+    $('#deleteEvent').classList.add('d-none');
+    $('#eventModalLabel').textContent = 'New Event';
+  }
+
+  function toLocalInputValue(date) {
+    // date can be a Date or ISO string
+    const d = (date instanceof Date) ? date : new Date(date);
+    const tzAdjusted = new Date(d.getTime() - d.getTimezoneOffset()*60000);
+    return tzAdjusted.toISOString().slice(0,16);
+  }
+
+  function gatherPayload() {
+    const items = $$('.collateral-item:checked').map(i => i.value);
+    const title = eventTitle.value.trim();
+    const dateStr = eventDate.value;
+    return {
+      calendar_title: title,
+      description: eventDesc.value.trim(),
+      date: dateStr ? new Date(dateStr).toISOString() : '',
+      status: eventStatus.value,
+      request_collateral: eventRequest.checked,
+      collateral_items: eventRequest.checked ? items : []
+    };
+  }
+
+  // Calendar init
+  let calendar;
+  document.addEventListener('DOMContentLoaded', () => {
+    // Ensure modal lives at body level (avoid parent overflow issues)
+    try { document.body.appendChild(modalEl); } catch (e) { /* ignore */ }
+
+    const calendarEl = document.getElementById('sim-calendar');
+    calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      height: 'auto',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+      },
+      events: async (info, success, failure) => {
+        try {
+          const res = await fetch('/api/sim-calendar/events');
+          if (!res.ok) throw new Error('Failed to load events');
+          const data = await res.json();
+          const fcEvents = (data || []).map(e => ({
+            id: e.id,
+            title: e.title || e.calendar_title || '',
+            start: e.start || e.date,
+            extendedProps: {
+              description: e.description || '',
+              status: e.status || 'Confirmed',
+              request_collateral: !!e.request_collateral,
+              collateral_items: e.collateral_items || []
+            }
+          }));
+          success(fcEvents);
+        } catch (err) {
+          console.error('Events load error:', err);
+          success([]); // show empty calendar rather than failing UI
+        }
+      },
+      dateClick: function(info) {
+        resetForm();
+        // Prefill clicked date
+        eventDate.value = toLocalInputValue(info.date);
+        showModal();
+      },
+      eventClick: function(info) {
+        resetForm();
+        const ev = info.event;
+        $('#eventModalLabel').textContent = 'Edit Event';
+        $('#deleteEvent').classList.remove('d-none');
+        eventId.value = ev.id || '';
+        eventTitle.value = ev.title || '';
+        eventDate.value = ev.start ? toLocalInputValue(ev.start) : '';
+        eventStatus.value = (ev.extendedProps && ev.extendedProps.status) || 'Confirmed';
+        eventRequest.checked = !!(ev.extendedProps && ev.extendedProps.request_collateral);
+        collateralWrap.style.display = eventRequest.checked ? 'block' : 'none';
+        const items = (ev.extendedProps && ev.extendedProps.collateral_items) || [];
+        collateralBoxes.forEach(cb => cb.checked = items.includes(cb.value));
+        eventDesc.value = (ev.extendedProps && ev.extendedProps.description) || '';
+        showModal();
+      }
+    });
+    calendar.render();
+    // Initial load of events list once calendar is ready
+    loadAndRenderEventsList();
+  });
+
+  // New Event button
+  document.getElementById('btnNewEvent').addEventListener('click', () => {
+    resetForm();
+    // Prefill current datetime
+    eventDate.value = toLocalInputValue(new Date());
+    showModal();
+  });
+
+  // Save Event
+  $('#saveEvent').addEventListener('click', async () => {
+    const payload = gatherPayload();
+    if (!payload.calendar_title || !payload.date) {
+      alert('Title and Date/Time are required');
+      return;
+    }
+    const id = eventId.value;
+    const url = id ? `/api/sim-calendar/events/${id}` : '/api/sim-calendar/events';
+    const method = id ? 'PATCH' : 'POST';
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(await res.text());
+      hideModal();
+      calendar?.refetchEvents();
+    } catch (err) {
+      console.error('Save error:', err);
+      alert('Save failed.');
+    }
+  });
+
+  // Delete Event
+  $('#deleteEvent').addEventListener('click', async () => {
+    const id = eventId.value;
+    if (!id) return;
+    if (!confirm('Delete this event?')) return;
+    try {
+      const res = await fetch(`/api/sim-calendar/events/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text());
+      hideModal();
+      calendar?.refetchEvents();
+      await loadAndRenderEventsList();
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert('Delete failed.');
+    }
+  });
+
+  // Events list rendering
+  async function loadAndRenderEventsList() {
+    const container = document.getElementById('eventsList');
+    container.innerHTML = '<div class="text-muted">Loading events…</div>';
+    try {
+      const res = await fetch('/api/sim-calendar/events');
+      if (!res.ok) throw new Error('Failed to load events');
+      const data = await res.json();
+      const events = (data || []).map(e => ({
+        id: e.id,
+        title: e.title || e.calendar_title || '(no title)',
+        date: e.start || e.date,
+        description: e.description || '',
+        status: e.status || 'Confirmed',
+        request_collateral: !!e.request_collateral,
+        collateral_items: e.collateral_items || []
+      }));
+      // sort ascending by date, with invalid dates at end
+      const withTime = events.map(ev => ({...ev, ts: Date.parse(ev.date) || Infinity}));
+      withTime.sort((a,b) => a.ts - b.ts);
+      // Build list HTML
+      if (!withTime.length) {
+        container.innerHTML = '<div class="text-muted">No events yet.</div>';
+        return;
+      }
+      const now = Date.now();
+      const rows = withTime.map(ev => {
+        const dt = isFinite(ev.ts) ? new Date(ev.ts) : null;
+        const dateLabel = dt ? dt.toLocaleString() : 'Invalid date';
+        const upcoming = dt ? (ev.ts >= now) : false;
+        const badgeCls = ev.status === 'Cancelled' ? 'bg-danger' : 'bg-success';
+        return `
+          <div class="d-flex align-items-start justify-content-between border rounded p-2 mb-2">
+            <div>
+              <div class="fw-semibold ${upcoming ? '' : 'text-muted'}" data-ev-id="${ev.id}" data-action="open-edit" style="cursor: pointer;">${ev.title}</div>
+              <div class="small text-muted">${dateLabel}</div>
+              <span class="badge ${badgeCls} mt-1">${ev.status}</span>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-secondary" data-action="goto" data-ev-date="${ev.date}">Open</button>
+              <button class="btn btn-sm btn-outline-primary" data-action="edit" data-ev='${JSON.stringify(ev).replace(/'/g, "&#39;")}' >Edit</button>
+            </div>
+          </div>`;
+      }).join('');
+      container.innerHTML = rows;
+    } catch (err) {
+      console.error('List load error:', err);
+      container.innerHTML = '<div class="text-danger">Failed to load events.</div>';
+    }
+  }
+
+  document.getElementById('refreshEvents').addEventListener('click', async () => {
+    await loadAndRenderEventsList();
+  });
+
+  // Delegate clicks inside the list
+  document.getElementById('eventsList').addEventListener('click', (e) => {
+    const gotoBtn = e.target.closest('[data-action="goto"]');
+    const editBtn = e.target.closest('[data-action="edit"]');
+    const titleOpen = e.target.closest('[data-action="open-edit"]');
+    if (gotoBtn) {
+      const d = gotoBtn.getAttribute('data-ev-date');
+      if (d && calendar) calendar.gotoDate(new Date(d));
+    } else if (editBtn) {
+      try {
+        const ev = JSON.parse(editBtn.getAttribute('data-ev'));
+        resetForm();
+        document.getElementById('eventModalLabel').textContent = 'Edit Event';
+        document.getElementById('deleteEvent').classList.remove('d-none');
+        eventId.value = ev.id || '';
+        eventTitle.value = ev.title || '';
+        eventDate.value = ev.date ? toLocalInputValue(ev.date) : '';
+        eventStatus.value = ev.status || 'Confirmed';
+        eventRequest.checked = !!ev.request_collateral;
+        collateralWrap.style.display = eventRequest.checked ? 'block' : 'none';
+        collateralBoxes.forEach(cb => cb.checked = (ev.collateral_items || []).includes(cb.value));
+        eventDesc.value = ev.description || '';
+        showModal();
+      } catch (err) {
+        console.error('Bad event payload', err);
+      }
+    } else if (titleOpen) {
+      // Same as edit
+      const id = titleOpen.getAttribute('data-ev-id');
+      const row = titleOpen.closest('.border');
+      const editDataBtn = row?.querySelector('[data-action="edit"]');
+      if (editDataBtn) editDataBtn.click();
+    }
+  });
+
+  // Reset form when modal fully hides
+  modalEl.addEventListener('hidden.bs.modal', resetForm);
+})();
+</script>
+</body>
+</html>

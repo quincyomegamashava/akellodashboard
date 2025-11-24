@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class=" w3-padding " style="height: 95vh; overflow: auto;">
+        <div class="w3-display-middle w3-card w3-small w3-padding">
+            <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
+                <span class="w3-large"><b>Register</b></span>
+                <br>
+            </header>
+            <form action="" method="post">
+                {{ form.hidden_tag() }}
+                
+                <span class="w3-third w3-margin">
+                    <p>
+                        {{ form.username.label }}<br>
+                        {{ form.username(class="w3-input w3-border",size=32) }}<br>
+                        {% for error in form.username.errors %}
+                        <span style="color: red;">[{{ error }}]</span>
+                        {% endfor %}
+                    </p>
+                    
+                    <p>
+                        {{ form.email.label }}<br>
+                        {{ form.email(class="w3-input w3-border",size=64) }}<br>
+                        {% for error in form.email.errors %}
+                        <span style="color: red;">[{{ error }}]</span>
+                        {% endfor %}
+                    </p>
+
+                    <p>
+                        {{ form.firstname.label }}<br>
+                        {{ form.firstname(class="w3-input w3-border",size=32) }}<br>
+                        {% for error in form.firstname.errors %}
+                        <span style="color: red;">[{{ error }}]</span>
+                        {% endfor %}
+                    </p>
+
+                    <p>
+                        {{ form.lastname.label }}<br>
+                        {{ form.lastname(class="w3-input w3-border",size=32) }}<br>
+                        {% for error in form.lastname.errors %}
+                        <span style="color: red;">[{{ error }}]</span>
+                        {% endfor %}
+                    </p>
+                </span>
+
+                <span class="w3-third w3-margin">
+                    <p>
+                        {{ form.userRole.label }}<br>
+                        {{ form.userRole(class="w3-select w3-border") }}<br>
+                        {% for error in form.userRole.errors %}
+                        <span style="color: red;">[{{ error }}]</span>
+                        {% endfor %}
+                    </p>
+
+                    <p>
+                        {{ form.department.label }}<br>
+                        {{ form.department(class="w3-select w3-border") }}<br>
+                        {% for error in form.department.errors %}
+                        <span style="color: red;">[{{ error }}]</span>
+                        {% endfor %}
+                    </p>
+
+                    <p>
+                        {{ form.province.label }}<br>
+                        {{ form.province(class="w3-select w3-border") }}<br>
+                        {% for error in form.province.errors %}
+                        <span style="color: red;">[{{ error }}]</span>
+                        {% endfor %}
+                    </p>
+
+                    <p>
+                        {{ form.password.label }}<br>
+                        {{ form.password(class="w3-input w3-border",size=32) }}<br>
+                        {% for error in form.password.errors %}
+                        <span style="color: red;">[{{ error }}]</span>
+                        {% endfor %}
+                    </p>
+                    
+                    <p>
+                        {{ form.password2.label }}<br>
+                        {{ form.password2(class="w3-input w3-border",size=32) }}<br>
+                        {% for error in form.password2.errors %}
+                        <span style="color: red;">[{{ error }}]</span>
+                        {% endfor %}
+                    </p>
+                </span>
+                <br>
+
+                <p>{{ form.submit(class="w3-button w3-bottom w3-teal w3-card", style="width:fit-content;") }}</p>
+            </form>
+            <br>
+        </div>
+    </div>
+{% endblock %}

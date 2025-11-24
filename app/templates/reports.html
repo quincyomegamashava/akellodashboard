@@ -1,0 +1,261 @@
+
+
+{% extends "base.html" %}
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.10.0/js/anychart-bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> -->
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+  <style>
+    .container {
+      display: flex;
+      width: 100%;
+    }
+    .sidebar {
+      width: 25%;
+      border-right: 1px solid #ccc;
+      padding: 10px;
+    }
+    .content {
+      width: 75%;
+      padding: 10px;
+    }
+    .user-link {
+      display: block;
+      margin: 5px 0;
+      padding: 5px;
+      text-decoration: none;
+      color: black;
+    }
+    .user-link.active {
+      font-weight: bold;
+      background: #f0f0f0;
+      color: white !important;
+    }
+    .report {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+{% block content %}
+
+<div class="w3-container w3-padding w3-margin w3-full">
+
+<div class="w3-quarter w3-border w3-padding w3-margin w3-round">
+
+  <!-- Department Header -->
+<header class="w3-container w3-margin-bottom w3-round-large w3-padding w3-center w3-card" style="background: linear-gradient(135deg, #e6f0ff, #ffffff); border: 1px solid #cce0ff;">
+  <h5 class="w3-margin-0 w3-text-dark-grey">
+    {{ user_department }}
+    <span class="w3-small">
+        <svg onclick="document.getElementById('new_report').style.display='block'" 
+          style="cursor: pointer;" 
+          xmlns="http://www.w3.org/2000/svg" width="18" height="18" 
+          fill="currentColor" 
+          class="bi bi-patch-plus w3-margin-left w3-text-teal" 
+          viewBox="0 0 16 16">
+        <path fill-rule="evenodd" d="M8 5.5a.5.5 0 0 1 .5.5v1.5H10a.5.5 0 0 1 0 1H8.5V10a.5.5 0 0 1-1 0V8.5H6a.5.5 0 0 1 0-1h1.5V6a.5.5 0 0 1 .5-.5"/>
+        <path d="m10.273 2.513-.921-.944.715-.698.622.637.89-.011a2.89 2.89 0 0 1 2.924 2.924l-.01.89.636.622a2.89 2.89 0 0 1 0 4.134l-.637.622.011.89a2.89 2.89 0 0 1-2.924 2.924l-.89-.01-.622.636a2.89 2.89 0 0 1-4.134 0l-.622-.637-.89.011a2.89 2.89 0 0 1-2.924-2.924l.01-.89-.636-.622a2.89 2.89 0 0 1 0-4.134l.637-.622-.011-.89a2.89 2.89 0 0 1 2.924-2.924l.89.01.622-.636a2.89 2.89 0 0 1 4.134 0z"/>
+      </svg> Add 
+    </span>
+  </h5>
+</header>
+
+<!-- User List -->
+<div class="w3-container">
+  {% for user in users %}
+    <div class="user-link w3-margin-bottom w3-padding-small w3-border w3-round w3-hover-shadow 
+                {% if user.department != user_department %} w3-hide {% endif %}
+                {% if user.id == selected_user_id %} w3-light-blue w3-text-white active {% else %} w3-light-grey {% endif %}">
+      <a href="{{ url_for('reports', user_id=user.id) }}" 
+         class="w3-block w3-text-dark-grey w3-padding-small"
+         style="text-decoration: none; {% if user.id == selected_user_id %} color: white; {% else %} color: #333; {% endif %}">
+        <i class="bi bi-person-circle me-2"></i> {{ user.username }}
+      </a>
+    </div>
+  {% endfor %}
+</div>
+
+
+</div>
+
+<div class="w3-twothird w3-padding w3-margin w3-round " style="height: 75vh; overflow-y: auto;">
+
+  <div class="">
+    <!-- Right Content -->
+    <div class="content">
+      {% if reports %}
+        {% for report in reports %}
+          <div class="report w3-card w3-hover-shadow w3-round-large w3-margin w3-padding w3-animate-opacity 
+            {% if selected_report_user.department != user_department %} w3-hide {% endif %}" 
+     style="border-left: 4px solid lightblue ; width: 55vw; background-color: #fafafa;">
+
+  <!-- Week & Edit -->
+  <div class="w3-flex w3-row w3-margin-bottom w3-padding-small w3-light-grey w3-round">
+    <div class="w3-col s9">
+      <strong class="w3-text-dark-grey">📅 Week Starting:</strong> {{ report.week_start }}
+    </div>
+    <div class="w3-col s3 w3-right-align">
+      <svg onclick="document.getElementById('edit_report_{{report.id}}').style.display='block'" 
+           style="cursor: pointer;" 
+           xmlns="http://www.w3.org/2000/svg" 
+           width="18" height="18" 
+           fill="currentColor" 
+           class="bi bi-pen w3-text-blue" 
+           viewBox="0 0 16 16">
+        <path d="m13.498.795.149-.149a1.207 1.207 0 1 1 1.707 1.708l-.149.148a1.5 1.5 0 0 1-.059 2.059L4.854 
+                 14.854a.5.5 0 0 1-.233.131l-4 1a.5.5 0 0 1-.606-.606l1-4a.5.5 
+                 0 0 1 .131-.232l9.642-9.642a.5.5 
+                 0 0 0-.642.056L6.854 
+                 4.854a.5.5 0 1 1-.708-.708L9.44.854A1.5 
+                 1.5 0 0 1 11.5.796a1.5 
+                 1.5 0 0 1 1.998-.001m-.644.766a.5.5 
+                 0 0 0-.707 0L1.95 
+                 11.756l-.764 3.057 3.057-.764L14.44 
+                 3.854a.5.5 0 0 0 0-.708z"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Workstreams -->
+  <div class="w3-row-padding w3-margin-bottom">
+    <div class="w3-half w3-small w3-border-right" style="max-height: 15vh; overflow-y: auto;">
+      <strong class="w3-text-dark-grey">✅ Workstreams this week:</strong>
+      <pre class="w3-small" style="white-space: pre-wrap;">{{ report.work_done }}</pre>
+    </div>
+    <div class="w3-half w3-small" style="max-height: 15vh; overflow-y: auto;">
+      <strong class="w3-text-dark-grey">📌 Workstreams for next week:</strong>
+      <pre class="w3-small" style="white-space: pre-wrap;">{{ report.work_next }}</pre>
+    </div>
+  </div>
+
+  <!-- Challenges -->
+  <div class="w3-margin-bottom">
+    <strong class="w3-text-dark-grey">⚠️ Challenges:</strong>
+    <pre class="w3-small w3-padding-small w3-round" style="background:#f5f5f5; white-space: pre-wrap;">{{ report.challenges }}</pre>
+  </div>
+
+  <!-- Footer -->
+  <footer class="w3-small w3-text-dark-grey w3-right-align w3-light-blue">
+    🕒 Submitted: {{ report.created_at.strftime("%Y-%m-%d %H:%M") }}
+  </footer>
+</div>
+
+
+
+<!-- view aslhome modal -->
+<div id="edit_report_{{report.id}}" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 55vw; height: 75vh;">
+    <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;">
+      <span onclick="document.getElementById('edit_report_{{report.id}}').style.display='none'"
+        class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Edit report</b></span>
+      
+    </header>
+    <div class="w3-container w3-margin-top" style="height: 65vh; overflow-y: auto;">
+     
+      <div class="w3-padding w3-small w3-margin">
+        <form action="{{url_for('edit_report',report_id=report.id)}}" method="POST">
+
+          <label>Week Start:</label><br>
+          <input type="date" name="week_start" class="w3-input form-control w3-border w3-round" value="{{ report.week_start }}" required><br><br>
+
+          <label>Work Done:</label><br>
+          <textarea name="work_done" class="w3-input form-control w3-border w3-round" required>{{ report.work_done }}</textarea><br><br>
+
+          <label>Work Next:</label><br>
+          <textarea name="work_next" class="w3-input form-control w3-border w3-round" required>{{ report.work_next }}</textarea><br><br>
+
+          <label>Challenges:</label><br>
+          <textarea name="challenges" class="w3-input form-control w3-border w3-round">{{ report.challenges }}</textarea><br><br>
+
+          <button class="w3-button w3-round w3-border w3-teal" type="submit">Save Changes</button>
+        </form>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+<!-- view aslhome ends here -->
+
+
+
+        {% endfor %}
+      {% else %}
+        <p class="report w3-hover-shadow w3-margin w3-border w3-padding w3-round" style="border-bottom: 2px solid blue; width: 50vw;">No reports found for this user.</p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+
+<!-- view aslhome modal -->
+<div id="new_report" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 55vw; height: 65vh;">
+    <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;">
+      <span onclick="document.getElementById('new_report').style.display='none'"
+        class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Add new report</b></span>
+      
+    </header>
+    <div class="w3-container w3-margin-top" style="height: 75vh; overflow-y: auto;">
+     
+      <div class="w3-padding w3-small w3-margin">
+        <form class="w3-small" method="POST" action="/submit_weekly_report">
+
+          <label>Week Start (must be Monday):</label><br>
+          <input type="date" id="week_start" name="week_start" class="w3-input form-control w3-border w3-round" required><br><br>
+
+          <label>Work Done This Week:</label><br>
+          <textarea name="work_done" class="w3-input form-control w3-border w3-round" required></textarea><br><br>
+
+          <label>Work Planned Next Week:</label><br>
+          <textarea name="work_next" class="w3-input form-control w3-border w3-round" required></textarea><br><br>
+
+          <label>Challenges:</label><br>
+          <textarea name="challenges" class="w3-input form-control w3-border w3-round"></textarea><br><br>
+
+          <button class="w3-button w3-round w3-border w3-teal" type="submit">Submit Report</button>
+        </form>
+      </div>
+
+      <script>
+        // Restrict calendar to Mondays only
+        document.getElementById("week_start").addEventListener("input", function () {
+          let date = new Date(this.value);
+          if (date.getDay() !== 1) { // 1 = Monday in JS
+            alert("Please select a Monday as the week start date.");
+            this.value = ""; // reset
+          }
+        });
+      </script>
+
+    </div>
+
+  </div>
+</div>
+<!-- view aslhome ends here -->
+
+
+
+
+
+
+
+</div>
+
+
+{% endblock %}

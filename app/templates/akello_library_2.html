@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Akello Library Database Info</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 40px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        input[type="text"] {
+            padding: 5px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        h1, h2 {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Akello Library Database Information</h1>
+
+    <h2>Institutions (Live Search)</h2>
+
+    <label>Name:</label>
+    <input type="text" id="nameFilter" placeholder="Search by name..." onkeyup="filterInstitutions()">
+
+    <label>Province:</label>
+    <input type="text" id="provinceFilter" placeholder="Search by province..." onkeyup="filterInstitutions()">
+
+    {% if institutions %}
+    <table id="institutionsTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Level</th>
+                <th>Number of Users</th>
+                <th>Province</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in institutions %}
+                <tr>
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.level }}</td>
+                    <td>{{ row.number_of_users }}</td>
+                    <td>{{ row.province }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p>No institutions found.</p>
+    {% endif %}
+
+    <h2>BA Payouts</h2>
+    {% if ba_payouts %}
+    <table>
+        <thead>
+            <tr>
+                {% for col in ba_payouts[0].keys() %}
+                    <th>{{ col }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in ba_payouts %}
+                <tr>
+                    {% for value in row.values() %}
+                        <td>{{ value }}</td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p>No BA Payouts data found.</p>
+    {% endif %}
+
+    <script>
+        function filterInstitutions() {
+            const nameInput = document.getElementById('nameFilter').value.toLowerCase();
+            const provinceInput = document.getElementById('provinceFilter').value.toLowerCase();
+            const table = document.getElementById('institutionsTable');
+            const rows = table.getElementsByTagName('tr');
+
+            for (let i = 1; i < rows.length; i++) { // start at 1 to skip header
+                const nameCell = rows[i].cells[0].textContent.toLowerCase();
+                const provinceCell = rows[i].cells[3].textContent.toLowerCase();
+
+                const nameMatch = nameCell.includes(nameInput);
+                const provinceMatch = provinceCell.includes(provinceInput);
+
+                rows[i].style.display = (nameMatch && provinceMatch) ? '' : 'none';
+            }
+        }
+    </script>
+</body>
+</html>

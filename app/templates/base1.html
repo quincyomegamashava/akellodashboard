@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% if title %}
+    <title>{{ title }} - Akello</title>
+    {% else %}
+    <title>Welcome to Akello</title>
+    {% endif %}
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script> -->
+
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lobster">
+
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+
+<script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://getbootstrap.com/docs/5.3/assets/css/docs.css" rel="stylesheet">
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- home analytics -->
+   <!-- <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script> -->
+  <!-- home ana ends here -->
+  <style>
+    /* Set height of the grid so .sidenav can be 100% (adjust if needed) */
+    .row.content {height: 1500px}
+    
+    /* Set gray background color and 100% height */
+    .sidenav {
+      background-color: #f1f1f1;
+      height: 100%;
+    }
+    
+    /* Set black background color, white text and some padding */
+    footer {
+      background-color: #555;
+      color: white;
+      padding: 15px;
+    }
+    
+    /* On small screens, set height to 'auto' for sidenav and grid */
+    @media screen and (max-width: 767px) {
+      .sidenav {
+        height: auto;
+        padding: 15px;
+      }
+      .row.content {height: auto;} 
+    }
+
+    .sidebar {
+      height: 100vh;
+      width: 200px;
+      position: fixed;
+      background-color: white;
+      border-right: 1px solid #00407d;
+      padding-top: 20px;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 12px 16px;
+      color: #333;
+      text-decoration: none;
+      border-left: 4px solid transparent;
+    }
+
+    .sidebar a:hover {
+      background-color: #ddd;
+    }
+
+    .sidebar a.active {
+      background-color: #e6f0ff;
+      border-left: 8px solid #00407d;
+      font-weight: bold;
+      color: #00407d !important;
+    }
+
+    /* menu tabs */
+    .active-tab {
+    background-color: #00407d !important;
+    color: white !important;
+  }
+
+  .blank-border{
+      border: none;
+    }
+
+    body{
+      color: #00407d !important;
+    }
+
+
+    /* new navigations */
+    ul {
+  list-style-type: none;
+  /* margin: 0; */
+  padding: 0;
+  overflow: hidden;
+  background-color: white;
+  /* height: 7vh; */
+}
+
+li {
+  float: left;
+  /* height: 7vh; */
+}
+
+li a {
+  display: block;
+  color: #00407d;
+  text-align: center;
+  /* padding: 14px 16px; */
+  text-decoration: none;
+}
+
+li a:hover:not(.active) {
+  background-color: white;
+}
+
+.active:hover {
+  color: white;
+}
+
+.active {
+  background-color: #00407d;
+  color: white;
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #f9f9f9;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+}
+
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+
+.desc {
+  padding: 15px;
+  text-align: center;
+}
+
+
+.disabled-link {
+    pointer-events: none; /* Prevents all mouse events */
+    cursor: default;     /* Changes the cursor to the default arrow */
+    opacity: 0.5;        /* Makes the link look grayed out */
+}
+    
+  </style>
+</head>
+<body style="color: #00407d;">
+
+<div class="" >
+{% if current_user.is_authenticated %}
+  <nav class="w3-container w3-padding  w3-top w3-hide-medium w3-hide-small" style=" overflow:auto;">
+      <ul class="w3-small w3-padding" style="height: 6vh; overflow-x: auto;">
+        <li class="w3-margin-right w3-hover-shadow" style="background-color: #00407d !important; border-radius: 25px;">
+          <a class="w3-padding w3-margin-right " style="color: white !important; background-color: transparent; text-decoration: none; border-radius: 25px;" href="#home">
+            {% if current_user.is_authenticated %}
+              <span class="">
+                <img class="w3-card w3-circle w3-white" style="width: 10%; height: 10%;" src="{{ current_user.avatar(128) }}">
+              </span>
+            {% endif %} {{ current_user.username }}
+          </a>
+        </li>
+        <li class="w3-hide-small w3-hide-medium w3-hover-shadow w3-margin-right" style="border-radius: 25px;">
+          <a class="{% if title == 'Home' %} active {% endif %} w3-border w3-padding  " style="border-radius: 25px; text-decoration: none;" href="{{url_for('welcome')}}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-house-door" viewBox="0 0 16 16">
+              <path d="M8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4.5a.5.5 0 0 0 .5-.5v-4h2v4a.5.5 0 0 0 .5.5H14a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293zM2.5 14V7.707l5.5-5.5 5.5 5.5V14H10v-4a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5v4z"/>
+            </svg>
+            Home
+          </a>
+        </li>
+        <li class="w3-hide-small w3-hide-medium w3-hover-shadow w3-margin-right" style="border-radius: 25px;">
+          <a class="{% if title == 'Analytics' %} active {% endif %} w3-border w3-padding  {% if current_user.userRole == 'Brand Ambassador' %} disabled-link w3-hide {% endif %} " style="border-radius: 25px; text-decoration: none;" href="{{url_for('akello_monitor')}}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-yelp" viewBox="0 0 16 16">
+              <path d="m4.188 10.095.736-.17.073-.02A.813.813 0 0 0 5.45 8.65a1 1 0 0 0-.3-.258 3 3 0 0 0-.428-.198l-.808-.295a76 76 0 0 0-1.364-.493C2.253 7.3 2 7.208 1.783 7.14c-.041-.013-.087-.025-.124-.038a2.1 2.1 0 0 0-.606-.116.72.72 0 0 0-.572.245 2 2 0 0 0-.105.132 1.6 1.6 0 0 0-.155.309c-.15.443-.225.908-.22 1.376.002.423.013.966.246 1.334a.8.8 0 0 0 .22.24c.166.114.333.129.507.141.26.019.513-.045.764-.103l2.447-.566zm8.219-3.911a4.2 4.2 0 0 0-.8-1.14 1.6 1.6 0 0 0-.275-.21 2 2 0 0 0-.15-.073.72.72 0 0 0-.621.031c-.142.07-.294.182-.496.37-.028.028-.063.06-.094.089-.167.156-.353.35-.574.575q-.51.516-1.01 1.042l-.598.62a3 3 0 0 0-.298.365 1 1 0 0 0-.157.364.8.8 0 0 0 .007.301q0 .007.003.013a.81.81 0 0 0 .945.616l.074-.014 3.185-.736c.251-.058.506-.112.732-.242.151-.088.295-.175.394-.35a.8.8 0 0 0 .093-.313c.05-.434-.178-.927-.36-1.308M6.706 7.523c.23-.29.23-.722.25-1.075.07-1.181.143-2.362.201-3.543.022-.448.07-.89.044-1.34-.022-.372-.025-.799-.26-1.104C6.528-.077 5.644-.033 5.04.05q-.278.038-.553.104a8 8 0 0 0-.543.149c-.58.19-1.393.537-1.53 1.204-.078.377.106.763.249 1.107.173.417.41.792.625 1.185.57 1.036 1.15 2.066 1.728 3.097.172.308.36.697.695.857q.033.015.068.025c.15.057.313.068.469.032l.028-.007a.8.8 0 0 0 .377-.226zm-.276 3.161a.74.74 0 0 0-.923-.234 1 1 0 0 0-.145.09 2 2 0 0 0-.346.354c-.026.033-.05.077-.08.104l-.512.705q-.435.591-.861 1.193c-.185.26-.346.479-.472.673l-.072.11c-.152.235-.238.406-.282.559a.7.7 0 0 0-.03.314c.013.11.05.217.108.312q.046.07.1.138a1.6 1.6 0 0 0 .257.237 4.5 4.5 0 0 0 2.196.76 1.6 1.6 0 0 0 .349-.027 2 2 0 0 0 .163-.048.8.8 0 0 0 .278-.178.7.7 0 0 0 .17-.266c.059-.147.098-.335.123-.613l.012-.13c.02-.231.03-.502.045-.821q.037-.735.06-1.469l.033-.87a2.1 2.1 0 0 0-.055-.623 1 1 0 0 0-.117-.27Zm5.783 1.362a2.2 2.2 0 0 0-.498-.378l-.112-.067c-.199-.12-.438-.246-.719-.398q-.644-.353-1.295-.695l-.767-.407c-.04-.012-.08-.04-.118-.059a2 2 0 0 0-.466-.166 1 1 0 0 0-.17-.018.74.74 0 0 0-.725.616 1 1 0 0 0 .01.293c.038.204.13.406.224.583l.41.768q.341.65.696 1.294c.152.28.28.52.398.719q.036.057.068.112c.145.239.261.39.379.497a.73.73 0 0 0 .596.201 2 2 0 0 0 .168-.029 1.6 1.6 0 0 0 .325-.129 4 4 0 0 0 .855-.64c.306-.3.577-.63.788-1.006q.045-.08.076-.165a2 2 0 0 0 .051-.161q.019-.083.029-.168a.8.8 0 0 0-.038-.327.7.7 0 0 0-.165-.27"/>
+            </svg>
+            Analytics
+          </a>
+        </li>
+        <!-- <li>
+            <a href="#">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-bar-chart" viewBox="0 0 16 16">
+                <path d="M4 11H2v3h2zm5-4H7v7h2zm5-5v12h-2V2zm-2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM6 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zm-5 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/>
+              </svg>
+              Key Metrics
+            </a>
+        </li>
+        <li>
+          <a href="#">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-calendar2-week" viewBox="0 0 16 16">
+                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M2 2a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/>
+                <path d="M2.5 4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5zM11 7.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm-3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm-5 3a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"/>
+            </svg>
+            Planning
+          </a>
+        </li> -->
+        <li class="w3-hide-small w3-hide-medium w3-hover-shadow w3-margin-right" style="border-radius: 25px;">
+          <a class="{% if title == 'Contracting' %} active {% endif %} w3-border w3-padding {% if current_user.userRole == 'Brand Ambassador' %} disabled-link w3-hide {% endif %}  " style="border-radius: 25px; text-decoration: none;" href="{{url_for('contracting')}}">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-journal-text" viewBox="0 0 16 16">
+                <path d="M5 10.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5"/>
+                <path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2"/>
+                <path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1zm0 3v-.5a.5.5 0 0 1 1 0V8h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1zm0 3v-.5a.5.5 0 0 1 1 0v.5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1z"/>
+              </svg>
+              IPA Contracting
+            </a>
+        </li>
+        <li class="w3-hide-small w3-hide-medium w3-hover-shadow w3-margin-right" style="border-radius: 25px;">
+          <a disabled class="{% if title == 'Champions' %} active {% endif %} w3-border w3-padding disabled-link" style="border-radius: 25px; text-decoration: none;" href="{{url_for('all_champion_details')}}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-mortarboard" viewBox="0 0 16 16">
+              <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917zM8 8.46 1.758 5.965 8 3.052l6.242 2.913z"/>
+              <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466zm-.068 1.873.22-.748 3.496 1.311a.5.5 0 0 0 .352 0l3.496-1.311.22.748L8 12.46z"/>
+            </svg>
+            Champions
+          </a>
+        </li>
+        <li class="w3-hide-small w3-hide-medium w3-hover-shadow w3-margin-right" style="border-radius: 25px;">
+          <a class="{% if title == 'Book Allocations' %} active {% endif %} w3-border w3-padding {% if current_user.userRole == 'Brand Ambassador' %} disabled-link w3-hide {% endif %}  " style="border-radius: 25px; text-decoration: none;" href="{{url_for('bookallocations')}}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-book" viewBox="0 0 16 16">
+              <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
+            </svg>
+            Book Allocations
+          </a>
+        </li>
+        <li class="w3-hide-small w3-hide-medium w3-hover-shadow w3-margin-right" style="border-radius: 25px;">
+          <a class="{% if title == 'Reports' %} active {% endif %}  w3-border w3-padding " style="border-radius: 25px; text-decoration: none;"  href="{{url_for('akello_weekly_reports')}}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard-data" viewBox="0 0 16 16">
+              <path d="M4 11a1 1 0 1 1 2 0v1a1 1 0 1 1-2 0zm6-4a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0zM7 9a1 1 0 0 1 2 0v3a1 1 0 1 1-2 0z"/>
+              <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1z"/>
+              <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0z"/>
+            </svg>
+            Reports
+          </a>
+        </li>
+        <li class="w3-hide-small w3-hide-medium w3-hover-shadow w3-margin-right" style="border-radius: 25px;">
+          <a class="{% if title == 'Workspaces' %} active {% endif %} w3-border w3-padding {% if current_user.userRole == 'Brand Ambassador' %} disabled-link w3-hide {% endif %}  " style="border-radius: 25px; text-decoration: none;" href="{{url_for('projectmanagement')}}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="bi bi-ui-radios-grid" viewBox="0 0 16 16">
+                <path d="M3.5 15a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5m9-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5m0 9a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5M16 3.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0m-9 9a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0m5.5 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m-9-11a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m0 2a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7"/>
+            </svg>
+            Workspaces
+          </a>
+        </li>
+        <li class="w3-hide-small w3-hide-medium w3-hover-shadow w3-margin-right" style="border-radius: 25px;">
+          <a class="{% if title == 'Help desk' %} active {% endif %} w3-border w3-padding " style="border-radius: 25px; text-decoration: none;" href="{{url_for('help_desk')}}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="bi bi-bug" viewBox="0 0 16 16">
+                <path d="M4.355.522a.5.5 0 0 1 .623.333l.291.956A4.979 4.979 0 0 1 8 1c1.007 0 1.946.298 2.731.811l.29-.956a.5.5 0 1 1 .957.29l-.41 1.352A4.985 4.985 0 0 1 13 6h.5a.5.5 0 0 0 .5-.5V5a.5.5 0 0 1 1 0v.5A1.5 1.5 0 0 1 13.5 7H13v1h1.5a.5.5 0 0 1 0 1H13v1h.5a1.5 1.5 0 0 1 1.5 1.5v.5a.5.5 0 1 1-1 0v-.5a.5.5 0 0 0-.5-.5H13a5 5 0 0 1-10 0h-.5a.5.5 0 0 0-.5.5v.5a.5.5 0 1 1-1 0v-.5A1.5 1.5 0 0 1 2.5 10H3V9H1.5a.5.5 0 0 1 0-1H3V7h-.5A1.5 1.5 0 0 1 1 5.5V5a.5.5 0 0 1 1 0v.5a.5.5 0 0 0 .5.5H3c0-1.364.547-2.601 1.432-3.503l-.41-1.352a.5.5 0 0 1 .333-.623zM4 7v4a4 4 0 0 0 3.5 3.97V7zm4.5 0v7.97A4 4 0 0 0 12 11V7zM12 6a3.989 3.989 0 0 0-1.334-2.982A3.983 3.983 0 0 0 8 2a3.983 3.983 0 0 0-2.667 1.018A3.989 3.989 0 0 0 4 6z"/>
+            </svg>
+            Help Desk
+          </a>
+        </li>
+        <li class="w3-hide-small w3-hide w3-hide-medium w3-hover-shadow w3-margin-right" style="border-radius: 25px;">
+          <a class="w3-border w3-padding {% if current_user.userRole == 'Brand Ambassador' %} disabled-link w3-hide {% endif %}  " href="#" style="border-radius: 25px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="bi bi-people" viewBox="0 0 16 16">
+                <path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1h8Zm-7.978-1A.261.261 0 0 1 7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002a.274.274 0 0 1-.014.002H7.022ZM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM6.936 9.28a5.88 5.88 0 0 0-1.23-.247A7.35 7.35 0 0 0 5 9c-4 0-5 3-5 4 0 .667.333 1 1 1h4.216A2.238 2.238 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816ZM4.92 10A5.493 5.493 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275ZM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0Zm3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/>
+            </svg>
+            Team
+          </a>
+        </li>
+        <li class="w3-hide-small w3-hide-medium w3-margin-right w3-hover-shadow" style="border-radius: 25px;">
+          <a class="{% if title == 'Administration' %} active {% endif %} {% if current_user.userRole != 'Admin' %} w3-hide {% endif %} w3-border w3-padding {% if current_user.userRole == 'Brand Ambassador' %} disabled-link w3-hide {% endif %}  " style="border-radius: 25px; text-decoration: none;" href="{{url_for('administration')}}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear" viewBox="0 0 16 16">
+                <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/>
+                <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z"/>
+            </svg>
+            Administration
+          </a>
+        </li>
+        <li class="w3-hide-small w3-hide-medium w3-margin-right w3-hover-shadow" style="border-radius: 25px;">
+          <a class="{% if title == 'Profile' %} active {% endif %} w3-border w3-padding " style="border-radius: 25px; text-decoration: none;" href="{{url_for('profile',username=current_user.username)}}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-person" viewBox="0 0 16 16">
+                <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/>
+            </svg>
+            Profile
+          </a>
+        </li>
+        <li class="w3-hide-small w3-hide-medium w3-hover-shadow" style="float:right ; border-radius: 25px;">
+          <a class="w3-red w3-border w3-padding " style="border-radius: 25px; text-decoration: none;" href="{{url_for('logout')}}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-escape" viewBox="0 0 16 16">
+              <path d="M8.538 1.02a.5.5 0 1 0-.076.998 6 6 0 1 1-6.445 6.444.5.5 0 0 0-.997.076A7 7 0 1 0 8.538 1.02"/>
+              <path d="M7.096 7.828a.5.5 0 0 0 .707-.707L2.707 2.025h2.768a.5.5 0 1 0 0-1H1.5a.5.5 0 0 0-.5.5V5.5a.5.5 0 0 0 1 0V2.732z"/>
+            </svg> Logout
+          </a>
+        </li>
+      </ul>
+      
+  </nav>
+  
+<!-- Mobile Menu Toggle Button -->
+<a href="javascript:void(0)" class="w3-bar-item w3-button w3-right w3-hide-large w3-hover-teal" onclick="w3_open()">
+  <i class="fa fa-bars fa-lg"></i>
+</a>
+
+<!-- Sidebar Navigation (Off-Canvas) -->
+<nav class="w3-sidebar w3-light-grey w3-card-4 w3-animate-left w3-hide-large" style="width: 280px; display: none; z-index: 999;" id="mySidebar">
+  
+  <!-- Close Button -->
+  <div class="w3-container w3-text-black w3-theme-d1 w3-padding-16">
+    <span onclick="w3_close()" class="w3-button w3-white w3-right w3-round" style="padding: 4px 10px;">
+      <i class="fa fa-times"></i>
+    </span>
+    <h5 class="w3-margin-0 w3-text-black w3-small"><i class="fa fa-bars w3-margin-right"></i>Akello Simulation </h5>
+  </div>
+<!-- User Profile Section -->
+  <div class="w3-center w3-padding-24" style="background: #f0f5ff;">
+    <img src="{{ current_user.avatar(128) }}" 
+         alt="User Avatar" 
+         class="w3-circle w3-border w3-border-white" 
+         style="width: 80px; height: 80px; object-fit: cover;">
+    <h6 class="w3-margin-top w3-margin-bottom w3-bold">{{ current_user.username }}</h6>
+    <p class="w3-text-grey w3-tiny">{{ current_user.userRole }}</p>
+  </div>
+
+  <!-- Navigation Links -->
+  <div class="w3-bar-block w3-padding-top-0">
+    
+    <!-- Home -->
+    <a href="{{ url_for('welcome') }}" 
+       class="w3-bar-item w3-button w3-padding {% if title == 'Home' %}w3-theme-l1 w3-border-left active{% endif %}"
+       style="border-left-width: 4px !important;">
+      <i class="bi bi-house-door w3-margin-right"></i> Home
+    </a>
+
+    <!-- Analytics -->
+    <a href="{{ url_for('akello_monitor') }}" 
+       class="w3-bar-item w3-button w3-padding {% if title == 'Analytics' %}w3-theme-l1 w3-border-left active{% endif %}">
+      <i class="bi bi-graph-up-arrow w3-margin-right"></i> Analytics
+    </a>
+
+    <!-- Contracting -->
+    <a href="{{ url_for('contracting') }}" 
+       class="w3-bar-item w3-button w3-padding {% if title == 'Contracting' %}w3-theme-l1 w3-border-left active{% endif %}">
+      <i class="bi bi-journal-text w3-margin-right"></i> IPA Contracting
+    </a>
+
+    <!-- School Tracker -->
+    <a href="{{ url_for('all_champion_details') }}" 
+       class="w3-bar-item w3-button w3-padding {% if title == 'Champions' %}w3-theme-l1 w3-border-left active{% endif %}"
+       disabled>
+      <i class="bi bi-mortarboard w3-margin-right"></i> Champions
+    </a>
+
+    <!-- Book Allocations -->
+    <a href="{{ url_for('bookallocations') }}" 
+       class="w3-bar-item w3-button w3-padding {% if title == 'Book Allocations' %}w3-theme-l1 w3-border-left active{% endif %}">
+      <i class="bi bi-book w3-margin-right"></i> Book Allocations
+    </a>
+
+    <!-- Reports -->
+    <a href="{{ url_for('akello_weekly_reports') }}" 
+       class="w3-bar-item w3-button w3-padding {% if title == 'Reports' %}w3-theme-l1 w3-border-left active{% endif %}">
+      <i class="bi bi-clipboard-data w3-margin-right"></i> Reports
+    </a>
+
+    <!-- Workspaces -->
+    <a href="{{ url_for('workspaces') }}" 
+       class="w3-bar-item w3-button w3-padding {% if title == 'Workspaces' %}w3-theme-l1 w3-border-left active{% endif %}">
+      <i class="bi bi-ui-radios-grid w3-margin-right"></i> Workspaces
+    </a>
+
+    <!-- Help Desk -->
+    <a href="{{ url_for('helpdesk') }}" 
+       class="w3-bar-item w3-button w3-padding {% if title == 'Help desk' %}w3-theme-l1 w3-border-left active{% endif %}">
+      <i class="bi bi-bug w3-margin-right"></i> Help Desk
+    </a>
+
+    <!-- Settings (Only for Admin) -->
+    {% if current_user.userRole == 'Admin' %}
+    <a href="{{ url_for('administration') }}" 
+       class="w3-bar-item w3-button w3-padding {% if title == 'Settings' %}w3-theme-l1 w3-border-left active{% endif %}">
+      <i class="bi bi-gear w3-margin-right"></i> Settings
+    </a>
+    {% endif %}
+
+    <!-- Profile -->
+    <a href="{{ url_for('profile', username=current_user.username) }}" 
+       class="w3-bar-item w3-button w3-padding {% if title == 'Profile' %}w3-theme-l1 w3-border-left active{% endif %}">
+      <i class="bi bi-person w3-margin-right"></i> Profile
+    </a>
+
+    <!-- Logout -->
+    <a href="{{ url_for('logout') }}" 
+       class="w3-bar-item w3-button w3-red w3-padding w3-center w3-margin-top w3-topbar" 
+       style="border-top: 1px solid #ccc;">
+      <i class="bi bi-box-arrow-right w3-margin-right"></i> Logout
+    </a>
+  </div>
+</nav>
+
+
+<!-- Mobile Sidebar Navigation -->
+<nav id="mobileNav" class="w3-sidebar w3-card-4 w3-animate-left w3-hide-large" style="width: 280px; display: none; z-index: 999;">
+
+  <!-- Close Button -->
+  <div class="w3-container w3-padding-small w3-right-align">
+    <button class="w3-button w3-round w3-white w3-border" onclick="w3_close()" title="Close">
+      <i class="fa fa-times"></i>
+    </button>
+  </div>
+
+  <!-- Profile Header -->
+  <div class="w3-center w3-padding-24" style="background: linear-gradient(135deg, #eaf2ff 0%, #ffffff 100%);">
+    <div style="position: relative; display: inline-block;">
+      <img
+        src="{{ current_user.avatar(128) }}"
+        alt="User Avatar"
+        class="w3-circle"
+        style="width: 84px; height: 84px; object-fit: cover; border: 3px solid #fff; box-shadow: 0 6px 18px rgba(0,0,0,0.12);"
+      >
+      <span
+        class="w3-badge w3-teal"
+        style="position: absolute; bottom: -2px; right: -2px; font-size: 10px; padding: 5px 8px; border-radius: 999px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <i class="bi bi-check2"></i>
+      </span>
+    </div>
+
+    <h6 class="w3-margin-top w3-margin-bottom" style="font-weight: 700; color: #1f2c48;">
+      {{ current_user.username }}
+    </h6>
+    <span class="role-chip">{{ current_user.userRole }}</span>
+  </div>
+
+  <!-- Navigation -->
+  <div class="w3-padding-small">
+    <a href="{{ url_for('welcome') }}"
+       class="nav-link {% if title == 'Home' %} active {% endif %}">
+      <i class="bi bi-house-door nav-icon"></i>
+      <span>Home</span>
+    </a>
+
+    <a href="{{ url_for('akello_monitor') }}"
+       class="nav-link {% if title == 'Analytics' %} active {% endif %}">
+      <i class="bi bi-graph-up-arrow nav-icon"></i>
+      <span>Analytics</span>
+    </a>
+
+    <a href="{{ url_for('contracting') }}"
+       class="nav-link {% if title == 'Contracting' %} active {% endif %}">
+      <i class="bi bi-journal-text nav-icon"></i>
+      <span>IPA Contracting</span>
+    </a>
+
+    <a href="{{ url_for('all_champion_details') }}"
+       class="nav-link {% if title == 'Champions' %} active {% endif %} disabled-link" title="Coming soon">
+      <i class="bi bi-mortarboard nav-icon"></i>
+      <span>Champions</span>
+      <span class="w3-badge w3-light-grey w3-round-small nav-badge">Beta</span>
+    </a>
+
+    <a href="{{ url_for('bookallocations') }}"
+       class="nav-link {% if title == 'Book Allocations' %} active {% endif %}">
+      <i class="bi bi-book nav-icon"></i>
+      <span>Book Allocations</span>
+    </a>
+
+    <a href="{{ url_for('akello_weekly_reports') }}"
+       class="nav-link {% if title == 'Reports' %} active {% endif %}">
+      <i class="bi bi-clipboard-data nav-icon"></i>
+      <span>Reports</span>
+    </a>
+
+    <a href="{{ url_for('workspaces') }}"
+       class="nav-link {% if title == 'Workspaces' %} active {% endif %}">
+      <i class="bi bi-ui-radios-grid nav-icon"></i>
+      <span>Workspaces</span>
+    </a>
+
+    <a href="{{ url_for('helpdesk') }}"
+       class="nav-link {% if title == 'Help desk' %} active {% endif %}">
+      <i class="bi bi-bug nav-icon"></i>
+      <span>Help Desk</span>
+    </a>
+
+    {% if current_user.userRole == 'Admin' %}
+    <a href="{{ url_for('administration') }}"
+       class="nav-link {% if title == 'Settings' %} active {% endif %}">
+      <i class="bi bi-gear nav-icon"></i>
+      <span>Settings</span>
+      <span class="w3-badge w3-indigo w3-round-small nav-badge">Admin</span>
+    </a>
+    {% endif %}
+
+    <div class="nav-divider"></div>
+
+    <a href="{{ url_for('profile', username=current_user.username) }}"
+       class="nav-link {% if title == 'Profile' %} active {% endif %}">
+      <i class="bi bi-person nav-icon"></i>
+      <span>Profile</span>
+    </a>
+
+    <a href="{{ url_for('logout') }}"
+       class="nav-link w3-red logout">
+      <i class="bi bi-box-arrow-right nav-icon"></i>
+      <span>Logout</span
+    ></a>
+  </div>
+</nav>
+
+<style>
+  /* Scoped mobile nav styling */
+  #mobileNav .role-chip {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: 999px;
+    background: #e6f0ff;
+    color: #00407d;
+    border: 1px solid rgba(0,64,125,0.15);
+  }
+
+  #mobileNav .nav-divider {
+    height: 1px;
+    background: #eef2f8;
+    margin: 10px 6px;
+  }
+
+  #mobileNav .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    margin: 4px 6px;
+    color: #1f2c48;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all .18s ease;
+  }
+
+  #mobileNav .nav-link:hover {
+    background: #f4f7fe;
+    border-color: #e7eefc;
+  }
+
+  #mobileNav .nav-link.active {
+    background: linear-gradient(135deg, #eaf2ff 0%, #ffffff 100%);
+    border-color: #d7e6ff;
+    box-shadow: 0 6px 16px rgba(0,64,125,0.08);
+  }
+
+  #mobileNav .nav-link.logout {
+    color: #b32020;
+    border-color: #f0dede;
+    background: #fff7f7;
+  }
+  #mobileNav .nav-link.logout:hover {
+    background: #ffecec;
+  }
+
+  #mobileNav .nav-icon {
+    font-size: 16px;
+    color: #00407d;
+    width: 18px;
+    text-align: center;
+  }
+
+  #mobileNav .nav-badge {
+    margin-left: auto;
+    font-size: 10px;
+    color: #1f2c48;
+    border: 1px solid #e0e6f4;
+    background: #f8faff;
+  }
+</style>
+
+  {% endif %}
+
+
+  <div class="row content" style="height: 95vh; ">
+  
+    <div class="col-sm-3 w3-hide sidenav {% if current_user.is_anonymous %} w3-hide {% endif %}" style="background: white;">
+      
+      <div class="sidebar w3-card w3-hide-medium w3-hide-small" style="overflow: hidden;">
+        <div class="w3-margin-bottom w3-padding">
+            {% if current_user.is_authenticated %}
+              <span class="w3-margin">
+                <img class="w3-card w3-circle w3-white" src="{{ current_user.avatar(128) }}">
+              </span>
+            {% endif %}
+            <br>
+            <!-- <span class="w3-center w3-card w3-border w3-margin w3-padding" style="text-align: center; border-radius: 25px 25px 25px 25xpx;">{{ current_user.username }}</span> -->
+              <span class="w3-margin-top" style=" color: #00407d;">
+                <b class=" w3-large w3-padding" style="border-bottom: 5px solid #00407d; border-radius: 20px 20px 20px 20px;">
+                    {{ current_user.username }}
+                </b>
+              </span>
+            
+        </div>
+        <div class="w3-margin-top">
+          <a class="{% if title == 'Home' %} active {% endif %}" href="{{url_for('index')}}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-house-door" viewBox="0 0 16 16">
+            <path d="M8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4.5a.5.5 0 0 0 .5-.5v-4h2v4a.5.5 0 0 0 .5.5H14a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293zM2.5 14V7.707l5.5-5.5 5.5 5.5V14H10v-4a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5v4z"/>
+          </svg>
+          Home
+        </a>
+        <a class="{% if title == 'Analytics' %} active {% endif %} " href="{{url_for('akello_analytics')}}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-yelp" viewBox="0 0 16 16">
+            <path d="m4.188 10.095.736-.17.073-.02A.813.813 0 0 0 5.45 8.65a1 1 0 0 0-.3-.258 3 3 0 0 0-.428-.198l-.808-.295a76 76 0 0 0-1.364-.493C2.253 7.3 2 7.208 1.783 7.14c-.041-.013-.087-.025-.124-.038a2.1 2.1 0 0 0-.606-.116.72.72 0 0 0-.572.245 2 2 0 0 0-.105.132 1.6 1.6 0 0 0-.155.309c-.15.443-.225.908-.22 1.376.002.423.013.966.246 1.334a.8.8 0 0 0 .22.24c.166.114.333.129.507.141.26.019.513-.045.764-.103l2.447-.566zm8.219-3.911a4.2 4.2 0 0 0-.8-1.14 1.6 1.6 0 0 0-.275-.21 2 2 0 0 0-.15-.073.72.72 0 0 0-.621.031c-.142.07-.294.182-.496.37-.028.028-.063.06-.094.089-.167.156-.353.35-.574.575q-.51.516-1.01 1.042l-.598.62a3 3 0 0 0-.298.365 1 1 0 0 0-.157.364.8.8 0 0 0 .007.301q0 .007.003.013a.81.81 0 0 0 .945.616l.074-.014 3.185-.736c.251-.058.506-.112.732-.242.151-.088.295-.175.394-.35a.8.8 0 0 0 .093-.313c.05-.434-.178-.927-.36-1.308M6.706 7.523c.23-.29.23-.722.25-1.075.07-1.181.143-2.362.201-3.543.022-.448.07-.89.044-1.34-.022-.372-.025-.799-.26-1.104C6.528-.077 5.644-.033 5.04.05q-.278.038-.553.104a8 8 0 0 0-.543.149c-.58.19-1.393.537-1.53 1.204-.078.377.106.763.249 1.107.173.417.41.792.625 1.185.57 1.036 1.15 2.066 1.728 3.097.172.308.36.697.695.857q.033.015.068.025c.15.057.313.068.469.032l.028-.007a.8.8 0 0 0 .377-.226zm-.276 3.161a.74.74 0 0 0-.923-.234 1 1 0 0 0-.145.09 2 2 0 0 0-.346.354c-.026.033-.05.077-.08.104l-.512.705q-.435.591-.861 1.193c-.185.26-.346.479-.472.673l-.072.11c-.152.235-.238.406-.282.559a.7.7 0 0 0-.03.314c.013.11.05.217.108.312q.046.07.1.138a1.6 1.6 0 0 0 .257.237 4.5 4.5 0 0 0 2.196.76 1.6 1.6 0 0 0 .349-.027 2 2 0 0 0 .163-.048.8.8 0 0 0 .278-.178.7.7 0 0 0 .17-.266c.059-.147.098-.335.123-.613l.012-.13c.02-.231.03-.502.045-.821q.037-.735.06-1.469l.033-.87a2.1 2.1 0 0 0-.055-.623 1 1 0 0 0-.117-.27Zm5.783 1.362a2.2 2.2 0 0 0-.498-.378l-.112-.067c-.199-.12-.438-.246-.719-.398q-.644-.353-1.295-.695l-.767-.407c-.04-.012-.08-.04-.118-.059a2 2 0 0 0-.466-.166 1 1 0 0 0-.17-.018.74.74 0 0 0-.725.616 1 1 0 0 0 .01.293c.038.204.13.406.224.583l.41.768q.341.65.696 1.294c.152.28.28.52.398.719q.036.057.068.112c.145.239.261.39.379.497a.73.73 0 0 0 .596.201 2 2 0 0 0 .168-.029 1.6 1.6 0 0 0 .325-.129 4 4 0 0 0 .855-.64c.306-.3.577-.63.788-1.006q.045-.08.076-.165a2 2 0 0 0 .051-.161q.019-.083.029-.168a.8.8 0 0 0-.038-.327.7.7 0 0 0-.165-.27"/>
+          </svg>
+          Analytics
+        </a>
+        <!-- <a href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-yelp" viewBox="0 0 16 16">
+            <path d="m4.188 10.095.736-.17.073-.02A.813.813 0 0 0 5.45 8.65a1 1 0 0 0-.3-.258 3 3 0 0 0-.428-.198l-.808-.295a76 76 0 0 0-1.364-.493C2.253 7.3 2 7.208 1.783 7.14c-.041-.013-.087-.025-.124-.038a2.1 2.1 0 0 0-.606-.116.72.72 0 0 0-.572.245 2 2 0 0 0-.105.132 1.6 1.6 0 0 0-.155.309c-.15.443-.225.908-.22 1.376.002.423.013.966.246 1.334a.8.8 0 0 0 .22.24c.166.114.333.129.507.141.26.019.513-.045.764-.103l2.447-.566zm8.219-3.911a4.2 4.2 0 0 0-.8-1.14 1.6 1.6 0 0 0-.275-.21 2 2 0 0 0-.15-.073.72.72 0 0 0-.621.031c-.142.07-.294.182-.496.37-.028.028-.063.06-.094.089-.167.156-.353.35-.574.575q-.51.516-1.01 1.042l-.598.62a3 3 0 0 0-.298.365 1 1 0 0 0-.157.364.8.8 0 0 0 .007.301q0 .007.003.013a.81.81 0 0 0 .945.616l.074-.014 3.185-.736c.251-.058.506-.112.732-.242.151-.088.295-.175.394-.35a.8.8 0 0 0 .093-.313c.05-.434-.178-.927-.36-1.308M6.706 7.523c.23-.29.23-.722.25-1.075.07-1.181.143-2.362.201-3.543.022-.448.07-.89.044-1.34-.022-.372-.025-.799-.26-1.104C6.528-.077 5.644-.033 5.04.05q-.278.038-.553.104a8 8 0 0 0-.543.149c-.58.19-1.393.537-1.53 1.204-.078.377.106.763.249 1.107.173.417.41.792.625 1.185.57 1.036 1.15 2.066 1.728 3.097.172.308.36.697.695.857q.033.015.068.025c.15.057.313.068.469.032l.028-.007a.8.8 0 0 0 .377-.226zm-.276 3.161a.74.74 0 0 0-.923-.234 1 1 0 0 0-.145.09 2 2 0 0 0-.346.354c-.026.033-.05.077-.08.104l-.512.705q-.435.591-.861 1.193c-.185.26-.346.479-.472.673l-.072.11c-.152.235-.238.406-.282.559a.7.7 0 0 0-.03.314c.013.11.05.217.108.312q.046.07.1.138a1.6 1.6 0 0 0 .257.237 4.5 4.5 0 0 0 2.196.76 1.6 1.6 0 0 0 .349-.027 2 2 0 0 0 .163-.048.8.8 0 0 0 .278-.178.7.7 0 0 0 .17-.266c.059-.147.098-.335.123-.613l.012-.13c.02-.231.03-.502.045-.821q.037-.735.06-1.469l.033-.87a2.1 2.1 0 0 0-.055-.623 1 1 0 0 0-.117-.27Zm5.783 1.362a2.2 2.2 0 0 0-.498-.378l-.112-.067c-.199-.12-.438-.246-.719-.398q-.644-.353-1.295-.695l-.767-.407c-.04-.012-.08-.04-.118-.059a2 2 0 0 0-.466-.166 1 1 0 0 0-.17-.018.74.74 0 0 0-.725.616 1 1 0 0 0 .01.293c.038.204.13.406.224.583l.41.768q.341.65.696 1.294c.152.28.28.52.398.719q.036.057.068.112c.145.239.261.39.379.497a.73.73 0 0 0 .596.201 2 2 0 0 0 .168-.029 1.6 1.6 0 0 0 .325-.129 4 4 0 0 0 .855-.64c.306-.3.577-.63.788-1.006q.045-.08.076-.165a2 2 0 0 0 .051-.161q.019-.083.029-.168a.8.8 0 0 0-.038-.327.7.7 0 0 0-.165-.27"/>
+          </svg>
+          Productivity
+        </a> -->
+        <a href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-bar-chart" viewBox="0 0 16 16">
+            <path d="M4 11H2v3h2zm5-4H7v7h2zm5-5v12h-2V2zm-2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM6 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zm-5 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/>
+          </svg>
+          Key Metrics
+        </a>
+        <a href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-calendar2-week" viewBox="0 0 16 16">
+              <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M2 2a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/>
+              <path d="M2.5 4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5zM11 7.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm-3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm-5 3a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"/>
+          </svg>
+          Planning
+        </a>
+        <a href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-journal-text" viewBox="0 0 16 16">
+            <path d="M5 10.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5"/>
+            <path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2"/>
+            <path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1zm0 3v-.5a.5.5 0 0 1 1 0V8h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1zm0 3v-.5a.5.5 0 0 1 1 0v.5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1z"/>
+          </svg>
+          IPA Contracting
+        </a>
+        <a class="{% if title == 'School tracker' %} active {% endif %}" href="{{url_for('schooltracker')}}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-mortarboard" viewBox="0 0 16 16">
+            <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917zM8 8.46 1.758 5.965 8 3.052l6.242 2.913z"/>
+            <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466zm-.068 1.873.22-.748 3.496 1.311a.5.5 0 0 0 .352 0l3.496-1.311.22.748L8 12.46z"/>
+          </svg>
+          School Tracker
+        </a>
+        <a class="{% if title == 'Book Allocations' %} active {% endif %}" href="{{url_for('bookallocations')}}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-book" viewBox="0 0 16 16">
+            <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
+          </svg>
+          Book Allocations
+        </a>
+        <a href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="bi bi-ui-radios-grid" viewBox="0 0 16 16">
+              <path d="M3.5 15a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5m9-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5m0 9a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5M16 3.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0m-9 9a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0m5.5 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m-9-11a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m0 2a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7"/>
+          </svg>
+          Workspaces
+        </a>
+        <a href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="bi bi-bug" viewBox="0 0 16 16">
+              <path d="M4.355.522a.5.5 0 0 1 .623.333l.291.956A4.979 4.979 0 0 1 8 1c1.007 0 1.946.298 2.731.811l.29-.956a.5.5 0 1 1 .957.29l-.41 1.352A4.985 4.985 0 0 1 13 6h.5a.5.5 0 0 0 .5-.5V5a.5.5 0 0 1 1 0v.5A1.5 1.5 0 0 1 13.5 7H13v1h1.5a.5.5 0 0 1 0 1H13v1h.5a1.5 1.5 0 0 1 1.5 1.5v.5a.5.5 0 1 1-1 0v-.5a.5.5 0 0 0-.5-.5H13a5 5 0 0 1-10 0h-.5a.5.5 0 0 0-.5.5v.5a.5.5 0 1 1-1 0v-.5A1.5 1.5 0 0 1 2.5 10H3V9H1.5a.5.5 0 0 1 0-1H3V7h-.5A1.5 1.5 0 0 1 1 5.5V5a.5.5 0 0 1 1 0v.5a.5.5 0 0 0 .5.5H3c0-1.364.547-2.601 1.432-3.503l-.41-1.352a.5.5 0 0 1 .333-.623zM4 7v4a4 4 0 0 0 3.5 3.97V7zm4.5 0v7.97A4 4 0 0 0 12 11V7zM12 6a3.989 3.989 0 0 0-1.334-2.982A3.983 3.983 0 0 0 8 2a3.983 3.983 0 0 0-2.667 1.018A3.989 3.989 0 0 0 4 6z"/>
+          </svg>
+          Help Desk
+        </a>
+        <a href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="bi bi-people" viewBox="0 0 16 16">
+              <path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1h8Zm-7.978-1A.261.261 0 0 1 7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002a.274.274 0 0 1-.014.002H7.022ZM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM6.936 9.28a5.88 5.88 0 0 0-1.23-.247A7.35 7.35 0 0 0 5 9c-4 0-5 3-5 4 0 .667.333 1 1 1h4.216A2.238 2.238 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816ZM4.92 10A5.493 5.493 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275ZM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0Zm3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/>
+          </svg>
+          Team
+        </a>
+        <a class="{% if title == 'Profile' %} active {% endif %}" href="{{url_for('profile',username=current_user.username)}}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-person" viewBox="0 0 16 16">
+              <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/>
+          </svg>
+          Profile
+        </a>
+        <a class="{% if title == 'Settings' %} active {% endif %}" href="{{url_for('administration')}}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear" viewBox="0 0 16 16">
+              <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/>
+              <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z"/>
+          </svg>
+          Settings
+        </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="w3-container w3-main margin" style="height: 94vh; margin-top: 1%;">
+        <div class="col-sm-12" style=" margin-top: 2%;">
+          {% if title == 'Sign In' %}
+            
+          {% else %}
+            <p class="w3-margin-top" style="  color: #00407d;">
+              <b class="w3-left w3-large w3-padding" style="border-bottom: 5px solid #00407d; border-radius: 20px 20px 20px 20px;">
+                  {{title}}
+              </b>
+            </p>
+          {% endif %}
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Tabbed Menu
+  function openMenu(evt, menuName) {
+    var i, x, tablinks;
+    x = document.getElementsByClassName("menu");
+    for (i = 0; i < x.length; i++) {
+      x[i].style.display = "none";
+    }
+
+    tablinks = document.getElementsByClassName("tablink");
+    for (i = 0; i < tablinks.length; i++) {
+      tablinks[i].classList.remove("active-tab");
+    }
+
+    document.getElementById(menuName).style.display = "block";
+    evt.currentTarget.classList.add("active-tab");
+  }
+
+  // Automatically click the default tab (ensure the element with id="myLink" exists)
+  document.getElementById("myLink").click();
+</script>
+
+
+<script>
+// Script to open and close sidebar
+function w3_open() {
+    document.getElementById("mySidebar").style.display = "block";
+    document.getElementById("myOverlay").style.display = "block";
+}
+ 
+function w3_close() {
+    document.getElementById("mySidebar").style.display = "none";
+    document.getElementById("myOverlay").style.display = "none";
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- <script src="{{ url_for('static', filename='libraryinstitutions.js') }}"></script> -->
+
+<!-- <script src="{{ url_for('static', filename='chat-log-by-province.js') }}"></script>
+<script src="{{ url_for('static', filename='allmetrics.js') }}"></script>
+<script src="{{ url_for('static', filename='exportdocuments.js') }}"></script>
+<script src="{{ url_for('static', filename='aslprovinceusage.js') }}"></script>
+<script src="{{ url_for('static', filename='aslandal.js') }}"></script> -->
+
+</body>
+</html>

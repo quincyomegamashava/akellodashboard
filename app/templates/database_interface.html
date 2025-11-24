@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Query Interface - {{ title }}</title>
+    
+    <!-- Essential CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Database Interface CSS - Load with highest priority -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/database-interface.css') }}">
+    
+    <!-- External Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/mode-sql.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/theme-github.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/ext-language_tools.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"></script>
+</head>
+<body>
+
+{% block content %}
+<div class="database-container">
+    <!-- Header -->
+    <div class="database-header">
+        <div class="header-content">
+            <h1>Database Query Interface</h1>
+            <div class="header-actions">
+                <select id="databaseSelector" class="db-select">
+                    <option value="">Select Database...</option>
+                </select>
+                <button id="connectBtn" class="btn-primary">Connect</button>
+                <span id="connectionStatus" class="connection-status disconnected">Disconnected</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Interface -->
+    <div class="database-interface">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Database Schema Explorer -->
+            <div class="sidebar-section">
+                <div class="section-header">
+                    <h3>Database Schema</h3>
+                    <button id="refreshSchemaBtn" class="btn-icon" title="Refresh Schema">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div class="schema-tree" id="schemaTree">
+                    <div class="empty-state">
+                        <p>Connect to a database to view schema</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Saved Queries -->
+            <div class="sidebar-section">
+                <div class="section-header">
+                    <h3>Saved Queries</h3>
+                    <button id="newQueryBtn" class="btn-icon" title="New Query">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="saved-queries" id="savedQueries">
+                    <div class="empty-state">
+                        <p>No saved queries</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Query Tabs -->
+            <div class="query-tabs">
+                <div class="tab-header">
+                    <button class="tab-button active" data-tab="sql-editor">SQL Editor</button>
+                    <button class="tab-button" data-tab="visual-builder">Visual Query Builder</button>
+                    <button class="tab-button" data-tab="results">Results</button>
+                </div>
+            </div>
+
+            <!-- SQL Editor Tab -->
+            <div id="sql-editor" class="tab-content active">
+                <div class="editor-toolbar">
+                    <div class="toolbar-group">
+                        <button id="executeBtn" class="btn-success">
+                            <i class="fas fa-play"></i> Execute Query
+                        </button>
+                        <button id="formatBtn" class="btn-secondary">
+                            <i class="fas fa-indent"></i> Format
+                        </button>
+                        <button id="saveQueryBtn" class="btn-secondary">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                    </div>
+                    <div class="toolbar-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="allowModifications">
+                            Allow Modifications
+                        </label>
+                        <label class="input-label">
+                            Limit: <input type="number" id="queryLimit" value="1000" min="1" max="10000" class="limit-input">
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="sql-editor-container">
+                    <div id="sqlEditor" class="sql-editor-ace"></div>
+                </div>
+            </div>
+
+            <!-- Visual Query Builder Tab -->
+            <div id="visual-builder" class="tab-content">
+                <div class="builder-toolbar">
+                    <button id="buildQueryBtn" class="btn-primary">
+                        <i class="fas fa-cogs"></i> Build Query
+                    </button>
+                    <button id="executeBuiltBtn" class="btn-success">
+                        <i class="fas fa-play"></i> Execute
+                    </button>
+                    <button id="clearBuilderBtn" class="btn-secondary">
+                        <i class="fas fa-trash"></i> Clear
+                    </button>
+                </div>
+
+                <div class="query-builder">
+                    <!-- Tables Selection -->
+                    <div class="builder-section">
+                        <h4>Select Tables</h4>
+                        <div class="tables-container" id="tablesContainer">
+                            <div class="empty-state">Connect to database to select tables</div>
+                        </div>
+                    </div>
+
+                    <!-- Columns Selection -->
+                    <div class="builder-section">
+                        <h4><i class="fas fa-columns"></i> Select Columns</h4>
+                        <div class="columns-container" id="columnsContainer">
+                            <div class="empty-state">Select tables first</div>
+                        </div>
+                        <div class="column-options">
+                            <button id="selectAllColumnsBtn" class="btn-sm btn-secondary">Select All</button>
+                            <button id="clearColumnsBtn" class="btn-sm btn-secondary">Clear</button>
+                        </div>
+                    </div>
+
+                    <!-- Date Range Filters -->
+                    <div class="builder-section" id="dateFiltersSection" style="display: none;">
+                        <h4><i class="fas fa-calendar-alt"></i> Date Range Filters</h4>
+                        <div class="date-filters-container" id="dateFiltersContainer">
+                            <!-- Date filters will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Joins -->
+                    <div class="builder-section">
+                        <h4><i class="fas fa-link"></i> Table Joins</h4>
+                        <div class="joins-container" id="joinsContainer">
+                            <button id="addJoinBtn" class="btn-secondary">
+                                <i class="fas fa-plus"></i> Add Join
+                            </button>
+                            <div class="join-suggestions" id="joinSuggestions">
+                                <!-- Auto-suggested joins will appear here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Conditions -->
+                    <div class="builder-section">
+                        <h4><i class="fas fa-filter"></i> WHERE Conditions</h4>
+                        <div class="conditions-container" id="conditionsContainer">
+                            <button id="addConditionBtn" class="btn-secondary">
+                                <i class="fas fa-plus"></i> Add Condition
+                            </button>
+                            <div class="condition-templates">
+                                <button class="btn-sm btn-outline" onclick="dbInterface.addQuickCondition('equals')">Equals</button>
+                                <button class="btn-sm btn-outline" onclick="dbInterface.addQuickCondition('like')">Contains</button>
+                                <button class="btn-sm btn-outline" onclick="dbInterface.addQuickCondition('between')">Between</button>
+                                <button class="btn-sm btn-outline" onclick="dbInterface.addQuickCondition('in')">In List</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grouping & Aggregation -->
+                    <div class="builder-section">
+                        <h4><i class="fas fa-layer-group"></i> Group & Aggregate</h4>
+                        <div class="grouping-container" id="groupingContainer">
+                            <div class="group-by-section">
+                                <label>Group By:</label>
+                                <select id="groupBySelect" multiple class="form-select">
+                                    <option value="">Select columns to group by...</option>
+                                </select>
+                            </div>
+                            <div class="aggregation-section">
+                                <label>Aggregations:</label>
+                                <div id="aggregationsContainer">
+                                    <button id="addAggregationBtn" class="btn-sm btn-secondary">
+                                        <i class="fas fa-plus"></i> Add Aggregation
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Order By -->
+                    <div class="builder-section">
+                        <h4><i class="fas fa-sort"></i> Sort Results</h4>
+                        <div class="orderby-container" id="orderbyContainer">
+                            <button id="addOrderBtn" class="btn-secondary">
+                                <i class="fas fa-plus"></i> Add Sort
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Limit & Pagination -->
+                    <div class="builder-section">
+                        <h4><i class="fas fa-list-ol"></i> Limit Results</h4>
+                        <div class="limit-container">
+                            <div class="limit-controls">
+                                <label for="visualLimit">Limit:</label>
+                                <input type="number" id="visualLimit" value="100" min="1" max="10000" class="limit-input">
+                                <label for="visualOffset">Offset:</label>
+                                <input type="number" id="visualOffset" value="0" min="0" class="limit-input">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Tab -->
+            <div id="results" class="tab-content">
+                <div class="results-toolbar">
+                    <div class="toolbar-group">
+                        <span id="resultsInfo" class="results-info">No results</span>
+                    </div>
+                    <div class="toolbar-group">
+                        <button id="exportCsvBtn" class="btn-secondary" disabled>
+                            <i class="fas fa-download"></i> Export CSV
+                        </button>
+                        <button id="copyResultsBtn" class="btn-secondary" disabled>
+                            <i class="fas fa-copy"></i> Copy
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="results-container" id="resultsContainer">
+                    <div class="empty-state">
+                        <i class="fas fa-database fa-3x"></i>
+                        <p>Execute a query to see results</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save Query Modal -->
+<div id="saveQueryModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Save Query</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="queryName">Query Name:</label>
+                <input type="text" id="queryName" class="form-control" placeholder="Enter query name...">
+            </div>
+            <div class="form-group">
+                <label for="queryDescription">Description (optional):</label>
+                <textarea id="queryDescription" class="form-control" placeholder="Enter query description..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="cancelSaveBtn" class="btn-secondary">Cancel</button>
+            <button id="confirmSaveBtn" class="btn-primary">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Table Preview Modal -->
+<div id="tablePreviewModal" class="modal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h3 id="tablePreviewTitle">Table Preview</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="tablePreviewContent">
+                <div class="loading-state">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/database-interface.js') }}"></script>
+{% endblock %}
+</body>
+</html>

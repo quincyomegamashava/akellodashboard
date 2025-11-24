@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+<link rel="stylesheet" href="https://www.w3schools.com/lib/w3-theme-blue-grey.css">
+<link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Open+Sans'>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+ <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+<style>
+html, body, h1, h2, h3, h4, h5 {font-family: "Open Sans", sans-serif}
+</style>
+</head>
+{% block content %}
+<body class="w3-theme-l5 w3-small" data-school-id="{{ school_id }}" data-school-name="{{ school_name }}">
+
+
+
+<!-- Page Container -->
+<div class="w3-container w3-content" style="max-width:1400px;margin-top:80px">    
+  <!-- The Grid -->
+  <div class="w3-row">
+    <!-- Left Column -->
+    <div class="w3-col m3">
+      <!-- Profile -->
+      <div class="w3-card w3-round w3-white">
+        <div class="w3-container">
+         <!-- <h4 class="w3-center">Profile</h4> -->
+         <div class="d-inline-flex align-items-center justify-content-center p-3 bg-primary bg-opacity-10 rounded-circle mb-3" style="width: 80px; height: 80px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="currentColor" class="bi bi-mortarboard text-primary" viewBox="0 0 16 16">
+            <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917zM8 8.46 1.758 5.965 8 3.052l6.242 2.913z"/>
+            <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466zm-.068 1.873.22-.748 3.496 1.311a.5.5 0 0 0 .352 0l3.496-1.311.22.748L8 12.46z"/>
+            </svg>
+        </div>
+         <hr>
+         <p>
+            <span class="badge bg-primary bg-gradient px-3 py-2" style="font-size: 0.85rem; border-radius: 50px;">
+                <i class="fas fa-school me-2"></i>{{ school_name }}
+            </span>
+         </p>
+         <p><i class="fas fa-map-marker-alt me-1"></i>{{ school_province }}</p>
+         <!-- <p><i class="fa fa-birthday-cake fa-fw w3-margin-right w3-text-theme"></i> April 1, 1988</p> -->
+         <p>
+            <span class="badge bg-primary bg-opacity-20 w3-text-white px-3 py-2 rounded-pill">
+                <i class="fas fa-graduation-cap me-1"></i> School Profile
+            </span>
+         </p>
+        </div>
+      </div>
+      <br>
+
+      <div id="school-profile" data-asl-school-id="{{ asl_school_id }}"></div>
+      
+
+      
+
+      <!-- Accordion -->
+      <div class="w3-card w3-round">
+        <div class="w3-white">
+          <button onclick="myFunction('Demo1')" class="w3-button w3-block w3-theme-l1 w3-left-align"><i class="fa fa-circle-o-notch fa-fw w3-margin-right"></i> Smartlearning </button>
+          <div id="Demo1" class="w3-hide w3-container">
+            <p>Some text..</p>
+          </div>
+          <button onclick="myFunction('Demo2')" class="w3-button w3-block w3-theme-l1 w3-left-align"><i class="fa fa-calendar-check-o fa-fw w3-margin-right"></i> Library</button>
+          <div id="Demo2" class="w3-hide w3-container">
+            <p>Some other text..</p>
+          </div>
+          <button onclick="myFunction('Demo3')" class="w3-button w3-block w3-theme-l1 w3-left-align"><i class="fa fa-users fa-fw w3-margin-right"></i> Ask Akello</button>
+          <div id="Demo3" class="w3-hide w3-container">
+         <div class="w3-row-padding">
+         <br>
+           <div class="w3-half">
+             <img src="/w3images/lights.jpg" style="width:100%" class="w3-margin-bottom">
+           </div>
+           <div class="w3-half">
+             <img src="/w3images/nature.jpg" style="width:100%" class="w3-margin-bottom">
+           </div>
+           <div class="w3-half">
+             <img src="/w3images/mountains.jpg" style="width:100%" class="w3-margin-bottom">
+           </div>
+           <div class="w3-half">
+             <img src="/w3images/forest.jpg" style="width:100%" class="w3-margin-bottom">
+           </div>
+           <div class="w3-half">
+             <img src="/w3images/nature.jpg" style="width:100%" class="w3-margin-bottom">
+           </div>
+           <div class="w3-half">
+             <img src="/w3images/snow.jpg" style="width:100%" class="w3-margin-bottom">
+           </div>
+         </div>
+          </div>
+        </div>      
+      </div>
+      <br>
+      
+
+      
+      <!-- Alert Box -->
+      <div class="w3-container w3-display-container w3-round w3-theme-l4 w3-border w3-theme-border w3-margin-bottom w3-hide-small">
+        <span onclick="this.parentElement.style.display='none'" class="w3-button w3-theme-l3 w3-display-topright">
+          <i class="fa fa-remove"></i>
+        </span>
+        <p><strong>Hey!</strong></p>
+        <p>Something about mpbile view</p>
+      </div>
+    
+    <!-- End Left Column -->
+    </div>
+    
+    <!-- Middle Column -->
+    <div class="w3-col m7">
+    
+      <div class="w3-row-padding">
+        <div class="w3-col m12">
+          <div class="w3-card w3-round w3-white">
+            <div class="w3-container w3-padding">
+              <!-- <h5 class="w3-opacity">General Information</h5> -->
+              <p><button class="w3-button w3-block w3-light-gray w3-theme-l4">General Information</button></p>
+
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="w3-container w3-card w3-white w3-round w3-margin"><br>
+            <!-- First Name & Last Name -->
+    <div class="w3-col l6 m6 s12 w3-padding-small">
+      <label class="w3-opacity w3-small">School</label>
+       <div class="mt-2">
+        <span class="badge w3-light-gray bg-gradient px-3 py-2" style="font-size: 0.85rem; border-radius: 50px;">
+          <i class="fas fa-school me-2"></i>{{ school_name }}
+        </span>
+      </div>
+    </div>
+    <div class="w3-col l6 m6 s12 w3-padding-small">
+      <label class="w3-opacity w3-small">Provincee</label>
+       <div class="mt-2">
+        <span class="badge w3-light-gray bg-gradient px-3 py-2" style="font-size: 0.85rem; border-radius: 50px;">
+          <i class="fas fa-map-marker-alt me-1"></i>{{ school_province }}
+        </span>
+      </div>
+    </div>
+
+    <!-- <div id="school-breakdown"></div> -->
+
+    
+      </div>
+
+
+      <div class="w3-container w3-card w3-white w3-round w3-margin"><br>
+           <div class="w3-center w3-border w3-border-light-gray w3-round w3-padding w3-container">
+            <div id="grade-counts"></div>
+           </div>
+
+      </div>
+
+
+      <div class="w3-container w3-card w3-white w3-round w3-margin"><br>
+           <div id="grade-filter" class="w3-input w3-small w3-left bg-light w3-border-light-gray w3-border rounded" style="margin-bottom: 10px; padding: 5px;">
+  
+</div>
+
+<div class="table-responsive w3-border w3-border-light-gray w3-round w3-padding " style="height: 60vh; overflow-y: auto;">
+    <table class="table w3-small w3-card table-bordered table-striped table-hover" id="student-table">
+        <thead>
+          <tr>
+            <td colspan="5">
+              <div class="w3-center mb-1">
+    <!-- Search input -->
+    <div class="input-group " style="max-width: 60%;">
+        <span class="input-group-text bg-light border-end-0">
+            <i class="fas fa-search text-muted"></i>
+        </span>
+        <input type="text" 
+               id="userSearchInput" 
+               onkeyup="filterUsers()" 
+               placeholder="Search for users..." 
+               class="form-control form-control-sm border-start-0" />
+    </div>
+</div>
+<br>
+            </td>
+          </tr>
+            <tr id="student-table-header" class="table-light"></tr>
+        </thead>
+        <tbody id="student-table-body"></tbody>
+    </table>
+</div>
+
+      </div>
+      
+
+      
+    <!-- End Middle Column -->
+    </div>
+    
+
+    <!-- Right Column -->
+    <div class="w3-col m2">
+      <div class="w3-card w3-round w3-white w3-center">
+        <div class="w3-container w3-padding ">
+          <p><button class="w3-button w3-margin-top w3-light-gray w3-block w3-theme-l4">Info</button></p>
+        </div>
+      </div>
+      <br>
+      
+      <div class=" w3-round  w3-center">
+        <div class="w3-container">
+          <!-- Total Schools -->
+  <div class="w3-col-12 l3 m6 w3-padding">
+    <div class="w3-border-light-gray w3-card-4 w3-round-large w3-white w3-hover-shadow">
+      <div class="w3-container w3-purple w3-text-white w3-padding w3-round-top">
+        <h6 class="w3-margin-0">
+          <div class="">
+            <i class="fas fa-school fa-2x w3-text-white"></i>
+        </div>
+            <small class=" w3-text-white">Ask Akello</small>
+        </h6>
+      </div>
+      <div class="w3-container w3-center w3-padding">
+        <p class="w3-large w3-text-gray ">
+          <span id="total-ask">---</span>
+        </p>
+      </div>
+    </div>
+  </div>
+        </div>
+      </div>
+      <br>
+
+
+      <div class=" w3-round  w3-center">
+        <div class="w3-container">
+         <!-- ASL Students -->
+  <div class="w3-col-12 l3 m6 w3-padding">
+    <div class="w3-border-light-gray w3-card-4 w3-round-large w3-white w3-hover-shadow">
+      <div class="w3-container w3-blue w3-text-white w3-padding w3-round-top">
+        <h6 class="w3-margin-0">
+          <div class="">
+                <i class="fas fa-laptop fa-2x w3-text-white"></i>
+            </div>
+            <small class=" w3-text-white">ASL MTD</small>
+        </h6>
+      </div>
+      <div class="w3-container w3-center w3-padding">
+        <p class="w3-large w3-text-gray w3-margin-0">
+          <span id="total-count"></span>
+        </p>
+      </div>
+    </div>
+  </div>
+        </div>
+      </div>
+      <br>
+
+
+
+      <div class=" w3-round  w3-center">
+        <div class="w3-container">
+          <!-- Library Students -->
+  <div class="w3-col-12 l3 m6 w3-padding">
+    <div class="w3-border-light-gray w3-card-4 w3-round-large w3-white w3-hover-shadow">
+      <div class="w3-container w3-teal w3-text-white w3-padding w3-round-top">
+        <h6 class="w3-margin-0">
+          <div class="">
+                <i class="fas fa-book fa-2x tw3-text-white"></i>
+            </div>
+            <small class="w3-text-white">AL MTD</small>
+        </h6>
+      </div>
+      <div class="w3-container w3-center w3-padding">
+        <p class="w3-large w3-text-gray w3-margin-0">
+          <span id="active-users"></span>
+        </p>
+      </div>
+    </div>
+  </div>
+        </div>
+      </div>
+      <br>
+
+      
+    <!-- End Right Column -->
+    </div>
+    
+  <!-- End Grid -->
+  </div>
+  
+<!-- End Page Container -->
+</div>
+<br>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script src="{{ url_for('static', filename='smartlearning-school-profile.js') }}"></script>
+
+
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    // --- Get asl_school_id from the page ---
+    const schoolEl = document.querySelector("#school-profile");
+    const aslSchoolId = schoolEl?.dataset.aslSchoolId;
+
+    if (!aslSchoolId) {
+      console.error("asl_school_id not found on page");
+      return;
+    }
+
+    // --- Call the API ---
+    const response = await fetch(`/api/library/school_profile?asl_school_id=${encodeURIComponent(aslSchoolId)}`);
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("API error:", data.error || data.message || data);
+      return;
+    }
+
+    // --- Display total active users ---
+    const totalEl = document.querySelector("#active-users");
+    totalEl.textContent = `${data.total_active_users}`;
+
+    // --- Display per-school breakdown ---
+    const breakdownEl = document.querySelector("#school-breakdown");
+    breakdownEl.innerHTML = ""; // clear old data
+
+    if (data.schools && data.schools.length > 0) {
+      const list = document.createElement("ul");
+      data.schools.forEach(school => {
+        const li = document.createElement("li");
+        li.textContent = `${school.institution_name}: ${school.active_users} active users`;
+        list.appendChild(li);
+      });
+      breakdownEl.appendChild(list);
+    } else {
+      breakdownEl.textContent = "No schools with activity found.";
+    }
+
+  } catch (err) {
+    console.error("Error fetching school profile:", err);
+  }
+});
+</script>
+
+
+
+
+ 
+<script>
+// Accordion
+function myFunction(id) {
+  var x = document.getElementById(id);
+  if (x.className.indexOf("w3-show") == -1) {
+    x.className += " w3-show";
+    x.previousElementSibling.className += " w3-theme-d1";
+  } else { 
+    x.className = x.className.replace("w3-show", "");
+    x.previousElementSibling.className = 
+    x.previousElementSibling.className.replace(" w3-theme-d1", "");
+  }
+}
+
+// Used to toggle the menu on smaller screens when clicking on the menu button
+function openNav() {
+  var x = document.getElementById("navDemo");
+  if (x.className.indexOf("w3-show") == -1) {
+    x.className += " w3-show";
+  } else { 
+    x.className = x.className.replace(" w3-show", "");
+  }
+}
+</script>
+
+</body>
+{% endblock %}

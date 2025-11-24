@@ -1,0 +1,984 @@
+{% extends "base.html" %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/index.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="w3-display-container w3-small rounded-2xl p-6" style="height: 65vh; width: 75vw; overflow: auto;">
+    <div class="w3-display-middle bg-white" style="height: 63vh; width: 73vw; overflow: auto;">
+        
+        <!-- Menu Container -->
+        <div class="w3-padding" id="menu">
+            <div class="w3-card rounded-2xl soft-shadow p-6 w3-small" style="width: 69vw;">
+                
+                <div class="text-slate-500 w3-center uppercase w3-text-indigo font-bold tracking-wider text-2xl px-2 mt-6">REPORTS STATISTICS</div>
+                <div class="w3-row w3-center w3-border w3-border-light-gray">
+                    <a href="javascript:void(0)" onclick="openHLFTab(event, 'hlf-overview');" id="hlfOverviewLink">
+                        <div class="w3-col s4 tablink w3-padding w3-hover-indigo w3-small rounded-2xl p-6">Overview</div>
+                    </a>
+                    <a href="javascript:void(0)" onclick="openHLFTab(event, 'teacher-tracker');">
+                        <div class="w3-col s4 tablink w3-padding w3-hover-indigo w3-small rounded-2xl p-6">Teacher Tracker</div>
+                    </a>
+                    <a href="javascript:void(0)" onclick="openHLFTab(event, 'learner-tracker');">
+                        <div class="w3-col s4 tablink w3-padding w3-hover-indigo w3-small rounded-2xl p-6">Learner Tracker</div>
+                    </a>
+                </div>
+
+                <div id="hlf-overview" class="w3-container hlf-menu w3-padding-32 w3-white">
+                    <!-- Header -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <p class="text-slate-600">Weekly usage analytics for ASL, Library, and Ask Akello platforms</p>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button id="toggleChartType" class="btn btn-outline-primary">
+                                        <i class="fas fa-chart-bar me-1"></i>
+                                        Switch to Line Chart
+                                    </button>
+                                    <button id="refreshData" class="btn btn-outline-secondary">
+                                        <i class="fas fa-sync-alt me-1"></i>
+                                        Refresh
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+    <!-- Date Range Controls -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card glass soft-shadow">
+                <div class="card-body">
+                    <form id="dateRangeForm" class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label for="startDate" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="startDate" name="start_date">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="endDate" class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="endDate" name="end_date">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-search me-1"></i>
+                                Apply Date Range
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="text-center py-5" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-slate-600">Loading weekly statistics...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="alert alert-danger" role="alert" style="display: none;">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <span id="errorMessage"></span>
+    </div>
+
+    <!-- Stats Summary Cards -->
+    <div class="row mb-4" id="summaryCards">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card glass soft-shadow border-0">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-primary bg-opacity-10 rounded-3 p-3">
+                                <i class="fas fa-graduation-cap text-primary fa-lg"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="text-slate-600 small">Total ASL Users</div>
+                            <div class="fs-4 fw-bold text-slate-800" id="totalASL">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card glass soft-shadow border-0">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-success bg-opacity-10 rounded-3 p-3">
+                                <i class="fas fa-book-open text-success fa-lg"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="text-slate-600 small">Total Library Users</div>
+                            <div class="fs-4 fw-bold text-slate-800" id="totalLibrary">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card glass soft-shadow border-0">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-warning bg-opacity-10 rounded-3 p-3">
+                                <i class="fas fa-comments text-warning fa-lg"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="text-slate-600 small">Total Ask Akello</div>
+                            <div class="fs-4 fw-bold text-slate-800" id="totalAskAkello">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card glass soft-shadow border-0">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-info bg-opacity-10 rounded-3 p-3">
+                                <i class="fas fa-users text-info fa-lg"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="text-slate-600 small">Overall Total</div>
+                            <div class="fs-4 fw-bold text-slate-800" id="totalOverall">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Container -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card glass soft-shadow">
+                <div class="card-header bg-white border-0 pb-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="card-title mb-1">Weekly Usage Trends</h5>
+                            <small class="text-slate-600" id="chartDateRange">Loading...</small>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="showDataLabels">
+                                <label class="form-check-label" for="showDataLabels">Show Values</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="position-relative" style="height: 400px;">
+                        <canvas id="hlfStatsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card glass soft-shadow">
+                <div class="card-header bg-white border-0">
+                    <h5 class="card-title mb-0">Weekly Data Table</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="dataTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Week Starting</th>
+                                    <th>Week #</th>
+                                    <th class="text-center">ASL Users</th>
+                                    <th class="text-center">Library Users</th>
+                                    <th class="text-center">Ask Akello Users</th>
+                                    <th class="text-center">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTableBody">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+                </div>
+
+                <div id="teacher-tracker" class="w3-container hlf-menu w3-padding-32 w3-white" style="display: none;">
+                    <!-- Teacher Data Controls -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card glass soft-shadow">
+                                <div class="card-body">
+                                    <div class="row align-items-end">
+                                        <div class="col-md-3">
+                                            <label class="form-label">Start Date</label>
+                                            <input type="date" class="form-control" id="teacherStartDate">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">End Date</label>
+                                            <input type="date" class="form-control" id="teacherEndDate">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Metric</label>
+                                            <select class="form-control" id="teacherMetricSelect">
+                                                <option value="teacher_access">Teacher Access</option>
+                                                <option value="teacher_activities">Teacher Set Activities</option>
+                                                <option value="registrations">Registrations</option>
+                                                <option value="unique_subscribers">Unique Subscribers</option>
+                                                <option value="unique_users">Unique Users</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <button type="button" id="loadTeacherData" class="btn btn-primary w-100">
+                                                <i class="fas fa-sync-alt me-1"></i>
+                                                Load Data
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Teacher Stats Summary -->
+                    <div class="row mb-4" id="teacherSummaryCards">
+                        <div class="col-md-3">
+                            <div class="card glass soft-shadow border-0">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-chalkboard-teacher fa-2x text-primary mb-2"></i>
+                                    <h6>Current Metric</h6>
+                                    <div class="fs-4 fw-bold text-slate-800" id="teacherCurrentMetric">Teacher Access</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card glass soft-shadow border-0">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-calendar fa-2x text-success mb-2"></i>
+                                    <h6>Date Range</h6>
+                                    <div class="small text-slate-600" id="teacherDateRange">Loading...</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card glass soft-shadow border-0">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-users fa-2x text-warning mb-2"></i>
+                                    <h6>Total Count</h6>
+                                    <div class="fs-4 fw-bold text-slate-800" id="teacherTotalCount">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card glass soft-shadow border-0">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-map-marked-alt fa-2x text-info mb-2"></i>
+                                    <h6>Provinces</h6>
+                                    <div class="fs-4 fw-bold text-slate-800" id="teacherProvincesCount">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Section -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card glass soft-shadow">
+                                <div class="card-header bg-white border-0">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h5 class="card-title mb-1">Teacher Analytics</h5>
+                                            <small class="text-slate-600" id="teacherChartSubtitle">Province breakdown by gender</small>
+                                        </div>
+                                        <div class="d-flex gap-2">
+                                            <button id="toggleTeacherChart" class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-chart-line me-1"></i>
+                                                Switch to Line
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Loading State -->
+                                    <div id="teacherChartLoading" class="text-center py-5" style="display: none;">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 text-slate-600">Loading teacher data...</p>
+                                    </div>
+                                    
+                                    <!-- Chart Container -->
+                                    <div class="position-relative" style="height: 400px;">
+                                        <canvas id="teacherAnalyticsChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Table -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card glass soft-shadow">
+                                <div class="card-header bg-white border-0">
+                                    <h5 class="card-title mb-0">Detailed Breakdown</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped" id="teacherDataTable">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Province</th>
+                                                    <th class="text-center">Male</th>
+                                                    <th class="text-center">Female</th>
+                                                    <th class="text-center">Unknown</th>
+                                                    <th class="text-center">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="teacherDataTableBody">
+                                                <tr><td colspan="5" class="text-center">Load data to view breakdown</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="learner-tracker" class="w3-container hlf-menu w3-padding-32 w3-white" style="display: none;">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-success" role="alert">
+                                <i class="fas fa-user-graduate me-2"></i>
+                                <strong>Learner Tracker</strong> - Monitor student progress and learning outcomes across all platforms.
+                            </div>
+                            <div class="card glass soft-shadow">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-tools fa-3x text-muted mb-3"></i>
+                                    <h4>Learner Tracker Coming Soon</h4>
+                                    <p class="text-muted">This section will provide comprehensive insights into student learning patterns, progress tracking, and performance analytics.</p>
+                                    <div class="row mt-4">
+                                        <div class="col-md-3">
+                                            <div class="card border-0 bg-light">
+                                                <div class="card-body">
+                                                    <i class="fas fa-users fa-2x text-primary mb-2"></i>
+                                                    <h6>Active Learners</h6>
+                                                    <p class="text-muted small">Track student engagement</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card border-0 bg-light">
+                                                <div class="card-body">
+                                                    <i class="fas fa-trophy fa-2x text-warning mb-2"></i>
+                                                    <h6>Progress Tracking</h6>
+                                                    <p class="text-muted small">Monitor learning milestones</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card border-0 bg-light">
+                                                <div class="card-body">
+                                                    <i class="fas fa-clock fa-2x text-info mb-2"></i>
+                                                    <h6>Time Analytics</h6>
+                                                    <p class="text-muted small">Analyze learning duration</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card border-0 bg-light">
+                                                <div class="card-body">
+                                                    <i class="fas fa-star fa-2x text-success mb-2"></i>
+                                                    <h6>Performance</h6>
+                                                    <p class="text-muted small">Track learning outcomes</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let chart = null;
+    let currentChartType = 'bar';
+    let chartData = null;
+
+    // Initialize overview tab as active by default
+    setTimeout(() => {
+        document.getElementById("hlfOverviewLink").click();
+    }, 50);
+
+    // Initialize date inputs with current year
+    const today = new Date();
+    const startOfYear = new Date(today.getFullYear(), 0, 1);
+    document.getElementById('startDate').value = startOfYear.toISOString().split('T')[0];
+    document.getElementById('endDate').value = today.toISOString().split('T')[0];
+
+    // Load initial data
+    loadHLFStats();
+
+    // Event listeners
+    document.getElementById('toggleChartType').addEventListener('click', toggleChartType);
+    document.getElementById('refreshData').addEventListener('click', loadHLFStats);
+    document.getElementById('showDataLabels').addEventListener('change', updateChart);
+    document.getElementById('dateRangeForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        loadHLFStats();
+    });
+
+    function loadHLFStats() {
+        showLoading(true);
+        hideError();
+        
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        
+        let url = '/api/hlf-weekly-stats/';
+        if (startDate && endDate) {
+            url += `?start_date=${startDate}&end_date=${endDate}`;
+        }
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                showLoading(false);
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+                
+                chartData = data;
+                updateSummaryCards(data);
+                updateChart(data);
+                updateDataTable(data);
+                updateDateRange(data);
+            })
+            .catch(error => {
+                showLoading(false);
+                console.error('Error loading HLF stats:', error);
+                showError('Failed to load statistics. Please try again later.');
+            });
+    }
+
+    function updateSummaryCards(data) {
+        if (data.totals) {
+            document.getElementById('totalASL').textContent = data.totals.asl?.toLocaleString() || '0';
+            document.getElementById('totalLibrary').textContent = data.totals.library?.toLocaleString() || '0';
+            document.getElementById('totalAskAkello').textContent = data.totals.ask_akello?.toLocaleString() || '0';
+            document.getElementById('totalOverall').textContent = data.totals.overall?.toLocaleString() || '0';
+        }
+    }
+
+    function updateChart(data = chartData) {
+        if (!data || !data.weeks) return;
+
+        const ctx = document.getElementById('hlfStatsChart').getContext('2d');
+        
+        // Destroy existing chart
+        if (chart) {
+            chart.destroy();
+        }
+
+        const weeks = data.weeks;
+        const labels = weeks.map(week => `Week ${week.week_number}`);
+        const showDataLabels = document.getElementById('showDataLabels').checked;
+
+        const chartConfig = {
+            type: currentChartType,
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'ASL Users',
+                        data: weeks.map(week => week.asl),
+                        backgroundColor: currentChartType === 'bar' ? 'rgba(59, 130, 246, 0.6)' : 'rgba(59, 130, 246, 0.1)',
+                        borderColor: 'rgb(59, 130, 246)',
+                        borderWidth: 2,
+                        fill: currentChartType === 'line'
+                    },
+                    {
+                        label: 'Library Users',
+                        data: weeks.map(week => week.library),
+                        backgroundColor: currentChartType === 'bar' ? 'rgba(34, 197, 94, 0.6)' : 'rgba(34, 197, 94, 0.1)',
+                        borderColor: 'rgb(34, 197, 94)',
+                        borderWidth: 2,
+                        fill: currentChartType === 'line'
+                    },
+                    {
+                        label: 'Ask Akello Users',
+                        data: weeks.map(week => week.ask_akello),
+                        backgroundColor: currentChartType === 'bar' ? 'rgba(245, 158, 11, 0.6)' : 'rgba(245, 158, 11, 0.1)',
+                        borderColor: 'rgb(245, 158, 11)',
+                        borderWidth: 2,
+                        fill: currentChartType === 'line'
+                    },
+                    {
+                        label: 'Overall Total',
+                        data: weeks.map(week => week.overall),
+                        backgroundColor: currentChartType === 'bar' ? 'rgba(168, 85, 247, 0.6)' : 'rgba(168, 85, 247, 0.1)',
+                        borderColor: 'rgb(168, 85, 247)',
+                        borderWidth: 2,
+                        fill: currentChartType === 'line',
+                        type: currentChartType === 'bar' ? 'line' : currentChartType // Always show overall as line when in bar mode
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            title: function(context) {
+                                const weekIndex = context[0].dataIndex;
+                                return weeks[weekIndex].week_start;
+                            },
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y.toLocaleString() + ' users';
+                            }
+                        }
+                    },
+                    datalabels: {
+                        display: showDataLabels,
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: function(value) {
+                            return value > 0 ? value.toLocaleString() : '';
+                        },
+                        font: {
+                            size: 10
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Week'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Users'
+                        },
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        chart = new Chart(ctx, chartConfig);
+    }
+
+    function updateDataTable(data) {
+        if (!data || !data.weeks) return;
+
+        const tbody = document.getElementById('dataTableBody');
+        tbody.innerHTML = '';
+
+        data.weeks.forEach(week => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${week.week_start}</td>
+                <td>${week.week_number}</td>
+                <td class="text-center">${week.asl?.toLocaleString() || '0'}</td>
+                <td class="text-center">${week.library?.toLocaleString() || '0'}</td>
+                <td class="text-center">${week.ask_akello?.toLocaleString() || '0'}</td>
+                <td class="text-center fw-bold">${week.overall?.toLocaleString() || '0'}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    function updateDateRange(data) {
+        if (data && data.start_date && data.end_date) {
+            document.getElementById('chartDateRange').textContent = `${data.start_date} to ${data.end_date}`;
+        }
+    }
+
+    function toggleChartType() {
+        currentChartType = currentChartType === 'bar' ? 'line' : 'bar';
+        const button = document.getElementById('toggleChartType');
+        button.innerHTML = currentChartType === 'bar' 
+            ? '<i class="fas fa-chart-line me-1"></i>Switch to Line Chart'
+            : '<i class="fas fa-chart-bar me-1"></i>Switch to Bar Chart';
+        
+        updateChart();
+    }
+
+    function showLoading(show) {
+        document.getElementById('loadingState').style.display = show ? 'block' : 'none';
+        document.getElementById('summaryCards').style.display = show ? 'none' : 'block';
+    }
+
+    function showError(message) {
+        document.getElementById('errorMessage').textContent = message;
+        document.getElementById('errorState').style.display = 'block';
+    }
+
+    function hideError() {
+        document.getElementById('errorState').style.display = 'none';
+    }
+});
+
+// Teacher Tracker functionality
+let teacherChart = null;
+let teacherCurrentChartType = 'bar';
+let teacherCurrentData = null;
+
+// Initialize teacher tracker
+function initTeacherTracker() {
+    // Set default dates
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+    document.getElementById('teacherStartDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+    document.getElementById('teacherEndDate').value = today.toISOString().split('T')[0];
+    
+    // Event listeners
+    document.getElementById('loadTeacherData').addEventListener('click', loadTeacherData);
+    document.getElementById('toggleTeacherChart').addEventListener('click', toggleTeacherChartType);
+    document.getElementById('teacherMetricSelect').addEventListener('change', updateTeacherMetricDisplay);
+    
+    // Load initial data
+    loadTeacherData();
+}
+
+async function loadTeacherData() {
+    const metric = document.getElementById('teacherMetricSelect').value;
+    const startDate = document.getElementById('teacherStartDate').value;
+    const endDate = document.getElementById('teacherEndDate').value;
+    
+    showTeacherLoading(true);
+    
+    try {
+        let endpoint = '';
+        switch(metric) {
+            case 'teacher_access':
+                endpoint = '/api/asl_teacher_access';
+                break;
+            case 'teacher_activities':
+                endpoint = '/api/asl_teacher_set_activities';
+                break;
+            case 'registrations':
+                endpoint = '/asl_registrations';
+                break;
+            case 'unique_subscribers':
+                endpoint = '/api/asl_unique_subscribers';
+                break;
+            case 'unique_users':
+                endpoint = '/api/asl_unique_users';
+                break;
+            default:
+                endpoint = '/api/asl_teacher_access';
+        }
+        
+        // Add date parameters if provided
+        const url = new URL(endpoint, window.location.origin);
+        if (startDate && endDate) {
+            url.searchParams.append('start_date', startDate);
+            url.searchParams.append('end_date', endDate);
+        }
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        teacherCurrentData = data;
+        updateTeacherSummaryCards(data, metric);
+        updateTeacherChart(data);
+        updateTeacherTable(data);
+        
+    } catch (error) {
+        console.error('Error loading teacher data:', error);
+        showTeacherError('Failed to load teacher data: ' + error.message);
+    } finally {
+        showTeacherLoading(false);
+    }
+}
+
+function updateTeacherSummaryCards(data, metric) {
+    // Update metric name
+    const metricNames = {
+        'teacher_access': 'Teacher Access',
+        'teacher_activities': 'Teacher Activities',
+        'registrations': 'Registrations',
+        'unique_subscribers': 'Unique Subscribers',
+        'unique_users': 'Unique Users'
+    };
+    document.getElementById('teacherCurrentMetric').textContent = metricNames[metric] || 'Teacher Data';
+    
+    // Update date range
+    if (data.start_date && data.end_date) {
+        document.getElementById('teacherDateRange').textContent = `${data.start_date} to ${data.end_date}`;
+    }
+    
+    // Update total count
+    const totalKey = getTotalKey(metric);
+    const totalCount = data[totalKey] || calculateTotal(data.breakdown);
+    document.getElementById('teacherTotalCount').textContent = totalCount ? totalCount.toLocaleString() : '0';
+    
+    // Update provinces count
+    if (data.breakdown) {
+        const provinces = new Set(data.breakdown.map(item => item.school_province));
+        document.getElementById('teacherProvincesCount').textContent = provinces.size;
+    }
+}
+
+function getTotalKey(metric) {
+    const keyMap = {
+        'teacher_access': 'total_teachers',
+        'teacher_activities': 'total_teacher_set_activities',
+        'registrations': 'total_registrations',
+        'unique_subscribers': 'total_subscribers',
+        'unique_users': 'total_unique_users'
+    };
+    return keyMap[metric];
+}
+
+function calculateTotal(breakdown) {
+    if (!breakdown) return 0;
+    return breakdown.reduce((total, item) => total + (item.count || 0), 0);
+}
+
+function updateTeacherChart(data) {
+    if (!data.breakdown) return;
+    
+    // Organize data by province and gender
+    const provinceData = {};
+    data.breakdown.forEach(item => {
+        const province = item.school_province || 'Unknown';
+        const gender = item.gender || 'Unknown';
+        
+        if (!provinceData[province]) {
+            provinceData[province] = { Male: 0, Female: 0, Unknown: 0 };
+        }
+        
+        // Normalize gender
+        let normalizedGender = 'Unknown';
+        if (gender.toLowerCase().startsWith('m')) normalizedGender = 'Male';
+        else if (gender.toLowerCase().startsWith('f')) normalizedGender = 'Female';
+        
+        provinceData[province][normalizedGender] += item.count || 0;
+    });
+    
+    const ctx = document.getElementById('teacherAnalyticsChart').getContext('2d');
+    
+    // Destroy existing chart
+    if (teacherChart) {
+        teacherChart.destroy();
+    }
+    
+    const provinces = Object.keys(provinceData);
+    const maleData = provinces.map(p => provinceData[p].Male);
+    const femaleData = provinces.map(p => provinceData[p].Female);
+    const unknownData = provinces.map(p => provinceData[p].Unknown);
+    
+    const chartConfig = {
+        type: teacherCurrentChartType,
+        data: {
+            labels: provinces,
+            datasets: [
+                {
+                    label: 'Male',
+                    data: maleData,
+                    backgroundColor: teacherCurrentChartType === 'bar' ? 'rgba(54, 162, 235, 0.6)' : 'rgba(54, 162, 235, 0.1)',
+                    borderColor: 'rgb(54, 162, 235)',
+                    borderWidth: 2,
+                    fill: teacherCurrentChartType === 'line'
+                },
+                {
+                    label: 'Female',
+                    data: femaleData,
+                    backgroundColor: teacherCurrentChartType === 'bar' ? 'rgba(255, 99, 132, 0.6)' : 'rgba(255, 99, 132, 0.1)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    borderWidth: 2,
+                    fill: teacherCurrentChartType === 'line'
+                },
+                {
+                    label: 'Unknown',
+                    data: unknownData,
+                    backgroundColor: teacherCurrentChartType === 'bar' ? 'rgba(201, 203, 207, 0.6)' : 'rgba(201, 203, 207, 0.1)',
+                    borderColor: 'rgb(201, 203, 207)',
+                    borderWidth: 2,
+                    fill: teacherCurrentChartType === 'line'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            },
+            scales: {
+                x: {
+                    stacked: teacherCurrentChartType === 'bar',
+                    title: {
+                        display: true,
+                        text: 'Province'
+                    }
+                },
+                y: {
+                    stacked: teacherCurrentChartType === 'bar',
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Count'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    };
+    
+    teacherChart = new Chart(ctx, chartConfig);
+}
+
+function updateTeacherTable(data) {
+    if (!data.breakdown) return;
+    
+    // Organize data by province
+    const provinceData = {};
+    data.breakdown.forEach(item => {
+        const province = item.school_province || 'Unknown';
+        const gender = item.gender || 'Unknown';
+        
+        if (!provinceData[province]) {
+            provinceData[province] = { Male: 0, Female: 0, Unknown: 0 };
+        }
+        
+        // Normalize gender
+        let normalizedGender = 'Unknown';
+        if (gender.toLowerCase().startsWith('m')) normalizedGender = 'Male';
+        else if (gender.toLowerCase().startsWith('f')) normalizedGender = 'Female';
+        
+        provinceData[province][normalizedGender] += item.count || 0;
+    });
+    
+    const tbody = document.getElementById('teacherDataTableBody');
+    tbody.innerHTML = '';
+    
+    Object.entries(provinceData).forEach(([province, counts]) => {
+        const total = counts.Male + counts.Female + counts.Unknown;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${province}</td>
+            <td class="text-center">${counts.Male.toLocaleString()}</td>
+            <td class="text-center">${counts.Female.toLocaleString()}</td>
+            <td class="text-center">${counts.Unknown.toLocaleString()}</td>
+            <td class="text-center fw-bold">${total.toLocaleString()}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function toggleTeacherChartType() {
+    teacherCurrentChartType = teacherCurrentChartType === 'bar' ? 'line' : 'bar';
+    const button = document.getElementById('toggleTeacherChart');
+    button.innerHTML = teacherCurrentChartType === 'bar' 
+        ? '<i class="fas fa-chart-line me-1"></i>Switch to Line'
+        : '<i class="fas fa-chart-bar me-1"></i>Switch to Bar';
+    
+    if (teacherCurrentData) {
+        updateTeacherChart(teacherCurrentData);
+    }
+}
+
+function updateTeacherMetricDisplay() {
+    const select = document.getElementById('teacherMetricSelect');
+    const selectedText = select.options[select.selectedIndex].text;
+    document.getElementById('teacherCurrentMetric').textContent = selectedText;
+}
+
+function showTeacherLoading(show) {
+    document.getElementById('teacherChartLoading').style.display = show ? 'block' : 'none';
+}
+
+function showTeacherError(message) {
+    console.error('Teacher Tracker Error:', message);
+    const tbody = document.getElementById('teacherDataTableBody');
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">${message}</td></tr>`;
+}
+
+// Tab switching functionality
+function openHLFTab(evt, tabName) {
+    var i, x, tablinks;
+    x = document.getElementsByClassName("hlf-menu");
+    for (i = 0; i < x.length; i++) {
+        x[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tablink");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" w3-indigo", "");
+    }
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.firstElementChild.className += " w3-indigo";
+    
+    // Initialize teacher tracker when tab is opened
+    if (tabName === 'teacher-tracker') {
+        // Use a small delay to ensure DOM elements are visible
+        setTimeout(() => {
+            initTeacherTracker();
+        }, 100);
+    }
+}
+
+// Tab initialization is handled in the main DOMContentLoaded event listener above
+</script>
+{% endblock %}
