@@ -6,7 +6,7 @@ Handles all database-related endpoints for the admin query tool
 from flask import Blueprint, render_template, request, jsonify, current_app, send_file
 from flask_login import login_required, current_user
 from functools import wraps
-from app.database_manager import db_manager
+from app.database_manager import get_db_manager
 import json
 import os
 from datetime import datetime
@@ -39,7 +39,7 @@ def databases_interface():
 def list_databases():
     """Get list of available databases"""
     try:
-        databases = db_manager.get_databases()
+        databases = get_db_manager().get_databases()
         return jsonify({
             'success': True,
             'databases': databases
@@ -57,7 +57,7 @@ def list_databases():
 def test_database_connection(db_key):
     """Test database connection"""
     try:
-        result = db_manager.test_connection(db_key)
+        result = get_db_manager().test_connection(db_key)
         return jsonify(result)
     except Exception as e:
         current_app.logger.error(f"Error testing connection for {db_key}: {e}")
@@ -72,7 +72,7 @@ def test_database_connection(db_key):
 def get_database_tables(db_key):
     """Get list of tables in database with schema information"""
     try:
-        tables = db_manager.get_tables(db_key)
+        tables = get_db_manager().get_tables(db_key)
         return jsonify({
             'success': True,
             'database': db_key,
@@ -92,7 +92,7 @@ def get_table_sample_data(db_key, table_name):
     """Get sample data from a table"""
     try:
         limit = request.args.get('limit', 10, type=int)
-        result = db_manager.get_sample_data(db_key, table_name, limit)
+        result = get_db_manager().get_sample_data(db_key, table_name, limit)
         return jsonify(result)
     except Exception as e:
         current_app.logger.error(f"Error getting sample data for {db_key}.{table_name}: {e}")
@@ -136,7 +136,7 @@ def execute_database_query(db_key):
                     }), 400
         
         limit = data.get('limit', 1000)
-        result = db_manager.execute_query(db_key, query, limit)
+        result = get_db_manager().execute_query(db_key, query, limit)
         
         # Log query execution for audit
         current_app.logger.info(f"Query executed by {current_user.username} on {db_key}: {query[:100]}...")
@@ -164,7 +164,7 @@ def build_visual_query(db_key):
             }), 400
         
         # Build the query
-        query = db_manager.build_query(db_key, data)
+        query = get_db_manager().build_query(db_key, data)
         
         return jsonify({
             'success': True,
@@ -192,11 +192,11 @@ def execute_built_query(db_key):
             }), 400
         
         # Build the query
-        query = db_manager.build_query(db_key, data)
+        query = get_db_manager().build_query(db_key, data)
         
         # Execute the query
         limit = data.get('limit', 1000)
-        result = db_manager.execute_query(db_key, query, limit)
+        result = get_db_manager().execute_query(db_key, query, limit)
         
         # Add the generated query to the result
         if result.get('success'):
@@ -270,7 +270,7 @@ def export_query_results(db_key):
 def get_database_schema(db_key):
     """Get complete database schema information"""
     try:
-        tables = db_manager.get_tables(db_key)
+        tables = get_db_manager().get_tables(db_key)
         
         # Organize schema information
         schema = {

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Play Game</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px 0;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    
+    .header-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .header h2 {
+      font-size: 20px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .back-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+    
+    .back-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+    
+    .game-container {
+      max-width: 1400px;
+      margin: 32px auto;
+      padding: 0 24px;
+    }
+    
+    #gameContainer {
+      background: white;
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      min-height: 500px;
+    }
+    
+    #gameContent {
+      position: relative;
+    }
+    
+    .loading-state {
+      text-align: center;
+      padding: 80px 20px;
+      color: #a0aec0;
+    }
+    
+    .loading-state i {
+      font-size: 48px;
+      margin-bottom: 16px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    #scoreSubmissionStatus {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    #scoreSubmissionStatus.show {
+      display: flex;
+    }
+    
+    .status-modal {
+      background: white;
+      border-radius: 20px;
+      padding: 48px;
+      max-width: 500px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      animation: slideUp 0.4s ease-out;
+    }
+    
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .status-icon {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      font-size: 40px;
+    }
+    
+    .status-icon.success {
+      background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+      color: white;
+    }
+    
+    .status-icon.error {
+      background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+      color: white;
+    }
+    
+    .status-icon.loading {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .status-icon.loading i {
+      animation: spin 1s linear infinite;
+    }
+    
+    #statusTitle {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 12px;
+    }
+    
+    #statusMessage {
+      font-size: 16px;
+      color: #718096;
+      margin-bottom: 32px;
+      line-height: 1.6;
+    }
+    
+    .status-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    .status-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-content">
+      <h2>
+        <i class="fas fa-gamepad"></i>
+        <span id="gameTitleHeader">Game</span>
+      </h2>
+      <a href="/game-dashboard" class="back-btn">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+      </a>
+    </div>
+  </div>
+
+  <div class="game-container">
+    <div id="gameContainer">
+      <div id="gameContent">
+        <div class="loading-state">
+          <i class="fas fa-spinner"></i>
+          <p>Loading game...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="scoreSubmissionStatus">
+    <div class="status-modal">
+      <div class="status-icon loading" id="statusIcon">
+        <i class="fas fa-spinner"></i>
+      </div>
+      <h3 id="statusTitle">Submitting Score...</h3>
+      <p id="statusMessage">Please wait...</p>
+      <button class="status-btn" onclick="window.location.href='/game-dashboard'" id="statusBtn" style="display:none;">
+        Return to Dashboard
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const gameId = window.location.pathname.split('/').pop();
+    const gameUserId = sessionStorage.getItem('gameUserId');
+
+    if (!gameUserId) {
+      window.location.href = '/game-login';
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadGame();
+      setupScoreSubmission();
+    });
+
+    async function loadGame() {
+      try {
+        const r = await fetch(`/api/games/${gameId}`);
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Failed to load game');
+        
+        document.getElementById('gameTitleHeader').textContent = data.game.title;
+        const container = document.getElementById('gameContent');
+        
+        // Parse the HTML to separate content, styles, and scripts
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(data.game.html_content, 'text/html');
+        
+        // Extract styles from head
+        const styles = Array.from(doc.querySelectorAll('style'));
+        const styleContents = styles.map(style => style.textContent);
+        
+        // Extract scripts before removing them
+        const scripts = Array.from(doc.querySelectorAll('script'));
+        const scriptContents = scripts.map(script => ({
+          src: script.src,
+          text: script.textContent,
+          type: script.type
+        }));
+        
+        // Remove scripts and styles from the document
+        scripts.forEach(script => script.remove());
+        styles.forEach(style => style.remove());
+        
+        // Inject styles into the page head
+        styleContents.forEach(styleText => {
+          const styleElement = document.createElement('style');
+          styleElement.textContent = styleText;
+          document.head.appendChild(styleElement);
+        });
+        
+        // Inject the HTML content (without scripts and styles)
+        container.innerHTML = doc.body.innerHTML;
+        
+        // Execute scripts after content is loaded, in order
+        scriptContents.forEach(scriptData => {
+          const newScript = document.createElement('script');
+          if (scriptData.type) {
+            newScript.type = scriptData.type;
+          }
+          if (scriptData.src) {
+            newScript.src = scriptData.src;
+            newScript.onload = () => {
+              setTimeout(() => injectScoreSubmissionScript(data.game), 100);
+            };
+          } else {
+            newScript.textContent = scriptData.text;
+          }
+          container.appendChild(newScript);
+        });
+        
+        // If no external scripts, inject score submission after a short delay
+        if (scriptContents.every(s => !s.src)) {
+          setTimeout(() => {
+            injectScoreSubmissionScript(data.game);
+          }, 200);
+        }
+      } catch (e) {
+        document.getElementById('gameContent').innerHTML = 
+          '<div style="text-align:center; padding:48px; color:#e53e3e;"><i class="fas fa-exclamation-triangle" style="font-size:48px; margin-bottom:16px;"></i><p>Error loading game: ' + e.message + '</p></div>';
+      }
+    }
+
+    function injectScoreSubmissionScript(game) {
+      setTimeout(() => {
+        window.gameScoreSubmit = function(score, maxScore) {
+          if (window.submitGameScore) {
+            window.submitGameScore(gameId, score, maxScore || game.max_score || null);
+          }
+        };
+        
+        const checkBtn = document.getElementById('checkBtn');
+        if (checkBtn) {
+          const newCheckBtn = checkBtn.cloneNode(true);
+          checkBtn.parentNode.replaceChild(newCheckBtn, checkBtn);
+          
+          newCheckBtn.addEventListener('click', function(e) {
+            setTimeout(() => {
+              const scoreBox = document.getElementById('scoreBox');
+              if (scoreBox) {
+                const text = scoreBox.textContent || '';
+                const match = text.match(/Score:\s*(\d+)\s*\/\s*(\d+)/i);
+                if (match) {
+                  const score = parseInt(match[1]);
+                  const maxScore = parseInt(match[2]);
+                  if (window.gameScoreSubmit) {
+                    window.gameScoreSubmit(score, maxScore);
+                  }
+                }
+              }
+            }, 1000);
+          });
+        }
+      }, 500);
+    }
+
+    function setupScoreSubmission() {
+      window.submitGameScore = async function(gameId, score, maxScore) {
+        const statusDiv = document.getElementById('scoreSubmissionStatus');
+        const statusTitle = document.getElementById('statusTitle');
+        const statusMessage = document.getElementById('statusMessage');
+        const statusIcon = document.getElementById('statusIcon');
+        const statusBtn = document.getElementById('statusBtn');
+        
+        statusDiv.classList.add('show');
+        statusIcon.className = 'status-icon loading';
+        statusIcon.innerHTML = '<i class="fas fa-spinner"></i>';
+        statusTitle.textContent = 'Submitting Score...';
+        statusMessage.textContent = 'Please wait...';
+        statusBtn.style.display = 'none';
+
+        const userId = sessionStorage.getItem('gameUserId');
+        if (!userId) {
+          statusIcon.className = 'status-icon error';
+          statusIcon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+          statusTitle.textContent = 'Error';
+          statusMessage.textContent = 'User not authenticated. Please login again.';
+          statusBtn.style.display = 'block';
+          setTimeout(() => window.location.href = '/game-login', 3000);
+          return;
+        }
+
+        try {
+          const r = await fetch('/api/game-scores/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              game_id: parseInt(gameId),
+              score: parseInt(score),
+              max_score: maxScore ? parseInt(maxScore) : null,
+              user_id: parseInt(userId)
+            })
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || 'Failed to submit score');
+          
+          statusIcon.className = 'status-icon success';
+          statusIcon.innerHTML = '<i class="fas fa-check"></i>';
+          statusTitle.textContent = 'Score Submitted!';
+          statusMessage.innerHTML = `
+            <strong style="font-size: 20px; color: #48bb78;">${score}${maxScore ? ' / ' + maxScore : ''}</strong><br>
+            ${data.score && data.score.percentage ? '<span style="color: #718096;">Percentage: ' + data.score.percentage.toFixed(1) + '%</span>' : ''}<br><br>
+            Great job! Your score has been saved.
+          `;
+          statusBtn.style.display = 'block';
+        } catch (e) {
+          statusIcon.className = 'status-icon error';
+          statusIcon.innerHTML = '<i class="fas fa-times"></i>';
+          statusTitle.textContent = 'Error';
+          statusMessage.textContent = 'Failed to submit score: ' + e.message;
+          statusBtn.style.display = 'block';
+        }
+      };
+    }
+  </script>
+</body>
+</html>

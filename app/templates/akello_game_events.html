@@ -1,0 +1,941 @@
+{% extends 'base.html' %}
+{% block title %}Game Events Management{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * {
+    box-sizing: border-box;
+  }
+  
+  .dashboard-container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 0 24px;
+  }
+  
+  .page-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  
+  .page-header h1 {
+    font-size: 36px;
+    font-weight: 700;
+    color: #1a202c;
+    margin-bottom: 12px;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  .page-header p {
+    font-size: 18px;
+    color: #718096;
+  }
+  
+  .action-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 32px;
+    margin-bottom: 40px;
+  }
+  
+  .action-card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    border: 2px solid transparent;
+  }
+  
+  .action-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  }
+  
+  .action-card.registration {
+    border-color: #6366f1;
+  }
+  
+  .action-card.registration:hover {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+  }
+  
+  .action-card.management {
+    border-color: #10b981;
+  }
+  
+  .action-card.management:hover {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+  }
+  
+  .action-card.tracking {
+    border-color: #f59e0b;
+  }
+  
+  .action-card.tracking:hover {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+  }
+  
+  .action-card-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    font-size: 40px;
+    transition: all 0.3s ease;
+  }
+  
+  .action-card.registration .action-card-icon {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+  }
+  
+  .action-card.management .action-card-icon {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+  }
+  
+  .action-card.tracking .action-card-icon {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+  }
+  
+  .action-card:hover .action-card-icon {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+  }
+  
+  .action-card h3 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  .action-card p {
+    font-size: 15px;
+    opacity: 0.8;
+    margin: 0;
+  }
+  
+  /* Modal Styles */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  
+  .modal-overlay.show {
+    display: flex;
+  }
+  
+  .modal-content {
+    background: white;
+    border-radius: 20px;
+    max-width: 1000px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease-out;
+    position: relative;
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .modal-header {
+    padding: 24px 32px;
+    color: white;
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  .modal-header h2 {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .modal-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+  }
+  
+  .modal-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+  }
+  
+  .modal-body {
+    padding: 32px;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 8px;
+  }
+  
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.3s ease;
+  }
+  
+  .form-group input:focus,
+  .form-group textarea:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  }
+  
+  .form-group textarea {
+    resize: vertical;
+    font-family: 'Courier New', monospace;
+  }
+  
+  .btn {
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  }
+  
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+  }
+  
+  .btn-success {
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    color: white;
+  }
+  
+  .btn-danger {
+    background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+    color: white;
+  }
+  
+  .btn-secondary {
+    background: #e2e8f0;
+    color: #2d3748;
+  }
+  
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .table-container {
+    overflow-x: auto;
+    margin-top: 20px;
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  table th {
+    background: #f7fafc;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #718096;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  
+  table td {
+    padding: 12px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 14px;
+  }
+  
+  table tr:hover {
+    background: #f7fafc;
+  }
+  
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  
+  .stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+  }
+  
+  .stat-card.blue { background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); }
+  .stat-card.green { background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); }
+  .stat-card.orange { background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%); }
+  .stat-card.purple { background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%); }
+  
+  .stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  
+  .stat-label {
+    font-size: 12px;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .games-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+  }
+  
+  .game-item {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s ease;
+  }
+  
+  .game-item:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+    transform: translateY(-4px);
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 48px;
+    color: #a0aec0;
+  }
+  
+  .empty-state i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+  <div class="page-header">
+    <h1><i class="fas fa-gamepad"></i> Game Events Management</h1>
+    <p>Manage game users, create games, and track scores</p>
+  </div>
+  
+  <div class="action-cards">
+    <div class="action-card registration" onclick="openUserRegistrationModal()">
+      <div class="action-card-icon">
+        <i class="fas fa-user-plus"></i>
+      </div>
+      <h3>User Registration</h3>
+      <p>Register new game participants</p>
+    </div>
+    
+    <div class="action-card management" onclick="openGameManagementModal()">
+      <div class="action-card-icon">
+        <i class="fas fa-cog"></i>
+      </div>
+      <h3>Game Management</h3>
+      <p>Create and manage games</p>
+    </div>
+    
+    <div class="action-card tracking" onclick="openScoreTrackingModal()">
+      <div class="action-card-icon">
+        <i class="fas fa-chart-line"></i>
+      </div>
+      <h3>Score Tracking</h3>
+      <p>View scores and statistics</p>
+    </div>
+  </div>
+</div>
+
+<!-- User Registration Modal -->
+<div id="userRegistrationModal" class="modal-overlay" onclick="if(event.target === this) closeUserRegistrationModal()">
+  <div class="modal-content">
+    <div class="modal-header" style="background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+      <h2><i class="fas fa-user-plus"></i> User Registration</h2>
+      <button class="modal-close" onclick="closeUserRegistrationModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="registerGameUserForm">
+        <div class="form-group">
+          <label>First Name *</label>
+          <input type="text" id="guFirstname" placeholder="e.g., John" required>
+        </div>
+        <div class="form-group">
+          <label>Surname *</label>
+          <input type="text" id="guSurname" placeholder="e.g., Doe" required>
+        </div>
+        <div class="form-group">
+          <label>Username *</label>
+          <input type="text" id="guUsername" placeholder="e.g., johndoe" required>
+        </div>
+        <div class="form-group">
+          <label>Password *</label>
+          <input type="password" id="guPassword" placeholder="Enter password" required>
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <button type="submit" class="btn btn-primary" id="registerBtn">
+            <i class="fas fa-user-plus"></i> Register User
+          </button>
+          <button type="reset" class="btn btn-secondary">Clear</button>
+        </div>
+      </form>
+      
+      <div style="margin-top: 32px;">
+        <h3 style="margin-bottom: 16px; font-size: 18px; font-weight: 600;">Registered Game Users</h3>
+        <div id="gameUsersList" class="table-container">
+          <div class="empty-state">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Game Management Modal -->
+<div id="gameManagementModal" class="modal-overlay" onclick="if(event.target === this) closeGameManagementModal()">
+  <div class="modal-content">
+    <div class="modal-header" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%);">
+      <h2><i class="fas fa-cog"></i> Game Management</h2>
+      <button class="modal-close" onclick="closeGameManagementModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom: 24px;">
+        <button class="btn btn-success" type="button" onclick="openGameModal()">
+          <i class="fas fa-plus"></i> Create New Game
+        </button>
+      </div>
+      <div id="gamesList" class="games-grid">
+        <div class="empty-state">
+          <i class="fas fa-spinner fa-spin"></i>
+          <p>Loading games...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Score Tracking Modal -->
+<div id="scoreTrackingModal" class="modal-overlay" onclick="if(event.target === this) closeScoreTrackingModal()">
+  <div class="modal-content">
+    <div class="modal-header" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+      <h2><i class="fas fa-chart-line"></i> Score Tracking</h2>
+      <button class="modal-close" onclick="closeScoreTrackingModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>Filter by Game</label>
+          <select id="scoreGameFilter" onchange="loadScores()">
+            <option value="">All Games</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>Filter by User</label>
+          <select id="scoreUserFilter" onchange="loadScores()">
+            <option value="">All Users</option>
+          </select>
+        </div>
+      </div>
+      <div id="scoresTable">
+        <div class="empty-state">
+          <i class="fas fa-spinner fa-spin"></i>
+          <p>Loading scores...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create/Edit Game Modal -->
+<div id="gameModal" class="modal-overlay" onclick="if(event.target === this) closeGameModal()">
+  <div class="modal-content">
+    <div class="modal-header" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%);">
+      <h2 id="gameModalTitle"><i class="fas fa-plus"></i> Create New Game</h2>
+      <button class="modal-close" onclick="closeGameModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="gameForm">
+        <div class="form-group">
+          <label>Game Title *</label>
+          <input type="text" id="gameTitle" placeholder="e.g., Synonym Match" required>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="gameDescription" rows="2" placeholder="Brief description of the game"></textarea>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label>Maximum Score (optional)</label>
+            <input type="number" id="gameMaxScore" min="1" placeholder="e.g., 5">
+            <small style="color: #718096; font-size: 12px;">Leave empty if game calculates its own max score</small>
+          </div>
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="gameIsActive" checked style="width: auto;">
+              Game is Active
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Game HTML Code *</label>
+          <textarea id="gameHtml" rows="20" placeholder="Paste your HTML game code here..." required style="font-family: 'Courier New', monospace; font-size: 12px;"></textarea>
+          <small style="color: #718096; font-size: 12px;">Note: The game must include score submission functionality.</small>
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <button type="submit" class="btn btn-success" id="saveGameBtn">
+            <i class="fas fa-save"></i> Save Game
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="closeGameModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let currentGameId = null;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Don't auto-load data, wait for modal opens
+  });
+
+  // Modal Functions
+  function openUserRegistrationModal() {
+    document.getElementById('userRegistrationModal').classList.add('show');
+    loadGameUsers();
+  }
+  window.openUserRegistrationModal = openUserRegistrationModal;
+
+  function closeUserRegistrationModal() {
+    document.getElementById('userRegistrationModal').classList.remove('show');
+  }
+  window.closeUserRegistrationModal = closeUserRegistrationModal;
+
+  function openGameManagementModal() {
+    document.getElementById('gameManagementModal').classList.add('show');
+    loadGames();
+  }
+  window.openGameManagementModal = openGameManagementModal;
+
+  function closeGameManagementModal() {
+    document.getElementById('gameManagementModal').classList.remove('show');
+  }
+  window.closeGameManagementModal = closeGameManagementModal;
+
+  function openScoreTrackingModal() {
+    document.getElementById('scoreTrackingModal').classList.add('show');
+    loadScores();
+  }
+  window.openScoreTrackingModal = openScoreTrackingModal;
+
+  function closeScoreTrackingModal() {
+    document.getElementById('scoreTrackingModal').classList.remove('show');
+  }
+  window.closeScoreTrackingModal = closeScoreTrackingModal;
+
+  // Register Game User
+  document.getElementById('registerGameUserForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const firstname = document.getElementById('guFirstname').value.trim();
+    const surname = document.getElementById('guSurname').value.trim();
+    const username = document.getElementById('guUsername').value.trim();
+    const password = document.getElementById('guPassword').value;
+
+    if (!firstname || !surname || !username || !password) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    const btn = document.getElementById('registerBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
+
+    try {
+      const r = await fetch('/api/game-users/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstname, surname, username, password })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed to register');
+      alert('User registered successfully!');
+      document.getElementById('registerGameUserForm').reset();
+      loadGameUsers();
+    } catch (err) {
+      alert('Error: ' + (err.message || 'Failed to register user'));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-user-plus"></i> Register User';
+    }
+  });
+
+  async function loadGameUsers() {
+    try {
+      const r = await fetch('/api/game-users');
+      const data = await r.json();
+      const list = document.getElementById('gameUsersList');
+      if (!data.users || data.users.length === 0) {
+        list.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>No users registered yet</p></div>';
+        return;
+      }
+      list.innerHTML = '<table><thead><tr><th>Name</th><th>Username</th><th>Registered</th><th>Last Login</th><th>Actions</th></tr></thead><tbody>' +
+        data.users.map(u => `
+          <tr>
+            <td>${escapeHtml(u.firstname)} ${escapeHtml(u.surname)}</td>
+            <td>${escapeHtml(u.username)}</td>
+            <td>${formatDate(u.created_at)}</td>
+            <td>${u.last_login ? formatDate(u.last_login) : 'Never'}</td>
+            <td>
+              <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="deleteGameUser(${u.id})">Delete</button>
+            </td>
+          </tr>
+        `).join('') + '</tbody></table>';
+    } catch (e) {
+      console.error(e);
+      document.getElementById('gameUsersList').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error loading users</p></div>';
+    }
+  }
+
+  async function deleteGameUser(id) {
+    if (!confirm('Delete this game user? This will also delete all their scores.')) return;
+    try {
+      const r = await fetch(`/api/game-users/${id}`, { method: 'DELETE' });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed');
+      loadGameUsers();
+      loadScores();
+    } catch (e) {
+      alert('Error deleting user: ' + (e.message || ''));
+    }
+  }
+  window.deleteGameUser = deleteGameUser;
+
+  // Game Management
+  function openGameModal(gameId = null) {
+    currentGameId = gameId;
+    document.getElementById('gameModalTitle').innerHTML = gameId ? '<i class="fas fa-edit"></i> Edit Game' : '<i class="fas fa-plus"></i> Create New Game';
+    document.getElementById('gameForm').reset();
+    document.getElementById('gameIsActive').checked = true;
+    if (gameId) {
+      loadGameForEdit(gameId);
+    }
+    document.getElementById('gameModal').classList.add('show');
+  }
+  window.openGameModal = openGameModal;
+
+  function closeGameModal() {
+    document.getElementById('gameModal').classList.remove('show');
+    currentGameId = null;
+  }
+  window.closeGameModal = closeGameModal;
+
+  async function loadGameForEdit(gameId) {
+    try {
+      const r = await fetch(`/api/games/${gameId}`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed');
+      document.getElementById('gameTitle').value = data.game.title || '';
+      document.getElementById('gameDescription').value = data.game.description || '';
+      document.getElementById('gameMaxScore').value = data.game.max_score || '';
+      document.getElementById('gameIsActive').checked = data.game.is_active !== false;
+      document.getElementById('gameHtml').value = data.game.html_content || '';
+    } catch (e) {
+      alert('Error loading game: ' + (e.message || ''));
+    }
+  }
+
+  document.getElementById('gameForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = document.getElementById('gameTitle').value.trim();
+    const description = document.getElementById('gameDescription').value.trim();
+    const maxScore = document.getElementById('gameMaxScore').value ? parseInt(document.getElementById('gameMaxScore').value) : null;
+    const htmlContent = document.getElementById('gameHtml').value.trim();
+    const isActive = document.getElementById('gameIsActive').checked;
+
+    if (!title || !htmlContent) {
+      alert('Title and HTML content are required');
+      return;
+    }
+
+    const btn = document.getElementById('saveGameBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    try {
+      const url = currentGameId ? `/api/games/${currentGameId}` : '/api/games';
+      const method = currentGameId ? 'PUT' : 'POST';
+      const r = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description, max_score: maxScore, html_content: htmlContent, is_active: isActive })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed to save');
+      alert('Game saved successfully!');
+      closeGameModal();
+      loadGames();
+      loadScores();
+    } catch (err) {
+      alert('Error: ' + (err.message || 'Failed to save game'));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-save"></i> Save Game';
+    }
+  });
+
+  async function loadGames() {
+    try {
+      const r = await fetch('/api/games');
+      const data = await r.json();
+      const container = document.getElementById('gamesList');
+      if (!data.games || data.games.length === 0) {
+        container.innerHTML = '<div class="empty-state"><i class="fas fa-gamepad"></i><p>No games created yet</p></div>';
+        return;
+      }
+      container.innerHTML = data.games.map(g => `
+        <div class="game-item">
+          <div style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">
+            ${escapeHtml(g.title)} 
+            ${g.is_active ? '<span style="background: #48bb78; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; margin-left: 8px;">Active</span>' : '<span style="background: #a0aec0; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; margin-left: 8px;">Inactive</span>'}
+          </div>
+          <div style="color: #718096; font-size: 14px; margin-bottom: 16px;">${escapeHtml(g.description || 'No description')}</div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-primary" style="padding: 8px 16px; font-size: 12px; flex: 1;" onclick="openGameModal(${g.id})">
+              <i class="fas fa-edit"></i> Edit
+            </button>
+            <button class="btn btn-danger" style="padding: 8px 16px; font-size: 12px; flex: 1;" onclick="deleteGame(${g.id})">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      console.error(e);
+      document.getElementById('gamesList').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error loading games</p></div>';
+    }
+  }
+
+  async function deleteGame(id) {
+    if (!confirm('Delete this game? This will also delete all scores for this game.')) return;
+    try {
+      const r = await fetch(`/api/games/${id}`, { method: 'DELETE' });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed');
+      loadGames();
+      loadScores();
+    } catch (e) {
+      alert('Error deleting game: ' + (e.message || ''));
+    }
+  }
+  window.deleteGame = deleteGame;
+
+  async function loadScores() {
+    try {
+      const gameFilter = document.getElementById('scoreGameFilter').value;
+      const userFilter = document.getElementById('scoreUserFilter').value;
+      let url = '/api/game-scores';
+      const params = new URLSearchParams();
+      if (gameFilter) params.append('game_id', gameFilter);
+      if (userFilter) params.append('user_id', userFilter);
+      if (params.toString()) url += '?' + params.toString();
+
+      const r = await fetch(url);
+      const data = await r.json();
+      
+      updateScoreFilters(data.games || [], data.users || []);
+
+      const table = document.getElementById('scoresTable');
+      if (!data.scores || data.scores.length === 0) {
+        table.innerHTML = '<div class="empty-state"><i class="fas fa-trophy"></i><p>No scores yet</p></div>';
+        return;
+      }
+
+      const stats = calculateStats(data.scores);
+      
+      table.innerHTML = `
+        <div class="stats-grid">
+          <div class="stat-card blue">
+            <div class="stat-value">${stats.totalAttempts}</div>
+            <div class="stat-label">Total Attempts</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-value">${stats.uniqueUsers}</div>
+            <div class="stat-label">Unique Players</div>
+          </div>
+          <div class="stat-card orange">
+            <div class="stat-value">${stats.avgScore.toFixed(1)}</div>
+            <div class="stat-label">Average Score</div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-value">${stats.avgPercentage.toFixed(1)}%</div>
+            <div class="stat-label">Avg Percentage</div>
+          </div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Game</th>
+                <th>Score</th>
+                <th>Max Score</th>
+                <th>Percentage</th>
+                <th>Attempt #</th>
+                <th>Played At</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.scores.map(s => `
+                <tr>
+                  <td>${escapeHtml(s.user_name || 'Unknown')}</td>
+                  <td>${escapeHtml(s.game_title || 'Unknown')}</td>
+                  <td><strong>${s.score}</strong></td>
+                  <td>${s.max_score || 'N/A'}</td>
+                  <td>${s.percentage ? s.percentage.toFixed(1) + '%' : 'N/A'}</td>
+                  <td>${s.attempt_number}</td>
+                  <td>${formatDate(s.played_at)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } catch (e) {
+      console.error(e);
+      document.getElementById('scoresTable').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error loading scores</p></div>';
+    }
+  }
+
+  function updateScoreFilters(games, users) {
+    const gameSelect = document.getElementById('scoreGameFilter');
+    const userSelect = document.getElementById('scoreUserFilter');
+    
+    const currentGame = gameSelect.value;
+    gameSelect.innerHTML = '<option value="">All Games</option>' + games.map(g => 
+      `<option value="${g.id}">${escapeHtml(g.title)}</option>`
+    ).join('');
+    if (currentGame) gameSelect.value = currentGame;
+
+    const currentUser = userSelect.value;
+    userSelect.innerHTML = '<option value="">All Users</option>' + users.map(u => 
+      `<option value="${u.id}">${escapeHtml(u.firstname)} ${escapeHtml(u.surname)} (${escapeHtml(u.username)})</option>`
+    ).join('');
+    if (currentUser) userSelect.value = currentUser;
+  }
+
+  function calculateStats(scores) {
+    if (!scores.length) return { totalAttempts: 0, uniqueUsers: 0, avgScore: 0, avgPercentage: 0 };
+    const uniqueUsers = new Set(scores.map(s => s.user_id)).size;
+    const totalScore = scores.reduce((sum, s) => sum + s.score, 0);
+    const totalPercentage = scores.filter(s => s.percentage).reduce((sum, s) => sum + s.percentage, 0);
+    const withPercentage = scores.filter(s => s.percentage).length;
+    return {
+      totalAttempts: scores.length,
+      uniqueUsers,
+      avgScore: totalScore / scores.length,
+      avgPercentage: withPercentage > 0 ? totalPercentage / withPercentage : 0
+    };
+  }
+
+  function formatDate(d) {
+    if (!d) return 'N/A';
+    const date = new Date(d);
+    return date.toLocaleString();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"]+/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] || c));
+  }
+</script>
+{% endblock %}
+

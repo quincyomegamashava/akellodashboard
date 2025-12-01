@@ -253,17 +253,30 @@
               </div>
             </details>
             {% endif %}
-            <div class="text-slate-500 uppercase w3-text-indigo font-bold tracking-wider w3-hide text-xs px-2 mt-6">
+            {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}
+            <div class="text-slate-500 uppercase w3-text-indigo font-bold tracking-wider text-xs px-2 mt-6">
               Content</div>
-            <a class="nav-link w3-hide {% if title == 'Content Development' %}nav-active w3-indigo  w3-text-color{% endif %}"
+            <a class="nav-link {% if title == 'Content Development' %}nav-active w3-indigo  w3-text-color{% endif %}"
               href="{{ url_for('content_development') }}">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-body-text"
                 viewBox="0 0 16 16">
                 <path fill-rule="evenodd"
                   d="M0 .5A.5.5 0 0 1 .5 0h4a.5.5 0 0 1 0 1h-4A.5.5 0 0 1 0 .5m0 2A.5.5 0 0 1 .5 2h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5m9 0a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m-9 2A.5.5 0 0 1 .5 4h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5m5 0a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m7 0a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5m-12 2A.5.5 0 0 1 .5 6h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5m8 0a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m-8 2A.5.5 0 0 1 .5 8h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m7 0a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5m-7 2a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 0 1h-8a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5" />
               </svg>
-              Content development
+              Content Development
             </a>
+            {% endif %}
+            {% if current_user.userRole == 'Admin' or current_user.has_privilege('Akello Events') %}
+            <a class="nav-link {% if title == 'Game Events Management' %}nav-active w3-indigo  w3-text-color{% endif %}"
+              href="{{ url_for('akello_game_events') }}">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-controller"
+                viewBox="0 0 16 16">
+                <path
+                  d="M11.5 6.027a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m-1.586 3.5.5-.5a.5.5 0 1 1 .707.707l-.5.5a.5.5 0 0 1-.707-.707M14.5 3.5a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1m-8 9.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m.5-8.5a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1m8.5-.5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0M11 5.5a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1m-6 7a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m-1-6a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1m8.5-2.5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0m-7.5-.5a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5z" />
+              </svg>
+              Akello Events
+            </a>
+            {% endif %}
             <div class="text-slate-500 uppercase w3-text-indigo font-bold tracking-wider text-xs px-2 mt-6">Settings
             </div>
             {% if current_user.userRole == 'Admin' %}
@@ -369,6 +382,14 @@
               {% endif %}
               <a class="nav-link {% if title == 'Help desk' %}nav-active w3-indigo  w3-text-color{% endif %}"
                 href="{{ url_for('help_desk') }}">Help Desk</a>
+              {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}
+              <a class="nav-link {% if title == 'Content Development' %}nav-active w3-indigo  w3-text-color{% endif %}"
+                href="{{ url_for('content_development') }}">Content Development</a>
+              {% endif %}
+              {% if current_user.userRole == 'Admin' or current_user.has_privilege('Akello Events') %}
+              <a class="nav-link {% if title == 'Game Events Management' %}nav-active w3-indigo  w3-text-color{% endif %}"
+                href="{{ url_for('akello_game_events') }}">Akello Events</a>
+              {% endif %}
               {% if current_user.userRole == 'Admin' %}
               <a class="nav-link {% if title == 'Administration' %}nav-active w3-indigo  w3-text-color{% endif %}"
                 href="{{ url_for('administration') }}">Administration</a>

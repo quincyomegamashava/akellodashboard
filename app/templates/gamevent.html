@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Synonym Match – Drag and Drop</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f4f4f9;
+        padding: 20px;
+    }
+
+    h2 {
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    #scoreBox {
+        text-align: center;
+        font-size: 18px;
+        margin-bottom: 15px;
+        font-weight: bold;
+    }
+
+    .container {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        max-width: 900px;
+        margin: 0 auto;
+        flex-wrap: wrap;
+    }
+
+    .list {
+        flex: 1 1 300px;
+        padding: 15px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .item, .dropzone {
+        padding: 12px;
+        margin: 10px 0;
+        background: #e8e8ff;
+        border-radius: 6px;
+        text-align: center;
+        font-weight: bold;
+        cursor: grab;
+        user-select: none;
+    }
+
+    .dropzone {
+        background: #ffe8e8;
+        min-height: 45px;
+    }
+
+    .correct {
+        background: #c8f7c5 !important;
+        color: #1a751a !important;
+    }
+
+    .wrong {
+        background: #f7c5c5 !important;
+        color: #8b0000 !important;
+    }
+
+    button {
+        display: block;
+        margin: 25px auto;
+        padding: 12px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 6px;
+        background: #4a57ff;
+        color: white;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    button:hover {
+        background: #2e3bd6;
+    }
+
+    /* CONFETTI CANVAS */
+    #confetti {
+        position: fixed;
+        top: 0; 
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 999;
+        display: none;
+    }
+
+</style>
+</head>
+
+<body>
+
+<canvas id="confetti"></canvas>
+
+<h2>Match the Words With the Same Meaning</h2>
+<div id="scoreBox">Score: 0 / 5</div>
+
+<div class="container">
+
+    <div class="list">
+        <h3>Drag These</h3>
+        <div id="dragItems"></div>
+    </div>
+
+    <div class="list">
+        <h3>Drop Here</h3>
+        <div class="dropzone" data-match="quick">Fast</div>
+        <div class="dropzone" data-match="angry">Furious</div>
+        <div class="dropzone" data-match="easy">Simple</div>
+        <div class="dropzone" data-match="brave">Courageous</div>
+        <div class="dropzone" data-match="help">Assist</div>
+    </div>
+
+</div>
+
+<button id="checkBtn">Check Answers</button>
+<button id="resetBtn">Reset</button>
+
+<script>
+    let score = 0;
+    const scoreBox = document.getElementById('scoreBox');
+    const dragContainer = document.getElementById('dragItems');
+    const zones = document.querySelectorAll('.dropzone');
+
+    const words = [
+        { id: "quick", text: "Quick" },
+        { id: "angry", text: "Angry" },
+        { id: "easy", text: "Easy" },
+        { id: "brave", text: "Brave" },
+        { id: "help", text: "Help" }
+    ];
+
+    // Shuffle function
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    // Render the randomized items
+    function renderItems() {
+        dragContainer.innerHTML = "";
+        let shuffled = shuffle([...words]);
+        shuffled.forEach(w => {
+            let div = document.createElement("div");
+            div.className = "item";
+            div.id = w.id;
+            div.textContent = w.text;
+            div.setAttribute("draggable", "true");
+            dragContainer.appendChild(div);
+        });
+
+        enableDragging();
+    }
+
+    // Enable drag listeners
+    function enableDragging() {
+        const items = document.querySelectorAll('.item');
+
+        items.forEach(item => {
+            item.addEventListener('dragstart', e => {
+                e.dataTransfer.setData('text', e.target.id);
+            });
+        });
+    }
+
+    // Drop zones setup
+    zones.forEach(zone => {
+        zone.addEventListener('dragover', e => e.preventDefault());
+
+        zone.addEventListener('drop', e => {
+            e.preventDefault();
+            const draggedId = e.dataTransfer.getData('text');
+            const matchId = zone.dataset.match;
+
+            if (!zone.classList.contains('correct')) {
+                if (draggedId === matchId) {
+                    zone.classList.add('correct');
+                    zone.innerHTML += " ✓";
+                    document.getElementById(draggedId).style.display = "none";
+                    score++;
+                    updateScore();
+
+                    if (score === 5) {
+                        launchConfetti();
+                    }
+                } else {
+                    zone.classList.add('wrong');
+                    setTimeout(() => zone.classList.remove('wrong'), 1000);
+                }
+            }
+        });
+    });
+
+    // Update score UI
+    function updateScore() {
+        scoreBox.textContent = `Score: ${score} / 5`;
+    }
+
+    // Check Answers button
+    document.getElementById('checkBtn').addEventListener('click', () => {
+        zones.forEach(zone => {
+            if (!zone.classList.contains('correct')) {
+                zone.classList.add('wrong');
+            }
+        });
+
+        const finalScore = score;
+        const maxScore = 5;
+        alert(`Your final score is ${finalScore} out of ${maxScore}.`);
+        if (finalScore === maxScore) launchConfetti();
+        
+        // Submit score to backend
+        if (window.gameScoreSubmit) {
+            window.gameScoreSubmit(finalScore, maxScore);
+        } else if (window.parent && window.parent.submitGameScore) {
+            // Try to get game ID from URL or parent context
+            const gameIdMatch = window.location.pathname.match(/\/play-game\/(\d+)/);
+            if (gameIdMatch) {
+                window.parent.submitGameScore(parseInt(gameIdMatch[1]), finalScore, maxScore);
+            }
+        }
+    });
+
+    // Reset button
+    document.getElementById('resetBtn').addEventListener('click', resetGame);
+
+    function resetGame() {
+        score = 0;
+        updateScore();
+
+        zones.forEach(zone => {
+            zone.classList.remove('correct', 'wrong');
+            zone.textContent = zone.textContent.split(" ")[0];
+        });
+
+        renderItems();
+        stopConfetti();
+    }
+
+    renderItems();
+
+    /*************** CONFETTI EFFECT *****************/
+
+    const confettiCanvas = document.getElementById("confetti");
+    const ctx = confettiCanvas.getContext("2d");
+
+    let confettiPieces = [];
+    let confettiActive = false;
+
+    function launchConfetti() {
+        confettiCanvas.style.display = "block";
+        confettiActive = true;
+        confettiPieces = [];
+
+        for (let i = 0; i < 150; i++) {
+            confettiPieces.push({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * -50,
+                size: Math.random() * 8 + 4,
+                speed: Math.random() * 3 + 2,
+                color: `hsl(${Math.random() * 360}, 100%, 50%)`
+            });
+        }
+
+        drawConfetti();
+    }
+
+    function drawConfetti() {
+        if (!confettiActive) return;
+
+        confettiCanvas.width = window.innerWidth;
+        confettiCanvas.height = window.innerHeight;
+
+        ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+        confettiPieces.forEach(p => {
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+            p.y += p.speed;
+
+            if (p.y > confettiCanvas.height) {
+                p.y = -10;
+            }
+        });
+
+        requestAnimationFrame(drawConfetti);
+    }
+
+    function stopConfetti() {
+        confettiActive = false;
+        confettiCanvas.style.display = "none";
+    }
+</script>
+
+</body>
+</html>

@@ -554,5 +554,36 @@ class DatabaseManager:
             self.logger.error(f"Export error: {e}")
             raise
 
-# Global database manager instance
-db_manager = DatabaseManager()
+# Global database manager instance - lazy initialization
+_db_manager = None
+
+def get_db_manager():
+    """Get or create database manager instance (lazy initialization)"""
+    global _db_manager
+    if _db_manager is None:
+        # Check if we're running a migration command
+        import sys
+        is_migration = any('db' in arg or 'migrate' in arg for arg in sys.argv)
+        if is_migration:
+            # During migrations, return a dummy manager that doesn't connect
+            class DummyManager:
+                def get_databases(self):
+                    return []
+                def test_connection(self, db_key):
+                    return {'success': False, 'error': 'Not available during migrations'}
+                def get_tables(self, db_key):
+                    return []
+                def get_sample_data(self, db_key, table_name, limit=10):
+                    return {'success': False, 'error': 'Not available during migrations'}
+                def execute_query(self, db_key, query, limit=1000):
+                    return {'success': False, 'error': 'Not available during migrations'}
+                def build_query(self, db_key, data):
+                    return ""
+            _db_manager = DummyManager()
+        else:
+            _db_manager = DatabaseManager()
+    return _db_manager
+
+# For backward compatibility - will be initialized lazily when first accessed
+# This allows existing code that imports db_manager directly to still work
+db_manager = None

@@ -95,7 +95,7 @@ class User(UserMixin, db.Model):
 
     def get_privileges(self):
         """Ensure all expected privileges exist in dict, default False."""
-        all_privs = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife"]
+        all_privs = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events"]
         if not self.privileges:
             self.privileges = {}
         for p in all_privs:
@@ -188,6 +188,7 @@ class Workspace(db.Model):
     members = db.relationship('User', secondary=workspace_membership, back_populates='memberships')
     files = db.relationship('WorkspaceFile', backref='workspace', lazy=True, cascade='all, delete-orphan')
     lessons = db.relationship('Lesson', backref='workspace', lazy=True, cascade='all, delete-orphan')
+    activity_questions = db.relationship('ActivityQuestion', backref='workspace', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Workspace {self.name}>'
@@ -242,6 +243,77 @@ class Lesson(db.Model):
     content = db.Column(db.Text, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ActivityQuestion(db.Model):
+    __tablename__ = 'activity_questions'
+    id = db.Column(db.Integer, primary_key=True)
+    workspace_id = db.Column(db.Integer, db.ForeignKey('workspace.id', ondelete='CASCADE'), nullable=False)
+    lesson_id = db.Column(db.Integer, db.ForeignKey('lessons.id', ondelete='SET NULL'), nullable=True)
+    topic = db.Column(db.String(255), nullable=False)
+    subject = db.Column(db.String(120), nullable=True)
+    age_range = db.Column(db.JSON, nullable=True)  # {min_age: int, max_age: int}
+    grade_range = db.Column(db.JSON, nullable=True)  # {min_grade: int, max_grade: int}
+    ability_levels = db.Column(db.JSON, default=list)  # ["beginner", "intermediate", "advanced"]
+    question_type = db.Column(db.String(50), nullable=False, default='mixed')  # multiple_choice, short_answer, essay, mixed
+    num_questions = db.Column(db.Integer, nullable=False, default=5)
+    prompt = db.Column(db.Text, nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class GameUser(db.Model):
+    __tablename__ = 'game_users'
+    id = db.Column(db.Integer, primary_key=True)
+    firstname = db.Column(db.String(64), nullable=False)
+    surname = db.Column(db.String(64), nullable=False)
+    username = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(256), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime, nullable=True)
+    scores = db.relationship('GameScore', backref='game_user', lazy=True, cascade='all, delete-orphan')
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def __repr__(self):
+        return f'<GameUser {self.username}>'
+
+
+class Game(db.Model):
+    __tablename__ = 'games'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    html_content = db.Column(db.Text, nullable=False)  # The HTML game code
+    max_score = db.Column(db.Integer, nullable=True)  # Maximum possible score (for percentage calculation)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    scores = db.relationship('GameScore', backref='game', lazy=True, cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<Game {self.title}>'
+
+
+class GameScore(db.Model):
+    __tablename__ = 'game_scores'
+    id = db.Column(db.Integer, primary_key=True)
+    game_user_id = db.Column(db.Integer, db.ForeignKey('game_users.id', ondelete='CASCADE'), nullable=False)
+    game_id = db.Column(db.Integer, db.ForeignKey('games.id', ondelete='CASCADE'), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
+    max_score = db.Column(db.Integer, nullable=True)  # Store max score at time of attempt
+    percentage = db.Column(db.Float, nullable=True)  # Calculated percentage
+    attempt_number = db.Column(db.Integer, default=1, nullable=False)  # Which attempt this is for this user+game
+    played_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    def __repr__(self):
+        return f'<GameScore User:{self.game_user_id} Game:{self.game_id} Score:{self.score}>'
 
 class Scorecard(db.Model):
     _tablename_ = 'scorecard'

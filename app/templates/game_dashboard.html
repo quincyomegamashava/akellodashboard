@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      color: #2d3748;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px 0;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .user-welcome {
+      font-size: 15px;
+      font-weight: 500;
+    }
+    
+    .logout-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .logout-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+    
+    .stat-card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+      border-left: 4px solid;
+    }
+    
+    .stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+    }
+    
+    .stat-card.blue { border-left-color: #4299e1; }
+    .stat-card.green { border-left-color: #48bb78; }
+    .stat-card.orange { border-left-color: #ed8936; }
+    
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 8px;
+    }
+    
+    .stat-label {
+      font-size: 14px;
+      color: #718096;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .section {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 32px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    }
+    
+    .section-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    
+    .game-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 16px;
+      padding: 24px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .game-card::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+      transition: all 0.5s ease;
+    }
+    
+    .game-card:hover {
+      transform: translateY(-6px) scale(1.02);
+      box-shadow: 0 12px 30px rgba(102, 126, 234, 0.4);
+    }
+    
+    .game-card:hover::before {
+      transform: rotate(45deg);
+    }
+    
+    .game-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .game-description {
+      font-size: 14px;
+      opacity: 0.9;
+      margin-bottom: 20px;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .play-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid white;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+      z-index: 1;
+      width: 100%;
+    }
+    
+    .play-btn:hover {
+      background: white;
+      color: #667eea;
+      transform: scale(1.05);
+    }
+    
+    .scores-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+    
+    .scores-table th {
+      background: #f7fafc;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #718096;
+      letter-spacing: 0.5px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .scores-table td {
+      padding: 16px 12px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 14px;
+    }
+    
+    .scores-table tr:hover {
+      background: #f7fafc;
+    }
+    
+    .scores-table tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: #a0aec0;
+    }
+    
+    .empty-state i {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 48px;
+      color: #a0aec0;
+    }
+    
+    .loading i {
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-content">
+      <h1>
+        <i class="fas fa-gamepad"></i>
+        Game Portal
+      </h1>
+      <div class="header-actions">
+        <span class="user-welcome" id="userNameDisplay">Welcome, Player!</span>
+        <button class="logout-btn" onclick="logout()">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- User Stats -->
+    <div class="stats-grid">
+      <div class="stat-card blue">
+        <div class="stat-value" id="totalGamesPlayed">0</div>
+        <div class="stat-label">Games Played</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value" id="averageScore">0</div>
+        <div class="stat-label">Average Score</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value" id="bestScore">0</div>
+        <div class="stat-label">Best Score</div>
+      </div>
+    </div>
+
+    <!-- Games List -->
+    <div class="section">
+      <h2 class="section-title">
+        <i class="fas fa-play-circle"></i>
+        Available Games
+      </h2>
+      <div id="gamesList" class="games-grid">
+        <div class="loading">
+          <i class="fas fa-spinner"></i>
+          <p>Loading games...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Your Scores -->
+    <div class="section">
+      <h2 class="section-title">
+        <i class="fas fa-trophy"></i>
+        Your Scores
+      </h2>
+      <div id="myScores">
+        <div class="loading">
+          <i class="fas fa-spinner"></i>
+          <p>Loading scores...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const gameUserId = sessionStorage.getItem('gameUserId');
+    const gameUserName = sessionStorage.getItem('gameUserName');
+
+    if (!gameUserId) {
+      window.location.href = '/game-login';
+    }
+
+    document.getElementById('userNameDisplay').textContent = `Welcome, ${gameUserName || 'Player'}!`;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadGames();
+      loadUserStats();
+      loadMyScores();
+    });
+
+    async function loadGames() {
+      try {
+        const r = await fetch('/api/games?active=true');
+        const data = await r.json();
+        const container = document.getElementById('gamesList');
+        if (!data.games || data.games.length === 0) {
+          container.innerHTML = '<div class="empty-state"><i class="fas fa-gamepad"></i><p>No games available at the moment</p></div>';
+          return;
+        }
+        container.innerHTML = data.games.map(g => `
+          <div class="game-card" onclick="playGame(${g.id})">
+            <div class="game-title">${escapeHtml(g.title)}</div>
+            <div class="game-description">${escapeHtml(g.description || 'Test your skills with this exciting game!')}</div>
+            <button class="play-btn">
+              <i class="fas fa-play"></i> Play Now
+            </button>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error(e);
+        document.getElementById('gamesList').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error loading games</p></div>';
+      }
+    }
+
+    function playGame(gameId) {
+      window.location.href = `/play-game/${gameId}`;
+    }
+    window.playGame = playGame;
+
+    async function loadUserStats() {
+      try {
+        const r = await fetch(`/api/game-users/${gameUserId}/stats`);
+        const data = await r.json();
+        if (r.ok && data.stats) {
+          document.getElementById('totalGamesPlayed').textContent = data.stats.total_games || 0;
+          document.getElementById('averageScore').textContent = data.stats.average_score ? data.stats.average_score.toFixed(1) : '0';
+          document.getElementById('bestScore').textContent = data.stats.best_score || 0;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadMyScores() {
+      try {
+        const r = await fetch(`/api/game-scores?user_id=${gameUserId}`);
+        const data = await r.json();
+        const container = document.getElementById('myScores');
+        if (!data.scores || data.scores.length === 0) {
+          container.innerHTML = '<div class="empty-state"><i class="fas fa-trophy"></i><p>You haven\'t played any games yet</p></div>';
+          return;
+        }
+        container.innerHTML = '<table class="scores-table"><thead><tr><th>Game</th><th>Score</th><th>Max Score</th><th>Percentage</th><th>Attempt</th><th>Date</th></tr></thead><tbody>' +
+          data.scores.map(s => `
+            <tr>
+              <td><strong>${escapeHtml(s.game_title || 'Unknown')}</strong></td>
+              <td><strong style="color: #667eea;">${s.score}</strong></td>
+              <td>${s.max_score || 'N/A'}</td>
+              <td>${s.percentage ? '<span style="color: #48bb78; font-weight: 600;">' + s.percentage.toFixed(1) + '%</span>' : 'N/A'}</td>
+              <td>#${s.attempt_number}</td>
+              <td>${formatDate(s.played_at)}</td>
+            </tr>
+          `).join('') + '</tbody></table>';
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function logout() {
+      sessionStorage.clear();
+      window.location.href = '/game-login';
+    }
+    window.logout = logout;
+
+    function formatDate(d) {
+      if (!d) return 'N/A';
+      const date = new Date(d);
+      return date.toLocaleString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"]+/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] || c));
+    }
+  </script>
+</body>
+</html>

@@ -4,12 +4,12 @@ import calendar
 import json
 from urllib import parse
 from urllib.parse import urlsplit
-from flask import jsonify, render_template, flash, redirect, render_template_string, session, url_for, request, send_file
+from flask import jsonify, render_template, flash, redirect, render_template_string, session, url_for, request, send_file, Response, stream_with_context
 from flask_login import login_user, logout_user, current_user, login_required
 import sqlalchemy as sa
 from app import app, db
 from app.forms import EventForm, LoginForm, PerfomanceTargetsForm, RegistrationForm, BookAllocationForm, ReportForm, WorkspaceForm, ProjectForm, TaskForm, CSVUploadForm, ChampionCSVUploadForm, ChampionSchoolForm, AkelloSimEventForm
-from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, Report, Workspace, Project, Task, ChampionSchool, Event, WeeklyReport, TaskA, ColumnA, ProjectA, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, CollateralItems, CollateralRequest
+from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, Report, Workspace, Project, Task, ChampionSchool, Event, WeeklyReport, TaskA, ColumnA, ProjectA, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore
 from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from collections import defaultdict
@@ -256,6 +256,7 @@ cache = Cache(app)
 
 @app.route("/generate_lesson", methods=["POST"])
 def generate_lesson():
+    """Legacy endpoint for lesson plan generation - now uses Ollama instead of OpenAI"""
     data = request.get_json()
     topic = data.get("topic")
     objectives = data.get("objectives", [])
@@ -282,7 +283,7 @@ def generate_lesson():
     # Build notes context
     notes_context = f"\n\nAdditional requirements: {notes}" if notes else ""
 
-    # 🧩 Enhanced prompt construction
+    # Enhanced prompt construction
     prompt = f"""
     You are an experienced British teacher. Create a detailed, age-appropriate lesson plan{subject_context}.
 
@@ -322,23 +323,72 @@ def generate_lesson():
     }}
     """
 
+    # Ollama config
+    base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')
+    model = os.getenv('OLLAMA_MODEL') or 'llama3.1'
+
+    # Try HTTP API first
+    content = ''
+    http_error = None
+    headers = {}
+    authz = os.getenv('OLLAMA_AUTHORIZATION')
+    api_key = os.getenv('OLLAMA_API_KEY')
+    if authz:
+        headers['Authorization'] = authz
+    elif api_key:
+        headers['Authorization'] = f'Bearer {api_key}'
+
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",  # or gpt-4-turbo
-            messages=[
-                {"role": "system", "content": "You are a professional British lesson plan designer with expertise in creating engaging, age-appropriate educational content."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=2000
-        )
-
-        content = response.choices[0].message.content
-        return jsonify({"lesson": content})
-
+        resp = requests.post(f"{base_url}/api/generate", json={
+            'model': model,
+            'prompt': prompt,
+            'stream': False
+        }, timeout=120, headers=headers)
+        resp.raise_for_status()
+        payload = resp.json()
+        content = payload.get('response') or payload.get('message') or ''
+        if not content:
+            content = payload.get('data') or ''
     except Exception as e:
-        print(f"Error generating lesson: {e}")
-        return jsonify({"error": str(e)}), 500
+        http_error = e
+    # If HTTP failed or returned empty, try HTTP chat endpoint
+    if not content:
+        try:
+            resp2 = requests.post(f"{base_url}/api/chat", json={
+                'model': model,
+                'messages': [
+                    {'role': 'system', 'content': 'You are a professional British lesson plan designer with expertise in creating engaging, age-appropriate educational content.'},
+                    {'role': 'user', 'content': prompt}
+            ],
+                'stream': False
+            }, timeout=120, headers=headers)
+            resp2.raise_for_status()
+            payload2 = resp2.json()
+            content = payload2.get('message', {}).get('content') or ''
+        except Exception:
+            pass
+    # If HTTP failed or returned empty, try Python library fallback
+    if not content:
+        try:
+            from ollama import Client
+            client = Client(host=base_url)
+            res = client.generate(model=model, prompt=prompt, stream=False)
+            content = res.get('response') or res.get('message', {}).get('content') or ''
+            if not content:
+                res2 = client.chat(model=model, messages=[
+                    {'role': 'system', 'content': 'You are a professional British lesson plan designer with expertise in creating engaging, age-appropriate educational content.'},
+                    {'role': 'user', 'content': prompt}
+                ])
+                content = res2.get('message', {}).get('content') or ''
+        except Exception as e:
+            if http_error:
+                return jsonify({'error': f'Failed to generate from Ollama HTTP ({http_error}); and Python client also failed: {e}'}), 502
+            return jsonify({'error': f'Failed to generate from Ollama Python client: {e}'}), 502
+
+    if not content:
+        return jsonify({'error': 'Failed to generate lesson plan from Ollama'}), 502
+
+        return jsonify({"lesson": content})
 
 
 
@@ -641,6 +691,9 @@ def index():
 @app.route('/content-development', methods=['GET'])
 @login_required
 def content_development():
+    # Check if user is admin or has Content Development privilege
+    if current_user.userRole != 'Admin' and not current_user.has_privilege('Content Development'):
+        return "Unauthorized", 403
     return render_template('content_development.html', title='Content Development')
 
 
@@ -750,6 +803,20 @@ def workspaces_mine():
             'subject': l.subject,
             'created_at': l.created_at.isoformat() if l.created_at else None
         }
+    
+    def activity_question_to_dict(aq):
+        return {
+            'id': aq.id,
+            'lesson_id': aq.lesson_id,
+            'topic': aq.topic,
+            'subject': aq.subject,
+            'age_range': aq.age_range,
+            'grade_range': aq.grade_range,
+            'ability_levels': aq.ability_levels,
+            'question_type': aq.question_type,
+            'num_questions': aq.num_questions,
+            'created_at': aq.created_at.isoformat() if aq.created_at else None
+        }
 
     def tasks_for_workspace(ws_id):
         # Collect all tasks in all projects under this workspace
@@ -782,6 +849,7 @@ def workspaces_mine():
     for ws in wss:
         files = [file_to_dict(f) for f in ws.files]
         lessons = [lesson_to_dict(l) for l in ws.lessons]
+        activity_questions = [activity_question_to_dict(aq) for aq in ws.activity_questions]
         tasks = tasks_for_workspace(ws.id)
         data.append({
             'id': ws.id,
@@ -790,6 +858,7 @@ def workspaces_mine():
             'created_at': ws.created_at.isoformat() if ws.created_at else None,
             'files': files,
             'lessons': lessons,
+            'activity_questions': activity_questions,
             'tasks': tasks
         })
     return jsonify({'workspaces': data})
@@ -901,22 +970,249 @@ def create_workspace_api():
 
 
 def build_lesson_prompt(age:int, topic:str, objectives:list, aspects:list, activities:list, images:list, subject: str = None):
-    header = f"Using British English create a lesson aimed to teach {{{age}}} year olds on the topic, {{\"{topic}\"}}"
-    if subject:
-        header += f"\n\nSubject: {subject}"
-    obj_lines = "\n".join([f"• {o}" for o in objectives]) if objectives else "• define the key concept\n• explain the importance of the topic"
-    aspects_lines = "\n".join([f"•\t{a}" for a in aspects]) if aspects else "•\tKey ideas"
-    activities_lines = "\n".join([f"•\t{a}" for a in activities]) if activities else "•\tShort quiz\n•\tGroup discussion"
-    images_lines = "\n".join([f"• {i}" for i in images]) if images else "• Simple diagram or infographic relevant to the topic"
+    """Build an optimized, concise prompt for faster generation"""
+    # Format: SUBJECT (all caps) then Topic
+    subject_title = (subject or "GENERAL").upper()
+    
+    # Limit items for faster generation
+    obj_lines = "\n".join([f"• {o}" for o in objectives[:5]]) if objectives else "• Understand key concepts\n• Apply knowledge"
+    aspects_lines = "\n".join([f"• {a}" for a in aspects[:4]]) if aspects else "• Core concepts\n• Examples"
+    activities_lines = "\n".join([f"• {a}" for a in activities[:3]]) if activities else "• Practical exercises"
 
-    parts = [
-        header,
-        "\n\n\nThe lesson's objectives are as follows: \n\n\n" + obj_lines,
-        "\n\n\nthe content should include the following aspects:\n\n\n" + aspects_lines,
-        "\n\n\nAssign activites to help reiterate  the lesson, activities should involve:\n" + activities_lines,
-        "\n\n\nSuggest any images  or illustrations to help emphasis points in the lesson\n\n" + images_lines + "\n"
-    ]
-    return "".join(parts)
+    # More concise prompt for faster generation
+    prompt = f"""Create a lesson for {age}-year-olds:
+
+{subject_title}
+{topic}
+
+Objectives
+By the end of this lesson, you should be able to:
+{obj_lines}
+
+[For each concept, include:]
+[Concept Name]
+[Brief description]
+Uses of [Concept Name]
+[Key uses]
+
+{aspects_lines}
+
+Activity 1
+{activities_lines}
+
+Format: ALL CAPS subject, topic, Objectives, concepts with Uses, Activity. British English. Write to students directly."""
+    
+    return prompt
+
+
+@app.route('/api/lessons/generate-stream', methods=['POST'])
+@login_required
+def generate_lesson_api_stream():
+    """Streaming endpoint for lesson generation with progress updates"""
+    
+    def send_error(error_msg):
+        return f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
+    
+    try:
+        data = request.get_json(silent=True) or {}
+        workspace_id = data.get('workspace_id')
+        topic = (data.get('topic') or '').strip()
+        age = data.get('age')
+        subject_field = (data.get('subject') or '').strip() or None
+        objectives = data.get('objectives') or []
+        aspects = data.get('aspects') or []
+        activities = data.get('activities') or []
+        images = data.get('images') or []
+        custom_prompt = (data.get('custom_prompt') or '').strip()
+
+        if not workspace_id:
+            return Response(send_error('workspace_id is required'), mimetype='text/event-stream'), 400
+
+        workspace_id_int = int(workspace_id)
+        ws = Workspace.query.get_or_404(workspace_id_int)
+        if current_user not in ws.members:
+            return Response(send_error('Not a member of this workspace'), mimetype='text/event-stream'), 403
+        
+        # Store values we need in the generator (avoid detached instance errors)
+        user_id = current_user.id
+    except Exception as e:
+        return Response(send_error(f'Error: {str(e)}'), mimetype='text/event-stream'), 500
+
+    # Ollama config - optimized for speed
+    base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')
+    model = (data.get('model') or os.getenv('OLLAMA_MODEL') or 'phi3:mini')  # Default to faster model
+    # Reduced tokens for faster generation (1500 tokens ≈ 1000-1200 words, enough for a lesson)
+    num_predict = int(os.getenv('OLLAMA_MAX_TOKENS', '1500'))
+    # Lower temperature for faster, more focused responses
+    temperature = float(os.getenv('OLLAMA_TEMPERATURE', '0.6'))
+
+    headers = {}
+    authz = os.getenv('OLLAMA_AUTHORIZATION')
+    api_key = os.getenv('OLLAMA_API_KEY')
+    if authz:
+        headers['Authorization'] = authz
+    elif api_key:
+        headers['Authorization'] = f'Bearer {api_key}'
+
+    def generate():
+        content = ''
+        total_chars = 0
+        estimated_total = num_predict * 4  # Rough estimate: 4 chars per token
+        
+        try:
+            # Build prompt
+            if custom_prompt:
+                if not topic or not age:
+                    yield send_error('topic and age are required even when using custom prompt (for reference)')
+                    return
+                subject_title = (subject_field or "GENERAL").upper() if subject_field else "GENERAL"
+                prompt = f"""Create a lesson following this EXACT format:
+
+{subject_title}
+{topic}
+
+Objectives
+By the end of this lesson, you should be able to:
+[List objectives based on: {custom_prompt}]
+
+[For each main concept, include:]
+[Concept Name]
+[Description]
+Uses of [Concept Name]
+[Uses list]
+
+Activity 1
+[Activity description]
+
+CRITICAL: Follow the format exactly - ALL CAPS subject title, then topic, then Objectives section, then concepts with Uses subsections, then Activities. Use British English. Write directly to students."""
+            else:
+                if not topic or not age:
+                    yield send_error('workspace_id, topic and age are required')
+                    return
+                prompt = build_lesson_prompt(int(age), topic, objectives, aspects, activities, images, subject_field)
+            
+            yield f"data: {json.dumps({'type': 'progress', 'percentage': 5, 'message': 'Starting generation...'})}\n\n"
+            
+            # For streaming, use (connect_timeout, read_timeout) where read_timeout=None allows unlimited streaming
+            resp = requests.post(f"{base_url}/api/chat", json={
+                'model': model,
+                'messages': [
+                    {'role': 'system', 'content': 'You are an expert educator. Write clear, engaging student lessons in British English following the exact format specified.'},
+                    {'role': 'user', 'content': prompt}
+                ],
+                'stream': True,
+                'options': {
+                    'num_predict': num_predict,
+                    'temperature': temperature
+                }
+            }, timeout=(30, None), headers=headers, stream=True)  # 30s connect, None for read (allows streaming)
+            resp.raise_for_status()
+            
+            yield f"data: {json.dumps({'type': 'progress', 'percentage': 10, 'message': 'Model processing...'})}\n\n"
+            
+            for line in resp.iter_lines():
+                if line:
+                    try:
+                        chunk = json.loads(line)
+                        if 'message' in chunk and 'content' in chunk['message']:
+                            new_content = chunk['message']['content']
+                            content += new_content
+                            total_chars += len(new_content)
+                            # Update progress based on content length
+                            progress = min(95, 10 + int((total_chars / estimated_total) * 85))
+                            yield f"data: {json.dumps({'type': 'progress', 'percentage': progress, 'message': f'Generating... {progress}%', 'content': new_content})}\n\n"
+                        elif 'response' in chunk:
+                            new_content = chunk['response']
+                            content += new_content
+                            total_chars += len(new_content)
+                            progress = min(95, 10 + int((total_chars / estimated_total) * 85))
+                            yield f"data: {json.dumps({'type': 'progress', 'percentage': progress, 'message': f'Generating... {progress}%', 'content': new_content})}\n\n"
+                    except json.JSONDecodeError:
+                        continue
+            
+            # Save lesson - use stored workspace_id and user_id to avoid detached instance errors
+            lesson = Lesson(
+                workspace_id=workspace_id_int,
+                topic=topic,
+                subject=subject_field,
+                age=int(age),
+                objectives=objectives,
+                aspects=aspects,
+                activities=activities,
+                images=images,
+                prompt=prompt,
+                content=content,
+                created_by=user_id
+            )
+            db.session.add(lesson)
+            db.session.commit()
+            
+            yield f"data: {json.dumps({'type': 'complete', 'percentage': 100, 'message': 'Lesson generation complete!', 'lesson_id': lesson.id, 'content': content})}\n\n"
+            
+        except requests.exceptions.ReadTimeout as e:
+            # Handle timeout - try to save partial content if we have some
+            error_msg = 'Generation timed out. The model is taking longer than expected. Try using a faster model (phi3:mini) or reducing the content length.'
+            app.logger.error(f"Lesson generation timeout: {str(e)}")
+            if content:
+                # Save partial content
+                try:
+                    lesson = Lesson(
+                        workspace_id=workspace_id_int,
+                        topic=topic,
+                        subject=subject_field,
+                        age=int(age),
+                        objectives=objectives,
+                        aspects=aspects,
+                        activities=activities,
+                        images=images,
+                        prompt=prompt,
+                        content=content + "\n\n[Note: Generation was interrupted - partial content]",
+                        created_by=user_id
+                    )
+                    db.session.add(lesson)
+                    db.session.commit()
+                    yield f"data: {json.dumps({'type': 'error', 'message': error_msg + ' Partial content saved.', 'partial_content': content, 'lesson_id': lesson.id})}\n\n"
+                except Exception as save_err:
+                    app.logger.error(f"Error saving partial content: {save_err}")
+                    yield send_error(error_msg)
+            else:
+                yield send_error(error_msg)
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, requests.exceptions.RequestException) as e:
+            # Handle network disconnections and connection errors
+            import traceback
+            error_msg = f'Network error: {str(e)}. Please check your connection and try again. If Ollama is remote, ensure it\'s accessible.'
+            app.logger.error(f"Lesson generation connection error: {traceback.format_exc()}")
+            if content:
+                # Try to save partial content on network error
+                try:
+                    lesson = Lesson(
+                        workspace_id=workspace_id_int,
+                        topic=topic,
+                        subject=subject_field,
+                        age=int(age),
+                        objectives=objectives,
+                        aspects=aspects,
+                        activities=activities,
+                        images=images,
+                        prompt=prompt,
+                        content=content + "\n\n[Note: Generation was interrupted due to network error - partial content]",
+                        created_by=user_id
+                    )
+                    db.session.add(lesson)
+                    db.session.commit()
+                    yield f"data: {json.dumps({'type': 'error', 'message': error_msg + ' Partial content saved.', 'partial_content': content, 'lesson_id': lesson.id})}\n\n"
+                except Exception as save_err:
+                    app.logger.error(f"Error saving partial content on network error: {save_err}")
+                    yield send_error(error_msg)
+            else:
+                yield send_error(error_msg)
+        except Exception as e:
+            import traceback
+            error_msg = f'Error generating lesson: {str(e)}'
+            app.logger.error(f"Lesson generation error: {traceback.format_exc()}")
+            yield send_error(error_msg)
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 
 @app.route('/api/lessons/generate', methods=['POST'])
@@ -931,24 +1227,57 @@ def generate_lesson_api():
     aspects = data.get('aspects') or []
     activities = data.get('activities') or []
     images = data.get('images') or []
+    custom_prompt = (data.get('custom_prompt') or '').strip()  # For single prompt mode
 
-    if not workspace_id or not topic or not age:
-        return jsonify({'error': 'workspace_id, topic and age are required'}), 400
+    if not workspace_id:
+        return jsonify({'error': 'workspace_id is required'}), 400
 
     ws = Workspace.query.get_or_404(int(workspace_id))
     # ensure requester is a member
     if current_user not in ws.members:
         return jsonify({'error': 'Not a member of this workspace'}), 403
 
+    # If custom prompt is provided, use it directly; otherwise build from structured inputs
+    if custom_prompt:
+        if not topic or not age:
+            return jsonify({'error': 'topic and age are required even when using custom prompt (for reference)'}), 400
+        subject_title = (subject_field or "GENERAL").upper() if subject_field else "GENERAL"
+        prompt = f"""Create a lesson following this EXACT format:
+
+{subject_title}
+{topic}
+
+Objectives
+By the end of this lesson, you should be able to:
+[List objectives based on: {custom_prompt}]
+
+[For each main concept, include:]
+[Concept Name]
+[Description]
+Uses of [Concept Name]
+[Uses list]
+
+Activity 1
+[Activity description]
+
+CRITICAL: Follow the format exactly - ALL CAPS subject title, then topic, then Objectives section, then concepts with Uses subsections, then Activities. Use British English. Write directly to students."""
+    else:
+        if not topic or not age:
+            return jsonify({'error': 'workspace_id, topic and age are required'}), 400
     prompt = build_lesson_prompt(int(age), topic, objectives, aspects, activities, images, subject_field)
 
     # Ollama config
     base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')
     model = (data.get('model') or os.getenv('OLLAMA_MODEL') or 'llama3.1')
+    
+    # Optimization: Use faster parameters for quicker generation
+    # num_predict limits output length (2000 tokens ≈ 1500 words, enough for a complete lesson)
+    num_predict = int(os.getenv('OLLAMA_MAX_TOKENS', '2000'))
+    # Lower temperature = faster, more focused responses (0.7 is a good balance)
+    temperature = float(os.getenv('OLLAMA_TEMPERATURE', '0.7'))
 
-    # Try HTTP API first
+    # Try HTTP chat endpoint first (usually more efficient)
     content = ''
-    http_error = None
     headers = {}
     authz = os.getenv('OLLAMA_AUTHORIZATION')
     api_key = os.getenv('OLLAMA_API_KEY')
@@ -957,49 +1286,65 @@ def generate_lesson_api():
     elif api_key:
         headers['Authorization'] = f'Bearer {api_key}'
 
+    # Use streaming for progress tracking
+    content = ''
     try:
-        resp = requests.post(f"{base_url}/api/generate", json={
+        # Try streaming first for progress updates
+        resp = requests.post(f"{base_url}/api/chat", json={
             'model': model,
-            'prompt': prompt,
-            'stream': False
-        }, timeout=120, headers=headers)
+            'messages': [
+                {'role': 'system', 'content': 'You are an expert educator. Write clear, engaging student lessons in British English following the exact format specified.'},
+                {'role': 'user', 'content': prompt}
+            ],
+            'stream': True,
+            'options': {
+                'num_predict': num_predict,
+                'temperature': temperature
+            }
+        }, timeout=90, headers=headers, stream=True)
         resp.raise_for_status()
-        payload = resp.json()
-        content = payload.get('response') or payload.get('message') or ''
-        if not content:
-            content = payload.get('data') or ''
+        
+        # Collect streamed content
+        for line in resp.iter_lines():
+            if line:
+                try:
+                    chunk = json.loads(line)
+                    if 'message' in chunk and 'content' in chunk['message']:
+                        content += chunk['message']['content']
+                    elif 'response' in chunk:
+                        content += chunk['response']
+                except json.JSONDecodeError:
+                    continue
     except Exception as e:
-        http_error = e
-    # If HTTP failed or returned empty, try HTTP chat endpoint
-    if not content:
+        # Fallback to non-streaming
         try:
             resp2 = requests.post(f"{base_url}/api/chat", json={
                 'model': model,
-                'messages': [{ 'role': 'user', 'content': prompt }],
-                'stream': False
-            }, timeout=120, headers=headers)
+                'messages': [
+                    {'role': 'system', 'content': 'You are an expert educator. Write clear, engaging student lessons in British English following the exact format specified.'},
+                    {'role': 'user', 'content': prompt}
+                ],
+                'stream': False,
+                'options': {
+                    'num_predict': num_predict,
+                    'temperature': temperature
+                }
+            }, timeout=60, headers=headers)
             resp2.raise_for_status()
-            payload2 = resp2.json()
-            # Chat responses place content under message.content
-            content = payload2.get('message', {}).get('content') or ''
-        except Exception:
-            pass
-    # If HTTP failed or returned empty, try Python library fallback (with explicit host)
-    if not content:
-        try:
-            from ollama import Client
-            client = Client(host=base_url)
-            # Try generate first
-            res = client.generate(model=model, prompt=prompt, stream=False)
-            content = res.get('response') or res.get('message', {}).get('content') or ''
-            if not content:
-                # Then chat
-                res2 = client.chat(model=model, messages=[{ 'role': 'user', 'content': prompt }])
-                content = res2.get('message', {}).get('content') or ''
-        except Exception as e:
-            if http_error:
-                return jsonify({'error': f'Failed to generate from Ollama HTTP ({http_error}); and Python client also failed: {e}'}), 502
-            return jsonify({'error': f'Failed to generate from Ollama Python client: {e}'}), 502
+            payload = resp2.json()
+            content = payload.get('message', {}).get('content') or ''
+        except Exception as e2:
+            # Final fallback: Python library
+            try:
+                from ollama import Client
+                client = Client(host=base_url)
+                res = client.chat(model=model, messages=[
+                    {'role': 'system', 'content': 'You are an expert educator. Write clear, engaging student lessons in British English following the exact format specified.'},
+                    {'role': 'user', 'content': prompt}
+                ], options={'num_predict': num_predict, 'temperature': temperature})
+                content = res.get('message', {}).get('content') or ''
+            except Exception as e3:
+                return jsonify({'error': f'Failed to generate from Ollama: {str(e3)}'}), 502
 
     # Save lesson
     lesson = Lesson(
@@ -1031,6 +1376,234 @@ def generate_lesson_api():
     }), 201
 
 
+def build_activity_question_prompt(topic: str, subject: str, age_range: dict, grade_range: dict, ability_levels: list, question_type: str, num_questions: int):
+    """Build prompt for generating activity questions using Ollama"""
+    parts = []
+    
+    # Header
+    header = f"Create {num_questions} activity questions for students on the topic: \"{topic}\""
+    if subject:
+        header += f" in the subject of {subject}"
+    parts.append(header)
+    
+    # Student range specifications
+    range_specs = []
+    if age_range and age_range.get('min_age') and age_range.get('max_age'):
+        range_specs.append(f"Age range: {age_range['min_age']}-{age_range['max_age']} years old")
+    if grade_range and grade_range.get('min_grade') and grade_range.get('max_grade'):
+        range_specs.append(f"Grade range: Grade {grade_range['min_grade']}-{grade_range['max_grade']}")
+    if ability_levels:
+        levels_str = ", ".join(ability_levels)
+        range_specs.append(f"Ability levels: {levels_str}")
+    
+    if range_specs:
+        parts.append("\n\nStudent specifications:\n" + "\n".join([f"• {s}" for s in range_specs]))
+    
+    # Question type
+    question_type_map = {
+        'multiple_choice': 'multiple choice questions with 4 options each',
+        'short_answer': 'short answer questions (1-2 sentences)',
+        'essay': 'essay questions requiring detailed responses',
+        'mixed': 'a mix of question types (multiple choice, short answer, and essay)'
+    }
+    qtype_desc = question_type_map.get(question_type, 'mixed questions')
+    parts.append(f"\n\nQuestion type: {qtype_desc}")
+    
+    # Format requirements
+    parts.append("\n\nFormat the output clearly with:")
+    parts.append("• Question number and question text")
+    if question_type in ['multiple_choice', 'mixed']:
+        parts.append("• For multiple choice: List options A, B, C, D and indicate the correct answer")
+    if question_type in ['essay', 'mixed']:
+        parts.append("• For essay questions: Include suggested marking criteria or key points")
+    parts.append("\nUse British English spelling and terminology.")
+    
+    return "\n".join(parts)
+
+
+@app.route('/api/activity-questions/generate', methods=['POST'])
+@login_required
+def generate_activity_questions_api():
+    data = request.get_json(silent=True) or {}
+    workspace_id = data.get('workspace_id')
+    topic = (data.get('topic') or '').strip()
+    subject_field = (data.get('subject') or '').strip() or None
+    age_range = data.get('age_range')  # {min_age: int, max_age: int}
+    grade_range = data.get('grade_range')  # {min_grade: int, max_grade: int}
+    ability_levels = data.get('ability_levels') or []
+    question_type = data.get('question_type', 'mixed')
+    num_questions = data.get('num_questions', 5)
+    lesson_id = data.get('lesson_id')  # Optional link to a lesson
+    
+    if not workspace_id or not topic:
+        return jsonify({'error': 'workspace_id and topic are required'}), 400
+    
+    if not isinstance(num_questions, int) or num_questions < 1:
+        num_questions = 5
+    
+    # Validate age range if provided
+    if age_range:
+        min_age = age_range.get('min_age')
+        max_age = age_range.get('max_age')
+        if min_age and max_age and min_age > max_age:
+            return jsonify({'error': 'min_age must be less than or equal to max_age'}), 400
+    
+    # Validate grade range if provided
+    if grade_range:
+        min_grade = grade_range.get('min_grade')
+        max_grade = grade_range.get('max_grade')
+        if min_grade and max_grade and min_grade > max_grade:
+            return jsonify({'error': 'min_grade must be less than or equal to max_grade'}), 400
+    
+    ws = Workspace.query.get_or_404(int(workspace_id))
+    # ensure requester is a member
+    if current_user not in ws.members:
+        return jsonify({'error': 'Not a member of this workspace'}), 403
+    
+    # Validate lesson_id if provided
+    if lesson_id:
+        lesson = Lesson.query.get(lesson_id)
+        if not lesson or lesson.workspace_id != ws.id:
+            return jsonify({'error': 'Invalid lesson_id or lesson does not belong to workspace'}), 400
+    
+    prompt = build_activity_question_prompt(topic, subject_field, age_range, grade_range, ability_levels, question_type, num_questions)
+    
+    # Ollama config
+    base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')
+    model = (data.get('model') or os.getenv('OLLAMA_MODEL') or 'llama3.1')
+    
+    # Try HTTP API first
+    content = ''
+    http_error = None
+    headers = {}
+    authz = os.getenv('OLLAMA_AUTHORIZATION')
+    api_key = os.getenv('OLLAMA_API_KEY')
+    if authz:
+        headers['Authorization'] = authz
+    elif api_key:
+        headers['Authorization'] = f'Bearer {api_key}'
+    
+    try:
+        resp = requests.post(f"{base_url}/api/generate", json={
+            'model': model,
+            'prompt': prompt,
+            'stream': False
+        }, timeout=120, headers=headers)
+        resp.raise_for_status()
+        payload = resp.json()
+        content = payload.get('response') or payload.get('message') or ''
+        if not content:
+            content = payload.get('data') or ''
+    except Exception as e:
+        http_error = e
+    # If HTTP failed or returned empty, try HTTP chat endpoint
+    if not content:
+        try:
+            resp2 = requests.post(f"{base_url}/api/chat", json={
+                'model': model,
+                'messages': [{ 'role': 'user', 'content': prompt }],
+                'stream': False
+            }, timeout=120, headers=headers)
+            resp2.raise_for_status()
+            payload2 = resp2.json()
+            content = payload2.get('message', {}).get('content') or ''
+        except Exception:
+            pass
+    # If HTTP failed or returned empty, try Python library fallback
+    if not content:
+        try:
+            from ollama import Client
+            client = Client(host=base_url)
+            res = client.generate(model=model, prompt=prompt, stream=False)
+            content = res.get('response') or res.get('message', {}).get('content') or ''
+            if not content:
+                res2 = client.chat(model=model, messages=[{ 'role': 'user', 'content': prompt }])
+                content = res2.get('message', {}).get('content') or ''
+        except Exception as e:
+            if http_error:
+                return jsonify({'error': f'Failed to generate from Ollama HTTP ({http_error}); and Python client also failed: {e}'}), 502
+            return jsonify({'error': f'Failed to generate from Ollama Python client: {e}'}), 502
+    
+    # Save activity question
+    activity_question = ActivityQuestion(
+        workspace_id=ws.id,
+        lesson_id=lesson_id if lesson_id else None,
+        topic=topic,
+        subject=subject_field,
+        age_range=age_range,
+        grade_range=grade_range,
+        ability_levels=ability_levels,
+        question_type=question_type,
+        num_questions=num_questions,
+        prompt=prompt,
+        content=content,
+        created_by=current_user.id
+    )
+    db.session.add(activity_question)
+    db.session.commit()
+    
+    return jsonify({
+        'activity_question': {
+            'id': activity_question.id,
+            'workspace_id': ws.id,
+            'topic': activity_question.topic,
+            'subject': activity_question.subject,
+            'content': activity_question.content
+        },
+        'model': model
+    }), 201
+
+
+@app.route('/api/activity-questions/<int:question_id>', methods=['GET'])
+@login_required
+def get_activity_question(question_id):
+    activity_question = ActivityQuestion.query.get_or_404(question_id)
+    # Ensure user has access via membership
+    ws = Workspace.query.get(activity_question.workspace_id)
+    if current_user not in ws.members:
+        return jsonify({'error': 'Not authorized'}), 403
+    return jsonify({
+        'id': activity_question.id,
+        'workspace_id': activity_question.workspace_id,
+        'lesson_id': activity_question.lesson_id,
+        'topic': activity_question.topic,
+        'subject': activity_question.subject,
+        'age_range': activity_question.age_range,
+        'grade_range': activity_question.grade_range,
+        'ability_levels': activity_question.ability_levels,
+        'question_type': activity_question.question_type,
+        'num_questions': activity_question.num_questions,
+        'content': activity_question.content,
+        'created_at': activity_question.created_at.isoformat() if activity_question.created_at else None
+    })
+
+
+@app.route('/api/workspaces/<int:ws_id>/activity-questions', methods=['GET'])
+@login_required
+def get_workspace_activity_questions(ws_id):
+    ws = Workspace.query.get_or_404(ws_id)
+    if current_user not in ws.members:
+        return jsonify({'error': 'Not authorized'}), 403
+    
+    questions = ActivityQuestion.query.filter_by(workspace_id=ws_id).order_by(ActivityQuestion.created_at.desc()).all()
+    
+    def question_to_dict(aq):
+        return {
+            'id': aq.id,
+            'lesson_id': aq.lesson_id,
+            'topic': aq.topic,
+            'subject': aq.subject,
+            'age_range': aq.age_range,
+            'grade_range': aq.grade_range,
+            'ability_levels': aq.ability_levels,
+            'question_type': aq.question_type,
+            'num_questions': aq.num_questions,
+            'created_at': aq.created_at.isoformat() if aq.created_at else None
+        }
+    
+    return jsonify({
+        'activity_questions': [question_to_dict(aq) for aq in questions]
+    })
 
 
 
@@ -12811,5 +13384,439 @@ def mobile_dashboard_overview():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': 'Server error'}), 500
+
+
+# ==================== GAME SYSTEM ROUTES ====================
+
+@app.route('/akello-game-events')
+@login_required
+def akello_game_events():
+    """Admin page for managing game users and games"""
+    # Check if user is admin or has Akello Events privilege
+    if current_user.userRole != 'Admin' and not current_user.has_privilege('Akello Events'):
+        return "Unauthorized", 403
+    return render_template('akello_game_events.html', title='Game Events Management')
+
+
+@app.route('/game-login')
+def game_login():
+    """Login page for game participants"""
+    return render_template('game_login.html', title='Game Login')
+
+
+@app.route('/game-dashboard')
+def game_dashboard():
+    """Game dashboard for participants"""
+    return render_template('game_dashboard.html', title='Game Dashboard')
+
+
+@app.route('/play-game/<int:game_id>')
+def play_game(game_id):
+    """Page to play a specific game"""
+    return render_template('play_game.html', title='Play Game', game_id=game_id)
+
+
+# Game User API Routes
+@app.route('/api/game-users/register', methods=['POST'])
+@login_required
+def register_game_user():
+    """Register a new game user (admin only)"""
+    if current_user.userRole != 'Admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        data = request.get_json()
+        firstname = data.get('firstname', '').strip()
+        surname = data.get('surname', '').strip()
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
+        
+        if not all([firstname, surname, username, password]):
+            return jsonify({'error': 'All fields are required'}), 400
+        
+        # Check if username exists
+        existing = GameUser.query.filter_by(username=username).first()
+        if existing:
+            return jsonify({'error': 'Username already exists'}), 400
+        
+        game_user = GameUser(
+            firstname=firstname,
+            surname=surname,
+            username=username
+        )
+        game_user.set_password(password)
+        db.session.add(game_user)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': game_user.id,
+                'firstname': game_user.firstname,
+                'surname': game_user.surname,
+                'username': game_user.username
+            }
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/game-users/login', methods=['POST'])
+def game_user_login():
+    """Login for game users"""
+    try:
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
+        
+        if not username or not password:
+            return jsonify({'error': 'Username and password are required'}), 400
+        
+        game_user = GameUser.query.filter_by(username=username).first()
+        if not game_user or not game_user.check_password(password):
+            return jsonify({'error': 'Invalid username or password'}), 401
+        
+        # Update last login
+        game_user.last_login = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': game_user.id,
+                'firstname': game_user.firstname,
+                'surname': game_user.surname,
+                'username': game_user.username
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/game-users', methods=['GET'])
+@login_required
+def list_game_users():
+    """List all game users (admin only)"""
+    if current_user.userRole != 'Admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        users = GameUser.query.order_by(GameUser.created_at.desc()).all()
+        return jsonify({
+            'users': [{
+                'id': u.id,
+                'firstname': u.firstname,
+                'surname': u.surname,
+                'username': u.username,
+                'created_at': u.created_at.isoformat() if u.created_at else None,
+                'last_login': u.last_login.isoformat() if u.last_login else None
+            } for u in users]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/game-users/<int:user_id>', methods=['DELETE'])
+@login_required
+def delete_game_user(user_id):
+    """Delete a game user (admin only)"""
+    if current_user.userRole != 'Admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        game_user = GameUser.query.get_or_404(user_id)
+        db.session.delete(game_user)
+        db.session.commit()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/game-users/<int:user_id>/stats', methods=['GET'])
+def get_game_user_stats(user_id):
+    """Get statistics for a game user"""
+    try:
+        scores = GameScore.query.filter_by(game_user_id=user_id).all()
+        if not scores:
+            return jsonify({
+                'stats': {
+                    'total_games': 0,
+                    'average_score': 0,
+                    'best_score': 0
+                }
+            }), 200
+        
+        total_games = len(scores)
+        total_score = sum(s.score for s in scores)
+        best_score = max(s.score for s in scores)
+        average_score = total_score / total_games if total_games > 0 else 0
+        
+        return jsonify({
+            'stats': {
+                'total_games': total_games,
+                'average_score': round(average_score, 1),
+                'best_score': best_score
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# Game API Routes
+@app.route('/api/games', methods=['GET'])
+def list_games():
+    """List all games (filter by active if requested)"""
+    try:
+        active_only = request.args.get('active', '').lower() == 'true'
+        query = Game.query
+        if active_only:
+            query = query.filter_by(is_active=True)
+        games = query.order_by(Game.created_at.desc()).all()
+        
+        return jsonify({
+            'games': [{
+                'id': g.id,
+                'title': g.title,
+                'description': g.description,
+                'max_score': g.max_score,
+                'is_active': g.is_active,
+                'created_at': g.created_at.isoformat() if g.created_at else None
+            } for g in games]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/games', methods=['POST'])
+@login_required
+def create_game():
+    """Create a new game (admin only)"""
+    if current_user.userRole != 'Admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        data = request.get_json()
+        title = data.get('title', '').strip()
+        description = data.get('description', '').strip()
+        html_content = data.get('html_content', '').strip()
+        max_score = data.get('max_score')
+        is_active = data.get('is_active', True)
+        
+        if not title or not html_content:
+            return jsonify({'error': 'Title and HTML content are required'}), 400
+        
+        game = Game(
+            title=title,
+            description=description,
+            html_content=html_content,
+            max_score=int(max_score) if max_score else None,
+            is_active=bool(is_active),
+            created_by=current_user.id
+        )
+        db.session.add(game)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'game': {
+                'id': game.id,
+                'title': game.title,
+                'description': game.description,
+                'max_score': game.max_score,
+                'is_active': game.is_active
+            }
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/games/<int:game_id>', methods=['GET'])
+def get_game(game_id):
+    """Get a specific game"""
+    try:
+        game = Game.query.get_or_404(game_id)
+        return jsonify({
+            'game': {
+                'id': game.id,
+                'title': game.title,
+                'description': game.description,
+                'html_content': game.html_content,
+                'max_score': game.max_score,
+                'is_active': game.is_active,
+                'created_at': game.created_at.isoformat() if game.created_at else None
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/games/<int:game_id>', methods=['PUT'])
+@login_required
+def update_game(game_id):
+    """Update a game (admin only)"""
+    if current_user.userRole != 'Admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        game = Game.query.get_or_404(game_id)
+        data = request.get_json()
+        
+        if 'title' in data:
+            game.title = data['title'].strip()
+        if 'description' in data:
+            game.description = data.get('description', '').strip()
+        if 'html_content' in data:
+            game.html_content = data['html_content'].strip()
+        if 'max_score' in data:
+            game.max_score = int(data['max_score']) if data['max_score'] else None
+        if 'is_active' in data:
+            game.is_active = bool(data['is_active'])
+        
+        game.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'game': {
+                'id': game.id,
+                'title': game.title,
+                'description': game.description,
+                'max_score': game.max_score,
+                'is_active': game.is_active
+            }
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/games/<int:game_id>', methods=['DELETE'])
+@login_required
+def delete_game_route(game_id):
+    """Delete a game (admin only)"""
+    if current_user.userRole != 'Admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        game = Game.query.get_or_404(game_id)
+        db.session.delete(game)
+        db.session.commit()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+# Game Score API Routes
+@app.route('/api/game-scores/submit', methods=['POST'])
+def submit_game_score():
+    """Submit a score for a game"""
+    try:
+        data = request.get_json()
+        game_id = data.get('game_id')
+        score = data.get('score')
+        max_score = data.get('max_score')
+        user_id = data.get('user_id')
+        
+        # Get user from request body (sent from frontend sessionStorage)
+        if not user_id:
+            return jsonify({'error': 'User not authenticated. Please login again.'}), 401
+        
+        if not game_id or score is None:
+            return jsonify({'error': 'Game ID and score are required'}), 400
+        
+        # Get game to check max_score
+        game = Game.query.get(game_id)
+        if not game:
+            return jsonify({'error': 'Game not found'}), 404
+        
+        # Use game's max_score if not provided
+        if max_score is None and game.max_score:
+            max_score = game.max_score
+        
+        # Calculate percentage
+        percentage = None
+        if max_score and max_score > 0:
+            percentage = (score / max_score) * 100
+        
+        # Get attempt number
+        last_attempt = GameScore.query.filter_by(
+            game_user_id=user_id,
+            game_id=game_id
+        ).order_by(GameScore.attempt_number.desc()).first()
+        
+        attempt_number = (last_attempt.attempt_number + 1) if last_attempt else 1
+        
+        # Create score record
+        game_score = GameScore(
+            game_user_id=int(user_id),
+            game_id=int(game_id),
+            score=int(score),
+            max_score=int(max_score) if max_score else None,
+            percentage=percentage,
+            attempt_number=attempt_number
+        )
+        db.session.add(game_score)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'score': {
+                'id': game_score.id,
+                'score': game_score.score,
+                'max_score': game_score.max_score,
+                'percentage': game_score.percentage,
+                'attempt_number': game_score.attempt_number
+            }
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/game-scores', methods=['GET'])
+def list_game_scores():
+    """List game scores with optional filters"""
+    try:
+        game_id = request.args.get('game_id')
+        user_id = request.args.get('user_id')
+        
+        query = GameScore.query
+        
+        if game_id:
+            query = query.filter_by(game_id=int(game_id))
+        if user_id:
+            query = query.filter_by(game_user_id=int(user_id))
+        
+        scores = query.order_by(GameScore.played_at.desc()).all()
+        
+        # Get related data
+        game_ids = list(set(s.game_id for s in scores))
+        user_ids = list(set(s.game_user_id for s in scores))
+        
+        games = {g.id: g for g in Game.query.filter(Game.id.in_(game_ids)).all()} if game_ids else {}
+        users = {u.id: u for u in GameUser.query.filter(GameUser.id.in_(user_ids)).all()} if user_ids else {}
+        
+        return jsonify({
+            'scores': [{
+                'id': s.id,
+                'user_id': s.game_user_id,
+                'user_name': f"{users.get(s.game_user_id, GameUser()).firstname} {users.get(s.game_user_id, GameUser()).surname}" if s.game_user_id in users else 'Unknown',
+                'game_id': s.game_id,
+                'game_title': games.get(s.game_id, Game()).title if s.game_id in games else 'Unknown',
+                'score': s.score,
+                'max_score': s.max_score,
+                'percentage': s.percentage,
+                'attempt_number': s.attempt_number,
+                'played_at': s.played_at.isoformat() if s.played_at else None
+            } for s in scores],
+            'games': [{'id': g.id, 'title': g.title} for g in games.values()],
+            'users': [{'id': u.id, 'firstname': u.firstname, 'surname': u.surname, 'username': u.username} for u in users.values()]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
