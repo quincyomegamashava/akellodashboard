@@ -13392,8 +13392,13 @@ def mobile_dashboard_overview():
 @login_required
 def akello_game_events():
     """Admin page for managing game users and games"""
-    # Check if user is admin or has Akello Events privilege
-    if current_user.userRole != 'Admin' and not current_user.has_privilege('Akello Events'):
+    # Check if user is admin or has Akello Events or Content Development privilege
+    has_permission = (
+        current_user.userRole == 'Admin' or 
+        current_user.has_privilege('Akello Events') or 
+        current_user.has_privilege('Content Development')
+    )
+    if not has_permission:
         return "Unauthorized", 403
     return render_template('akello_game_events.html', title='Game Events Management')
 
@@ -13420,8 +13425,14 @@ def play_game(game_id):
 @app.route('/api/game-users/register', methods=['POST'])
 @login_required
 def register_game_user():
-    """Register a new game user (admin only)"""
-    if current_user.userRole != 'Admin':
+    """Register a new game user (admin, Content Development, or Akello Events privilege)"""
+    # Check if user has permission to register game users
+    has_permission = (
+        current_user.userRole == 'Admin' or 
+        current_user.has_privilege('Content Development') or 
+        current_user.has_privilege('Akello Events')
+    )
+    if not has_permission:
         return jsonify({'error': 'Unauthorized'}), 403
     
     try:
@@ -13430,9 +13441,18 @@ def register_game_user():
         surname = data.get('surname', '').strip()
         username = data.get('username', '').strip()
         password = data.get('password', '')
+        age = data.get('age')
         
-        if not all([firstname, surname, username, password]):
+        if not all([firstname, surname, username, password, age]):
             return jsonify({'error': 'All fields are required'}), 400
+        
+        # Validate age (9-19)
+        try:
+            age = int(age)
+            if age < 9 or age > 19:
+                return jsonify({'error': 'Age must be between 9 and 19'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Age must be a valid number'}), 400
         
         # Check if username exists
         existing = GameUser.query.filter_by(username=username).first()
@@ -13442,7 +13462,8 @@ def register_game_user():
         game_user = GameUser(
             firstname=firstname,
             surname=surname,
-            username=username
+            username=username,
+            age=age
         )
         game_user.set_password(password)
         db.session.add(game_user)
@@ -13454,7 +13475,60 @@ def register_game_user():
                 'id': game_user.id,
                 'firstname': game_user.firstname,
                 'surname': game_user.surname,
-                'username': game_user.username
+                'username': game_user.username,
+                'age': game_user.age
+            }
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/game-users/register-public', methods=['POST'])
+def register_game_user_public():
+    """Public registration endpoint for game users to register themselves"""
+    try:
+        data = request.get_json()
+        firstname = data.get('firstname', '').strip()
+        surname = data.get('surname', '').strip()
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
+        age = data.get('age')
+        
+        if not all([firstname, surname, username, password, age]):
+            return jsonify({'error': 'All fields are required'}), 400
+        
+        # Validate age (9-19)
+        try:
+            age = int(age)
+            if age < 9 or age > 19:
+                return jsonify({'error': 'Age must be between 9 and 19'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Age must be a valid number'}), 400
+        
+        # Check if username exists
+        existing = GameUser.query.filter_by(username=username).first()
+        if existing:
+            return jsonify({'error': 'Username already exists'}), 400
+        
+        game_user = GameUser(
+            firstname=firstname,
+            surname=surname,
+            username=username,
+            age=age
+        )
+        game_user.set_password(password)
+        db.session.add(game_user)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': game_user.id,
+                'firstname': game_user.firstname,
+                'surname': game_user.surname,
+                'username': game_user.username,
+                'age': game_user.age
             }
         }), 201
     except Exception as e:
@@ -13487,7 +13561,8 @@ def game_user_login():
                 'id': game_user.id,
                 'firstname': game_user.firstname,
                 'surname': game_user.surname,
-                'username': game_user.username
+                'username': game_user.username,
+                'age': game_user.age
             }
         }), 200
     except Exception as e:
@@ -13497,8 +13572,13 @@ def game_user_login():
 @app.route('/api/game-users', methods=['GET'])
 @login_required
 def list_game_users():
-    """List all game users (admin only)"""
-    if current_user.userRole != 'Admin':
+    """List all game users (Admin, Content Development, or Akello Events privilege)"""
+    has_permission = (
+        current_user.userRole == 'Admin' or 
+        current_user.has_privilege('Content Development') or 
+        current_user.has_privilege('Akello Events')
+    )
+    if not has_permission:
         return jsonify({'error': 'Unauthorized'}), 403
     
     try:
@@ -13509,6 +13589,7 @@ def list_game_users():
                 'firstname': u.firstname,
                 'surname': u.surname,
                 'username': u.username,
+                'age': u.age,
                 'created_at': u.created_at.isoformat() if u.created_at else None,
                 'last_login': u.last_login.isoformat() if u.last_login else None
             } for u in users]
@@ -13520,8 +13601,13 @@ def list_game_users():
 @app.route('/api/game-users/<int:user_id>', methods=['DELETE'])
 @login_required
 def delete_game_user(user_id):
-    """Delete a game user (admin only)"""
-    if current_user.userRole != 'Admin':
+    """Delete a game user (Admin, Content Development, or Akello Events privilege)"""
+    has_permission = (
+        current_user.userRole == 'Admin' or 
+        current_user.has_privilege('Content Development') or 
+        current_user.has_privilege('Akello Events')
+    )
+    if not has_permission:
         return jsonify({'error': 'Unauthorized'}), 403
     
     try:
@@ -13536,7 +13622,7 @@ def delete_game_user(user_id):
 
 @app.route('/api/game-users/<int:user_id>/stats', methods=['GET'])
 def get_game_user_stats(user_id):
-    """Get statistics for a game user"""
+    """Get statistics for a game user - average is total score / unique games played"""
     try:
         scores = GameScore.query.filter_by(game_user_id=user_id).all()
         if not scores:
@@ -13544,22 +13630,95 @@ def get_game_user_stats(user_id):
                 'stats': {
                     'total_games': 0,
                     'average_score': 0,
-                    'best_score': 0
+                    'best_score': 0,
+                    'total_score': 0,
+                    'games_played': []
                 }
             }), 200
         
-        total_games = len(scores)
+        # Get unique games played (one attempt per game)
+        unique_games = {}
+        for score in scores:
+            if score.game_id not in unique_games:
+                unique_games[score.game_id] = score
+        
+        total_unique_games = len(unique_games)
         total_score = sum(s.score for s in scores)
+        # Average = total score / number of unique games played (not attempts)
+        average_score = total_score / total_unique_games if total_unique_games > 0 else 0
         best_score = max(s.score for s in scores)
-        average_score = total_score / total_games if total_games > 0 else 0
+        
+        # Get game titles for played games
+        game_ids = list(unique_games.keys())
+        games = {g.id: g.title for g in Game.query.filter(Game.id.in_(game_ids)).all()} if game_ids else {}
+        games_played = [{'id': gid, 'title': games.get(gid, 'Unknown')} for gid in game_ids]
         
         return jsonify({
             'stats': {
-                'total_games': total_games,
+                'total_games': total_unique_games,  # Unique games played
+                'total_attempts': len(scores),  # Total attempts
                 'average_score': round(average_score, 1),
-                'best_score': best_score
+                'best_score': best_score,
+                'total_score': total_score,
+                'games_played': games_played
             }
         }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/game-users/leaderboard', methods=['GET'])
+@login_required
+def get_leaderboard():
+    """Get leaderboard with user stats (Admin or Content Development privilege)"""
+    has_permission = (
+        current_user.userRole == 'Admin' or 
+        current_user.has_privilege('Content Development')
+    )
+    if not has_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        all_users = GameUser.query.all()
+        leaderboard = []
+        
+        for user in all_users:
+            scores = GameScore.query.filter_by(game_user_id=user.id).all()
+            if scores:
+                # Get unique games played
+                unique_games = set(s.game_id for s in scores)
+                total_unique_games = len(unique_games)
+                total_score = sum(s.score for s in scores)
+                average_score = total_score / total_unique_games if total_unique_games > 0 else 0
+                
+                leaderboard.append({
+                    'user_id': user.id,
+                    'firstname': user.firstname,
+                    'surname': user.surname,
+                    'username': user.username,
+                    'age': user.age,
+                    'total_score': total_score,
+                    'games_played': total_unique_games,
+                    'average_score': round(average_score, 1),
+                    'total_attempts': len(scores)
+                })
+            else:
+                leaderboard.append({
+                    'user_id': user.id,
+                    'firstname': user.firstname,
+                    'surname': user.surname,
+                    'username': user.username,
+                    'age': user.age,
+                    'total_score': 0,
+                    'games_played': 0,
+                    'average_score': 0,
+                    'total_attempts': 0
+                })
+        
+        # Sort by average score descending
+        leaderboard.sort(key=lambda x: x['average_score'], reverse=True)
+        
+        return jsonify({'leaderboard': leaderboard}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -13567,12 +13726,43 @@ def get_game_user_stats(user_id):
 # Game API Routes
 @app.route('/api/games', methods=['GET'])
 def list_games():
-    """List all games (filter by active if requested)"""
+    """List all games (filter by active if requested, filter by user age if user_id provided)"""
     try:
         active_only = request.args.get('active', '').lower() == 'true'
+        user_id = request.args.get('user_id')  # For filtering by user's age
+        
         query = Game.query
         if active_only:
             query = query.filter_by(is_active=True)
+        
+        # Filter by user's age if user_id is provided
+        if user_id:
+            try:
+                game_user = GameUser.query.get(int(user_id))
+                if game_user and game_user.age:
+                    user_age = game_user.age
+                    # Filter games where user's age falls within the game's age range
+                    # Age ranges: "9-10", "11-12", "13-14", "15-16", "17-19"
+                    matching_ranges = []
+                    if 9 <= user_age <= 10:
+                        matching_ranges = ['9-10']
+                    elif 11 <= user_age <= 12:
+                        matching_ranges = ['11-12']
+                    elif 13 <= user_age <= 14:
+                        matching_ranges = ['13-14']
+                    elif 15 <= user_age <= 16:
+                        matching_ranges = ['15-16']
+                    elif 17 <= user_age <= 19:
+                        matching_ranges = ['17-19']
+                    
+                    if matching_ranges:
+                        query = query.filter(Game.age_range.in_(matching_ranges))
+                    else:
+                        # If age doesn't match any range, return empty
+                        query = query.filter(Game.id == -1)  # Impossible condition
+            except (ValueError, AttributeError):
+                pass  # Invalid user_id, ignore filter
+        
         games = query.order_by(Game.created_at.desc()).all()
         
         return jsonify({
@@ -13581,6 +13771,8 @@ def list_games():
                 'title': g.title,
                 'description': g.description,
                 'max_score': g.max_score,
+                'age_range': g.age_range,
+                'difficulty_level': g.difficulty_level,
                 'is_active': g.is_active,
                 'created_at': g.created_at.isoformat() if g.created_at else None
             } for g in games]
@@ -13592,9 +13784,14 @@ def list_games():
 @app.route('/api/games', methods=['POST'])
 @login_required
 def create_game():
-    """Create a new game (admin only)"""
-    if current_user.userRole != 'Admin':
-        return jsonify({'error': 'Unauthorized'}), 403
+    """Create a new game (admin or Content Development privilege only)"""
+    # Only Admin and Content Development can create games
+    has_permission = (
+        current_user.userRole == 'Admin' or 
+        current_user.has_privilege('Content Development')
+    )
+    if not has_permission:
+        return jsonify({'error': 'Unauthorized. Only Admin and users with Content Development privilege can create games.'}), 403
     
     try:
         data = request.get_json()
@@ -13602,16 +13799,30 @@ def create_game():
         description = data.get('description', '').strip()
         html_content = data.get('html_content', '').strip()
         max_score = data.get('max_score')
+        age_range = data.get('age_range', '').strip()
+        difficulty_level = data.get('difficulty_level', '').strip()
         is_active = data.get('is_active', True)
         
         if not title or not html_content:
             return jsonify({'error': 'Title and HTML content are required'}), 400
+        
+        # Validate age_range if provided
+        valid_age_ranges = ['9-10', '11-12', '13-14', '15-16', '17-19']
+        if age_range and age_range not in valid_age_ranges:
+            return jsonify({'error': f'Age range must be one of: {", ".join(valid_age_ranges)}'}), 400
+        
+        # Validate difficulty_level if provided
+        valid_difficulty_levels = ['easy', 'medium', 'hard']
+        if difficulty_level and difficulty_level not in valid_difficulty_levels:
+            return jsonify({'error': f'Difficulty level must be one of: {", ".join(valid_difficulty_levels)}'}), 400
         
         game = Game(
             title=title,
             description=description,
             html_content=html_content,
             max_score=int(max_score) if max_score else None,
+            age_range=age_range if age_range else None,
+            difficulty_level=difficulty_level if difficulty_level else None,
             is_active=bool(is_active),
             created_by=current_user.id
         )
@@ -13625,6 +13836,8 @@ def create_game():
                 'title': game.title,
                 'description': game.description,
                 'max_score': game.max_score,
+                'age_range': game.age_range,
+                'difficulty_level': game.difficulty_level,
                 'is_active': game.is_active
             }
         }), 201
@@ -13645,6 +13858,8 @@ def get_game(game_id):
                 'description': game.description,
                 'html_content': game.html_content,
                 'max_score': game.max_score,
+                'age_range': game.age_range,
+                'difficulty_level': game.difficulty_level,
                 'is_active': game.is_active,
                 'created_at': game.created_at.isoformat() if game.created_at else None
             }
@@ -13656,8 +13871,12 @@ def get_game(game_id):
 @app.route('/api/games/<int:game_id>', methods=['PUT'])
 @login_required
 def update_game(game_id):
-    """Update a game (admin only)"""
-    if current_user.userRole != 'Admin':
+    """Update a game (admin or Content Development privilege only)"""
+    has_permission = (
+        current_user.userRole == 'Admin' or 
+        current_user.has_privilege('Content Development')
+    )
+    if not has_permission:
         return jsonify({'error': 'Unauthorized'}), 403
     
     try:
@@ -13672,6 +13891,18 @@ def update_game(game_id):
             game.html_content = data['html_content'].strip()
         if 'max_score' in data:
             game.max_score = int(data['max_score']) if data['max_score'] else None
+        if 'age_range' in data:
+            age_range = data.get('age_range', '').strip()
+            valid_age_ranges = ['9-10', '11-12', '13-14', '15-16', '17-19']
+            if age_range and age_range not in valid_age_ranges:
+                return jsonify({'error': f'Age range must be one of: {", ".join(valid_age_ranges)}'}), 400
+            game.age_range = age_range if age_range else None
+        if 'difficulty_level' in data:
+            difficulty_level = data.get('difficulty_level', '').strip()
+            valid_difficulty_levels = ['easy', 'medium', 'hard']
+            if difficulty_level and difficulty_level not in valid_difficulty_levels:
+                return jsonify({'error': f'Difficulty level must be one of: {", ".join(valid_difficulty_levels)}'}), 400
+            game.difficulty_level = difficulty_level if difficulty_level else None
         if 'is_active' in data:
             game.is_active = bool(data['is_active'])
         
@@ -13685,6 +13916,8 @@ def update_game(game_id):
                 'title': game.title,
                 'description': game.description,
                 'max_score': game.max_score,
+                'age_range': game.age_range,
+                'difficulty_level': game.difficulty_level,
                 'is_active': game.is_active
             }
         }), 200
@@ -13696,8 +13929,12 @@ def update_game(game_id):
 @app.route('/api/games/<int:game_id>', methods=['DELETE'])
 @login_required
 def delete_game_route(game_id):
-    """Delete a game (admin only)"""
-    if current_user.userRole != 'Admin':
+    """Delete a game (admin or Content Development privilege only)"""
+    has_permission = (
+        current_user.userRole == 'Admin' or 
+        current_user.has_privilege('Content Development')
+    )
+    if not has_permission:
         return jsonify({'error': 'Unauthorized'}), 403
     
     try:
@@ -13777,9 +14014,44 @@ def submit_game_score():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/game-users/<int:user_id>/scores', methods=['GET'])
+def get_game_user_scores(user_id):
+    """Get scores for a specific game user (public endpoint for game users)"""
+    try:
+        scores = GameScore.query.filter_by(game_user_id=user_id).order_by(GameScore.played_at.desc()).all()
+        
+        # Get related data
+        game_ids = list(set(s.game_id for s in scores))
+        games = {g.id: g for g in Game.query.filter(Game.id.in_(game_ids)).all()} if game_ids else {}
+        
+        return jsonify({
+            'scores': [{
+                'id': s.id,
+                'game_id': s.game_id,
+                'game_title': games.get(s.game_id, Game()).title if s.game_id in games else 'Unknown',
+                'score': s.score,
+                'max_score': s.max_score,
+                'percentage': s.percentage,
+                'attempt_number': s.attempt_number,
+                'played_at': s.played_at.isoformat() if s.played_at else None
+            } for s in scores]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/game-scores', methods=['GET'])
+@login_required
 def list_game_scores():
-    """List game scores with optional filters"""
+    """List game scores with optional filters (Admin or Content Development privilege)"""
+    # Check if user has permission to view scores
+    has_permission = (
+        current_user.userRole == 'Admin' or 
+        current_user.has_privilege('Content Development')
+    )
+    if not has_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
     try:
         game_id = request.args.get('game_id')
         user_id = request.args.get('user_id')

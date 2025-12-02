@@ -3,19 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Game Portal - Login</title>
+  <title>Game Portal - Login & Register</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      background: #ffffff;
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -28,260 +21,269 @@
     body::before {
       content: '';
       position: absolute;
-      width: 500px;
-      height: 500px;
+      width: 600px;
+      height: 600px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.1);
-      top: -250px;
-      right: -250px;
-      animation: float 20s infinite ease-in-out;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+      top: -300px;
+      right: -300px;
+      animation: float 25s infinite ease-in-out;
+      pointer-events: none;
     }
     
     body::after {
       content: '';
       position: absolute;
-      width: 400px;
-      height: 400px;
+      width: 500px;
+      height: 500px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.08);
-      bottom: -200px;
-      left: -200px;
-      animation: float 15s infinite ease-in-out reverse;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(20, 184, 166, 0.06) 100%);
+      bottom: -250px;
+      left: -250px;
+      animation: float 20s infinite ease-in-out reverse;
+      pointer-events: none;
     }
     
     @keyframes float {
       0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      50% { transform: translate(30px, 30px) rotate(180deg); }
+      50% { transform: translate(40px, 40px) rotate(180deg); }
     }
     
-    .login-container {
-      position: relative;
-      z-index: 1;
-      width: 100%;
-      max-width: 440px;
+    .glass-card {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        0 0 0 1px rgba(255, 255, 255, 0.8) inset,
+        0 20px 60px rgba(102, 126, 234, 0.15);
     }
     
-    .login-card {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(20px);
-      border-radius: 24px;
-      padding: 48px 40px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      animation: slideUp 0.6s ease-out;
+    .tab-button {
+      transition: all 0.3s ease;
     }
     
-    @keyframes slideUp {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    
-    .logo-section {
-      text-align: center;
-      margin-bottom: 40px;
-    }
-    
-    .logo-icon {
-      width: 80px;
-      height: 80px;
+    .tab-button.active {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 20px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-      animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-    }
-    
-    .logo-icon i {
-      font-size: 40px;
       color: white;
     }
     
-    .logo-section h1 {
-      font-size: 32px;
-      font-weight: 700;
-      color: #1a202c;
-      margin-bottom: 8px;
-      letter-spacing: -0.5px;
-    }
-    
-    .logo-section p {
-      color: #718096;
-      font-size: 15px;
-      font-weight: 400;
-    }
-    
-    .form-group {
-      margin-bottom: 24px;
-    }
-    
-    .form-group label {
-      display: block;
-      font-size: 14px;
-      font-weight: 600;
-      color: #2d3748;
-      margin-bottom: 8px;
-    }
-    
-    .form-group input {
-      width: 100%;
-      padding: 14px 16px;
-      border: 2px solid #e2e8f0;
-      border-radius: 12px;
-      font-size: 15px;
-      font-family: inherit;
-      transition: all 0.3s ease;
-      background: #f7fafc;
-    }
-    
-    .form-group input:focus {
-      outline: none;
-      border-color: #667eea;
-      background: white;
+    .form-input:focus {
       box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
     }
     
-    .form-group input::placeholder {
-      color: #a0aec0;
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
     }
     
-    .error-message {
-      background: #fed7d7;
-      color: #c53030;
-      padding: 12px 16px;
-      border-radius: 12px;
-      font-size: 14px;
-      margin-bottom: 20px;
-      display: none;
-      border-left: 4px solid #c53030;
-      animation: shake 0.5s;
-    }
-    
-    .error-message.show {
-      display: block;
-    }
-    
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-10px); }
-      75% { transform: translateX(10px); }
-    }
-    
-    .login-btn {
-      width: 100%;
-      padding: 16px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      border-radius: 12px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-    }
-    
-    .login-btn:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
-    }
-    
-    .login-btn:active:not(:disabled) {
-      transform: translateY(0);
-    }
-    
-    .login-btn:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-    }
-    
-    .login-btn i {
-      font-size: 18px;
-    }
-    
-    .spinner {
-      display: inline-block;
-      width: 18px;
-      height: 18px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    .tab-content {
+      animation: slideIn 0.3s ease-out;
     }
   </style>
 </head>
 <body>
-  <div class="login-container">
-    <div class="login-card">
-      <div class="logo-section">
-        <div class="logo-icon">
-          <i class="fas fa-gamepad"></i>
+  <div class="relative z-10 w-full max-w-md">
+    <div class="glass-card rounded-3xl p-8 shadow-xl">
+      <!-- Logo Section -->
+      <div class="text-center mb-8">
+        <div class="inline-block mb-4">
+          <img src="{{ url_for('static', filename='smartlearning.webp') }}" alt="Game Portal Logo" class="w-24 h-24 mx-auto rounded-2xl shadow-lg">
         </div>
-        <h1>Game Portal</h1>
-        <p>Welcome back! Please login to continue</p>
+        <h1 class="text-2xl uppercase font-bold text-slate-900 mb-2">Game Portal</h1>
+        <p class="text-slate-400">Join the fun and start playing!</p>
       </div>
-      
-      <form id="gameLoginForm">
-        <div class="form-group">
-          <label for="loginUsername">
-            <i class="fas fa-user"></i> Username
-          </label>
-          <input 
-            type="text" 
-            id="loginUsername" 
-            placeholder="Enter your username" 
-            required
-            autocomplete="username"
-          >
-        </div>
-        
-        <div class="form-group">
-          <label for="loginPassword">
-            <i class="fas fa-lock"></i> Password
-          </label>
-          <input 
-            type="password" 
-            id="loginPassword" 
-            placeholder="Enter your password" 
-            required
-            autocomplete="current-password"
-          >
-        </div>
-        
-        <div id="loginError" class="error-message">
-          <i class="fas fa-exclamation-circle"></i> <span id="loginErrorMsg"></span>
-        </div>
-        
-        <button type="submit" class="login-btn" id="loginBtn">
-          <i class="fas fa-sign-in-alt"></i>
-          <span>Login</span>
+
+      <!-- Tabs -->
+      <div class="flex gap-2 mb-6 bg-slate-100 rounded-xl p-1">
+        <button 
+          id="loginTab" 
+          class="tab-button flex-1 py-3 px-4 rounded-lg font-semibold text-sm active"
+          onclick="switchTab('login')"
+        >
+          <i class="fas fa-sign-in-alt mr-2"></i> Login
         </button>
-      </form>
+        <button 
+          id="registerTab" 
+          class="tab-button flex-1 py-3 px-4 rounded-lg font-semibold text-sm text-slate-600 hover:text-slate-900"
+          onclick="switchTab('register')"
+        >
+          <i class="fas fa-user-plus mr-2"></i> Register
+        </button>
+      </div>
+
+      <!-- Login Form -->
+      <div id="loginContent" class="tab-content">
+        <form id="gameLoginForm" class="space-y-5 w3-small">
+          <div>
+            <label for="loginUsername" class="block text-sm font-semibold text-slate-700 mb-2">
+              <i class="fas fa-user mr-2 text-indigo-600"></i> Username
+            </label>
+            <input 
+              type="text" 
+              id="loginUsername" 
+              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
+              placeholder="Enter your username" 
+              required
+              autocomplete="username"
+            >
+          </div>
+          
+          <div>
+            <label for="loginPassword" class="block text-sm font-semibold text-slate-700 mb-2">
+              <i class="fas fa-lock mr-2 text-indigo-600"></i> Password
+            </label>
+            <input 
+              type="password" 
+              id="loginPassword" 
+              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
+              placeholder="Enter your password" 
+              required
+              autocomplete="current-password"
+            >
+          </div>
+          
+          <div id="loginError" class="hidden bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            <span id="loginErrorMsg"></span>
+          </div>
+          
+          <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 flex items-center justify-center gap-2" id="loginBtn">
+            <i class="fas fa-sign-in-alt"></i>
+            <span>Login</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Register Form -->
+      <div id="registerContent" class="tab-content hidden">
+        <form id="gameRegisterForm" class="space-y-5">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label for="regFirstname" class="block text-sm font-semibold text-slate-700 mb-2">
+                <i class="fas fa-user mr-2 text-emerald-600"></i> First Name
+              </label>
+              <input 
+                type="text" 
+                id="regFirstname" 
+                class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
+                placeholder="John" 
+                required
+                autocomplete="given-name"
+              >
+            </div>
+            
+            <div>
+              <label for="regSurname" class="block text-sm font-semibold text-slate-700 mb-2">
+                <i class="fas fa-user mr-2 text-emerald-600"></i> Surname
+              </label>
+              <input 
+                type="text" 
+                id="regSurname" 
+                class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
+                placeholder="Doe" 
+                required
+                autocomplete="family-name"
+              >
+            </div>
+          </div>
+          
+          <div>
+            <label for="regUsername" class="block text-sm font-semibold text-slate-700 mb-2">
+              <i class="fas fa-at mr-2 text-emerald-600"></i> Username
+            </label>
+            <input 
+              type="text" 
+              id="regUsername" 
+              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
+              placeholder="Choose a username" 
+              required
+              autocomplete="username"
+            >
+          </div>
+          
+          <div>
+            <label for="regPassword" class="block text-sm font-semibold text-slate-700 mb-2">
+              <i class="fas fa-lock mr-2 text-emerald-600"></i> Password
+            </label>
+            <input 
+              type="password" 
+              id="regPassword" 
+              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
+              placeholder="Create a password" 
+              required
+              autocomplete="new-password"
+            >
+          </div>
+          
+          <div>
+            <label for="regAge" class="block text-sm font-semibold text-slate-700 mb-2">
+              <i class="fas fa-birthday-cake mr-2 text-emerald-600"></i> Age <span class="text-xs text-slate-500 font-normal">(9-19 years)</span>
+            </label>
+            <input 
+              type="number" 
+              id="regAge" 
+              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
+              placeholder="Enter your age" 
+              min="9"
+              max="19"
+              required
+            >
+            <p class="text-xs text-slate-500 mt-1">You must be between 9 and 19 years old to play</p>
+          </div>
+          
+          <div id="registerError" class="hidden bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            <span id="registerErrorMsg"></span>
+          </div>
+          
+          <div id="registerSuccess" class="hidden bg-green-50 border-l-4 border-green-500 text-green-700 p-4 rounded-lg">
+            <i class="fas fa-check-circle mr-2"></i>
+            <span>Registration successful! Redirecting to login...</span>
+          </div>
+          
+          <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 flex items-center justify-center gap-2" id="registerBtn">
+            <i class="fas fa-user-plus"></i>
+            <span>Create Account</span>
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 
   <script>
+    // Tab switching functionality
+    function switchTab(tab) {
+      const loginTab = document.getElementById('loginTab');
+      const registerTab = document.getElementById('registerTab');
+      const loginContent = document.getElementById('loginContent');
+      const registerContent = document.getElementById('registerContent');
+      
+      if (tab === 'login') {
+        loginTab.classList.add('active');
+        loginTab.classList.remove('text-slate-600', 'hover:text-slate-900');
+        registerTab.classList.remove('active');
+        registerTab.classList.add('text-slate-600', 'hover:text-slate-900');
+        loginContent.classList.remove('hidden');
+        registerContent.classList.add('hidden');
+      } else {
+        registerTab.classList.add('active');
+        registerTab.classList.remove('text-slate-600', 'hover:text-slate-900');
+        loginTab.classList.remove('active');
+        loginTab.classList.add('text-slate-600', 'hover:text-slate-900');
+        registerContent.classList.remove('hidden');
+        loginContent.classList.add('hidden');
+      }
+    }
+
+    // Login Form Handler
     document.getElementById('gameLoginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const username = document.getElementById('loginUsername').value.trim();
@@ -291,9 +293,10 @@
       const btn = document.getElementById('loginBtn');
       const btnSpan = btn.querySelector('span');
 
-      errorDiv.classList.remove('show');
+      errorDiv.classList.add('hidden');
       btn.disabled = true;
-      btnSpan.innerHTML = '<span class="spinner"></span> Logging in...';
+      btnSpan.textContent = 'Logging in...';
+      btn.innerHTML = '<span class="spinner inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span> Logging in...';
 
       try {
         const r = await fetch('/api/game-users/login', {
@@ -311,7 +314,7 @@
         
         // Success animation
         btn.style.background = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
-        btnSpan.innerHTML = '<i class="fas fa-check"></i> Success!';
+        btn.innerHTML = '<i class="fas fa-check mr-2"></i> Success!';
         
         // Redirect to dashboard
         setTimeout(() => {
@@ -319,13 +322,87 @@
         }, 500);
       } catch (err) {
         errorMsg.textContent = err.message || 'Invalid username or password';
-        errorDiv.classList.add('show');
+        errorDiv.classList.remove('hidden');
         btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        btn.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i> Login';
       } finally {
         btn.disabled = false;
-        if (!errorDiv.classList.contains('show')) {
-          btnSpan.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
-        }
+      }
+    });
+
+    // Register Form Handler
+    document.getElementById('gameRegisterForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const firstname = document.getElementById('regFirstname').value.trim();
+      const surname = document.getElementById('regSurname').value.trim();
+      const username = document.getElementById('regUsername').value.trim();
+      const password = document.getElementById('regPassword').value;
+      const age = parseInt(document.getElementById('regAge').value);
+      
+      const errorDiv = document.getElementById('registerError');
+      const successDiv = document.getElementById('registerSuccess');
+      const errorMsg = document.getElementById('registerErrorMsg');
+      const btn = document.getElementById('registerBtn');
+      const btnSpan = btn.querySelector('span');
+
+      errorDiv.classList.add('hidden');
+      successDiv.classList.add('hidden');
+      
+      // Validation
+      if (!firstname || !surname || !username || !password || !age) {
+        errorMsg.textContent = 'All fields are required';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+      
+      if (isNaN(age) || age < 9 || age > 19) {
+        errorMsg.textContent = 'Age must be between 9 and 19';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+      
+      if (password.length < 4) {
+        errorMsg.textContent = 'Password must be at least 4 characters long';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btnSpan.textContent = 'Creating account...';
+      btn.innerHTML = '<span class="spinner inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span> Creating account...';
+
+      try {
+        const r = await fetch('/api/game-users/register-public', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firstname, surname, username, password, age })
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Registration failed');
+        
+        // Success
+        successDiv.classList.remove('hidden');
+        btn.style.background = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
+        btn.innerHTML = '<i class="fas fa-check mr-2"></i> Account Created!';
+        
+        // Clear form
+        document.getElementById('gameRegisterForm').reset();
+        
+        // Switch to login tab after 2 seconds
+        setTimeout(() => {
+          switchTab('login');
+          document.getElementById('loginUsername').value = username;
+          successDiv.classList.add('hidden');
+          btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+          btn.innerHTML = '<i class="fas fa-user-plus mr-2"></i> Create Account';
+        }, 2000);
+      } catch (err) {
+        errorMsg.textContent = err.message || 'Registration failed. Please try again.';
+        errorDiv.classList.remove('hidden');
+        btn.style.background = 'linear-gradient(135deg, #ed8936 0%, #dd6b20 100%)';
+        btn.innerHTML = '<i class="fas fa-user-plus mr-2"></i> Create Account';
+      } finally {
+        btn.disabled = false;
       }
     });
   </script>

@@ -270,6 +270,7 @@ class GameUser(db.Model):
     surname = db.Column(db.String(64), nullable=False)
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
+    age = db.Column(db.Integer, nullable=False)  # Age of the game user (9-19)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
     scores = db.relationship('GameScore', backref='game_user', lazy=True, cascade='all, delete-orphan')
@@ -291,6 +292,8 @@ class Game(db.Model):
     description = db.Column(db.Text, nullable=True)
     html_content = db.Column(db.Text, nullable=False)  # The HTML game code
     max_score = db.Column(db.Integer, nullable=True)  # Maximum possible score (for percentage calculation)
+    age_range = db.Column(db.String(20), nullable=True)  # Age range like "9-10", "11-12", etc.
+    difficulty_level = db.Column(db.String(20), nullable=True)  # Difficulty level: 'easy', 'medium', 'hard'
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

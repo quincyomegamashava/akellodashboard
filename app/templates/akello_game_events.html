@@ -2,475 +2,172 @@
 {% block title %}Game Events Management{% endblock %}
 
 {% block head_extra %}
+<!-- Font Awesome is already included in base.html, but ensuring we have it if needed -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  * {
-    box-sizing: border-box;
-  }
-  
-  .dashboard-container {
-    max-width: 1200px;
-    margin: 40px auto;
-    padding: 0 24px;
-  }
-  
-  .page-header {
-    text-align: center;
-    margin-bottom: 48px;
-  }
-  
-  .page-header h1 {
-    font-size: 36px;
-    font-weight: 700;
-    color: #1a202c;
-    margin-bottom: 12px;
-    font-family: 'Inter', sans-serif;
-  }
-  
-  .page-header p {
-    font-size: 18px;
-    color: #718096;
-  }
-  
-  .action-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 32px;
-    margin-bottom: 40px;
-  }
-  
-  .action-card {
-    background: white;
-    border-radius: 20px;
-    padding: 40px 32px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-    border: 2px solid transparent;
-  }
-  
-  .action-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
-  }
-  
-  .action-card.registration {
-    border-color: #6366f1;
-  }
-  
-  .action-card.registration:hover {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    color: white;
-  }
-  
-  .action-card.management {
-    border-color: #10b981;
-  }
-  
-  .action-card.management:hover {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-  }
-  
-  .action-card.tracking {
-    border-color: #f59e0b;
-  }
-  
-  .action-card.tracking:hover {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: white;
-  }
-  
-  .action-card-icon {
-    width: 80px;
-    height: 80px;
-    border-radius: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 24px;
-    font-size: 40px;
+  /* Game Accordion Styles */
+  .game-accordion-item {
     transition: all 0.3s ease;
   }
   
-  .action-card.registration .action-card-icon {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    color: white;
-  }
-  
-  .action-card.management .action-card-icon {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-  }
-  
-  .action-card.tracking .action-card-icon {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: white;
-  }
-  
-  .action-card:hover .action-card-icon {
-    background: rgba(255, 255, 255, 0.2);
-    transform: scale(1.1);
-  }
-  
-  .action-card h3 {
-    font-size: 24px;
-    font-weight: 700;
-    margin-bottom: 12px;
-    font-family: 'Inter', sans-serif;
-  }
-  
-  .action-card p {
-    font-size: 15px;
-    opacity: 0.8;
-    margin: 0;
-  }
-  
-  /* Modal Styles */
-  .modal-overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(5px);
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    overflow-y: auto;
-  }
-  
-  .modal-overlay.show {
-    display: flex;
-  }
-  
-  .modal-content {
-    background: white;
-    border-radius: 20px;
-    max-width: 1000px;
-    width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    animation: slideUp 0.3s ease-out;
-    position: relative;
-  }
-  
-  @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  .modal-header {
-    padding: 24px 32px;
-    color: white;
-    border-top-left-radius: 20px;
-    border-top-right-radius: 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-  
-  .modal-header h2 {
-    font-size: 24px;
-    font-weight: 700;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  
-  .modal-close {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-  }
-  
-  .modal-close:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: rotate(90deg);
-  }
-  
-  .modal-body {
-    padding: 32px;
-  }
-  
-  .form-group {
-    margin-bottom: 20px;
-  }
-  
-  .form-group label {
-    display: block;
-    font-size: 14px;
-    font-weight: 600;
-    color: #2d3748;
-    margin-bottom: 8px;
-  }
-  
-  .form-group input,
-  .form-group textarea,
-  .form-group select {
-    width: 100%;
-    padding: 12px 16px;
-    border: 2px solid #e2e8f0;
-    border-radius: 10px;
-    font-size: 14px;
-    font-family: inherit;
-    transition: all 0.3s ease;
-  }
-  
-  .form-group input:focus,
-  .form-group textarea:focus,
-  .form-group select:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-  }
-  
-  .form-group textarea {
-    resize: vertical;
-    font-family: 'Courier New', monospace;
-  }
-  
-  .btn {
-    padding: 12px 24px;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 14px;
-    border: none;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  .btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-  }
-  
-  .btn-primary:hover:not(:disabled) {
+  .game-accordion-item:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   }
   
-  .btn-success {
-    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-    color: white;
+  .game-accordion-header {
+    cursor: pointer;
+    user-select: none;
   }
   
-  .btn-danger {
-    background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
-    color: white;
+  .game-accordion-content {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
   }
   
-  .btn-secondary {
-    background: #e2e8f0;
-    color: #2d3748;
+  .game-accordion-content.expanded {
+    max-height: 1000px;
+    opacity: 1;
   }
   
-  .btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-  
-  .table-container {
-    overflow-x: auto;
-    margin-top: 20px;
-  }
-  
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  
-  table th {
-    background: #f7fafc;
-    padding: 12px;
-    text-align: left;
-    font-weight: 600;
-    font-size: 12px;
-    text-transform: uppercase;
-    color: #718096;
-    border-bottom: 2px solid #e2e8f0;
-  }
-  
-  table td {
-    padding: 12px;
-    border-bottom: 1px solid #e2e8f0;
-    font-size: 14px;
-  }
-  
-  table tr:hover {
-    background: #f7fafc;
-  }
-  
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-  
-  .stat-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 20px;
-    border-radius: 12px;
-    text-align: center;
-  }
-  
-  .stat-card.blue { background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); }
-  .stat-card.green { background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); }
-  .stat-card.orange { background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%); }
-  .stat-card.purple { background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%); }
-  
-  .stat-value {
-    font-size: 32px;
-    font-weight: 700;
-    margin-bottom: 4px;
-  }
-  
-  .stat-label {
-    font-size: 12px;
-    opacity: 0.9;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  
-  .games-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 20px;
-    margin-top: 20px;
-  }
-  
-  .game-item {
-    background: white;
-    border: 2px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 20px;
-    transition: all 0.3s ease;
-  }
-  
-  .game-item:hover {
-    border-color: #667eea;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
-    transform: translateY(-4px);
-  }
-  
-  .empty-state {
-    text-align: center;
-    padding: 48px;
-    color: #a0aec0;
-  }
-  
-  .empty-state i {
-    font-size: 48px;
-    margin-bottom: 16px;
-    opacity: 0.5;
+  .game-accordion-icon {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
-  <div class="page-header">
-    <h1><i class="fas fa-gamepad"></i> Game Events Management</h1>
-    <p>Manage game users, create games, and track scores</p>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <!-- Page Header -->
+  <div class="text-center mb-12">
+    <h1 class="text-3xl font-bold text-slate-900 mb-3">Game Events Management</h1>
+    <p class="text-lg text-slate-500 max-w-2xl mx-auto">Manage game users, create educational games, and track performance scores.</p>
   </div>
   
-  <div class="action-cards">
-    <div class="action-card registration" onclick="openUserRegistrationModal()">
-      <div class="action-card-icon">
-        <i class="fas fa-user-plus"></i>
+  <!-- Action Cards Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+    
+    <!-- User Registration Card -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="openUserRegistrationModal()">
+      <div class="p-6">
+        <div class="w-12 h-12 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+          <i class="fas fa-user-plus text-xl"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-slate-900 mb-2">User Registration</h3>
+        <p class="text-slate-500 text-sm">Register new participants for game events and manage existing users.</p>
       </div>
-      <h3>User Registration</h3>
-      <p>Register new game participants</p>
     </div>
     
-    <div class="action-card management" onclick="openGameManagementModal()">
-      <div class="action-card-icon">
-        <i class="fas fa-cog"></i>
+    {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}
+    <!-- Game Management Card -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="openGameManagementModal()">
+      <div class="p-6">
+        <div class="w-12 h-12 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+          <i class="fas fa-cog text-xl"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-slate-900 mb-2">Game Management</h3>
+        <p class="text-slate-500 text-sm">Create, edit, and configure educational games and quizzes.</p>
       </div>
-      <h3>Game Management</h3>
-      <p>Create and manage games</p>
+    </div>
+    {% endif %}
+    
+    {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}
+    <!-- Score Tracking Card -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="openScoreTrackingModal()">
+      <div class="p-6">
+        <div class="w-12 h-12 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+          <i class="fas fa-chart-line text-xl"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-slate-900 mb-2">Score Tracking</h3>
+        <p class="text-slate-500 text-sm">Monitor performance metrics and view detailed score analytics.</p>
+      </div>
     </div>
     
-    <div class="action-card tracking" onclick="openScoreTrackingModal()">
-      <div class="action-card-icon">
-        <i class="fas fa-chart-line"></i>
+    <!-- Leaderboard Card -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="openLeaderboardModal()">
+      <div class="p-6">
+        <div class="w-12 h-12 rounded-lg bg-yellow-50 text-yellow-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+          <i class="fas fa-trophy text-xl"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-slate-900 mb-2">Leaderboard</h3>
+        <p class="text-slate-500 text-sm">View top performing players and overall rankings.</p>
       </div>
-      <h3>Score Tracking</h3>
-      <p>View scores and statistics</p>
     </div>
+    {% endif %}
   </div>
 </div>
 
 <!-- User Registration Modal -->
-<div id="userRegistrationModal" class="modal-overlay" onclick="if(event.target === this) closeUserRegistrationModal()">
-  <div class="modal-content">
-    <div class="modal-header" style="background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
-      <h2><i class="fas fa-user-plus"></i> User Registration</h2>
-      <button class="modal-close" onclick="closeUserRegistrationModal()">&times;</button>
-    </div>
-    <div class="modal-body">
-      <form id="registerGameUserForm">
-        <div class="form-group">
-          <label>First Name *</label>
-          <input type="text" id="guFirstname" placeholder="e.g., John" required>
-        </div>
-        <div class="form-group">
-          <label>Surname *</label>
-          <input type="text" id="guSurname" placeholder="e.g., Doe" required>
-        </div>
-        <div class="form-group">
-          <label>Username *</label>
-          <input type="text" id="guUsername" placeholder="e.g., johndoe" required>
-        </div>
-        <div class="form-group">
-          <label>Password *</label>
-          <input type="password" id="guPassword" placeholder="Enter password" required>
-        </div>
-        <div style="display: flex; gap: 12px; margin-top: 24px;">
-          <button type="submit" class="btn btn-primary" id="registerBtn">
-            <i class="fas fa-user-plus"></i> Register User
+<div id="userRegistrationModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <!-- Background backdrop -->
+  <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onclick="closeUserRegistrationModal()"></div>
+
+  <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+    <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+      <!-- Header -->
+      <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4 border-b border-slate-100">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold leading-6 text-slate-900 flex items-center gap-2">
+            <i class="fas fa-user-plus text-indigo-600"></i> User Registration
+          </h3>
+          <button type="button" class="text-slate-400 hover:text-slate-500 transition-colors" onclick="closeUserRegistrationModal()">
+            <span class="sr-only">Close</span>
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
-          <button type="reset" class="btn btn-secondary">Clear</button>
         </div>
-      </form>
-      
-      <div style="margin-top: 32px;">
-        <h3 style="margin-bottom: 16px; font-size: 18px; font-weight: 600;">Registered Game Users</h3>
-        <div id="gameUsersList" class="table-container">
-          <div class="empty-state">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Loading...</p>
+      </div>
+
+      <!-- Body -->
+      <div class="px-4 py-5 sm:p-6">
+        <form id="registerGameUserForm" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="guFirstname" class="block text-sm font-medium text-slate-700 mb-1">First Name *</label>
+              <input type="text" id="guFirstname" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="e.g., John" required>
+            </div>
+            <div>
+              <label for="guSurname" class="block text-sm font-medium text-slate-700 mb-1">Surname *</label>
+              <input type="text" id="guSurname" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="e.g., Doe" required>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="guUsername" class="block text-sm font-medium text-slate-700 mb-1">Username *</label>
+              <input type="text" id="guUsername" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="e.g., johndoe" required>
+            </div>
+            <div>
+              <label for="guAge" class="block text-sm font-medium text-slate-700 mb-1">Age * (9-19)</label>
+              <input type="number" id="guAge" class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="e.g., 12" min="9" max="19" required>
+            </div>
+          </div>
+
+          <div>
+            <label for="guPassword" class="block text-sm font-medium text-slate-700 mb-1">Password *</label>
+            <input type="password" id="guPassword" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="Enter password" required>
+          </div>
+
+          <div class="flex gap-3 mt-6">
+            <button type="submit" id="registerBtn" class="inline-flex justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-all">
+              <i class="fas fa-user-plus mr-2 mt-0.5"></i> Register User
+            </button>
+            <button type="reset" class="inline-flex justify-center rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition-all">
+              Clear
+            </button>
+          </div>
+        </form>
+
+        <div class="mt-8 border-t border-slate-100 pt-6">
+          <h4 class="text-base font-semibold text-slate-900 mb-4">Registered Users</h4>
+          <div id="gameUsersList" class="overflow-x-auto rounded-lg border border-slate-200">
+            <div class="p-8 text-center text-slate-400">
+              <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+              <p>Loading...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -479,22 +176,39 @@
 </div>
 
 <!-- Game Management Modal -->
-<div id="gameManagementModal" class="modal-overlay" onclick="if(event.target === this) closeGameManagementModal()">
-  <div class="modal-content">
-    <div class="modal-header" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%);">
-      <h2><i class="fas fa-cog"></i> Game Management</h2>
-      <button class="modal-close" onclick="closeGameManagementModal()">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div style="margin-bottom: 24px;">
-        <button class="btn btn-success" type="button" onclick="openGameModal()">
-          <i class="fas fa-plus"></i> Create New Game
-        </button>
+<div id="gameManagementModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onclick="closeGameManagementModal()"></div>
+
+  <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+    <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl">
+      <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4 border-b border-slate-100">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold leading-6 text-slate-900 flex items-center gap-2">
+            <i class="fas fa-gamepad text-emerald-600"></i> Game Management
+          </h3>
+          <button type="button" class="text-slate-400 hover:text-slate-500 transition-colors" onclick="closeGameManagementModal()">
+            <span class="sr-only">Close</span>
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
-      <div id="gamesList" class="games-grid">
-        <div class="empty-state">
-          <i class="fas fa-spinner fa-spin"></i>
-          <p>Loading games...</p>
+
+      <div class="px-4 py-5 sm:p-6 bg-slate-50/50 min-h-[400px]">
+        {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}
+        <div class="mb-6 flex justify-center">
+          <button type="button" onclick="openGameModal()" class="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:bg-emerald-500 hover:shadow-xl transition-all transform hover:scale-105">
+            <i class="fas fa-plus mr-2"></i> Create New Game
+          </button>
+        </div>
+        {% endif %}
+        
+        <div id="gamesList" class="space-y-3">
+          <div class="p-8 text-center text-slate-400">
+            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+            <p>Loading games...</p>
+          </div>
         </div>
       </div>
     </div>
@@ -502,79 +216,172 @@
 </div>
 
 <!-- Score Tracking Modal -->
-<div id="scoreTrackingModal" class="modal-overlay" onclick="if(event.target === this) closeScoreTrackingModal()">
-  <div class="modal-content">
-    <div class="modal-header" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-      <h2><i class="fas fa-chart-line"></i> Score Tracking</h2>
-      <button class="modal-close" onclick="closeScoreTrackingModal()">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-        <div class="form-group" style="margin-bottom: 0;">
-          <label>Filter by Game</label>
-          <select id="scoreGameFilter" onchange="loadScores()">
-            <option value="">All Games</option>
-          </select>
-        </div>
-        <div class="form-group" style="margin-bottom: 0;">
-          <label>Filter by User</label>
-          <select id="scoreUserFilter" onchange="loadScores()">
-            <option value="">All Users</option>
-          </select>
+{% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}
+<div id="scoreTrackingModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onclick="closeScoreTrackingModal()"></div>
+
+  <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+    <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-5xl">
+      <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4 border-b border-slate-100">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold leading-6 text-slate-900 flex items-center gap-2">
+            <i class="fas fa-chart-bar text-amber-500"></i> Score Tracking
+          </h3>
+          <button type="button" class="text-slate-400 hover:text-slate-500 transition-colors" onclick="closeScoreTrackingModal()">
+            <span class="sr-only">Close</span>
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       </div>
-      <div id="scoresTable">
-        <div class="empty-state">
-          <i class="fas fa-spinner fa-spin"></i>
-          <p>Loading scores...</p>
+
+      <div class="px-4 py-5 sm:p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Filter by Game</label>
+            <select id="scoreGameFilter" onchange="loadScores()" class="w-full p-2 rounded-lg border-slate-200 text-sm focus:border-amber-500 focus:ring focus:ring-amber-200">
+              <option value="">All Games</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Filter by User</label>
+            <select id="scoreUserFilter" onchange="loadScores()" class="w-full p-2 rounded-lg border-slate-200 text-sm focus:border-amber-500 focus:ring focus:ring-amber-200">
+              <option value="">All Users</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="scoresTable" class="bg-slate-50 rounded-xl p-4 border border-slate-100 min-h-[300px]">
+          <div class="flex flex-col items-center justify-center h-64 text-slate-400">
+            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+            <p>Loading scores...</p>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
+{% endif %}
 
-<!-- Create/Edit Game Modal -->
-<div id="gameModal" class="modal-overlay" onclick="if(event.target === this) closeGameModal()">
-  <div class="modal-content">
-    <div class="modal-header" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%);">
-      <h2 id="gameModalTitle"><i class="fas fa-plus"></i> Create New Game</h2>
-      <button class="modal-close" onclick="closeGameModal()">&times;</button>
-    </div>
-    <div class="modal-body">
-      <form id="gameForm">
-        <div class="form-group">
-          <label>Game Title *</label>
-          <input type="text" id="gameTitle" placeholder="e.g., Synonym Match" required>
-        </div>
-        <div class="form-group">
-          <label>Description</label>
-          <textarea id="gameDescription" rows="2" placeholder="Brief description of the game"></textarea>
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-          <div class="form-group">
-            <label>Maximum Score (optional)</label>
-            <input type="number" id="gameMaxScore" min="1" placeholder="e.g., 5">
-            <small style="color: #718096; font-size: 12px;">Leave empty if game calculates its own max score</small>
-          </div>
-          <div class="form-group">
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-              <input type="checkbox" id="gameIsActive" checked style="width: auto;">
-              Game is Active
-            </label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Game HTML Code *</label>
-          <textarea id="gameHtml" rows="20" placeholder="Paste your HTML game code here..." required style="font-family: 'Courier New', monospace; font-size: 12px;"></textarea>
-          <small style="color: #718096; font-size: 12px;">Note: The game must include score submission functionality.</small>
-        </div>
-        <div style="display: flex; gap: 12px; margin-top: 24px;">
-          <button type="submit" class="btn btn-success" id="saveGameBtn">
-            <i class="fas fa-save"></i> Save Game
+<!-- Leaderboard Modal -->
+{% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}
+<div id="leaderboardModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onclick="closeLeaderboardModal()"></div>
+
+  <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+    <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl">
+      <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4 border-b border-slate-100">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold leading-6 text-slate-900 flex items-center gap-2">
+            <i class="fas fa-trophy text-yellow-500"></i> Leaderboard
+          </h3>
+          <button type="button" class="text-slate-400 hover:text-slate-500 transition-colors" onclick="closeLeaderboardModal()">
+            <span class="sr-only">Close</span>
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
-          <button type="button" class="btn btn-secondary" onclick="closeGameModal()">Cancel</button>
         </div>
-      </form>
+      </div>
+
+      <div class="px-4 py-5 sm:p-6">
+        <div id="leaderboardTable" class="overflow-hidden rounded-lg border border-slate-200">
+          <div class="p-12 text-center text-slate-400">
+            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+            <p>Loading leaderboard...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Create/Edit Game Modal (Nested in functionality, keeps simple structure) -->
+<div id="gameModal" class="fixed inset-0 z-[60] hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeGameModal()"></div>
+
+  <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+    <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-3xl">
+      <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4 border-b border-slate-100">
+        <div class="flex items-center justify-between">
+          <h3 id="gameModalTitle" class="text-lg font-semibold leading-6 text-slate-900 flex items-center gap-2">
+            <i class="fas fa-plus"></i> Create New Game
+          </h3>
+          <button type="button" class="text-slate-400 hover:text-slate-500 transition-colors" onclick="closeGameModal()">
+            <span class="sr-only">Close</span>
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="px-4 py-5 sm:p-6">
+        <form id="gameForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Game Title *</label>
+            <input type="text" id="gameTitle" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="e.g., Synonym Match" required>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+            <textarea id="gameDescription" rows="2" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="Brief description of the game"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Age Range *</label>
+            <select id="gameAgeRange" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" required>
+              <option value="">Select age range</option>
+              <option value="9-10">9-10 years</option>
+              <option value="11-12">11-12 years</option>
+              <option value="13-14">13-14 years</option>
+              <option value="15-16">15-16 years</option>
+              <option value="17-19">17-19 years</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Difficulty Level *</label>
+            <select id="gameDifficulty" class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" required>
+              <option value="">Select difficulty level</option>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Maximum Score (optional)</label>
+              <input type="number" id="gameMaxScore" min="1" class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="e.g., 5">
+              <p class="text-xs text-slate-500 mt-1">Leave empty if game calculates its own max score</p>
+            </div>
+            <div class="flex items-center pt-6">
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="gameIsActive" class="rounded border-slate-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" checked>
+                <span class="ml-2 text-sm text-slate-700">Game is Active</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Game HTML Code *</label>
+            <textarea id="gameHtml" rows="12" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-xs font-mono bg-slate-50" placeholder="Paste your HTML game code here..." required></textarea>
+            <p class="text-xs text-slate-500 mt-1">Note: The game must include score submission functionality.</p>
+          </div>
+
+          <div class="flex gap-3 mt-6 pt-4 border-t border-slate-100">
+            <button type="submit" id="saveGameBtn" class="inline-flex justify-center rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition-all">
+              <i class="fas fa-save mr-2 mt-0.5"></i> Save Game
+            </button>
+            <button type="button" onclick="closeGameModal()" class="inline-flex justify-center rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition-all">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </div>
@@ -584,67 +391,188 @@
 {% block scripts %}
 <script>
   let currentGameId = null;
+  const canManageGames = {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}true{% else %}false{% endif %};
+  const canViewScores = {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}true{% else %}false{% endif %};
 
-  document.addEventListener('DOMContentLoaded', () => {
-    // Don't auto-load data, wait for modal opens
-  });
+  // Modal Utility Functions
+  function toggleModal(modalId, show) {
+    const modal = document.getElementById(modalId);
+    if (show) {
+      modal.classList.remove('hidden');
+      // Prevent body scrolling
+      document.body.style.overflow = 'hidden';
+    } else {
+      modal.classList.add('hidden');
+      // Restore body scrolling
+      document.body.style.overflow = 'auto';
+    }
+  }
 
-  // Modal Functions
+  // User Registration Modal
   function openUserRegistrationModal() {
-    document.getElementById('userRegistrationModal').classList.add('show');
+    toggleModal('userRegistrationModal', true);
     loadGameUsers();
   }
   window.openUserRegistrationModal = openUserRegistrationModal;
 
   function closeUserRegistrationModal() {
-    document.getElementById('userRegistrationModal').classList.remove('show');
+    toggleModal('userRegistrationModal', false);
   }
   window.closeUserRegistrationModal = closeUserRegistrationModal;
 
+  // Game Management Modal
   function openGameManagementModal() {
-    document.getElementById('gameManagementModal').classList.add('show');
+    toggleModal('gameManagementModal', true);
     loadGames();
   }
   window.openGameManagementModal = openGameManagementModal;
 
   function closeGameManagementModal() {
-    document.getElementById('gameManagementModal').classList.remove('show');
+    toggleModal('gameManagementModal', false);
   }
   window.closeGameManagementModal = closeGameManagementModal;
 
+  // Score Tracking Modal
   function openScoreTrackingModal() {
-    document.getElementById('scoreTrackingModal').classList.add('show');
+    toggleModal('scoreTrackingModal', true);
     loadScores();
   }
   window.openScoreTrackingModal = openScoreTrackingModal;
 
   function closeScoreTrackingModal() {
-    document.getElementById('scoreTrackingModal').classList.remove('show');
+    toggleModal('scoreTrackingModal', false);
   }
   window.closeScoreTrackingModal = closeScoreTrackingModal;
 
-  // Register Game User
+  // Leaderboard Modal
+  function openLeaderboardModal() {
+    toggleModal('leaderboardModal', true);
+    loadLeaderboard();
+  }
+  window.openLeaderboardModal = openLeaderboardModal;
+
+  function closeLeaderboardModal() {
+    toggleModal('leaderboardModal', false);
+  }
+  window.closeLeaderboardModal = closeLeaderboardModal;
+
+  // Game CRUD Modal
+  function openGameModal(gameId = null) {
+    currentGameId = gameId;
+    document.getElementById('gameModalTitle').innerHTML = gameId ? '<i class="fas fa-edit text-indigo-600 mr-2"></i> Edit Game' : '<i class="fas fa-plus text-emerald-600 mr-2"></i> Create New Game';
+    document.getElementById('gameForm').reset();
+    document.getElementById('gameIsActive').checked = true;
+    
+    if (gameId) {
+      loadGameForEdit(gameId);
+    }
+    toggleModal('gameModal', true);
+  }
+  window.openGameModal = openGameModal;
+
+  function closeGameModal() {
+    toggleModal('gameModal', false);
+    currentGameId = null;
+  }
+  window.closeGameModal = closeGameModal;
+
+  // --- Data Loading Functions ---
+
+  async function loadLeaderboard() {
+    try {
+      const r = await fetch('/api/game-users/leaderboard');
+      if (!r.ok) throw new Error('Failed to load leaderboard');
+      const data = await r.json();
+      const container = document.getElementById('leaderboardTable');
+      
+      if (!data.leaderboard || data.leaderboard.length === 0) {
+        container.innerHTML = `
+          <div class="p-12 text-center text-slate-400">
+            <i class="fas fa-trophy text-4xl mb-4 text-slate-300"></i>
+            <p>No players have recorded scores yet.</p>
+          </div>`;
+        return;
+      }
+      
+      container.innerHTML = `
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200">
+            <thead class="bg-slate-50">
+              <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Rank</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Player</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Age</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Games</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Total Score</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Avg Score</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-slate-200">
+              ${data.leaderboard.map((user, index) => `
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    ${index === 0 ? '<span class="text-2xl">🥇</span>' : 
+                      index === 1 ? '<span class="text-2xl">🥈</span>' : 
+                      index === 2 ? '<span class="text-2xl">🥉</span>' : 
+                      `<span class="text-slate-500 font-mono font-semibold">#${index + 1}</span>`}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="font-medium text-slate-900">${escapeHtml(user.firstname)} ${escapeHtml(user.surname)}</div>
+                    <div class="text-xs text-slate-500">@${escapeHtml(user.username)}</div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-slate-500">${user.age || 'N/A'}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-slate-500">${user.games_played}</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                      ${user.total_score}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap font-bold text-slate-700">${user.average_score.toFixed(1)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } catch (e) {
+      console.error(e);
+      document.getElementById('leaderboardTable').innerHTML = `
+        <div class="p-8 text-center text-red-500">
+          <i class="fas fa-exclamation-triangle mb-2"></i>
+          <p>Error loading leaderboard</p>
+        </div>`;
+    }
+  }
+
   document.getElementById('registerGameUserForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const firstname = document.getElementById('guFirstname').value.trim();
     const surname = document.getElementById('guSurname').value.trim();
     const username = document.getElementById('guUsername').value.trim();
     const password = document.getElementById('guPassword').value;
+    const age = document.getElementById('guAge').value;
 
-    if (!firstname || !surname || !username || !password) {
+    if (!firstname || !surname || !username || !password || !age) {
       alert('Please fill in all required fields');
       return;
     }
 
+    const ageNum = parseInt(age);
+    if (isNaN(ageNum) || ageNum < 9 || ageNum > 19) {
+      alert('Age must be between 9 and 19');
+      return;
+    }
+
     const btn = document.getElementById('registerBtn');
+    const originalContent = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Registering...';
 
     try {
       const r = await fetch('/api/game-users/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstname, surname, username, password })
+        body: JSON.stringify({ firstname, surname, username, password, age: ageNum })
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Failed to register');
@@ -655,7 +583,7 @@
       alert('Error: ' + (err.message || 'Failed to register user'));
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-user-plus"></i> Register User';
+      btn.innerHTML = originalContent;
     }
   });
 
@@ -664,25 +592,47 @@
       const r = await fetch('/api/game-users');
       const data = await r.json();
       const list = document.getElementById('gameUsersList');
+      
       if (!data.users || data.users.length === 0) {
-        list.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>No users registered yet</p></div>';
+        list.innerHTML = `
+          <div class="p-12 text-center text-slate-400">
+            <i class="fas fa-users text-4xl mb-4 text-slate-300"></i>
+            <p>No users registered yet</p>
+          </div>`;
         return;
       }
-      list.innerHTML = '<table><thead><tr><th>Name</th><th>Username</th><th>Registered</th><th>Last Login</th><th>Actions</th></tr></thead><tbody>' +
-        data.users.map(u => `
-          <tr>
-            <td>${escapeHtml(u.firstname)} ${escapeHtml(u.surname)}</td>
-            <td>${escapeHtml(u.username)}</td>
-            <td>${formatDate(u.created_at)}</td>
-            <td>${u.last_login ? formatDate(u.last_login) : 'Never'}</td>
-            <td>
-              <button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="deleteGameUser(${u.id})">Delete</button>
-            </td>
-          </tr>
-        `).join('') + '</tbody></table>';
+      
+      list.innerHTML = `
+        <table class="min-w-full divide-y divide-slate-200">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Age</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Registered</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-slate-200">
+            ${data.users.map(u => `
+              <tr class="hover:bg-slate-50 transition-colors">
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="text-sm font-medium text-slate-900">${escapeHtml(u.firstname)} ${escapeHtml(u.surname)}</div>
+                  <div class="text-xs text-slate-500">@${escapeHtml(u.username)}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${u.age || 'N/A'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${formatDate(u.created_at)}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button onclick="deleteGameUser(${u.id})" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors text-xs">
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
     } catch (e) {
       console.error(e);
-      document.getElementById('gameUsersList').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error loading users</p></div>';
+      document.getElementById('gameUsersList').innerHTML = '<div class="p-4 text-center text-red-500">Error loading users</div>';
     }
   }
 
@@ -700,25 +650,6 @@
   }
   window.deleteGameUser = deleteGameUser;
 
-  // Game Management
-  function openGameModal(gameId = null) {
-    currentGameId = gameId;
-    document.getElementById('gameModalTitle').innerHTML = gameId ? '<i class="fas fa-edit"></i> Edit Game' : '<i class="fas fa-plus"></i> Create New Game';
-    document.getElementById('gameForm').reset();
-    document.getElementById('gameIsActive').checked = true;
-    if (gameId) {
-      loadGameForEdit(gameId);
-    }
-    document.getElementById('gameModal').classList.add('show');
-  }
-  window.openGameModal = openGameModal;
-
-  function closeGameModal() {
-    document.getElementById('gameModal').classList.remove('show');
-    currentGameId = null;
-  }
-  window.closeGameModal = closeGameModal;
-
   async function loadGameForEdit(gameId) {
     try {
       const r = await fetch(`/api/games/${gameId}`);
@@ -727,6 +658,8 @@
       document.getElementById('gameTitle').value = data.game.title || '';
       document.getElementById('gameDescription').value = data.game.description || '';
       document.getElementById('gameMaxScore').value = data.game.max_score || '';
+      document.getElementById('gameAgeRange').value = data.game.age_range || '';
+      document.getElementById('gameDifficulty').value = data.game.difficulty_level || '';
       document.getElementById('gameIsActive').checked = data.game.is_active !== false;
       document.getElementById('gameHtml').value = data.game.html_content || '';
     } catch (e) {
@@ -740,16 +673,19 @@
     const description = document.getElementById('gameDescription').value.trim();
     const maxScore = document.getElementById('gameMaxScore').value ? parseInt(document.getElementById('gameMaxScore').value) : null;
     const htmlContent = document.getElementById('gameHtml').value.trim();
+    const ageRange = document.getElementById('gameAgeRange').value;
+    const difficulty = document.getElementById('gameDifficulty').value;
     const isActive = document.getElementById('gameIsActive').checked;
 
-    if (!title || !htmlContent) {
-      alert('Title and HTML content are required');
+    if (!title || !htmlContent || !ageRange || !difficulty) {
+      alert('Title, HTML content, age range, and difficulty level are required');
       return;
     }
 
     const btn = document.getElementById('saveGameBtn');
+    const originalContent = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Saving...';
 
     try {
       const url = currentGameId ? `/api/games/${currentGameId}` : '/api/games';
@@ -757,7 +693,7 @@
       const r = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, max_score: maxScore, html_content: htmlContent, is_active: isActive })
+        body: JSON.stringify({ title, description, max_score: maxScore, html_content: htmlContent, age_range: ageRange, difficulty_level: difficulty, is_active: isActive })
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Failed to save');
@@ -769,7 +705,7 @@
       alert('Error: ' + (err.message || 'Failed to save game'));
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-save"></i> Save Game';
+      btn.innerHTML = originalContent;
     }
   });
 
@@ -778,30 +714,64 @@
       const r = await fetch('/api/games');
       const data = await r.json();
       const container = document.getElementById('gamesList');
+      
       if (!data.games || data.games.length === 0) {
-        container.innerHTML = '<div class="empty-state"><i class="fas fa-gamepad"></i><p>No games created yet</p></div>';
+        container.innerHTML = `
+          <div class="p-12 text-center text-slate-400">
+            <div class="inline-block p-6 bg-white/60 backdrop-blur-md rounded-2xl border border-white/20 shadow-lg">
+              <i class="fas fa-gamepad text-4xl mb-4 text-slate-300"></i>
+              <p class="text-slate-500 font-medium">No games created yet</p>
+            </div>
+          </div>`;
         return;
       }
-      container.innerHTML = data.games.map(g => `
-        <div class="game-item">
-          <div style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">
-            ${escapeHtml(g.title)} 
-            ${g.is_active ? '<span style="background: #48bb78; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; margin-left: 8px;">Active</span>' : '<span style="background: #a0aec0; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; margin-left: 8px;">Inactive</span>'}
-          </div>
-          <div style="color: #718096; font-size: 14px; margin-bottom: 16px;">${escapeHtml(g.description || 'No description')}</div>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-primary" style="padding: 8px 16px; font-size: 12px; flex: 1;" onclick="openGameModal(${g.id})">
-              <i class="fas fa-edit"></i> Edit
-            </button>
-            <button class="btn btn-danger" style="padding: 8px 16px; font-size: 12px; flex: 1;" onclick="deleteGame(${g.id})">
-              <i class="fas fa-trash"></i> Delete
-            </button>
+      
+      container.innerHTML = data.games.map((g, index) => `
+        <div class="game-accordion-item bg-white/70 backdrop-blur-xl border border-white/30 rounded-2xl shadow-lg hover:shadow-xl transition-all overflow-hidden" style="background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.6) 100%);">
+          <button class="game-accordion-header w-full flex items-center justify-between p-5 text-left hover:bg-white/30 transition-colors" onclick="toggleGameAccordion(${index})">
+            <div class="flex items-center gap-4 flex-1 min-w-0">
+              <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow-md">
+                <i class="fas fa-gamepad text-sm"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h4 class="text-base font-bold text-slate-900 truncate">${escapeHtml(g.title)}</h4>
+                <div class="flex items-center gap-2 mt-1 flex-wrap">
+                  ${g.age_range ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100/80 text-slate-700 backdrop-blur-sm"><i class="fas fa-users mr-1 text-xs"></i> Ages ${g.age_range}</span>` : ''}
+                  ${g.difficulty_level ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getDifficultyBadgeClass(g.difficulty_level)} backdrop-blur-sm"><i class="fas ${getDifficultyIcon(g.difficulty_level)} mr-1 text-xs"></i> ${getDifficultyLabel(g.difficulty_level)}</span>` : ''}
+                  ${g.is_active ? 
+                    '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100/80 text-green-700 backdrop-blur-sm">Active</span>' : 
+                    '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100/80 text-slate-600 backdrop-blur-sm">Inactive</span>'}
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 flex-shrink-0 ml-4">
+              <i class="fas fa-chevron-down text-slate-400 transition-transform game-accordion-icon" id="accordion-icon-${index}"></i>
+            </div>
+          </button>
+          <div class="game-accordion-content overflow-hidden" id="accordion-content-${index}">
+            <div class="px-5 pb-5 pt-0 border-t border-white/20 bg-white/20 backdrop-blur-sm">
+              <div class="pt-4 space-y-3">
+                <div>
+                  <p class="text-sm text-slate-600 leading-relaxed">${escapeHtml(g.description || 'No description provided.')}</p>
+                </div>
+                ${g.max_score ? `<div class="text-xs text-slate-500"><i class="fas fa-star mr-1"></i> Max Score: ${g.max_score}</div>` : ''}
+                ${canManageGames ? `
+                <div class="flex gap-2 pt-2">
+                  <button class="flex-1 inline-flex justify-center items-center px-4 py-2 text-sm font-medium rounded-lg text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100/80 backdrop-blur-sm transition-all shadow-sm hover:shadow-md" onclick="openGameModal(${g.id})">
+                    <i class="fas fa-edit mr-2"></i> Edit
+                  </button>
+                  <button class="flex-1 inline-flex justify-center items-center px-4 py-2 text-sm font-medium rounded-lg text-red-700 bg-red-50/80 hover:bg-red-100/80 backdrop-blur-sm transition-all shadow-sm hover:shadow-md" onclick="deleteGame(${g.id})">
+                    <i class="fas fa-trash mr-2"></i> Delete
+                  </button>
+                </div>` : ''}
+              </div>
+            </div>
           </div>
         </div>
       `).join('');
     } catch (e) {
       console.error(e);
-      document.getElementById('gamesList').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error loading games</p></div>';
+      document.getElementById('gamesList').innerHTML = '<div class="col-span-full text-center text-red-500">Error loading games</div>';
     }
   }
 
@@ -819,6 +789,27 @@
   }
   window.deleteGame = deleteGame;
 
+  // Accordion toggle function for games
+  function toggleGameAccordion(index) {
+    const content = document.getElementById(`accordion-content-${index}`);
+    const icon = document.getElementById(`accordion-icon-${index}`);
+    
+    if (!content || !icon) return;
+    
+    const isExpanded = content.classList.contains('expanded');
+    
+    if (isExpanded) {
+      // Close accordion
+      content.classList.remove('expanded');
+      icon.style.transform = 'rotate(0deg)';
+    } else {
+      // Open accordion
+      content.classList.add('expanded');
+      icon.style.transform = 'rotate(180deg)';
+    }
+  }
+  window.toggleGameAccordion = toggleGameAccordion;
+
   async function loadScores() {
     try {
       const gameFilter = document.getElementById('scoreGameFilter').value;
@@ -834,56 +825,61 @@
       
       updateScoreFilters(data.games || [], data.users || []);
 
-      const table = document.getElementById('scoresTable');
+      const container = document.getElementById('scoresTable');
       if (!data.scores || data.scores.length === 0) {
-        table.innerHTML = '<div class="empty-state"><i class="fas fa-trophy"></i><p>No scores yet</p></div>';
+        container.innerHTML = `
+          <div class="p-12 text-center text-slate-400">
+            <i class="fas fa-chart-bar text-4xl mb-4 text-slate-300"></i>
+            <p>No score data available</p>
+          </div>`;
         return;
       }
 
       const stats = calculateStats(data.scores);
       
-      table.innerHTML = `
-        <div class="stats-grid">
-          <div class="stat-card blue">
-            <div class="stat-value">${stats.totalAttempts}</div>
-            <div class="stat-label">Total Attempts</div>
+      container.innerHTML = `
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div class="bg-white p-4 rounded-lg border border-indigo-100 shadow-sm text-center">
+            <div class="text-2xl font-bold text-indigo-600">${stats.totalAttempts}</div>
+            <div class="text-xs text-slate-500 uppercase tracking-wide mt-1">Total Attempts</div>
           </div>
-          <div class="stat-card green">
-            <div class="stat-value">${stats.uniqueUsers}</div>
-            <div class="stat-label">Unique Players</div>
+          <div class="bg-white p-4 rounded-lg border border-emerald-100 shadow-sm text-center">
+            <div class="text-2xl font-bold text-emerald-600">${stats.uniqueUsers}</div>
+            <div class="text-xs text-slate-500 uppercase tracking-wide mt-1">Unique Players</div>
           </div>
-          <div class="stat-card orange">
-            <div class="stat-value">${stats.avgScore.toFixed(1)}</div>
-            <div class="stat-label">Average Score</div>
+          <div class="bg-white p-4 rounded-lg border border-amber-100 shadow-sm text-center">
+            <div class="text-2xl font-bold text-amber-600">${stats.avgScore.toFixed(1)}</div>
+            <div class="text-xs text-slate-500 uppercase tracking-wide mt-1">Avg Score</div>
           </div>
-          <div class="stat-card purple">
-            <div class="stat-value">${stats.avgPercentage.toFixed(1)}%</div>
-            <div class="stat-label">Avg Percentage</div>
+          <div class="bg-white p-4 rounded-lg border border-purple-100 shadow-sm text-center">
+            <div class="text-2xl font-bold text-purple-600">${stats.avgPercentage.toFixed(1)}%</div>
+            <div class="text-xs text-slate-500 uppercase tracking-wide mt-1">Avg Accuracy</div>
           </div>
         </div>
-        <div class="table-container">
-          <table>
-            <thead>
+
+        <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table class="min-w-full divide-y divide-slate-200">
+            <thead class="bg-slate-50">
               <tr>
-                <th>User</th>
-                <th>Game</th>
-                <th>Score</th>
-                <th>Max Score</th>
-                <th>Percentage</th>
-                <th>Attempt #</th>
-                <th>Played At</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">User</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Game</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Score</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Pct</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Played</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody class="bg-white divide-y divide-slate-200">
               ${data.scores.map(s => `
-                <tr>
-                  <td>${escapeHtml(s.user_name || 'Unknown')}</td>
-                  <td>${escapeHtml(s.game_title || 'Unknown')}</td>
-                  <td><strong>${s.score}</strong></td>
-                  <td>${s.max_score || 'N/A'}</td>
-                  <td>${s.percentage ? s.percentage.toFixed(1) + '%' : 'N/A'}</td>
-                  <td>${s.attempt_number}</td>
-                  <td>${formatDate(s.played_at)}</td>
+                <tr class="hover:bg-slate-50">
+                  <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900">${escapeHtml(s.user_name || 'Unknown')}</td>
+                  <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-500">${escapeHtml(s.game_title || 'Unknown')}</td>
+                  <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-slate-700">${s.score} <span class="text-slate-400 font-normal text-xs">/ ${s.max_score || '?'}</span></td>
+                  <td class="px-4 py-3 whitespace-nowrap text-sm">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getPercentageColorClass(s.percentage)}">
+                      ${s.percentage ? s.percentage.toFixed(1) + '%' : 'N/A'}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-500">${formatDate(s.played_at)}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -892,8 +888,15 @@
       `;
     } catch (e) {
       console.error(e);
-      document.getElementById('scoresTable').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error loading scores</p></div>';
+      document.getElementById('scoresTable').innerHTML = '<div class="p-4 text-center text-red-500">Error loading scores</div>';
     }
+  }
+
+  function getPercentageColorClass(percentage) {
+    if (!percentage) return 'bg-slate-100 text-slate-800';
+    if (percentage >= 80) return 'bg-green-100 text-green-800';
+    if (percentage >= 50) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-red-100 text-red-800';
   }
 
   function updateScoreFilters(games, users) {
@@ -930,12 +933,38 @@
   function formatDate(d) {
     if (!d) return 'N/A';
     const date = new Date(d);
-    return date.toLocaleString();
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   }
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"]+/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] || c));
   }
+
+  function getDifficultyBadgeClass(level) {
+    const classes = {
+      'easy': 'bg-green-100 text-green-700',
+      'medium': 'bg-yellow-100 text-yellow-700',
+      'hard': 'bg-red-100 text-red-700'
+    };
+    return classes[level] || 'bg-slate-100 text-slate-600';
+  }
+
+  function getDifficultyIcon(level) {
+    const icons = {
+      'easy': 'fa-seedling',
+      'medium': 'fa-fire',
+      'hard': 'fa-mountain'
+    };
+    return icons[level] || 'fa-circle';
+  }
+
+  function getDifficultyLabel(level) {
+    const labels = {
+      'easy': 'Easy',
+      'medium': 'Medium',
+      'hard': 'Hard'
+    };
+    return labels[level] || level;
+  }
 </script>
 {% endblock %}
-
