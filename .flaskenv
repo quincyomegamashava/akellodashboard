@@ -18,6 +18,12 @@ EMAIL_ADDRESS=quincy.mashava@akello.co
 EMAIL_APP_PASSWORD=rfvgfmbhystwhrrq
 EMAIL_SENDER_FILTER=mashavaquincy@gmail.com
 
+# Microsoft Graph API Configuration
+MICROSOFT_CLIENT_ID=39bbc393-30b0-40e8-9ba7-dfb2911f5c2d
+MICROSOFT_TENANT_ID=f68064bc-0e02-4771-a46b-96a821b21c3d
+MICROSOFT_CLIENT_SECRET=337f4eb9-bf2c-48ca-9ec8-26aa3a619d79
+MICROSOFT_REDIRECT_URI=http://localhost:5000/microsoft-callback
+
 
 # Library Database Configuration
 LIBRARY_DB_HOST=40.88.149.15

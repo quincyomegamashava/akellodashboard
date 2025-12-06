@@ -53,6 +53,20 @@
         <i class="fa fa-plus-circle"></i>
         Add New Record
       </a>
+      <a href="#" class="btn-chip" onclick="document.getElementById('summaryAllocationsModal').style.display='block'">
+        <i class="fa fa-list"></i>
+        View Summary & Allocations
+      </a>
+      <a href="#" class="btn-chip" onclick="document.getElementById('requestAllocationModal').style.display='block'">
+        <i class="fa fa-book"></i>
+        Request Book Allocation
+      </a>
+      {% if current_user.userRole == 'Admin' %}
+      <a href="#" class="btn-chip" onclick="document.getElementById('manageRequestsModal').style.display='block'; loadRequests();">
+        <i class="fa fa-tasks"></i>
+        Manage Requests
+      </a>
+      {% endif %}
       <a href="#" class="btn-chip" onclick="document.getElementById('visuals').style.display='block'">
         <i class="fa fa-line-chart"></i>
         Province Visuals
@@ -67,57 +81,6 @@
       </a>
     </div>
     <input id="allocationsSearchInput" class="search-input" type="text" placeholder="Search allocations..." onkeyup="filterAllocations()" />
-  </div>
-
-  {% if province_summary %}
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-header">Quick Summary</div>
-    <div class="card-body">
-      <div style="display:flex; flex-wrap:wrap; gap:8px">
-        {% for province, count in province_summary.items() %}
-          <span class="btn-chip" style="padding:6px 10px"><i class="fa fa-map-marker"></i> {{ province }}: {{ count }}</span>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-  {% endif %}
-
-  <div class="w3-container">
-    <!-- Allocations -->
-    <section class="card">
-      <div class="card-header">Allocations</div>
-      <div class="card-body" style="overflow:auto; max-height:60vh">
-        <table id="allocTable" class="table table-striped">
-          <thead>
-            <tr>
-              <th>School</th>
-              <th>Province</th>
-              <th>Grades</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for alloc in allocations %}
-              <tr>
-                <td>{{ alloc.school_name }}</td>
-                <td>{{ alloc.school_province }}</td>
-                <td class="tags">
-                  {% for book in alloc.books_allocated.split(',') %}
-                    <span>{{ book.strip() }}</span>
-                  {% endfor %}
-                </td>
-                <td>
-                  <button class="btn-chip" title="Edit"><i class="fa fa-pencil"></i></button>
-                  <button class="btn-chip" title="Delete" style="color:#c1121f"><i class="fa fa-trash"></i></button>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Publisher and Provincial totals moved to modals. Use the action buttons above to open. -->
   </div>
 
   <!-- Keep scripts and DT init -->
@@ -400,5 +363,417 @@ new Chart(ctx, {
                     </div>
                 </div>
                  <!-- visuals-->
+
+<!-- Summary and Allocations Combined Modal -->
+<div id="summaryAllocationsModal" class="w3-modal" style="z-index:3000;">
+  <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 90vw; max-width: 1200px;">
+    <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
+      <span onclick="document.getElementById('summaryAllocationsModal').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <h5 class="w3-margin-0">Summary & Allocations</h5>
+    </header>
+    <div class="w3-container w3-padding" style="max-height:75vh; overflow:auto;">
+      <!-- Tabs -->
+      <div class="w3-bar w3-border-bottom" style="margin-bottom:16px">
+        <button class="w3-bar-item w3-button tablink w3-bottombar w3-border-indigo" onclick="openTab(event, 'SummaryTab')">Quick Summary</button>
+        <button class="w3-bar-item w3-button tablink" onclick="openTab(event, 'AllocationsTab')">Allocations</button>
+      </div>
+      
+      <!-- Summary Tab -->
+      <div id="SummaryTab" class="w3-container tabcontent">
+        {% if province_summary %}
+        <div class="card">
+          <div class="card-header">Quick Summary</div>
+          <div class="card-body">
+            <div style="display:flex; flex-wrap:wrap; gap:8px">
+              {% for province, count in province_summary.items() %}
+                <span class="btn-chip" style="padding:6px 10px"><i class="fa fa-map-marker"></i> {{ province }}: {{ count }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <p class="w3-text-gray">No summary data available</p>
+        {% endif %}
+      </div>
+      
+      <!-- Allocations Tab -->
+      <div id="AllocationsTab" class="w3-container tabcontent" style="display:none">
+        <div class="card">
+          <div class="card-header">Allocations</div>
+          <div class="card-body" style="overflow:auto; max-height:50vh">
+            <table id="allocTableModal" class="table table-striped">
+              <thead>
+                <tr>
+                  <th>School</th>
+                  <th>Province</th>
+                  <th>Grades</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for alloc in allocations %}
+                  <tr>
+                    <td>{{ alloc.school_name }}</td>
+                    <td>{{ alloc.school_province }}</td>
+                    <td class="tags">
+                      {% for book in alloc.books_allocated.split(',') %}
+                        <span>{{ book.strip() }}</span>
+                      {% endfor %}
+                    </td>
+                    <td>
+                      <button class="btn-chip" title="Edit"><i class="fa fa-pencil"></i></button>
+                      <button class="btn-chip" title="Delete" style="color:#c1121f"><i class="fa fa-trash"></i></button>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <footer class="w3-container w3-padding w3-light-grey">
+      <button class="w3-button w3-teal w3-small" onclick="document.getElementById('summaryAllocationsModal').style.display='none'">Close</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Request Book Allocation Modal -->
+<div id="requestAllocationModal" class="w3-modal" style="z-index:3000;">
+  <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 90vw; max-width: 800px;">
+    <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
+      <span onclick="document.getElementById('requestAllocationModal').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <h5 class="w3-margin-0">Request Book Allocation</h5>
+    </header>
+    <div class="w3-container w3-padding">
+      <form id="requestAllocationForm">
+        <div class="w3-margin-bottom">
+          <label class="w3-text-gray"><b>School Name</b></label>
+          <div id="schoolSelectContainer">
+            <select id="schoolSelect" class="w3-input w3-border" required>
+              <option value="">Loading schools...</option>
+            </select>
+          </div>
+          <div id="manualSchoolContainer" style="display:none; margin-top:8px">
+            <input type="text" id="manualSchoolName" class="w3-input w3-border" placeholder="Enter school name">
+          </div>
+          {% if current_user.userRole != 'Brand Ambassador' %}
+          <label class="w3-margin-top">
+            <input type="checkbox" id="addNewSchoolCheck" onchange="toggleManualSchool()">
+            <span class="w3-text-gray">Add new school</span>
+          </label>
+          {% endif %}
+        </div>
+        
+        <div class="w3-margin-bottom">
+          <label class="w3-text-gray"><b>School Province</b></label>
+          <select id="schoolProvince" class="w3-input w3-border" required>
+            <option value="">Select Province</option>
+            <option value="Harare">Harare</option>
+            <option value="Bulawayo">Bulawayo</option>
+            <option value="Manicaland">Manicaland</option>
+            <option value="Mashonaland Central">Mashonaland Central</option>
+            <option value="Mashonaland East">Mashonaland East</option>
+            <option value="Mashonaland West">Mashonaland West</option>
+            <option value="Masvingo">Masvingo</option>
+            <option value="Matabeleland North">Matabeleland North</option>
+            <option value="Matabeleland South">Matabeleland South</option>
+            <option value="Midlands">Midlands</option>
+          </select>
+        </div>
+        
+        <div class="w3-margin-bottom">
+          <label class="w3-text-gray"><b>School Grade</b></label>
+          <select id="schoolGrade" class="w3-input w3-border" required>
+            <option value="">Select Grade</option>
+            <option value="Grade4">Grade 4</option>
+            <option value="Grade5">Grade 5</option>
+            <option value="Grade6">Grade 6</option>
+            <option value="Grade7">Grade 7</option>
+            <option value="Form1">Form 1</option>
+            <option value="Form2">Form 2</option>
+            <option value="Form3">Form 3</option>
+            <option value="Form4">Form 4</option>
+            <option value="Form5">Form 5</option>
+            <option value="Form6">Form 6</option>
+          </select>
+        </div>
+        
+        <div class="w3-margin-bottom">
+          <label class="w3-text-gray"><b>Quantity</b></label>
+          <input type="number" id="quantity" class="w3-input w3-border" value="1" min="1" required>
+        </div>
+        
+        <div class="w3-margin-bottom">
+          <label class="w3-text-gray"><b>Notes (Optional)</b></label>
+          <textarea id="notes" class="w3-input w3-border" rows="3" placeholder="Additional notes..."></textarea>
+        </div>
+        
+        <div class="w3-margin-bottom">
+          <label class="w3-text-gray"><b>Requested Date (Optional)</b></label>
+          <input type="date" id="requestedDate" class="w3-input w3-border">
+        </div>
+        
+        <div id="requestError" class="w3-panel w3-red" style="display:none; margin-top:16px"></div>
+        <div id="requestSuccess" class="w3-panel w3-green" style="display:none; margin-top:16px"></div>
+      </form>
+    </div>
+    <footer class="w3-container w3-padding w3-light-grey">
+      <button class="w3-button w3-indigo w3-small" onclick="submitRequest()">Submit Request</button>
+      <button class="w3-button w3-teal w3-small" onclick="document.getElementById('requestAllocationModal').style.display='none'">Close</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Manage Requests Modal (Admin Only) -->
+<div id="manageRequestsModal" class="w3-modal" style="z-index:3000;">
+  <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 95vw; max-width: 1400px;">
+    <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
+      <span onclick="document.getElementById('manageRequestsModal').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <h5 class="w3-margin-0">Manage Book Allocation Requests</h5>
+    </header>
+    <div class="w3-container w3-padding">
+      <div class="w3-bar w3-margin-bottom">
+        <button class="w3-button w3-bar-item w3-indigo" onclick="loadRequests('')">All</button>
+        <button class="w3-button w3-bar-item" onclick="loadRequests('Not allocated')">Not Allocated</button>
+        <button class="w3-button w3-bar-item" onclick="loadRequests('Allocated')">Allocated</button>
+      </div>
+      
+      <div style="overflow:auto; max-height:60vh">
+        <table class="w3-table-all w3-small w3-striped w3-hoverable">
+          <thead>
+            <tr>
+              <th>Requester</th>
+              <th>School</th>
+              <th>Province</th>
+              <th>Grade</th>
+              <th>Quantity</th>
+              <th>Requested Date</th>
+              <th>Status</th>
+              <th>Created At</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="requestsTableBody">
+            <tr><td colspan="9" class="w3-center w3-text-gray">Loading requests...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <footer class="w3-container w3-padding w3-light-grey">
+      <button class="w3-button w3-teal w3-small" onclick="document.getElementById('manageRequestsModal').style.display='none'">Close</button>
+    </footer>
+  </div>
+</div>
+
+<script>
+function openTab(evt, tabName) {
+  var i, x, tablinks;
+  x = document.getElementsByClassName("tabcontent");
+  for (i = 0; i < x.length; i++) {
+    x[i].style.display = "none";
+  }
+  tablinks = document.getElementsByClassName("tablink");
+  for (i = 0; i < tablinks.length; i++) {
+    tablinks[i].classList.remove("w3-border-indigo");
+  }
+  document.getElementById(tabName).style.display = "block";
+  evt.currentTarget.classList.add("w3-border-indigo");
+}
+
+async function loadSchoolsForRequest() {
+  const schoolSelect = document.getElementById('schoolSelect');
+  const isBA = '{{ current_user.userRole }}' === 'Brand Ambassador';
+  
+  try {
+    if (isBA) {
+      const response = await fetch(`/api/champion-schools-by-user/{{ current_user.username }}`);
+      const data = await response.json();
+      schoolSelect.innerHTML = '<option value="">Select School</option>';
+      if (data.schools && data.schools.length > 0) {
+        data.schools.forEach(school => {
+          schoolSelect.innerHTML += `<option value="${school}">${school}</option>`;
+        });
+      } else {
+        schoolSelect.innerHTML = '<option value="">No schools assigned</option>';
+      }
+    } else {
+      const response = await fetch('/api/all-champion-schools');
+      const data = await response.json();
+      schoolSelect.innerHTML = '<option value="">Select School</option>';
+      if (data.schools && data.schools.length > 0) {
+        data.schools.forEach(school => {
+          schoolSelect.innerHTML += `<option value="${school}">${school}</option>`;
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error loading schools:', error);
+    schoolSelect.innerHTML = '<option value="">Error loading schools</option>';
+  }
+}
+
+function toggleManualSchool() {
+  const checkbox = document.getElementById('addNewSchoolCheck');
+  const selectContainer = document.getElementById('schoolSelectContainer');
+  const manualContainer = document.getElementById('manualSchoolContainer');
+  
+  if (checkbox && checkbox.checked) {
+    selectContainer.style.display = 'none';
+    manualContainer.style.display = 'block';
+    document.getElementById('manualSchoolName').required = true;
+    document.getElementById('schoolSelect').required = false;
+  } else {
+    selectContainer.style.display = 'block';
+    manualContainer.style.display = 'none';
+    if (document.getElementById('manualSchoolName')) {
+      document.getElementById('manualSchoolName').required = false;
+    }
+    document.getElementById('schoolSelect').required = true;
+  }
+}
+
+async function submitRequest() {
+  const errorDiv = document.getElementById('requestError');
+  const successDiv = document.getElementById('requestSuccess');
+  errorDiv.style.display = 'none';
+  successDiv.style.display = 'none';
+  
+  const addNewSchool = document.getElementById('addNewSchoolCheck')?.checked || false;
+  const schoolName = addNewSchool 
+    ? document.getElementById('manualSchoolName').value.trim()
+    : document.getElementById('schoolSelect').value;
+  
+  if (!schoolName) {
+    errorDiv.textContent = 'Please select or enter a school name';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  const data = {
+    school_name: schoolName,
+    school_province: document.getElementById('schoolProvince').value,
+    school_grade: document.getElementById('schoolGrade').value,
+    quantity: parseInt(document.getElementById('quantity').value) || 1,
+    notes: document.getElementById('notes').value.trim() || null,
+    requested_date: document.getElementById('requestedDate').value || null
+  };
+  
+  try {
+    const response = await fetch('/api/book-allocation-requests', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to submit request');
+    }
+    
+    successDiv.textContent = 'Request submitted successfully!';
+    successDiv.style.display = 'block';
+    
+    document.getElementById('requestAllocationForm').reset();
+    if (addNewSchool) {
+      document.getElementById('addNewSchoolCheck').checked = false;
+      toggleManualSchool();
+    }
+    
+    setTimeout(() => {
+      document.getElementById('requestAllocationModal').style.display = 'none';
+    }, 1500);
+  } catch (error) {
+    errorDiv.textContent = error.message;
+    errorDiv.style.display = 'block';
+  }
+}
+
+async function loadRequests(status = '') {
+  const tbody = document.getElementById('requestsTableBody');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '<tr><td colspan="9" class="w3-center w3-text-gray">Loading...</td></tr>';
+  
+  try {
+    const url = status ? `/api/book-allocation-requests?status=${encodeURIComponent(status)}` : '/api/book-allocation-requests';
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to load requests');
+    }
+    
+    if (!data.requests || data.requests.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" class="w3-center w3-text-gray">No requests found</td></tr>';
+      return;
+    }
+    
+    tbody.innerHTML = data.requests.map(req => {
+      const createdDate = req.created_at ? new Date(req.created_at).toLocaleDateString() : 'N/A';
+      const requestedDate = req.requested_date ? new Date(req.requested_date).toLocaleDateString() : 'N/A';
+      const statusBadge = req.status === 'Allocated' 
+        ? '<span class="w3-badge w3-green">Allocated</span>'
+        : '<span class="w3-badge w3-orange">Not Allocated</span>';
+      
+      const approveBtn = req.status === 'Not allocated'
+        ? `<button class="w3-button w3-small w3-green" onclick="approveRequest(${req.id})">Approve & Allocate</button>`
+        : '<span class="w3-text-gray">Already allocated</span>';
+      
+      return `
+        <tr>
+          <td>${req.requester_username}</td>
+          <td>${req.school_name}</td>
+          <td>${req.school_province}</td>
+          <td>${req.school_grade}</td>
+          <td>${req.quantity}</td>
+          <td>${requestedDate}</td>
+          <td>${statusBadge}</td>
+          <td>${createdDate}</td>
+          <td>${approveBtn}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (error) {
+    tbody.innerHTML = `<tr><td colspan="9" class="w3-center w3-text-red">Error: ${error.message}</td></tr>`;
+  }
+}
+
+async function approveRequest(requestId) {
+  if (!confirm('Approve this request and create allocation?')) return;
+  
+  try {
+    const response = await fetch(`/api/book-allocation-requests/${requestId}/approve`, {
+      method: 'POST'
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to approve request');
+    }
+    
+    alert('Request approved and allocation created successfully!');
+    loadRequests();
+  } catch (error) {
+    alert('Error: ' + error.message);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const openBtn = document.querySelector('[onclick*="requestAllocationModal"]');
+  if (openBtn) {
+    openBtn.addEventListener('click', function() {
+      setTimeout(() => {
+        const schoolSelect = document.getElementById('schoolSelect');
+        if (schoolSelect && (schoolSelect.options.length <= 1 || schoolSelect.options[0].text === 'Loading schools...')) {
+          loadSchoolsForRequest();
+        }
+      }, 100);
+    });
+  }
+});
+</script>
 
 {% endblock %}

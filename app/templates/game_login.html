@@ -223,20 +223,35 @@
             >
           </div>
           
-          <div>
-            <label for="regAge" class="block text-sm font-semibold text-slate-700 mb-2">
-              <i class="fas fa-birthday-cake mr-2 text-emerald-600"></i> Age <span class="text-xs text-slate-500 font-normal">(9-19 years)</span>
-            </label>
-            <input 
-              type="number" 
-              id="regAge" 
-              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
-              placeholder="Enter your age" 
-              min="9"
-              max="19"
-              required
-            >
-            <p class="text-xs text-slate-500 mt-1">You must be between 9 and 19 years old to play</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label for="regAge" class="block text-sm font-semibold text-slate-700 mb-2">
+                <i class="fas fa-birthday-cake mr-2 text-emerald-600"></i> Age <span class="text-xs text-slate-500 font-normal">(9-19 years)</span>
+              </label>
+              <input 
+                type="number" 
+                id="regAge" 
+                class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
+                placeholder="Enter your age" 
+                min="9"
+                max="19"
+                required
+              >
+              <p class="text-xs text-slate-500 mt-1">You must be between 9 and 19 years old to play</p>
+            </div>
+            
+            <div>
+              <label for="regPhoneNumber" class="block text-sm font-semibold text-slate-700 mb-2">
+                <i class="fas fa-phone mr-2 text-emerald-600"></i> Phone Number <span class="text-xs text-slate-500 font-normal">(Optional)</span>
+              </label>
+              <input 
+                type="tel" 
+                id="regPhoneNumber" 
+                class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
+                placeholder="+263 77 123 4567"
+                autocomplete="tel"
+              >
+            </div>
           </div>
           
           <div id="registerError" class="hidden bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg">
@@ -338,6 +353,7 @@
       const username = document.getElementById('regUsername').value.trim();
       const password = document.getElementById('regPassword').value;
       const age = parseInt(document.getElementById('regAge').value);
+      const phoneNumber = document.getElementById('regPhoneNumber').value.trim() || null;
       
       const errorDiv = document.getElementById('registerError');
       const successDiv = document.getElementById('registerSuccess');
@@ -375,7 +391,7 @@
         const r = await fetch('/api/game-users/register-public', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ firstname, surname, username, password, age })
+          body: JSON.stringify({ firstname, surname, username, password, age, phone_number: phoneNumber })
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || 'Registration failed');

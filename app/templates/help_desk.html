@@ -124,7 +124,7 @@
         </div>
         
         <div class="w3-col s12 m4 w3-margin-bottom">
-          <div class="w3-card w3-white w3-round w3-hover-shadow w3-border" onclick="document.getElementById('emailQueriesModal').style.display='block'" style="cursor:pointer;">
+          <div class="w3-card w3-white w3-round w3-hover-shadow w3-border" onclick="openEmailQueriesModal()" style="cursor:pointer;">
             <div class="w3-container w3-deep-purple w3-text-white w3-round-top w3-padding-small">
               <b><i class="fa fa-envelope"></i> Email Queries</b>
             </div>
@@ -294,12 +294,23 @@
     <div class="w3-container" style="padding:16px;">
       <div class="w3-card w3-white w3-round w3-padding">
         <h4 class="w3-text-deep-purple">Queries from Email</h4>
+        <div id="microsoftAuthStatus" class="w3-margin-bottom" style="display:none;">
+          <div class="w3-panel w3-yellow w3-round">
+            <p class="w3-small"><i class="fa fa-exclamation-triangle"></i> <span id="authStatusMessage">Not connected to Outlook</span></p>
+            <button class="w3-button w3-small w3-blue w3-round" onclick="connectToMicrosoft()" id="connectBtn">
+              <i class="fa fa-plug"></i> Connect to Outlook
+            </button>
+            <button class="w3-button w3-small w3-red w3-round" onclick="disconnectMicrosoft()" id="disconnectBtn" style="display:none;">
+              <i class="fa fa-unlink"></i> Disconnect
+            </button>
+          </div>
+        </div>
         <div class="w3-margin-bottom w3-row-padding">
           <div class="w3-col s12 m8">
             <input class="w3-input w3-border w3-round" id="emailQuerySearch" type="text" placeholder="Search email queries..." oninput="filterEmailQueries()">
           </div>
           <div class="w3-col s12 m4 w3-margin-top-small">
-            <button class="w3-button w3-indigo w3-round w3-block" onclick="fetchEmailQueries()">
+            <button class="w3-button w3-indigo w3-round w3-block" onclick="fetchEmailQueries()" id="refreshEmailsBtn">
               <i class="fa fa-refresh"></i> Refresh Emails
             </button>
           </div>
@@ -441,19 +452,84 @@
   showStep(currentStep);
 
   // ===== Email Queries Functions =====
+  
+  // Open email queries modal and check auth status
+  function openEmailQueriesModal() {
+    document.getElementById('emailQueriesModal').style.display='block';
+    checkMicrosoftAuth();
+  }
+  
+  // Check Microsoft authentication status
+  async function checkMicrosoftAuth() {
+    try {
+      const response = await fetch('/api/microsoft-auth-status');
+      const data = await response.json();
+      const authStatusDiv = document.getElementById('microsoftAuthStatus');
+      const authStatusMsg = document.getElementById('authStatusMessage');
+      const connectBtn = document.getElementById('connectBtn');
+      const disconnectBtn = document.getElementById('disconnectBtn');
+      
+      if (data.authenticated) {
+        authStatusDiv.style.display = 'block';
+        authStatusDiv.className = 'w3-margin-bottom w3-panel w3-green w3-round';
+        authStatusMsg.innerHTML = '<i class="fa fa-check-circle"></i> Connected to Outlook';
+        connectBtn.style.display = 'none';
+        disconnectBtn.style.display = 'inline-block';
+      } else {
+        authStatusDiv.style.display = 'block';
+        authStatusDiv.className = 'w3-margin-bottom w3-panel w3-yellow w3-round';
+        authStatusMsg.innerHTML = '<i class="fa fa-exclamation-triangle"></i> Not connected to Outlook. Connect to fetch emails.';
+        connectBtn.style.display = 'inline-block';
+        disconnectBtn.style.display = 'none';
+      }
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+    }
+  }
+  
+  // Connect to Microsoft
+  function connectToMicrosoft() {
+    window.location.href = '/microsoft-login';
+  }
+  
+  // Disconnect from Microsoft
+  async function disconnectMicrosoft() {
+    if (!confirm('Disconnect from Outlook? You will need to reconnect to fetch emails.')) return;
+    try {
+      const response = await fetch('/microsoft-logout');
+      if (response.ok) {
+        checkMicrosoftAuth();
+        document.getElementById('emailQueriesBody').innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">Click "Refresh Emails" to load email queries</td></tr>';
+      }
+    } catch (error) {
+      alert('Error disconnecting: ' + error.message);
+    }
+  }
+  
   async function fetchEmailQueries() {
     const loadingIndicator = document.getElementById('emailLoadingIndicator');
     const tbody = document.getElementById('emailQueriesBody');
     const countElement = document.getElementById('emailQueryCount');
     
     loadingIndicator.style.display = 'block';
-    tbody.innerHTML = '<tr><td colspan="5" class="w3-center w3-text-gray">Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">Loading...</td></tr>';
     
     try {
       const response = await fetch('/api/email-queries');
       const data = await response.json();
       
       if (!response.ok) {
+        // Check if authentication is required
+        if (data.requires_auth || response.status === 401) {
+          tbody.innerHTML = `<tr><td colspan="6" class="w3-center w3-text-orange">
+            <p><i class="fa fa-exclamation-triangle"></i> ${data.error || 'Authentication required'}</p>
+            <button class="w3-button w3-blue w3-round" onclick="connectToMicrosoft()">
+              <i class="fa fa-plug"></i> Connect to Outlook
+            </button>
+          </td></tr>`;
+          checkMicrosoftAuth();
+          return;
+        }
         throw new Error(data.error || 'Failed to fetch emails');
       }
       
@@ -466,19 +542,25 @@
         tbody.innerHTML = emails.map(email => {
           const status = email.status || 'Not started';
           const statusClass = status === 'Not started' ? 'status-grey' : (status === 'Looking into it' ? 'status-orange' : 'status-green');
+          // Escape HTML to prevent XSS
+          const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+          };
           return `
           <tr data-email-id="${email.id}" class="${statusClass}">
-            <td><strong>${email.subject || '(No Subject)'}</strong></td>
-            <td>${email.from || 'Unknown'}</td>
-            <td>${email.date || 'N/A'}</td>
+            <td><strong>${escapeHtml(email.subject || '(No Subject)')}</strong></td>
+            <td>${escapeHtml(email.from || 'Unknown')}</td>
+            <td>${escapeHtml(email.date || 'N/A')}</td>
             <td>
-              <select class="w3-input w3-border w3-round w3-small status-select" data-email-id="${email.id}" data-from="${email.from}" onchange="onEmailStatusChange(this)">
+              <select class="w3-input w3-border w3-round w3-small status-select" data-email-id="${email.id}" data-from="${escapeHtml(email.from || '')}" onchange="onEmailStatusChange(this)">
                 <option value="Not started" ${status === 'Not started' ? 'selected' : ''}>Not started</option>
                 <option value="Looking into it" ${status === 'Looking into it' ? 'selected' : ''}>Looking into it</option>
                 <option value="Resolved" ${status === 'Resolved' ? 'selected' : ''}>Resolved</option>
               </select>
             </td>
-            <td class="w3-small">${(email.preview || '').substring(0, 100)}${email.preview && email.preview.length > 100 ? '...' : ''}</td>
+            <td class="w3-small">${escapeHtml((email.preview || '').substring(0, 100))}${email.preview && email.preview.length > 100 ? '...' : ''}</td>
             <td>
               <button class="w3-button w3-tiny w3-indigo w3-round" onclick="viewEmailDetails('${email.id}')">
                 <i class="fa fa-eye"></i> View
@@ -491,6 +573,8 @@
         `;
         }).join('');
       }
+      // Update auth status after successful fetch
+      checkMicrosoftAuth();
     } catch (error) {
       tbody.innerHTML = `<tr><td colspan="6" class="w3-center w3-text-red">Error: ${error.message}</td></tr>`;
       console.error('Error fetching emails:', error);
@@ -510,10 +594,18 @@
   function viewEmailDetails(emailId) {
     // This will show email details in an alert or another modal
     fetch(`/api/email-queries/${emailId}`)
-      .then(res => res.json())
-      .then(data => {
+      .then(res => {
+        return res.json().then(data => ({ response: res, data: data }));
+      })
+      .then(({ response, data }) => {
         if (data.error) {
-          alert('Error: ' + data.error);
+          if (data.requires_auth || response.status === 401) {
+            if (confirm('Authentication required. Connect to Outlook?')) {
+              connectToMicrosoft();
+            }
+          } else {
+            alert('Error: ' + data.error);
+          }
           return;
         }
         const email = data.email;
@@ -532,7 +624,13 @@
       const data = await response.json();
       
       if (!response.ok) {
-        alert('Error: ' + (data.error || 'Failed to convert email'));
+        if (data.requires_auth || response.status === 401) {
+          if (confirm('Authentication required. Connect to Outlook?')) {
+            connectToMicrosoft();
+          }
+        } else {
+          alert('Error: ' + (data.error || 'Failed to convert email'));
+        }
         return;
       }
       

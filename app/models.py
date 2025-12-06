@@ -158,6 +158,44 @@ class BookAllocations(db.Model):
     allocated_by = db.Column(db.String(100), nullable=True)
 
 
+class BookAllocationRequest(db.Model):
+    __tablename__ = 'book_allocation_requests'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    requester_username = db.Column(db.String(100), nullable=False, index=True)
+    school_name = db.Column(db.String(100), nullable=False)
+    school_province = db.Column(db.String(100), nullable=False)
+    school_grade = db.Column(db.String(50), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+    notes = db.Column(db.Text, nullable=True)
+    requested_date = db.Column(db.Date, nullable=True)
+    status = db.Column(db.String(20), nullable=False, default='Not allocated', index=True)
+    approved_by = db.Column(db.String(100), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    converted_to_allocation_id = db.Column(db.Integer, db.ForeignKey('book_allocations.id'), nullable=True)
+    
+    # Relationship to BookAllocations
+    converted_allocation = db.relationship('BookAllocations', backref='source_request', foreign_keys=[converted_to_allocation_id])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'requester_username': self.requester_username,
+            'school_name': self.school_name,
+            'school_province': self.school_province,
+            'school_grade': self.school_grade,
+            'quantity': self.quantity,
+            'notes': self.notes,
+            'requested_date': self.requested_date.isoformat() if self.requested_date else None,
+            'status': self.status,
+            'approved_by': self.approved_by,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'converted_to_allocation_id': self.converted_to_allocation_id
+        }
+
+
 class Report(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     employee_name = db.Column(db.String(100), nullable=False)
@@ -271,6 +309,7 @@ class GameUser(db.Model):
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     age = db.Column(db.Integer, nullable=False)  # Age of the game user (9-19)
+    phone_number = db.Column(db.String(20), nullable=True)  # Optional phone number
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
     scores = db.relationship('GameScore', backref='game_user', lazy=True, cascade='all, delete-orphan')

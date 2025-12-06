@@ -91,6 +91,122 @@
       height: calc(100vh - 200px); /* Adjust based on modal header/footer */
       overflow: auto;
     }
+
+    /* Icon button tooltip styles */
+    .icon-btn-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .icon-btn-group:not(:last-child)::after {
+      content: '';
+      width: 1px;
+      height: 24px;
+      background-color: #e5e7eb;
+      margin-left: 0.5rem;
+    }
+
+    .icon-btn {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      color: #6b7280;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 16px;
+    }
+
+    .icon-btn:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+      color: #374151;
+    }
+
+    .icon-btn:active {
+      transform: scale(0.95);
+    }
+
+    .icon-btn.primary {
+      background: #6366f1;
+      border-color: #6366f1;
+      color: white;
+    }
+
+    .icon-btn.primary:hover {
+      background: #4f46e5;
+      border-color: #4f46e5;
+    }
+
+    .icon-btn.danger:hover {
+      background: #fee2e2;
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+
+    /* Tooltip */
+    .icon-btn[data-tooltip]::before {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      padding: 6px 10px;
+      background: #1f2937;
+      color: white;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      border-radius: 6px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 1000;
+    }
+
+    .icon-btn[data-tooltip]::after {
+      content: '';
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%) translateY(-2px);
+      border: 4px solid transparent;
+      border-top-color: #1f2937;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 1000;
+    }
+
+    .icon-btn[data-tooltip]:hover::before,
+    .icon-btn[data-tooltip]:hover::after {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 640px) {
+      .icon-btn-group {
+        gap: 0.375rem;
+      }
+
+      .icon-btn {
+        width: 44px;
+        height: 44px;
+      }
+
+      .header-actions {
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+    }
   </style>
 </head>
 <body class="bg-white-100 font-sans text-gray-800 min-h-screen p-6">
@@ -110,59 +226,91 @@
       <section class="bg-white/70 rounded-2xl shadow border border-slate-200 p-4">
 
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-<h1 class="text-3xl sm:text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-blue-600 to-teal-500 drop-shadow-sm"> Project Board</h1>
+          <h1 class="text-2xl sm:text-3xl font-bold text-slate-800">Project Board</h1>
 
-          <div class="flex flex-wrap items-center gap-3">
-            <a href="{{url_for('overview')}}" 
-              class="px-5 py-2.5 w3-small text-black font-medium rounded-xl bg-white shadow-md active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-house-heart-fill" viewBox="0 0 16 16">
-                <path d="M7.293 1.5a1 1 0 0 1 1.414 0L11 3.793V2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v3.293l2.354 2.353a.5.5 0 0 1-.708.707L8 2.207 1.354 8.853a.5.5 0 1 1-.708-.707z"/>
-                <path d="m14 9.293-6-6-6 6V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5zm-6-.811c1.664-1.673 5.825 1.254 0 5.018-5.825-3.764-1.664-6.691 0-5.018"/>
-              </svg>
-            </a>
+          <div class="header-actions flex flex-wrap items-center gap-2">
+            <!-- Hidden project select for internal state tracking -->
+            <select 
+              id="projectSelect" 
+              class="hidden"
+              style="display: none;"
+            ></select>
 
-            <div class="flex w3-hide disabled-link flex-col">
-              <select 
-                id="projectSelect" 
-                class="px-4 py-1 border disabled-link w3-hide text-black border-slate-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[200px] text-slate-700"
-              ></select>
+            <!-- Navigation Group -->
+            <div class="icon-btn-group">
+              <a href="{{url_for('overview')}}" 
+                class="icon-btn"
+                data-tooltip="Home"
+                aria-label="Home"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V8.207l1.146 1.147a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.707 1.5ZM13 7.207V13.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V7.207l5-5 5 5Z"/>
+                </svg>
+              </a>
             </div>
 
-            <button 
-id="editProjectBtn" 
-              class="px-4 py-2 w3-small bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl shadow-md active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-amber-300"
-            >
-              ✏️ Edit
-            </button>
+            <!-- Project Actions Group -->
+            <div class="icon-btn-group">
+              <button 
+                id="editProjectBtn" 
+                class="icon-btn"
+                data-tooltip="Edit Project"
+                aria-label="Edit Project"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                </svg>
+              </button>
 
-            <button 
-id="deleteProjectBtn" 
-              class="px-4 py-2 w3-small bg-rose-500 hover:bg-rose-600 text-white font-medium rounded-xl shadow-md active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-rose-300"
-            >
-              🗑️ Delete
-            </button>
+              <button 
+                id="deleteProjectBtn" 
+                class="icon-btn danger"
+                data-tooltip="Delete Project"
+                aria-label="Delete Project"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+                  <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+                </svg>
+              </button>
 
-            <button 
-id="newProjectBtn" 
-              class="px-5 py-2 w3-small bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-md active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center gap-2"
-            >
-              ➕ New Project
-            </button>
+              <button 
+                id="newProjectBtn" 
+                class="icon-btn primary"
+                data-tooltip="New Project"
+                aria-label="New Project"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4Z"/>
+                </svg>
+              </button>
+            </div>
 
-            <button 
-id="showGanttBtn" 
-              class="px-5 py-2 w3-small bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-xl shadow-md active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-teal-300 flex items-center gap-2"
-            >
-              📊 Show Gantt
-            </button>
+            <!-- View Options Group -->
+            <div class="icon-btn-group">
+              <button 
+                id="showGanttBtn" 
+                class="icon-btn"
+                data-tooltip="Show Gantt Chart"
+                aria-label="Show Gantt Chart"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M0 0h1v15h15v1H0V0Zm14.817 3.113a.5.5 0 0 1 .07.672l-4.5 5.5a.5.5 0 0 1-.79.01l-2.5-3.5a.5.5 0 0 1 .79-.617l2.003 2.803 4.157-5.08a.5.5 0 0 1 .703-.07ZM1 2v12h13V2H1Z"/>
+                </svg>
+              </button>
 
-            <button 
-id="showMyTasksBtn" 
-              class="px-5 py-2 w3-small bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl shadow-md active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 flex items-center gap-2"
-            >
-              🧾 My Tasks
-            </button>
+              <button 
+                id="showMyTasksBtn" 
+                class="icon-btn"
+                data-tooltip="My Tasks"
+                aria-label="My Tasks"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
+                  <path d="M5 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -900,13 +1048,21 @@ $('newProjectBtn').onclick = promptCreateProject;
 $('newProjectBtn2').onclick = promptCreateProject;
 $('editProjectBtn').onclick = () => {
   const sel = $('projectSelect');
-  if (!sel.value) return alert('No project selected');
-  promptEditProject(sel.value);
+  const projectId = (sel && sel.value) ? sel.value : (currentProjectId || null);
+  if (!projectId) {
+    alert('No project selected. Please select a project from the sidebar first.');
+    return;
+  }
+  promptEditProject(projectId);
 };
 $('deleteProjectBtn').onclick = () => {
   const sel = $('projectSelect');
-  if (!sel.value) return alert('No project selected');
-  confirmDeleteProject(sel.value);
+  const projectId = (sel && sel.value) ? sel.value : (currentProjectId || null);
+  if (!projectId) {
+    alert('No project selected. Please select a project from the sidebar first.');
+    return;
+  }
+  confirmDeleteProject(projectId);
 };
 
 // NEW: Wire up the Gantt Chart button

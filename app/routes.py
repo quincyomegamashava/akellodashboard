@@ -9,7 +9,7 @@ from flask_login import login_user, logout_user, current_user, login_required
 import sqlalchemy as sa
 from app import app, db
 from app.forms import EventForm, LoginForm, PerfomanceTargetsForm, RegistrationForm, BookAllocationForm, ReportForm, WorkspaceForm, ProjectForm, TaskForm, CSVUploadForm, ChampionCSVUploadForm, ChampionSchoolForm, AkelloSimEventForm
-from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, Report, Workspace, Project, Task, ChampionSchool, Event, WeeklyReport, TaskA, ColumnA, ProjectA, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore
+from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, Event, WeeklyReport, TaskA, ColumnA, ProjectA, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore
 from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from collections import defaultdict
@@ -9181,6 +9181,184 @@ def allocate_books():
         print("Form Errors:", allocate_form.errors)
 
 
+# ===== Book Allocation Request API Endpoints =====
+
+@app.route('/api/champion-schools-by-user/<username>', methods=['GET'])
+@login_required
+def get_champion_schools_by_user(username):
+    """Get schools for a specific Brand Ambassador user"""
+    try:
+        # Find the user
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Check if user is Brand Ambassador
+        if user.userRole != 'Brand Ambassador':
+            return jsonify({'error': 'User is not a Brand Ambassador'}), 403
+        
+        # Find ChampionSchool record matching the user
+        # Match by firstname, lastname, and province
+        champion = ChampionSchool.query.filter(
+            ChampionSchool.firstname.ilike(f'%{user.firstname}%'),
+            ChampionSchool.lastname.ilike(f'%{user.lastname}%'),
+            ChampionSchool.province.ilike(f'%{user.province}%')
+        ).first()
+        
+        if not champion:
+            return jsonify({'schools': []}), 200
+        
+        # Get schools from the champion
+        schools_data = champion.get_schools() or []
+        school_names = [s.get('school_name', '') for s in schools_data if s.get('school_name')]
+        
+        return jsonify({'schools': school_names}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/all-champion-schools', methods=['GET'])
+@login_required
+def get_all_champion_schools():
+    """Get all unique school names from all ChampionSchool records"""
+    try:
+        champions = ChampionSchool.query.all()
+        school_names_set = set()
+        
+        for champion in champions:
+            schools_data = champion.get_schools() or []
+            for school in schools_data:
+                school_name = school.get('school_name', '')
+                if school_name:
+                    school_names_set.add(school_name)
+        
+        return jsonify({'schools': sorted(list(school_names_set))}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/book-allocation-requests', methods=['GET'])
+@login_required
+def get_book_allocation_requests():
+    """List book allocation requests with optional status filter"""
+    try:
+        status_filter = request.args.get('status', None)
+        
+        # Admins see all requests, users see only their own
+        if current_user.userRole == 'Admin':
+            query = BookAllocationRequest.query
+        else:
+            query = BookAllocationRequest.query.filter_by(requester_username=current_user.username)
+        
+        # Apply status filter if provided
+        if status_filter:
+            query = query.filter_by(status=status_filter)
+        
+        requests = query.order_by(BookAllocationRequest.created_at.desc()).all()
+        
+        return jsonify({'requests': [req.to_dict() for req in requests]}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/book-allocation-requests', methods=['POST'])
+@login_required
+def create_book_allocation_request():
+    """Create a new book allocation request"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['school_name', 'school_province', 'school_grade']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return jsonify({'error': f'{field} is required'}), 400
+        
+        # If user is Brand Ambassador, validate school matches their username
+        if current_user.userRole == 'Brand Ambassador':
+            # Get schools for this user
+            champion = ChampionSchool.query.filter(
+                ChampionSchool.firstname.ilike(f'%{current_user.firstname}%'),
+                ChampionSchool.lastname.ilike(f'%{current_user.lastname}%'),
+                ChampionSchool.province.ilike(f'%{current_user.province}%')
+            ).first()
+            
+            if champion:
+                schools_data = champion.get_schools() or []
+                user_schools = [s.get('school_name', '') for s in schools_data if s.get('school_name')]
+                
+                if data['school_name'] not in user_schools:
+                    return jsonify({'error': 'School does not match your assigned schools'}), 403
+        
+        # Create request
+        request_obj = BookAllocationRequest(
+            requester_username=current_user.username,
+            school_name=data['school_name'],
+            school_province=data['school_province'],
+            school_grade=data['school_grade'],
+            quantity=data.get('quantity', 1),
+            notes=data.get('notes', None),
+            requested_date=datetime.strptime(data['requested_date'], '%Y-%m-%d').date() if data.get('requested_date') else None,
+            status='Not allocated'
+        )
+        
+        db.session.add(request_obj)
+        db.session.commit()
+        
+        return jsonify(request_obj.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/book-allocation-requests/<int:request_id>/approve', methods=['POST'])
+@login_required
+def approve_book_allocation_request(request_id):
+    """Approve a request and convert it to an allocation"""
+    if current_user.userRole != 'Admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        request_obj = BookAllocationRequest.query.get_or_404(request_id)
+        
+        if request_obj.status == 'Allocated':
+            return jsonify({'error': 'Request already allocated'}), 400
+        
+        # Create BookAllocations record
+        # Convert single grade to comma-separated format (for compatibility)
+        books_allocated = request_obj.school_grade
+        
+        allocation = BookAllocations(
+            school_name=request_obj.school_name,
+            school_province=request_obj.school_province,
+            books_allocated=books_allocated,
+            allocated_by=current_user.username
+        )
+        
+        db.session.add(allocation)
+        db.session.flush()  # Get the allocation ID
+        
+        # Update request
+        request_obj.status = 'Allocated'
+        request_obj.approved_by = current_user.username
+        request_obj.converted_to_allocation_id = allocation.id
+        
+        db.session.commit()
+        
+        return jsonify({
+            'request': request_obj.to_dict(),
+            'allocation': {
+                'id': allocation.id,
+                'school_name': allocation.school_name,
+                'school_province': allocation.school_province,
+                'books_allocated': allocation.books_allocated
+            }
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
@@ -11847,12 +12025,80 @@ def lesotho_asl_registrations():
 import imaplib
 import email
 import smtplib
+import ssl
 from email.header import decode_header
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import json
+import msal
 
+
+
+# ===== Microsoft Graph API Configuration =====
+def get_microsoft_config():
+    """Get Microsoft Graph API configuration from environment"""
+    return {
+        'client_id': os.getenv('MICROSOFT_CLIENT_ID'),
+        'client_secret': os.getenv('MICROSOFT_CLIENT_SECRET'),
+        'tenant_id': os.getenv('MICROSOFT_TENANT_ID'),
+        'redirect_uri': os.getenv('MICROSOFT_REDIRECT_URI', 'http://localhost:5000/microsoft-callback'),
+        'authority': f"https://login.microsoftonline.com/{os.getenv('MICROSOFT_TENANT_ID', '')}",
+        'scopes': ['User.Read', 'Mail.Read']
+    }
+
+def build_msal_app(cache=None):
+    """Build MSAL ConfidentialClientApplication"""
+    config = get_microsoft_config()
+    if not config['client_id'] or not config['client_secret'] or not config['tenant_id']:
+        return None
+    return msal.ConfidentialClientApplication(
+        config['client_id'],
+        authority=config['authority'],
+        client_credential=config['client_secret'],
+        token_cache=cache
+    )
+
+def get_token_from_cache():
+    """Get token from Flask session"""
+    return session.get('microsoft_token')
+
+def get_graph_api_token():
+    """Get valid access token, refreshing if necessary"""
+    token = get_token_from_cache()
+    if not token:
+        return None
+    
+    # Check if token is expired (with 5 minute buffer)
+    expires_on = token.get('expires_on', 0)
+    current_time = datetime.now().timestamp()
+    
+    # Handle both Unix timestamp and datetime string formats
+    if isinstance(expires_on, str):
+        try:
+            expires_on = datetime.fromisoformat(expires_on.replace('Z', '+00:00')).timestamp()
+        except:
+            expires_on = 0
+    
+    if expires_on and expires_on < (current_time + 300):
+        # Token expired or about to expire, try to refresh
+        msal_app = build_msal_app()
+        if msal_app:
+            accounts = msal_app.get_accounts()
+            if accounts:
+                result = msal_app.acquire_token_silent(
+                    get_microsoft_config()['scopes'],
+                    account=accounts[0]
+                )
+                if result and 'access_token' in result:
+                    session['microsoft_token'] = result
+                    return result.get('access_token')
+                elif result and 'error' in result:
+                    # Silent refresh failed, token needs re-authentication
+                    session.pop('microsoft_token', None)
+                    return None
+    
+    return token.get('access_token') if token else None
 
 
 # ===== Email Query Storage =====
@@ -11884,165 +12130,215 @@ def save_email_status(email_id, status):
 @app.route('/api/email-queries', methods=['GET'])
 @login_required
 def get_email_queries():
-    """Fetch emails from configured Outlook account"""
+    """Fetch emails from Outlook using Microsoft Graph API"""
     try:
-        # Get email configuration from environment
-        imap_server = os.getenv('EMAIL_IMAP_SERVER', 'outlook.office365.com')
-        imap_port = int(os.getenv('EMAIL_IMAP_PORT', '993'))
-        email_address = os.getenv('EMAIL_ADDRESS')
-        email_password = os.getenv('EMAIL_APP_PASSWORD')
-        sender_filter = os.getenv('EMAIL_SENDER_FILTER', '')
+        # Check if user is authenticated with Microsoft
+        access_token = get_graph_api_token()
+        if not access_token:
+            return jsonify({
+                'error': 'Not authenticated with Microsoft. Please connect to Outlook first.',
+                'requires_auth': True
+            }), 401
         
-        if not email_address or not email_password:
-            return jsonify({'error': 'Email configuration not set'}), 500
+        # Get sender filter from environment
+        sender_filter = os.getenv('EMAIL_SENDER_FILTER', 'mashavaquincy@gmail.com')
         
-        # Connect to IMAP server
-        mail = imaplib.IMAP4_SSL(imap_server, imap_port)
-        mail.login(email_address, email_password)
-        mail.select('inbox')
+        # Build Graph API endpoint with filter
+        graph_endpoint = "https://graph.microsoft.com/v1.0/me/messages"
         
-        # Search for emails from specific sender if filter is set
+        # Add filter for emails from specific sender
         if sender_filter:
-            status, messages = mail.search(None, f'FROM "{sender_filter}"')
-        else:
-            status, messages = mail.search(None, 'ALL')
+            # URL encode the filter
+            from urllib.parse import quote
+            filter_query = f"$filter=from/emailAddress/address eq '{sender_filter}'"
+            graph_endpoint += f"?{filter_query}"
         
-        email_ids = messages[0].split()
-        emails = []
+        # Add orderby and top to get most recent emails
+        separator = "&" if sender_filter else "?"
+        graph_endpoint += f"{separator}$orderby=receivedDateTime desc&$top=50&$select=id,subject,from,toRecipients,receivedDateTime,bodyPreview,body"
+        
+        # Make request to Graph API
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        print(f"Fetching emails from Graph API: {graph_endpoint}")
+        response = requests.get(graph_endpoint, headers=headers)
+        
+        if response.status_code == 401:
+            # Token expired or invalid, clear session
+            session.pop('microsoft_token', None)
+            return jsonify({
+                'error': 'Authentication expired. Please reconnect to Outlook.',
+                'requires_auth': True
+            }), 401
+        
+        if not response.ok:
+            error_data = response.json() if response.content else {}
+            error_msg = error_data.get('error', {}).get('message', f'Graph API error: {response.status_code}')
+            print(f"Graph API error: {error_msg}")
+            return jsonify({
+                'error': f'Failed to fetch emails: {error_msg}',
+                'details': error_data
+            }), response.status_code
+        
+        # Parse response
+        data = response.json()
+        graph_emails = data.get('value', [])
         
         # Load existing statuses
         email_statuses = load_email_statuses()
         
-        # Fetch last 50 emails
-        for email_id in email_ids[-50:]:
+        # Map Graph API response to our email format
+        emails = []
+        for graph_email in graph_emails:
             try:
-                email_id_str = email_id.decode()
-                status, msg_data = mail.fetch(email_id, '(RFC822)')
-                msg = email.message_from_bytes(msg_data[0][1])
+                email_id = graph_email.get('id', '')
+                from_info = graph_email.get('from', {}).get('emailAddress', {})
+                from_email = from_info.get('address', 'Unknown')
+                from_name = from_info.get('name', '')
                 
-                # Decode subject
-                subject_header = msg['Subject']
-                if subject_header:
-                    subject_decoded = decode_header(subject_header)[0][0]
-                    if isinstance(subject_decoded, bytes):
-                        subject = subject_decoded.decode()
-                    else:
-                        subject = subject_decoded
-                else:
-                    subject = '(No Subject)'
+                # Get recipients
+                to_recipients = graph_email.get('toRecipients', [])
+                to_email = ', '.join([r.get('emailAddress', {}).get('address', '') for r in to_recipients])
                 
-                # Get sender
-                from_header = msg.get('From', '')
-                
-                # Extract email address from "Name <email@example.com>" format
-                from_email = from_header
-                if '<' in from_header and '>' in from_header:
-                    from_email = from_header[from_header.index('<')+1:from_header.index('>')]
+                # Get subject
+                subject = graph_email.get('subject', '(No Subject)')
                 
                 # Get date
-                date_str = msg.get('Date', '')
+                received_date = graph_email.get('receivedDateTime', '')
+                date_str = received_date
                 
-                # Get body
-                body = ''
-                if msg.is_multipart():
-                    for part in msg.walk():
-                        if part.get_content_type() == 'text/plain':
-                            payload = part.get_payload(decode=True)
-                            if payload:
-                                body = payload.decode('utf-8', errors='ignore')
-                                break
-                else:
-                    payload = msg.get_payload(decode=True)
-                    if payload:
-                        body = payload.decode('utf-8', errors='ignore')
+                # Get body preview and full body
+                body_preview = graph_email.get('bodyPreview', '')
+                body_content = graph_email.get('body', {})
+                body = body_content.get('content', body_preview) if isinstance(body_content, dict) else body_preview
+                
+                # Clean HTML from body if present
+                if body_content.get('contentType') == 'html':
+                    from bs4 import BeautifulSoup
+                    try:
+                        soup = BeautifulSoup(body, 'html.parser')
+                        body = soup.get_text(separator=' ', strip=True)
+                    except:
+                        pass  # Keep original if parsing fails
                 
                 # Get status from storage
-                email_status_data = email_statuses.get(email_id_str, {})
+                email_status_data = email_statuses.get(email_id, {})
                 current_status = email_status_data.get('status', 'Not started')
                 
                 emails.append({
-                    'id': email_id_str,
+                    'id': email_id,
                     'subject': subject,
                     'from': from_email,
+                    'to': to_email,
                     'date': date_str,
-                    'preview': body[:200] if body else '',
+                    'preview': body_preview[:200] if body_preview else '',
                     'body': body,
                     'status': current_status
                 })
             except Exception as e:
-                print(f"Error processing email {email_id}: {str(e)}")
+                print(f"Error processing email {graph_email.get('id', 'unknown')}: {str(e)}")
                 continue
-        
-        mail.close()
-        mail.logout()
         
         return jsonify({'emails': emails}), 200
         
     except Exception as e:
-        print(f"Error fetching emails: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        print(f"Unexpected error fetching emails: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
 
 
 @app.route('/api/email-queries/<email_id>', methods=['GET'])
 @login_required
 def get_email_query_details(email_id):
-    """Get details of a specific email"""
+    """Get details of a specific email using Microsoft Graph API"""
     try:
-        imap_server = os.getenv('EMAIL_IMAP_SERVER', 'outlook.office365.com')
-        imap_port = int(os.getenv('EMAIL_IMAP_PORT', '993'))
-        email_address = os.getenv('EMAIL_ADDRESS')
-        email_password = os.getenv('EMAIL_APP_PASSWORD')
+        # Check if user is authenticated with Microsoft
+        access_token = get_graph_api_token()
+        if not access_token:
+            return jsonify({
+                'error': 'Not authenticated with Microsoft. Please connect to Outlook first.',
+                'requires_auth': True
+            }), 401
         
-        if not email_address or not email_password:
-            return jsonify({'error': 'Email configuration not set'}), 500
+        # Build Graph API endpoint for specific email
+        graph_endpoint = f"https://graph.microsoft.com/v1.0/me/messages/{email_id}"
         
-        mail = imaplib.IMAP4_SSL(imap_server, imap_port)
-        mail.login(email_address, email_password)
-        mail.select('inbox')
+        # Make request to Graph API
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
         
-        status, msg_data = mail.fetch(email_id.encode(), '(RFC822)')
-        msg = email.message_from_bytes(msg_data[0][1])
+        print(f"Fetching email details from Graph API: {graph_endpoint}")
+        response = requests.get(graph_endpoint, headers=headers)
         
-        # Decode subject
-        subject_header = msg['Subject']
-        if subject_header:
-            subject_decoded = decode_header(subject_header)[0][0]
-            if isinstance(subject_decoded, bytes):
-                subject = subject_decoded.decode()
-            else:
-                subject = subject_decoded
-        else:
-            subject = '(No Subject)'
+        if response.status_code == 401:
+            # Token expired or invalid, clear session
+            session.pop('microsoft_token', None)
+            return jsonify({
+                'error': 'Authentication expired. Please reconnect to Outlook.',
+                'requires_auth': True
+            }), 401
+        
+        if not response.ok:
+            error_data = response.json() if response.content else {}
+            error_msg = error_data.get('error', {}).get('message', f'Graph API error: {response.status_code}')
+            return jsonify({
+                'error': f'Failed to fetch email: {error_msg}',
+                'details': error_data
+            }), response.status_code
+        
+        # Parse response
+        graph_email = response.json()
+        
+        # Extract email data
+        from_info = graph_email.get('from', {}).get('emailAddress', {})
+        from_email = from_info.get('address', 'Unknown')
+        from_name = from_info.get('name', '')
+        
+        # Get recipients
+        to_recipients = graph_email.get('toRecipients', [])
+        to_email = ', '.join([r.get('emailAddress', {}).get('address', '') for r in to_recipients])
+        
+        # Get subject
+        subject = graph_email.get('subject', '(No Subject)')
+        
+        # Get date
+        received_date = graph_email.get('receivedDateTime', '')
         
         # Get body
-        body = ''
-        if msg.is_multipart():
-            for part in msg.walk():
-                if part.get_content_type() == 'text/plain':
-                    payload = part.get_payload(decode=True)
-                    if payload:
-                        body = payload.decode('utf-8', errors='ignore')
-                        break
-        else:
-            payload = msg.get_payload(decode=True)
-            if payload:
-                body = payload.decode('utf-8', errors='ignore')
+        body_content = graph_email.get('body', {})
+        body = body_content.get('content', '') if isinstance(body_content, dict) else ''
         
-        mail.close()
-        mail.logout()
+        # Clean HTML from body if present
+        if body_content.get('contentType') == 'html':
+            from bs4 import BeautifulSoup
+            try:
+                soup = BeautifulSoup(body, 'html.parser')
+                body = soup.get_text(separator='\n', strip=True)
+            except:
+                pass  # Keep original if parsing fails
         
         return jsonify({
             'email': {
                 'id': email_id,
                 'subject': subject,
-                'from': msg.get('From', ''),
-                'date': msg.get('Date', ''),
+                'from': from_email,
+                'to': to_email,
+                'date': received_date,
                 'body': body
             }
         }), 200
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Unexpected error fetching email details: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
 
 
 @app.route('/api/email-queries/<email_id>/status', methods=['PATCH'])
@@ -12138,66 +12434,79 @@ def send_resolution_email(email_id):
 @app.route('/api/email-queries/<email_id>/convert', methods=['POST'])
 @login_required
 def convert_email_to_query(email_id):
-    """Convert an email to a help desk query"""
+    """Convert an email to a help desk query using Microsoft Graph API"""
     if current_user.userRole != 'Admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
     try:
-        # Fetch the email
-        imap_server = os.getenv('EMAIL_IMAP_SERVER', 'outlook.office365.com')
-        imap_port = int(os.getenv('EMAIL_IMAP_PORT', '993'))
-        email_address = os.getenv('EMAIL_ADDRESS')
-        email_password = os.getenv('EMAIL_APP_PASSWORD')
+        # Check if user is authenticated with Microsoft
+        access_token = get_graph_api_token()
+        if not access_token:
+            return jsonify({
+                'error': 'Not authenticated with Microsoft. Please connect to Outlook first.',
+                'requires_auth': True
+            }), 401
         
-        if not email_address or not email_password:
-            return jsonify({'error': 'Email configuration not set'}), 500
+        # Build Graph API endpoint for specific email
+        graph_endpoint = f"https://graph.microsoft.com/v1.0/me/messages/{email_id}"
         
-        mail = imaplib.IMAP4_SSL(imap_server, imap_port)
-        mail.login(email_address, email_password)
-        mail.select('inbox')
+        # Make request to Graph API
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
         
-        status, msg_data = mail.fetch(email_id.encode(), '(RFC822)')
-        msg = email.message_from_bytes(msg_data[0][1])
+        print(f"Fetching email for conversion from Graph API: {graph_endpoint}")
+        response = requests.get(graph_endpoint, headers=headers)
         
-        # Decode subject
-        subject_header = msg['Subject']
-        if subject_header:
-            subject_decoded = decode_header(subject_header)[0][0]
-            if isinstance(subject_decoded, bytes):
-                subject = subject_decoded.decode()
-            else:
-                subject = subject_decoded
-        else:
-            subject = 'Email Query'
+        if response.status_code == 401:
+            # Token expired or invalid, clear session
+            session.pop('microsoft_token', None)
+            return jsonify({
+                'error': 'Authentication expired. Please reconnect to Outlook.',
+                'requires_auth': True
+            }), 401
+        
+        if not response.ok:
+            error_data = response.json() if response.content else {}
+            error_msg = error_data.get('error', {}).get('message', f'Graph API error: {response.status_code}')
+            return jsonify({
+                'error': f'Failed to fetch email: {error_msg}',
+                'details': error_data
+            }), response.status_code
+        
+        # Parse response
+        graph_email = response.json()
+        
+        # Extract email data
+        from_info = graph_email.get('from', {}).get('emailAddress', {})
+        from_email = from_info.get('address', 'Unknown')
+        from_name = from_info.get('name', '')
+        
+        # Get subject
+        subject = graph_email.get('subject', 'Email Query')
         
         # Get body
-        body = ''
-        if msg.is_multipart():
-            for part in msg.walk():
-                if part.get_content_type() == 'text/plain':
-                    payload = part.get_payload(decode=True)
-                    if payload:
-                        body = payload.decode('utf-8', errors='ignore')
-                        break
-        else:
-            payload = msg.get_payload(decode=True)
-            if payload:
-                body = payload.decode('utf-8', errors='ignore')
+        body_content = graph_email.get('body', {})
+        body = body_content.get('content', '') if isinstance(body_content, dict) else ''
         
-        # Get sender email
-        from_header = msg.get('From', '')
-        
-        mail.close()
-        mail.logout()
+        # Clean HTML from body if present
+        if body_content.get('contentType') == 'html':
+            from bs4 import BeautifulSoup
+            try:
+                soup = BeautifulSoup(body, 'html.parser')
+                body = soup.get_text(separator='\n', strip=True)
+            except:
+                pass  # Keep original if parsing fails
         
         # Create a help desk query from the email
         from app.models import HelpDeskQuery
         
         query = HelpDeskQuery(
             query_title=subject,
-            query_description=f"From: {from_header}\\n\\n{body}",
+            query_description=f"From: {from_email}\n\n{body}",
             query_type='Email',
-            created_by=from_header,
+            created_by=from_email,
             status='Not started'
         )
         
@@ -12208,7 +12517,10 @@ def convert_email_to_query(email_id):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        print(f"Unexpected error converting email to query: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
 
 
 
@@ -12358,6 +12670,92 @@ def help_desk():
         my_queries = []
 
     return render_template('help_desk.html', form=form, queries=queries, my_queries=my_queries, title='Help desk')
+
+
+# ===== Microsoft Graph API OAuth Routes =====
+
+@app.route('/microsoft-login')
+@login_required
+def microsoft_login():
+    """Initiate Microsoft OAuth login flow"""
+    try:
+        msal_app = build_msal_app()
+        if not msal_app:
+            flash('Microsoft Graph API is not configured. Please check your .env file.', 'error')
+            return redirect(url_for('help_desk'))
+        
+        config = get_microsoft_config()
+        auth_url = msal_app.get_authorization_request_url(
+            config['scopes'],
+            redirect_uri=config['redirect_uri']
+        )
+        return redirect(auth_url)
+    except Exception as e:
+        print(f"Error initiating Microsoft login: {str(e)}")
+        flash(f'Error connecting to Microsoft: {str(e)}', 'error')
+        return redirect(url_for('help_desk'))
+
+
+@app.route('/microsoft-callback')
+@login_required
+def microsoft_callback():
+    """Handle Microsoft OAuth callback"""
+    try:
+        error = request.args.get('error')
+        if error:
+            error_description = request.args.get('error_description', 'Unknown error')
+            flash(f'Microsoft authentication failed: {error_description}', 'error')
+            return redirect(url_for('help_desk'))
+        
+        code = request.args.get('code')
+        if not code:
+            flash('No authorization code received', 'error')
+            return redirect(url_for('help_desk'))
+        
+        msal_app = build_msal_app()
+        if not msal_app:
+            flash('Microsoft Graph API is not configured.', 'error')
+            return redirect(url_for('help_desk'))
+        
+        config = get_microsoft_config()
+        result = msal_app.acquire_token_by_authorization_code(
+            code,
+            scopes=config['scopes'],
+            redirect_uri=config['redirect_uri']
+        )
+        
+        if 'access_token' in result:
+            session['microsoft_token'] = result
+            flash('Successfully connected to Microsoft Outlook!', 'success')
+        else:
+            error_msg = result.get('error_description', result.get('error', 'Unknown error'))
+            flash(f'Failed to get access token: {error_msg}', 'error')
+        
+        return redirect(url_for('help_desk'))
+    except Exception as e:
+        print(f"Error in Microsoft callback: {str(e)}")
+        flash(f'Error during authentication: {str(e)}', 'error')
+        return redirect(url_for('help_desk'))
+
+
+@app.route('/microsoft-logout')
+@login_required
+def microsoft_logout():
+    """Logout from Microsoft (clear session token)"""
+    session.pop('microsoft_token', None)
+    flash('Disconnected from Microsoft Outlook', 'info')
+    return redirect(url_for('help_desk'))
+
+
+@app.route('/api/microsoft-auth-status')
+@login_required
+def microsoft_auth_status():
+    """Check Microsoft authentication status"""
+    token = get_graph_api_token()
+    return jsonify({
+        'authenticated': token is not None,
+        'has_token': get_token_from_cache() is not None
+    })
 
 
 # Update help desk query status (Admin only)
@@ -13442,6 +13840,7 @@ def register_game_user():
         username = data.get('username', '').strip()
         password = data.get('password', '')
         age = data.get('age')
+        phone_number = data.get('phone_number', '').strip() or None
         
         if not all([firstname, surname, username, password, age]):
             return jsonify({'error': 'All fields are required'}), 400
@@ -13463,7 +13862,8 @@ def register_game_user():
             firstname=firstname,
             surname=surname,
             username=username,
-            age=age
+            age=age,
+            phone_number=phone_number
         )
         game_user.set_password(password)
         db.session.add(game_user)
@@ -13476,7 +13876,8 @@ def register_game_user():
                 'firstname': game_user.firstname,
                 'surname': game_user.surname,
                 'username': game_user.username,
-                'age': game_user.age
+                'age': game_user.age,
+                'phone_number': game_user.phone_number
             }
         }), 201
     except Exception as e:
@@ -13494,6 +13895,7 @@ def register_game_user_public():
         username = data.get('username', '').strip()
         password = data.get('password', '')
         age = data.get('age')
+        phone_number = data.get('phone_number', '').strip() or None
         
         if not all([firstname, surname, username, password, age]):
             return jsonify({'error': 'All fields are required'}), 400
@@ -13515,7 +13917,8 @@ def register_game_user_public():
             firstname=firstname,
             surname=surname,
             username=username,
-            age=age
+            age=age,
+            phone_number=phone_number
         )
         game_user.set_password(password)
         db.session.add(game_user)
@@ -13528,7 +13931,8 @@ def register_game_user_public():
                 'firstname': game_user.firstname,
                 'surname': game_user.surname,
                 'username': game_user.username,
-                'age': game_user.age
+                'age': game_user.age,
+                'phone_number': game_user.phone_number
             }
         }), 201
     except Exception as e:
@@ -13590,6 +13994,7 @@ def list_game_users():
                 'surname': u.surname,
                 'username': u.username,
                 'age': u.age,
+                'phone_number': u.phone_number,
                 'created_at': u.created_at.isoformat() if u.created_at else None,
                 'last_login': u.last_login.isoformat() if u.last_login else None
             } for u in users]
@@ -14035,6 +14440,112 @@ def get_game_user_scores(user_id):
                 'attempt_number': s.attempt_number,
                 'played_at': s.played_at.isoformat() if s.played_at else None
             } for s in scores]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/game-users/<int:user_id>/leaderboard', methods=['GET'])
+def get_age_group_leaderboard(user_id):
+    """Get leaderboard filtered by user's age group (public endpoint for game users)"""
+    try:
+        # Get the current user to determine their age group
+        game_user = GameUser.query.get(user_id)
+        if not game_user or not game_user.age:
+            return jsonify({'error': 'User not found or age not set'}), 404
+        
+        user_age = game_user.age
+        
+        # Determine age range based on user's age
+        if 9 <= user_age <= 10:
+            age_range = '9-10'
+        elif 11 <= user_age <= 12:
+            age_range = '11-12'
+        elif 13 <= user_age <= 14:
+            age_range = '13-14'
+        elif 15 <= user_age <= 16:
+            age_range = '15-16'
+        elif 17 <= user_age <= 19:
+            age_range = '17-19'
+        else:
+            return jsonify({'error': 'Invalid age range'}), 400
+        
+        # Get all users in the same age group
+        if age_range == '9-10':
+            age_group_users = GameUser.query.filter(GameUser.age >= 9, GameUser.age <= 10).all()
+        elif age_range == '11-12':
+            age_group_users = GameUser.query.filter(GameUser.age >= 11, GameUser.age <= 12).all()
+        elif age_range == '13-14':
+            age_group_users = GameUser.query.filter(GameUser.age >= 13, GameUser.age <= 14).all()
+        elif age_range == '15-16':
+            age_group_users = GameUser.query.filter(GameUser.age >= 15, GameUser.age <= 16).all()
+        elif age_range == '17-19':
+            age_group_users = GameUser.query.filter(GameUser.age >= 17, GameUser.age <= 19).all()
+        else:
+            age_group_users = []
+        
+        user_ids = [u.id for u in age_group_users]
+        
+        if not user_ids:
+            return jsonify({'leaderboard': [], 'age_range': age_range}), 200
+        
+        # Get all scores for users in this age group
+        scores = GameScore.query.filter(GameScore.game_user_id.in_(user_ids)).all()
+        
+        # Calculate best score per user (highest score across all games)
+        user_best_scores = {}
+        for score in scores:
+            user_id_key = score.game_user_id
+            if user_id_key not in user_best_scores:
+                user_best_scores[user_id_key] = {
+                    'best_score': score.score,
+                    'total_games': 1,
+                    'total_score': score.score,
+                    'username': None,
+                    'firstname': None,
+                    'surname': None
+                }
+            else:
+                user_best_scores[user_id_key]['best_score'] = max(
+                    user_best_scores[user_id_key]['best_score'],
+                    score.score
+                )
+                user_best_scores[user_id_key]['total_games'] += 1
+                user_best_scores[user_id_key]['total_score'] += score.score
+        
+        # Get user details
+        users_dict = {u.id: u for u in age_group_users}
+        for user_id_key in user_best_scores:
+            user = users_dict.get(user_id_key)
+            if user:
+                user_best_scores[user_id_key]['username'] = user.username
+                user_best_scores[user_id_key]['firstname'] = user.firstname
+                user_best_scores[user_id_key]['surname'] = user.surname
+        
+        # Convert to list and sort by best score (descending)
+        leaderboard = [
+            {
+                'user_id': uid,
+                'username': data['username'],
+                'firstname': data['firstname'],
+                'surname': data['surname'],
+                'best_score': data['best_score'],
+                'total_games': data['total_games'],
+                'average_score': round(data['total_score'] / data['total_games'], 1) if data['total_games'] > 0 else 0
+            }
+            for uid, data in user_best_scores.items()
+        ]
+        
+        leaderboard.sort(key=lambda x: x['best_score'], reverse=True)
+        
+        # Add rank
+        for i, entry in enumerate(leaderboard, 1):
+            entry['rank'] = i
+        
+        return jsonify({
+            'leaderboard': leaderboard,
+            'age_range': age_range,
+            'current_user_id': user_id
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500

@@ -105,7 +105,7 @@
   <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onclick="closeUserRegistrationModal()"></div>
 
   <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-    <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+    <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl">
       <!-- Header -->
       <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4 border-b border-slate-100">
         <div class="flex items-center justify-between">
@@ -146,9 +146,15 @@
             </div>
           </div>
 
-          <div>
-            <label for="guPassword" class="block text-sm font-medium text-slate-700 mb-1">Password *</label>
-            <input type="password" id="guPassword" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="Enter password" required>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="guPassword" class="block text-sm font-medium text-slate-700 mb-1">Password *</label>
+              <input type="password" id="guPassword" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="Enter password" required>
+            </div>
+            <div>
+              <label for="guPhoneNumber" class="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+              <input type="tel" id="guPhoneNumber" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="e.g., +263 77 123 4567">
+            </div>
           </div>
 
           <div class="flex gap-3 mt-6">
@@ -162,7 +168,21 @@
         </form>
 
         <div class="mt-8 border-t border-slate-100 pt-6">
-          <h4 class="text-base font-semibold text-slate-900 mb-4">Registered Users</h4>
+          <div class="flex items-center justify-between mb-4">
+            <h4 class="text-base font-semibold text-slate-900">Registered Users</h4>
+            <div class="relative w-64">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fas fa-search text-slate-400"></i>
+              </div>
+              <input 
+                type="text" 
+                id="userSearchInput" 
+                class="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all" 
+                placeholder="Search users by name, username, age, or phone..."
+                onkeyup="filterUsers()"
+              >
+            </div>
+          </div>
           <div id="gameUsersList" class="overflow-x-auto rounded-lg border border-slate-200">
             <div class="p-8 text-center text-slate-400">
               <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
@@ -551,6 +571,7 @@
     const username = document.getElementById('guUsername').value.trim();
     const password = document.getElementById('guPassword').value;
     const age = document.getElementById('guAge').value;
+    const phoneNumber = document.getElementById('guPhoneNumber').value.trim();
 
     if (!firstname || !surname || !username || !password || !age) {
       alert('Please fill in all required fields');
@@ -572,7 +593,7 @@
       const r = await fetch('/api/game-users/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstname, surname, username, password, age: ageNum })
+        body: JSON.stringify({ firstname, surname, username, password, age: ageNum, phone_number: phoneNumber || null })
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Failed to register');
@@ -587,6 +608,9 @@
     }
   });
 
+  // Store users data globally for filtering
+  let allUsersData = [];
+
   async function loadGameUsers() {
     try {
       const r = await fetch('/api/game-users');
@@ -594,6 +618,7 @@
       const list = document.getElementById('gameUsersList');
       
       if (!data.users || data.users.length === 0) {
+        allUsersData = [];
         list.innerHTML = `
           <div class="p-12 text-center text-slate-400">
             <i class="fas fa-users text-4xl mb-4 text-slate-300"></i>
@@ -602,39 +627,89 @@
         return;
       }
       
-      list.innerHTML = `
-        <table class="min-w-full divide-y divide-slate-200">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Age</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Registered</th>
-              <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-slate-200">
-            ${data.users.map(u => `
-              <tr class="hover:bg-slate-50 transition-colors">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-medium text-slate-900">${escapeHtml(u.firstname)} ${escapeHtml(u.surname)}</div>
-                  <div class="text-xs text-slate-500">@${escapeHtml(u.username)}</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${u.age || 'N/A'}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${formatDate(u.created_at)}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button onclick="deleteGameUser(${u.id})" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors text-xs">
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>`;
+      // Store users data for filtering
+      allUsersData = data.users;
+      
+      // Render the table
+      renderUsersTable(allUsersData);
     } catch (e) {
       console.error(e);
       document.getElementById('gameUsersList').innerHTML = '<div class="p-4 text-center text-red-500">Error loading users</div>';
     }
   }
+
+  function renderUsersTable(users) {
+    const list = document.getElementById('gameUsersList');
+    
+    if (!users || users.length === 0) {
+      list.innerHTML = `
+        <div class="p-12 text-center text-slate-400">
+          <i class="fas fa-search text-4xl mb-4 text-slate-300"></i>
+          <p>No users found matching your search</p>
+        </div>`;
+      return;
+    }
+    
+    list.innerHTML = `
+      <table class="min-w-full divide-y divide-slate-200">
+        <thead class="bg-slate-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Age</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Phone Number</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Registered</th>
+            <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-slate-200">
+          ${users.map(u => `
+            <tr class="hover:bg-slate-50 transition-colors">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-slate-900">${escapeHtml(u.firstname)} ${escapeHtml(u.surname)}</div>
+                <div class="text-xs text-slate-500">@${escapeHtml(u.username)}</div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${u.age || 'N/A'}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${u.phone_number ? escapeHtml(u.phone_number) : '<span class="text-slate-400">—</span>'}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${formatDate(u.created_at)}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <button onclick="deleteGameUser(${u.id})" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors text-xs">
+                  Delete
+                </button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function filterUsers() {
+    const searchInput = document.getElementById('userSearchInput');
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    
+    if (!searchTerm) {
+      // Show all users if search is empty
+      renderUsersTable(allUsersData);
+      return;
+    }
+    
+    // Filter users based on search term
+    const filteredUsers = allUsersData.filter(user => {
+      const fullName = `${user.firstname} ${user.surname}`.toLowerCase();
+      const username = (user.username || '').toLowerCase();
+      const age = String(user.age || '').toLowerCase();
+      const phoneNumber = (user.phone_number || '').toLowerCase();
+      
+      return fullName.includes(searchTerm) || 
+             username.includes(searchTerm) || 
+             age.includes(searchTerm) || 
+             phoneNumber.includes(searchTerm);
+    });
+    
+    // Render filtered results
+    renderUsersTable(filteredUsers);
+  }
+
+  window.filterUsers = filterUsers;
 
   async function deleteGameUser(id) {
     if (!confirm('Delete this game user? This will also delete all their scores.')) return;

@@ -156,6 +156,34 @@ class BookAllocationForm(FlaskForm):
     submit = SubmitField('Submit')
 
 
+class BookAllocationRequestForm(FlaskForm):
+    school_name = StringField('School Name', validators=[DataRequired()])
+    school_province = SelectField(
+        'School Province',
+        choices=[
+            ('Harare', 'Harare'), ('Bulawayo', 'Bulawayo'), ('Manicaland', 'Manicaland'),
+            ('Mashonaland Central', 'Mashonaland Central'), ('Mashonaland East', 'Mashonaland East'),
+            ('Mashonaland West', 'Mashonaland West'), ('Masvingo', 'Masvingo'),
+            ('Matabeleland North', 'Matabeleland North'), ('Matabeleland South', 'Matabeleland South'),
+            ('Midlands', 'Midlands')
+        ],
+        validators=[DataRequired()]
+    )
+    school_grade = SelectField(
+        'School Grade',
+        choices=[
+            ('Grade4', 'Grade 4'), ('Grade5', 'Grade 5'), ('Grade6', 'Grade 6'), ('Grade7', 'Grade 7'),
+            ('Form1', 'Form 1'), ('Form2', 'Form 2'), ('Form3', 'Form 3'), ('Form4', 'Form 4'),
+            ('Form5', 'Form 5'), ('Form6', 'Form 6')
+        ],
+        validators=[DataRequired()]
+    )
+    quantity = IntegerField('Quantity', validators=[DataRequired()], default=1)
+    notes = TextAreaField('Notes (Optional)', validators=[])
+    requested_date = DateField('Requested Date (Optional)', validators=[])
+    submit = SubmitField('Submit Request')
+
+
 class ReportForm(FlaskForm):
     # department = SelectField("Department", choices=[
     #     ('Sales & Marketing', 'Sales & Marketing'),
