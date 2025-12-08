@@ -18,6 +18,13 @@ EMAIL_ADDRESS=quincy.mashava@akello.co
 EMAIL_APP_PASSWORD=rfvgfmbhystwhrrq
 EMAIL_SENDER_FILTER=mashavaquincy@gmail.com
 
+# Gmail IMAP Configuration
+GMAIL_IMAP_SERVER=imap.gmail.com
+GMAIL_IMAP_PORT=993
+GMAIL_EMAIL_ADDRESS=mashavaquincy@gmail.com
+GMAIL_SENDER_FILTER=quincy.mashava@akello.co
+# Note: GOOGLE_APP_PASSWORD or google_app_password should be set in .env file (not here for security)
+
 # Microsoft Graph API Configuration
 MICROSOFT_CLIENT_ID=39bbc393-30b0-40e8-9ba7-dfb2911f5c2d
 MICROSOFT_TENANT_ID=f68064bc-0e02-4771-a46b-96a821b21c3d

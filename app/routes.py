@@ -12130,6 +12130,23 @@ def save_email_status(email_id, status):
 @app.route('/api/email-queries', methods=['GET'])
 @login_required
 def get_email_queries():
+    """Fetch emails from Outlook (Graph API) or Gmail (IMAP) based on source parameter"""
+    try:
+        # Get email source from query parameter (default: 'outlook')
+        email_source = request.args.get('source', 'outlook').lower()
+        
+        if email_source == 'gmail':
+            return fetch_gmail_emails()
+        else:
+            return fetch_outlook_emails()
+    except Exception as e:
+        print(f"Unexpected error in get_email_queries: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+
+
+def fetch_outlook_emails():
     """Fetch emails from Outlook using Microsoft Graph API"""
     try:
         # Check if user is authenticated with Microsoft
@@ -12245,7 +12262,175 @@ def get_email_queries():
         return jsonify({'emails': emails}), 200
         
     except Exception as e:
-        print(f"Unexpected error fetching emails: {str(e)}")
+        print(f"Unexpected error fetching Outlook emails: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+
+
+def fetch_gmail_emails():
+    """Fetch emails from Gmail using IMAP"""
+    try:
+        # Get Gmail configuration from environment
+        gmail_imap_server = os.getenv('GMAIL_IMAP_SERVER', 'imap.gmail.com')
+        gmail_imap_port = int(os.getenv('GMAIL_IMAP_PORT', '993'))
+        gmail_email = os.getenv('GMAIL_EMAIL_ADDRESS', 'mashavaquincy@gmail.com')
+        # Try both uppercase and lowercase variable names
+        gmail_password = os.getenv('GOOGLE_APP_PASSWORD') or os.getenv('google_app_password')
+        gmail_sender_filter = os.getenv('GMAIL_SENDER_FILTER', 'quincy.mashava@akello.co')
+        
+        # Debug logging
+        print(f"Gmail Config Check - Email: {gmail_email}, Password set: {bool(gmail_password)}, Filter: {gmail_sender_filter}")
+        
+        if not gmail_email or not gmail_password:
+            error_msg = f'Gmail configuration not set. Email: {"✓" if gmail_email else "✗"}, Password: {"✓" if gmail_password else "✗"}'
+            print(f"Gmail config error: {error_msg}")
+            return jsonify({
+                'error': error_msg,
+                'requires_config': True
+            }), 500
+        
+        # Connect to Gmail IMAP server
+        mail = imaplib.IMAP4_SSL(gmail_imap_server, gmail_imap_port)
+        mail.login(gmail_email, gmail_password)
+        mail.select('inbox')
+        
+        # Search for emails from specific sender
+        if gmail_sender_filter:
+            search_query = f'FROM "{gmail_sender_filter}"'
+            print(f"Searching for emails: {search_query}")
+            status, messages = mail.search(None, search_query)
+        else:
+            print("Searching for all emails")
+            status, messages = mail.search(None, 'ALL')
+        
+        if status != 'OK':
+            error_msg = f'Failed to search emails. Status: {status}'
+            print(f"Gmail search error: {error_msg}")
+            mail.close()
+            mail.logout()
+            return jsonify({'error': error_msg}), 500
+        
+        email_ids = messages[0].split()
+        print(f"Found {len(email_ids)} email(s) matching the filter")
+        
+        # Load existing statuses
+        email_statuses = load_email_statuses()
+        
+        # Fetch last 50 emails (most recent)
+        emails = []
+        for email_id in email_ids[-50:]:
+            try:
+                email_id_str = email_id.decode()
+                status, msg_data = mail.fetch(email_id, '(RFC822)')
+                
+                if status != 'OK':
+                    continue
+                
+                msg = email.message_from_bytes(msg_data[0][1])
+                
+                # Decode subject
+                subject_header = msg['Subject']
+                if subject_header:
+                    subject_decoded = decode_header(subject_header)[0][0]
+                    if isinstance(subject_decoded, bytes):
+                        subject = subject_decoded.decode('utf-8', errors='ignore')
+                    else:
+                        subject = subject_decoded
+                else:
+                    subject = '(No Subject)'
+                
+                # Get sender
+                from_header = msg.get('From', '')
+                from_email = from_header
+                if '<' in from_header and '>' in from_header:
+                    from_email = from_header[from_header.index('<')+1:from_header.index('>')]
+                
+                # Get recipients
+                to_header = msg.get('To', '')
+                to_email = to_header
+                if '<' in to_header and '>' in to_header:
+                    to_email = to_header[to_header.index('<')+1:to_header.index('>')]
+                
+                # Get date
+                date_str = msg.get('Date', '')
+                received_date = date_str
+                
+                # Parse date to ISO format if possible
+                try:
+                    from email.utils import parsedate_to_datetime
+                    dt = parsedate_to_datetime(date_str)
+                    received_date = dt.isoformat() if dt else date_str
+                except:
+                    pass
+                
+                # Get body preview and full body
+                body = ''
+                body_preview = ''
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        content_type = part.get_content_type()
+                        if content_type == 'text/plain':
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                body = payload.decode('utf-8', errors='ignore')
+                                body_preview = body[:200] if body else ''
+                                break
+                        elif content_type == 'text/html' and not body:
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                html_body = payload.decode('utf-8', errors='ignore')
+                                from bs4 import BeautifulSoup
+                                try:
+                                    soup = BeautifulSoup(html_body, 'html.parser')
+                                    body = soup.get_text(separator=' ', strip=True)
+                                    body_preview = body[:200] if body else ''
+                                except:
+                                    body = html_body
+                                    body_preview = body[:200] if body else ''
+                else:
+                    payload = msg.get_payload(decode=True)
+                    if payload:
+                        body = payload.decode('utf-8', errors='ignore')
+                        body_preview = body[:200] if body else ''
+                
+                # Get status from storage (use email_id_str as key)
+                email_status_data = email_statuses.get(email_id_str, {})
+                current_status = email_status_data.get('status', 'Not started')
+                
+                emails.append({
+                    'id': email_id_str,
+                    'subject': subject,
+                    'from': from_email,
+                    'to': to_email,
+                    'date': received_date,
+                    'preview': body_preview,
+                    'body': body,
+                    'status': current_status
+                })
+            except Exception as e:
+                print(f"Error processing Gmail email {email_id}: {str(e)}")
+                continue
+        
+        mail.close()
+        mail.logout()
+        
+        # Sort by date (most recent first)
+        emails.sort(key=lambda x: x.get('date', ''), reverse=True)
+        
+        print(f"Successfully fetched {len(emails)} Gmail email(s)")
+        return jsonify({'emails': emails}), 200
+        
+    except imaplib.IMAP4.error as e:
+        error_msg = str(e)
+        if 'LOGIN' in error_msg or 'AUTHENTICATE' in error_msg:
+            return jsonify({
+                'error': 'Gmail authentication failed. Please check your Gmail app password.',
+                'requires_config': True
+            }), 401
+        return jsonify({'error': f'Gmail IMAP error: {error_msg}'}), 500
+    except Exception as e:
+        print(f"Unexpected error fetching Gmail emails: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
@@ -12254,6 +12439,23 @@ def get_email_queries():
 @app.route('/api/email-queries/<email_id>', methods=['GET'])
 @login_required
 def get_email_query_details(email_id):
+    """Get details of a specific email using Microsoft Graph API or Gmail IMAP"""
+    try:
+        # Get email source from query parameter (default: 'outlook')
+        email_source = request.args.get('source', 'outlook').lower()
+        
+        if email_source == 'gmail':
+            return get_gmail_email_details(email_id)
+        else:
+            return get_outlook_email_details(email_id)
+    except Exception as e:
+        print(f"Unexpected error in get_email_query_details: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+
+
+def get_outlook_email_details(email_id):
     """Get details of a specific email using Microsoft Graph API"""
     try:
         # Check if user is authenticated with Microsoft
@@ -12335,7 +12537,125 @@ def get_email_query_details(email_id):
         }), 200
         
     except Exception as e:
-        print(f"Unexpected error fetching email details: {str(e)}")
+        print(f"Unexpected error fetching Outlook email details: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+
+
+def get_gmail_email_details(email_id):
+    """Get details of a specific email from Gmail using IMAP"""
+    try:
+        # Get Gmail configuration from environment
+        gmail_imap_server = os.getenv('GMAIL_IMAP_SERVER', 'imap.gmail.com')
+        gmail_imap_port = int(os.getenv('GMAIL_IMAP_PORT', '993'))
+        gmail_email = os.getenv('GMAIL_EMAIL_ADDRESS', 'mashavaquincy@gmail.com')
+        # Try both uppercase and lowercase variable names
+        gmail_password = os.getenv('GOOGLE_APP_PASSWORD') or os.getenv('google_app_password')
+        
+        if not gmail_email or not gmail_password:
+            return jsonify({
+                'error': 'Gmail configuration not set. Please configure GMAIL_EMAIL_ADDRESS and GOOGLE_APP_PASSWORD.',
+                'requires_config': True
+            }), 500
+        
+        # Connect to Gmail IMAP server
+        mail = imaplib.IMAP4_SSL(gmail_imap_server, gmail_imap_port)
+        mail.login(gmail_email, gmail_password)
+        mail.select('inbox')
+        
+        # Fetch the specific email
+        status, msg_data = mail.fetch(email_id.encode(), '(RFC822)')
+        
+        if status != 'OK':
+            mail.close()
+            mail.logout()
+            return jsonify({'error': 'Email not found'}), 404
+        
+        msg = email.message_from_bytes(msg_data[0][1])
+        
+        # Decode subject
+        subject_header = msg['Subject']
+        if subject_header:
+            subject_decoded = decode_header(subject_header)[0][0]
+            if isinstance(subject_decoded, bytes):
+                subject = subject_decoded.decode('utf-8', errors='ignore')
+            else:
+                subject = subject_decoded
+        else:
+            subject = '(No Subject)'
+        
+        # Get sender
+        from_header = msg.get('From', '')
+        from_email = from_header
+        if '<' in from_header and '>' in from_header:
+            from_email = from_header[from_header.index('<')+1:from_header.index('>')]
+        
+        # Get recipients
+        to_header = msg.get('To', '')
+        to_email = to_header
+        if '<' in to_header and '>' in to_header:
+            to_email = to_header[to_header.index('<')+1:to_header.index('>')]
+        
+        # Get date
+        date_str = msg.get('Date', '')
+        received_date = date_str
+        try:
+            from email.utils import parsedate_to_datetime
+            dt = parsedate_to_datetime(date_str)
+            received_date = dt.isoformat() if dt else date_str
+        except:
+            pass
+        
+        # Get body
+        body = ''
+        if msg.is_multipart():
+            for part in msg.walk():
+                content_type = part.get_content_type()
+                if content_type == 'text/plain':
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        body = payload.decode('utf-8', errors='ignore')
+                        break
+                elif content_type == 'text/html' and not body:
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        html_body = payload.decode('utf-8', errors='ignore')
+                        from bs4 import BeautifulSoup
+                        try:
+                            soup = BeautifulSoup(html_body, 'html.parser')
+                            body = soup.get_text(separator='\n', strip=True)
+                        except:
+                            body = html_body
+        else:
+            payload = msg.get_payload(decode=True)
+            if payload:
+                body = payload.decode('utf-8', errors='ignore')
+        
+        mail.close()
+        mail.logout()
+        
+        return jsonify({
+            'email': {
+                'id': email_id,
+                'subject': subject,
+                'from': from_email,
+                'to': to_email,
+                'date': received_date,
+                'body': body
+            }
+        }), 200
+        
+    except imaplib.IMAP4.error as e:
+        error_msg = str(e)
+        if 'LOGIN' in error_msg or 'AUTHENTICATE' in error_msg:
+            return jsonify({
+                'error': 'Gmail authentication failed. Please check your Gmail app password.',
+                'requires_config': True
+            }), 401
+        return jsonify({'error': f'Gmail IMAP error: {error_msg}'}), 500
+    except Exception as e:
+        print(f"Unexpected error fetching Gmail email details: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
@@ -12434,10 +12754,29 @@ def send_resolution_email(email_id):
 @app.route('/api/email-queries/<email_id>/convert', methods=['POST'])
 @login_required
 def convert_email_to_query(email_id):
-    """Convert an email to a help desk query using Microsoft Graph API"""
+    """Convert an email to a help desk query using Microsoft Graph API or Gmail IMAP"""
     if current_user.userRole != 'Admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
+    try:
+        # Get email source from request body or query parameter (default: 'outlook')
+        data = request.get_json() or {}
+        email_source = data.get('source') or request.args.get('source', 'outlook').lower()
+        
+        if email_source == 'gmail':
+            return convert_gmail_email_to_query(email_id)
+        else:
+            return convert_outlook_email_to_query(email_id)
+    except Exception as e:
+        db.session.rollback()
+        print(f"Unexpected error in convert_email_to_query: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+
+
+def convert_outlook_email_to_query(email_id):
+    """Convert an Outlook email to a help desk query using Microsoft Graph API"""
     try:
         # Check if user is authenticated with Microsoft
         access_token = get_graph_api_token()
@@ -12517,7 +12856,116 @@ def convert_email_to_query(email_id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"Unexpected error converting email to query: {str(e)}")
+        print(f"Unexpected error converting Outlook email to query: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+
+
+def convert_gmail_email_to_query(email_id):
+    """Convert a Gmail email to a help desk query using IMAP"""
+    try:
+        # Get Gmail configuration from environment
+        gmail_imap_server = os.getenv('GMAIL_IMAP_SERVER', 'imap.gmail.com')
+        gmail_imap_port = int(os.getenv('GMAIL_IMAP_PORT', '993'))
+        gmail_email = os.getenv('GMAIL_EMAIL_ADDRESS', 'mashavaquincy@gmail.com')
+        # Try both uppercase and lowercase variable names
+        gmail_password = os.getenv('GOOGLE_APP_PASSWORD') or os.getenv('google_app_password')
+        
+        if not gmail_email or not gmail_password:
+            return jsonify({
+                'error': 'Gmail configuration not set. Please configure GMAIL_EMAIL_ADDRESS and GOOGLE_APP_PASSWORD.',
+                'requires_config': True
+            }), 500
+        
+        # Connect to Gmail IMAP server
+        mail = imaplib.IMAP4_SSL(gmail_imap_server, gmail_imap_port)
+        mail.login(gmail_email, gmail_password)
+        mail.select('inbox')
+        
+        # Fetch the specific email
+        status, msg_data = mail.fetch(email_id.encode(), '(RFC822)')
+        
+        if status != 'OK':
+            mail.close()
+            mail.logout()
+            return jsonify({'error': 'Email not found'}), 404
+        
+        msg = email.message_from_bytes(msg_data[0][1])
+        
+        # Decode subject
+        subject_header = msg['Subject']
+        if subject_header:
+            subject_decoded = decode_header(subject_header)[0][0]
+            if isinstance(subject_decoded, bytes):
+                subject = subject_decoded.decode('utf-8', errors='ignore')
+            else:
+                subject = subject_decoded
+        else:
+            subject = 'Email Query'
+        
+        # Get sender
+        from_header = msg.get('From', '')
+        from_email = from_header
+        if '<' in from_header and '>' in from_header:
+            from_email = from_header[from_header.index('<')+1:from_header.index('>')]
+        
+        # Get body
+        body = ''
+        if msg.is_multipart():
+            for part in msg.walk():
+                content_type = part.get_content_type()
+                if content_type == 'text/plain':
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        body = payload.decode('utf-8', errors='ignore')
+                        break
+                elif content_type == 'text/html' and not body:
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        html_body = payload.decode('utf-8', errors='ignore')
+                        from bs4 import BeautifulSoup
+                        try:
+                            soup = BeautifulSoup(html_body, 'html.parser')
+                            body = soup.get_text(separator='\n', strip=True)
+                        except:
+                            body = html_body
+        else:
+            payload = msg.get_payload(decode=True)
+            if payload:
+                body = payload.decode('utf-8', errors='ignore')
+        
+        mail.close()
+        mail.logout()
+        
+        # Create a help desk query from the email
+        from app.models import HelpDeskQuery
+        
+        query = HelpDeskQuery(
+            query_title=subject,
+            query_description=f"From: {from_email}\n\n{body}",
+            query_type='Email',
+            created_by=from_email,
+            status='Not started'
+        )
+        
+        db.session.add(query)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'query_id': query.id}), 201
+        
+    except imaplib.IMAP4.error as e:
+        db.session.rollback()
+        error_msg = str(e)
+        if 'LOGIN' in error_msg or 'AUTHENTICATE' in error_msg:
+            return jsonify({
+                'error': 'Gmail authentication failed. Please check your Gmail app password.',
+                'requires_config': True
+            }), 401
+        return jsonify({'error': f'Gmail IMAP error: {error_msg}'}), 500
+    except Exception as e:
+        db.session.rollback()
+        print(f"Unexpected error converting Gmail email to query: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
@@ -13845,11 +14293,11 @@ def register_game_user():
         if not all([firstname, surname, username, password, age]):
             return jsonify({'error': 'All fields are required'}), 400
         
-        # Validate age (9-19)
+        # Validate age (accept all ages)
         try:
             age = int(age)
-            if age < 9 or age > 19:
-                return jsonify({'error': 'Age must be between 9 and 19'}), 400
+            if age < 0 or age > 150:  # Reasonable age limits
+                return jsonify({'error': 'Please enter a valid age'}), 400
         except (ValueError, TypeError):
             return jsonify({'error': 'Age must be a valid number'}), 400
         
@@ -13865,6 +14313,8 @@ def register_game_user():
             age=age,
             phone_number=phone_number
         )
+        # Automatically assign age range based on age
+        game_user.age_range = game_user.determine_age_range()
         game_user.set_password(password)
         db.session.add(game_user)
         db.session.commit()
@@ -13877,6 +14327,7 @@ def register_game_user():
                 'surname': game_user.surname,
                 'username': game_user.username,
                 'age': game_user.age,
+                'age_range': game_user.age_range,
                 'phone_number': game_user.phone_number
             }
         }), 201
@@ -13900,11 +14351,11 @@ def register_game_user_public():
         if not all([firstname, surname, username, password, age]):
             return jsonify({'error': 'All fields are required'}), 400
         
-        # Validate age (9-19)
+        # Validate age (accept all ages)
         try:
             age = int(age)
-            if age < 9 or age > 19:
-                return jsonify({'error': 'Age must be between 9 and 19'}), 400
+            if age < 0 or age > 150:  # Reasonable age limits
+                return jsonify({'error': 'Please enter a valid age'}), 400
         except (ValueError, TypeError):
             return jsonify({'error': 'Age must be a valid number'}), 400
         
@@ -13920,6 +14371,8 @@ def register_game_user_public():
             age=age,
             phone_number=phone_number
         )
+        # Automatically assign age range based on age
+        game_user.age_range = game_user.determine_age_range()
         game_user.set_password(password)
         db.session.add(game_user)
         db.session.commit()
@@ -13932,6 +14385,7 @@ def register_game_user_public():
                 'surname': game_user.surname,
                 'username': game_user.username,
                 'age': game_user.age,
+                'age_range': game_user.age_range,
                 'phone_number': game_user.phone_number
             }
         }), 201
@@ -14147,18 +14601,24 @@ def list_games():
                 if game_user and game_user.age:
                     user_age = game_user.age
                     # Filter games where user's age falls within the game's age range
-                    # Age ranges: "9-10", "11-12", "13-14", "15-16", "17-19"
+                    # Age ranges: "Infants", "9-10", "11-12", "13-14", "15-16", "17-19", "9-19", "Youths & older"
                     matching_ranges = []
-                    if 9 <= user_age <= 10:
-                        matching_ranges = ['9-10']
+                    
+                    # Determine which age ranges match the user's age
+                    if user_age < 9:
+                        matching_ranges = ['Infants']
+                    elif 9 <= user_age <= 10:
+                        matching_ranges = ['9-10', '9-19']
                     elif 11 <= user_age <= 12:
-                        matching_ranges = ['11-12']
+                        matching_ranges = ['11-12', '9-19']
                     elif 13 <= user_age <= 14:
-                        matching_ranges = ['13-14']
+                        matching_ranges = ['13-14', '9-19']
                     elif 15 <= user_age <= 16:
-                        matching_ranges = ['15-16']
+                        matching_ranges = ['15-16', '9-19']
                     elif 17 <= user_age <= 19:
-                        matching_ranges = ['17-19']
+                        matching_ranges = ['17-19', '9-19']
+                    else:  # user_age > 19
+                        matching_ranges = ['Youths & older']
                     
                     if matching_ranges:
                         query = query.filter(Game.age_range.in_(matching_ranges))
@@ -14212,7 +14672,7 @@ def create_game():
             return jsonify({'error': 'Title and HTML content are required'}), 400
         
         # Validate age_range if provided
-        valid_age_ranges = ['9-10', '11-12', '13-14', '15-16', '17-19']
+        valid_age_ranges = ['Infants', '9-10', '11-12', '13-14', '15-16', '17-19', '9-19', 'Youths & older']
         if age_range and age_range not in valid_age_ranges:
             return jsonify({'error': f'Age range must be one of: {", ".join(valid_age_ranges)}'}), 400
         
@@ -14298,7 +14758,7 @@ def update_game(game_id):
             game.max_score = int(data['max_score']) if data['max_score'] else None
         if 'age_range' in data:
             age_range = data.get('age_range', '').strip()
-            valid_age_ranges = ['9-10', '11-12', '13-14', '15-16', '17-19']
+            valid_age_ranges = ['Infants', '9-10', '11-12', '13-14', '15-16', '17-19', '9-19', 'Youths & older']
             if age_range and age_range not in valid_age_ranges:
                 return jsonify({'error': f'Age range must be one of: {", ".join(valid_age_ranges)}'}), 400
             game.age_range = age_range if age_range else None
@@ -14457,7 +14917,9 @@ def get_age_group_leaderboard(user_id):
         user_age = game_user.age
         
         # Determine age range based on user's age
-        if 9 <= user_age <= 10:
+        if user_age < 9:
+            age_range = 'Infants'
+        elif 9 <= user_age <= 10:
             age_range = '9-10'
         elif 11 <= user_age <= 12:
             age_range = '11-12'
@@ -14467,11 +14929,13 @@ def get_age_group_leaderboard(user_id):
             age_range = '15-16'
         elif 17 <= user_age <= 19:
             age_range = '17-19'
-        else:
-            return jsonify({'error': 'Invalid age range'}), 400
+        else:  # user_age > 19
+            age_range = 'Youths & older'
         
         # Get all users in the same age group
-        if age_range == '9-10':
+        if age_range == 'Infants':
+            age_group_users = GameUser.query.filter(GameUser.age < 9).all()
+        elif age_range == '9-10':
             age_group_users = GameUser.query.filter(GameUser.age >= 9, GameUser.age <= 10).all()
         elif age_range == '11-12':
             age_group_users = GameUser.query.filter(GameUser.age >= 11, GameUser.age <= 12).all()
@@ -14481,6 +14945,8 @@ def get_age_group_leaderboard(user_id):
             age_group_users = GameUser.query.filter(GameUser.age >= 15, GameUser.age <= 16).all()
         elif age_range == '17-19':
             age_group_users = GameUser.query.filter(GameUser.age >= 17, GameUser.age <= 19).all()
+        elif age_range == 'Youths & older':
+            age_group_users = GameUser.query.filter(GameUser.age > 19).all()
         else:
             age_group_users = []
         

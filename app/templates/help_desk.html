@@ -294,6 +294,20 @@
     <div class="w3-container" style="padding:16px;">
       <div class="w3-card w3-white w3-round w3-padding">
         <h4 class="w3-text-deep-purple">Queries from Email</h4>
+        
+        <!-- Email Source Toggle -->
+        <div class="w3-margin-bottom">
+          <label class="w3-small w3-text-gray"><i class="fa fa-envelope"></i> Email Source:</label>
+          <div class="w3-bar w3-border w3-round" style="display:inline-flex; width:100%;">
+            <button class="w3-bar-item w3-button email-source-btn active" data-source="outlook" onclick="switchEmailSource('outlook')" style="flex:1;">
+              <i class="fa fa-windows"></i> Outlook
+            </button>
+            <button class="w3-bar-item w3-button email-source-btn" data-source="gmail" onclick="switchEmailSource('gmail')" style="flex:1;">
+              <i class="fa fa-google"></i> Gmail
+            </button>
+          </div>
+        </div>
+        
         <div id="microsoftAuthStatus" class="w3-margin-bottom" style="display:none;">
           <div class="w3-panel w3-yellow w3-round">
             <p class="w3-small"><i class="fa fa-exclamation-triangle"></i> <span id="authStatusMessage">Not connected to Outlook</span></p>
@@ -305,6 +319,13 @@
             </button>
           </div>
         </div>
+        
+        <div id="gmailConfigStatus" class="w3-margin-bottom" style="display:none;">
+          <div class="w3-panel w3-yellow w3-round">
+            <p class="w3-small"><i class="fa fa-exclamation-triangle"></i> <span id="gmailConfigMessage">Gmail configuration may be missing</span></p>
+          </div>
+        </div>
+        
         <div class="w3-margin-bottom w3-row-padding">
           <div class="w3-col s12 m8">
             <input class="w3-input w3-border w3-round" id="emailQuerySearch" type="text" placeholder="Search email queries..." oninput="filterEmailQueries()">
@@ -453,10 +474,64 @@
 
   // ===== Email Queries Functions =====
   
+  // Store current email source (default: 'outlook')
+  let currentEmailSource = localStorage.getItem('emailSource') || 'outlook';
+  
+  // Switch email source
+  function switchEmailSource(source) {
+    currentEmailSource = source;
+    localStorage.setItem('emailSource', source);
+    
+    // Update button styles
+    document.querySelectorAll('.email-source-btn').forEach(btn => {
+      if (btn.dataset.source === source) {
+        btn.classList.add('active');
+        btn.classList.add('w3-indigo');
+        btn.classList.remove('w3-light-gray');
+      } else {
+        btn.classList.remove('active');
+        btn.classList.remove('w3-indigo');
+        btn.classList.add('w3-light-gray');
+      }
+    });
+    
+    // Show/hide auth status based on source
+    const microsoftAuthDiv = document.getElementById('microsoftAuthStatus');
+    const gmailConfigDiv = document.getElementById('gmailConfigStatus');
+    
+    if (source === 'outlook') {
+      microsoftAuthDiv.style.display = 'block';
+      gmailConfigDiv.style.display = 'none';
+      checkMicrosoftAuth();
+    } else {
+      microsoftAuthDiv.style.display = 'none';
+      gmailConfigDiv.style.display = 'block';
+      // Check Gmail config status
+      checkGmailConfig();
+    }
+    
+    // Clear current email list
+    document.getElementById('emailQueriesBody').innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">Click "Refresh Emails" to load email queries</td></tr>';
+  }
+  
+  // Check Gmail configuration status
+  async function checkGmailConfig() {
+    const gmailConfigDiv = document.getElementById('gmailConfigStatus');
+    const gmailConfigMsg = document.getElementById('gmailConfigMessage');
+    
+    // Don't check config on modal open, just show status
+    // The actual fetch will show the real status
+    gmailConfigDiv.className = 'w3-margin-bottom w3-panel w3-blue w3-round';
+    gmailConfigMsg.innerHTML = '<i class="fa fa-info-circle"></i> Click "Refresh Emails" to load Gmail emails';
+  }
+  
   // Open email queries modal and check auth status
   function openEmailQueriesModal() {
     document.getElementById('emailQueriesModal').style.display='block';
-    checkMicrosoftAuth();
+    
+    // Initialize email source toggle
+    const savedSource = localStorage.getItem('emailSource') || 'outlook';
+    switchEmailSource(savedSource);
   }
   
   // Check Microsoft authentication status
@@ -511,16 +586,30 @@
     const tbody = document.getElementById('emailQueriesBody');
     const countElement = document.getElementById('emailQueryCount');
     
+    // Get current email source
+    const source = currentEmailSource || localStorage.getItem('emailSource') || 'outlook';
+    
     loadingIndicator.style.display = 'block';
     tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">Loading...</td></tr>';
     
     try {
-      const response = await fetch('/api/email-queries');
-      const data = await response.json();
+      console.log(`Fetching emails from ${source}...`);
+      const response = await fetch(`/api/email-queries?source=${source}`);
+      
+      // Get response text first to handle both JSON and text errors
+      const responseText = await response.text();
+      let data;
+      
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse response as JSON:', parseError, 'Response:', responseText.substring(0, 200));
+        throw new Error(`Invalid response format: ${responseText.substring(0, 100)}`);
+      }
       
       if (!response.ok) {
-        // Check if authentication is required
-        if (data.requires_auth || response.status === 401) {
+        // Check if authentication is required (for Outlook)
+        if ((data.requires_auth || response.status === 401) && source === 'outlook') {
           tbody.innerHTML = `<tr><td colspan="6" class="w3-center w3-text-orange">
             <p><i class="fa fa-exclamation-triangle"></i> ${data.error || 'Authentication required'}</p>
             <button class="w3-button w3-blue w3-round" onclick="connectToMicrosoft()">
@@ -530,54 +619,120 @@
           checkMicrosoftAuth();
           return;
         }
+        // Check if configuration is required (for Gmail)
+        if (data.requires_config && source === 'gmail') {
+          tbody.innerHTML = `<tr><td colspan="6" class="w3-center w3-text-orange">
+            <p><i class="fa fa-exclamation-triangle"></i> ${data.error || 'Gmail configuration required'}</p>
+            <p class="w3-small w3-text-gray">Please check your .env file for GOOGLE_APP_PASSWORD or google_app_password</p>
+          </td></tr>`;
+          // Update config status
+          const gmailConfigDiv = document.getElementById('gmailConfigStatus');
+          const gmailConfigMsg = document.getElementById('gmailConfigMessage');
+          if (gmailConfigDiv) {
+            gmailConfigDiv.className = 'w3-margin-bottom w3-panel w3-yellow w3-round';
+            gmailConfigMsg.innerHTML = '<i class="fa fa-exclamation-triangle"></i> ' + (data.error || 'Gmail configuration may be missing');
+          }
+          return;
+        }
         throw new Error(data.error || 'Failed to fetch emails');
       }
       
+      console.log('Response received:', { emailCount: data.emails?.length || 0, hasError: !!data.error, status: response.status });
+      
       const emails = data.emails || [];
+      console.log(`Fetched ${emails.length} emails from ${source}`);
       countElement.textContent = emails.length;
       
       if (emails.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">No email queries found</td></tr>';
       } else {
-        tbody.innerHTML = emails.map(email => {
-          const status = email.status || 'Not started';
-          const statusClass = status === 'Not started' ? 'status-grey' : (status === 'Looking into it' ? 'status-orange' : 'status-green');
+        try {
           // Escape HTML to prevent XSS
           const escapeHtml = (text) => {
+            if (!text) return '';
             const div = document.createElement('div');
-            div.textContent = text;
+            div.textContent = String(text);
             return div.innerHTML;
           };
-          return `
-          <tr data-email-id="${email.id}" class="${statusClass}">
-            <td><strong>${escapeHtml(email.subject || '(No Subject)')}</strong></td>
-            <td>${escapeHtml(email.from || 'Unknown')}</td>
-            <td>${escapeHtml(email.date || 'N/A')}</td>
+          
+          // Escape for use in JavaScript strings (for onclick attributes)
+          const escapeJs = (text) => {
+            if (!text) return '';
+            return String(text).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+          };
+          
+          tbody.innerHTML = emails.map(email => {
+            const status = email.status || 'Not started';
+            const statusClass = status === 'Not started' ? 'status-grey' : (status === 'Looking into it' ? 'status-orange' : 'status-green');
+            const emailId = escapeJs(email.id || '');
+            const emailFrom = escapeHtml(email.from || 'Unknown');
+            const emailSubject = escapeHtml(email.subject || '(No Subject)');
+            const emailDate = escapeHtml(email.date || 'N/A');
+            const emailPreview = escapeHtml((email.preview || '').substring(0, 100)) + (email.preview && email.preview.length > 100 ? '...' : '');
+            
+            return `
+          <tr data-email-id="${escapeHtml(email.id || '')}" class="${statusClass}">
+            <td><strong>${emailSubject}</strong></td>
+            <td>${emailFrom}</td>
+            <td>${emailDate}</td>
             <td>
-              <select class="w3-input w3-border w3-round w3-small status-select" data-email-id="${email.id}" data-from="${escapeHtml(email.from || '')}" onchange="onEmailStatusChange(this)">
+              <select class="w3-input w3-border w3-round w3-small status-select" data-email-id="${escapeHtml(email.id || '')}" data-from="${emailFrom}" onchange="onEmailStatusChange(this)">
                 <option value="Not started" ${status === 'Not started' ? 'selected' : ''}>Not started</option>
                 <option value="Looking into it" ${status === 'Looking into it' ? 'selected' : ''}>Looking into it</option>
                 <option value="Resolved" ${status === 'Resolved' ? 'selected' : ''}>Resolved</option>
               </select>
             </td>
-            <td class="w3-small">${escapeHtml((email.preview || '').substring(0, 100))}${email.preview && email.preview.length > 100 ? '...' : ''}</td>
+            <td class="w3-small">${emailPreview}</td>
             <td>
-              <button class="w3-button w3-tiny w3-indigo w3-round" onclick="viewEmailDetails('${email.id}')">
+              <button class="w3-button w3-tiny w3-indigo w3-round" onclick="viewEmailDetails('${emailId}', '${source}')">
                 <i class="fa fa-eye"></i> View
               </button>
-              <button class="w3-button w3-tiny w3-teal w3-round" onclick="convertEmailToQuery('${email.id}')">
+              <button class="w3-button w3-tiny w3-teal w3-round" onclick="convertEmailToQuery('${emailId}', '${source}')">
                 <i class="fa fa-plus"></i> Convert
               </button>
             </td>
           </tr>
         `;
-        }).join('');
+          }).join('');
+        } catch (renderError) {
+          console.error('Error rendering emails:', renderError);
+          tbody.innerHTML = `<tr><td colspan="6" class="w3-center w3-text-red">
+            <p><i class="fa fa-exclamation-circle"></i> Error rendering emails: ${renderError.message}</p>
+            <p class="w3-small w3-text-gray">Found ${emails.length} email(s) but failed to display them</p>
+          </td></tr>`;
+        }
       }
-      // Update auth status after successful fetch
-      checkMicrosoftAuth();
+      // Update auth/config status after successful fetch
+      if (source === 'outlook') {
+        checkMicrosoftAuth();
+      } else {
+        // Update Gmail config status on success
+        const gmailConfigDiv = document.getElementById('gmailConfigStatus');
+        const gmailConfigMsg = document.getElementById('gmailConfigMessage');
+        if (gmailConfigDiv && emails.length > 0) {
+          gmailConfigDiv.className = 'w3-margin-bottom w3-panel w3-green w3-round';
+          gmailConfigMsg.innerHTML = `<i class="fa fa-check-circle"></i> Gmail connected - ${emails.length} email(s) loaded`;
+        } else if (gmailConfigDiv) {
+          gmailConfigDiv.className = 'w3-margin-bottom w3-panel w3-blue w3-round';
+          gmailConfigMsg.innerHTML = '<i class="fa fa-info-circle"></i> Gmail connected - No emails found matching filter';
+        }
+      }
     } catch (error) {
-      tbody.innerHTML = `<tr><td colspan="6" class="w3-center w3-text-red">Error: ${error.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="w3-center w3-text-red">
+        <p><i class="fa fa-exclamation-circle"></i> Error: ${error.message}</p>
+        <p class="w3-small w3-text-gray">Check browser console for details</p>
+      </td></tr>`;
       console.error('Error fetching emails:', error);
+      
+      // Update Gmail config status on error
+      if (source === 'gmail') {
+        const gmailConfigDiv = document.getElementById('gmailConfigStatus');
+        const gmailConfigMsg = document.getElementById('gmailConfigMessage');
+        if (gmailConfigDiv) {
+          gmailConfigDiv.className = 'w3-margin-bottom w3-panel w3-red w3-round';
+          gmailConfigMsg.innerHTML = '<i class="fa fa-exclamation-triangle"></i> Error fetching Gmail emails: ' + error.message;
+        }
+      }
     } finally {
       loadingIndicator.style.display = 'none';
     }
@@ -591,9 +746,11 @@
     });
   }
   
-  function viewEmailDetails(emailId) {
+  function viewEmailDetails(emailId, source) {
+    // Use current source if not provided
+    source = source || currentEmailSource || localStorage.getItem('emailSource') || 'outlook';
     // This will show email details in an alert or another modal
-    fetch(`/api/email-queries/${emailId}`)
+    fetch(`/api/email-queries/${emailId}?source=${source}`)
       .then(res => {
         return res.json().then(data => ({ response: res, data: data }));
       })
@@ -614,12 +771,16 @@
       .catch(err => alert('Error viewing email: ' + err.message));
   }
   
-  async function convertEmailToQuery(emailId) {
+  async function convertEmailToQuery(emailId, source) {
+    // Use current source if not provided
+    source = source || currentEmailSource || localStorage.getItem('emailSource') || 'outlook';
     if (!confirm('Convert this email to a support query?')) return;
     
     try {
       const response = await fetch(`/api/email-queries/${emailId}/convert`, {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: source })
       });
       const data = await response.json();
       

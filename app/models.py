@@ -308,7 +308,8 @@ class GameUser(db.Model):
     surname = db.Column(db.String(64), nullable=False)
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
-    age = db.Column(db.Integer, nullable=False)  # Age of the game user (9-19)
+    age = db.Column(db.Integer, nullable=False)  # Age of the game user
+    age_range = db.Column(db.String(50), nullable=True)  # Age range category: "Infants", "9-19", "Youths & older"
     phone_number = db.Column(db.String(20), nullable=True)  # Optional phone number
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
@@ -319,6 +320,16 @@ class GameUser(db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+    
+    def determine_age_range(self):
+        """Automatically determine age range based on age"""
+        if self.age < 9:
+            return "Infants"
+        elif self.age > 19:
+            return "Youths & older"
+        else:
+            # For ages 9-19, use the age as the range (e.g., "9-19")
+            return "9-19"
 
     def __repr__(self):
         return f'<GameUser {self.username}>'

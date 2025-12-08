@@ -141,8 +141,8 @@
               <input type="text" id="guUsername" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="e.g., johndoe" required>
             </div>
             <div>
-              <label for="guAge" class="block text-sm font-medium text-slate-700 mb-1">Age * (9-19)</label>
-              <input type="number" id="guAge" class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="e.g., 12" min="9" max="19" required>
+              <label for="guAge" class="block text-sm font-medium text-slate-700 mb-1">Age * (All ages welcome)</label>
+              <input type="number" id="guAge" class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="e.g., 12" min="0" max="150" required>
             </div>
           </div>
 
@@ -354,11 +354,14 @@
             <label class="block text-sm font-medium text-slate-700 mb-1">Age Range *</label>
             <select id="gameAgeRange" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" required>
               <option value="">Select age range</option>
+              <option value="Infants">Infants (under 9)</option>
               <option value="9-10">9-10 years</option>
               <option value="11-12">11-12 years</option>
               <option value="13-14">13-14 years</option>
               <option value="15-16">15-16 years</option>
               <option value="17-19">17-19 years</option>
+              <option value="9-19">9-19 years</option>
+              <option value="Youths & older">Youths & older (over 19)</option>
             </select>
           </div>
 
@@ -579,8 +582,8 @@
     }
 
     const ageNum = parseInt(age);
-    if (isNaN(ageNum) || ageNum < 9 || ageNum > 19) {
-      alert('Age must be between 9 and 19');
+    if (isNaN(ageNum) || ageNum < 0 || ageNum > 150) {
+      alert('Please enter a valid age');
       return;
     }
 
