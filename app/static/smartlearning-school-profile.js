@@ -50,7 +50,25 @@ window.loadSmartlearningData = function(startDate = null, endDate = null) {
         const tr = document.createElement("tr");
         data.columns.forEach(col => {
           const td = document.createElement("td");
-          td.textContent = row[col];
+          // Make username clickable
+          if (col === 'username' && row[col]) {
+            const link = document.createElement("a");
+            link.href = `/learner-profile/${encodeURIComponent(row[col])}`;
+            link.textContent = row[col];
+            link.style.color = '#6366f1';
+            link.style.textDecoration = 'none';
+            link.style.fontWeight = '600';
+            link.style.cursor = 'pointer';
+            link.addEventListener('mouseenter', function() {
+              this.style.textDecoration = 'underline';
+            });
+            link.addEventListener('mouseleave', function() {
+              this.style.textDecoration = 'none';
+            });
+            td.appendChild(link);
+          } else {
+            td.textContent = row[col];
+          }
           tr.appendChild(td);
         });
         tbody.appendChild(tr);

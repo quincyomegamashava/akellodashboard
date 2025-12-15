@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+
+{% block content %}
+<style>
+  html, body, h1, h2, h3, h4, h5 {font-family: "Open Sans", sans-serif}
+  
+  .search-wrapper { 
+    max-width: 1400px; 
+    margin: 60px auto 40px; 
+    padding: 0 24px; 
+  }
+  
+  .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  
+  .card-header { 
+    padding: 24px 28px; 
+    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+    font-weight: 700;
+    font-size: 1.5rem;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(255, 255, 255, 0.9) 100%);
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .card-header i {
+    color: #6366f1;
+    font-size: 1.75rem;
+  }
+  
+  .card-body { 
+    padding: 28px; 
+  }
+  
+  .search-container {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  
+  .search-input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+  }
+  
+  .search-input:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+  
+  .search-btn {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .search-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  }
+  
+  .results-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  
+  .results-table thead th {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+    padding: 14px 16px;
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid rgba(99, 102, 241, 0.2);
+    text-align: left;
+  }
+  
+  .results-table tbody tr {
+    transition: all 0.2s ease;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+  }
+  
+  .results-table tbody tr:hover {
+    background: rgba(99, 102, 241, 0.05);
+  }
+  
+  .results-table tbody tr:last-child {
+    border-bottom: none;
+  }
+  
+  .results-table tbody td {
+    padding: 14px 16px;
+    vertical-align: middle;
+  }
+  
+  .username-link {
+    color: #6366f1;
+    text-decoration: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .username-link:hover {
+    color: #4f46e5;
+    text-decoration: underline;
+  }
+  
+  .input-group {
+    display: flex;
+    width: 100%;
+  }
+  
+  .input-group-text {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #6b7a90;
+    text-align: center;
+    white-space: nowrap;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px 0 0 8px;
+  }
+  
+  .form-control {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #1e293b;
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid #dee2e6;
+    border-radius: 0 8px 8px 0;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  }
+  
+  .form-control:focus {
+    color: #1e293b;
+    background-color: #fff;
+    border-color: #6366f1;
+    outline: 0;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+  
+  .no-matches {
+    display: none;
+  }
+  
+  .no-results {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6b7a90;
+  }
+  
+  .no-results i {
+    font-size: 3rem;
+    color: #cbd5e1;
+    margin-bottom: 16px;
+  }
+  
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #6b7a90;
+  }
+  
+  .results-count {
+    color: #6b7a90;
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+  }
+  
+  @media (max-width: 780px) {
+    .search-wrapper {
+      max-width: 95vw;
+      padding: 0 16px;
+    }
+    
+    .search-container {
+      flex-direction: column;
+    }
+    
+    .results-table {
+      font-size: 0.85rem;
+    }
+    
+    .results-table thead th,
+    .results-table tbody td {
+      padding: 10px 8px;
+    }
+  }
+</style>
+
+<div class="search-wrapper">
+  <div class="glass-card">
+    <div class="card-header">
+      <i class="fas fa-search"></i>
+      <span class="w3-small">Search Learners</span>
+    </div>
+    <div class="card-body">
+      <div class="search-container">
+        <input 
+          type="text" 
+          id="searchInput" 
+          class="search-input" 
+          placeholder="Search by name, surname, or username (e.g., 'John', 'Smith', 'John Smith', or 'username')..."
+          onkeypress="if(event.key === 'Enter') searchLearners()"
+        />
+        <button class="search-btn" onclick="searchLearners()">
+          <i class="fas fa-search"></i> Search
+        </button>
+      </div>
+      
+      <div id="resultsContainer" class="w3-small">
+        <div class="no-results">
+          <i class="fas fa-search"></i>
+          <p>Enter a search term to find learners</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function searchLearners() {
+  const searchTerm = document.getElementById('searchInput').value.trim();
+  const resultsContainer = document.getElementById('resultsContainer');
+  
+  if (!searchTerm) {
+    resultsContainer.innerHTML = `
+      <div class="no-results">
+        <i class="fas fa-exclamation-circle"></i>
+        <p>Please enter a search term</p>
+      </div>
+    `;
+    return;
+  }
+  
+  // Show loading state
+  resultsContainer.innerHTML = `
+    <div class="loading">
+      <i class="fas fa-spinner fa-spin fa-2x"></i>
+      <p style="margin-top: 12px">Searching learners...</p>
+    </div>
+  `;
+  
+  // Fetch results
+  fetch(`/api/search-learners?q=${encodeURIComponent(searchTerm)}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.error) {
+        resultsContainer.innerHTML = `
+          <div class="no-results">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p>${data.error}</p>
+          </div>
+        `;
+        return;
+      }
+      
+      if (!data.learners || data.learners.length === 0) {
+        resultsContainer.innerHTML = `
+          <div class="no-results">
+            <i class="fas fa-user-slash"></i>
+            <p>No learners found matching "${searchTerm}"</p>
+          </div>
+        `;
+        return;
+      }
+      
+      // Display results
+      let html = `
+        <div class="results-count">
+          Found <strong>${data.count}</strong> learner${data.count !== 1 ? 's' : ''}
+        </div>
+        <div style="margin-bottom: 16px;">
+          <div class="input-group input-group-sm" style="max-width: 400px;">
+            <span class="input-group-text bg-light border-end-0">
+              <i class="fas fa-filter text-muted"></i>
+            </span>
+            <input 
+              type="text" 
+              id="tableSearchInput" 
+              class="form-control border-start-0" 
+              placeholder="Filter results by any column..."
+              onkeyup="filterTable()"
+            />
+          </div>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="results-table" id="resultsTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Surname</th>
+                <th>Username</th>
+                <th>Grade</th>
+                <th>School</th>
+                <th>Province</th>
+                <th>Last Login</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTableBody">
+      `;
+      
+      data.learners.forEach(learner => {
+        const name = learner.name || '—';
+        const surname = learner.surname || '—';
+        const username = learner.username || '—';
+        const grade = learner.grade ? `Grade ${learner.grade}` : '—';
+        const school = learner.school_name || '—';
+        const province = learner.school_province || '—';
+        const lastLogin = learner.last_login || '—';
+        
+        html += `
+          <tr>
+            <td>${escapeHtml(name)}</td>
+            <td>${escapeHtml(surname)}</td>
+            <td>
+              <a href="/learner-profile/${encodeURIComponent(username)}" class="username-link">
+                ${escapeHtml(username)}
+              </a>
+            </td>
+            <td>${escapeHtml(grade)}</td>
+            <td>${escapeHtml(school)}</td>
+            <td>${escapeHtml(province)}</td>
+            <td>${escapeHtml(lastLogin)}</td>
+          </tr>
+        `;
+      });
+      
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      resultsContainer.innerHTML = html;
+      
+      // Store original data for filtering
+      window.currentLearnersData = data.learners;
+    })
+    .catch(error => {
+      console.error('Error searching learners:', error);
+      resultsContainer.innerHTML = `
+        <div class="no-results">
+          <i class="fas fa-exclamation-triangle"></i>
+          <p>Error searching learners. Please try again.</p>
+        </div>
+      `;
+    });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function filterTable() {
+  const input = document.getElementById('tableSearchInput');
+  const filter = input.value.toLowerCase();
+  const table = document.getElementById('resultsTable');
+  const tbody = document.getElementById('resultsTableBody');
+  const rows = tbody.getElementsByTagName('tr');
+  
+  let visibleCount = 0;
+  
+  // Loop through all table rows
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const cells = row.getElementsByTagName('td');
+    let found = false;
+    
+    // Check each cell (column) for the search term
+    for (let j = 0; j < cells.length; j++) {
+      const cellText = cells[j].textContent || cells[j].innerText;
+      if (cellText.toLowerCase().indexOf(filter) > -1) {
+        found = true;
+        break;
+      }
+    }
+    
+    // Show or hide the row based on whether it matches
+    if (found) {
+      row.style.display = '';
+      visibleCount++;
+    } else {
+      row.style.display = 'none';
+    }
+  }
+  
+  // Show "no matches" message if needed
+  let noMatchesRow = document.getElementById('noMatchesRow');
+  if (visibleCount === 0 && filter) {
+    if (!noMatchesRow) {
+      noMatchesRow = document.createElement('tr');
+      noMatchesRow.id = 'noMatchesRow';
+      noMatchesRow.className = 'no-matches';
+      noMatchesRow.innerHTML = '<td colspan="7" style="text-align: center; padding: 20px; color: #6b7a90;">No matching records found</td>';
+      tbody.appendChild(noMatchesRow);
+    }
+    noMatchesRow.style.display = '';
+  } else {
+    if (noMatchesRow) {
+      noMatchesRow.style.display = 'none';
+    }
+  }
+  
+  // Update results count
+  const resultsCount = document.querySelector('.results-count');
+  if (resultsCount && filter) {
+    const totalCount = window.currentLearnersData ? window.currentLearnersData.length : rows.length;
+    resultsCount.innerHTML = `Showing <strong>${visibleCount}</strong> of <strong>${totalCount}</strong> learner${totalCount !== 1 ? 's' : ''}`;
+  } else if (resultsCount && !filter) {
+    const totalCount = window.currentLearnersData ? window.currentLearnersData.length : rows.length;
+    resultsCount.innerHTML = `Found <strong>${totalCount}</strong> learner${totalCount !== 1 ? 's' : ''}`;
+  }
+}
+</script>
+
+{% endblock %}
+

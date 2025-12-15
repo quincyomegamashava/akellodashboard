@@ -3,35 +3,321 @@
 {% block content %}
 
 <style>
-  .contract-wrapper { max-width: 1200px; margin: 40px auto; padding: 0 16px; }
-  .card { background:#fff; border-radius:14px; box-shadow:0 8px 20px rgba(10,31,68,.08); overflow:hidden }
-  .card-header { padding:14px 16px; border-bottom:1px solid #eef2f7; font-weight:700; background:linear-gradient(180deg,#f7faff,#fff) }
-  .card-body { padding:14px 16px }
-  .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px }
-  .btn-chip { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; border:1px solid #dbe4f0; background:#fff; box-shadow:0 3px 10px rgba(10,31,68,.06) }
-  .btn-chip:hover { background:#0d6efd; color:#fff; border-color:#0d6efd }
-  table { width:100% }
-  thead th { background:#f1f5fb; position: sticky; top: 0; z-index: 1; }
-  th, td { padding:10px 8px; vertical-align: middle; }
-  input[type="text"], select { width:100%; border:1px solid #dbe4f0; border-radius:8px; padding:6px 8px }
-  #totalWeight { font-weight:700; color:#0b213f }
+  .contract-wrapper { 
+    max-width: 1400px; 
+    margin: 40px auto; 
+    padding: 0 24px; 
+  }
+  
+  .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+  
+  .card-header { 
+    padding: 24px 28px; 
+    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+    font-weight: 700;
+    font-size: 1.5rem;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(255, 255, 255, 0.9) 100%);
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .card-header i {
+    color: #6366f1;
+    font-size: 1.75rem;
+  }
+  
+  .card-body { 
+    padding: 28px; 
+  }
+  
+  .toolbar { 
+    display: flex; 
+    flex-wrap: wrap; 
+    gap: 12px; 
+    align-items: center; 
+    justify-content: space-between; 
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    background: rgba(248, 250, 252, 0.6);
+    border-radius: 12px;
+    border: 1px solid rgba(226, 232, 240, 0.5);
+  }
+  
+  .toolbar-left {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  
+  .toolbar-right {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  
+  .btn-modern {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+  
+  .btn-primary-modern {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+  }
+  
+  .btn-primary-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  }
+  
+  .btn-success-modern {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+  }
+  
+  .btn-success-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  }
+  
+  .btn-danger-modern {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+  }
+  
+  .btn-danger-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  }
+  
+  .btn-chip { 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 8px; 
+    padding: 8px 16px; 
+    border-radius: 10px; 
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+  
+  .btn-chip:hover { 
+    background: #6366f1; 
+    color: #fff; 
+    border-color: #6366f1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+  }
+  
+  .table-container {
+    max-height: 65vh;
+    overflow: auto;
+    border-radius: 12px;
+    border: 1px solid rgba(226, 232, 240, 0.5);
+    background: rgba(255, 255, 255, 0.5);
+  }
+  
+  table { 
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  
+  thead th { 
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+    position: sticky; 
+    top: 0; 
+    z-index: 10;
+    padding: 14px 12px;
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid rgba(99, 102, 241, 0.2);
+  }
+  
+  tbody tr {
+    transition: all 0.2s ease;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+  }
+  
+  tbody tr:hover {
+    background: rgba(99, 102, 241, 0.05);
+  }
+  
+  tbody tr:last-child {
+    border-bottom: none;
+  }
+  
+  th, td { 
+    padding: 14px 12px; 
+    vertical-align: middle; 
+  }
+  
+  input[type="text"], select { 
+    width: 100%; 
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 8px; 
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.9);
+  }
+  
+  input[type="text"]:focus, select:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    background: white;
+  }
+  
+  #totalWeight { 
+    font-weight: 700; 
+    color: #1e293b;
+    font-size: 1rem;
+    padding: 8px 16px;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+  }
+  
+  .error {
+    color: #ef4444;
+    padding: 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 8px;
+    margin-top: 16px;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+  
+  /* Custom scrollbar */
+  .table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .table-container::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.5);
+    border-radius: 4px;
+  }
+  
+  .table-container::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.5);
+    border-radius: 4px;
+  }
+  
+  .table-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.8);
+  }
+  
   @media (max-width: 780px) {
-    .contract-wrapper { max-width: 85vw; }
-    .table-container { overflow:auto }
-    .table-container table thead { display:none }
-    .table-container table tbody tr { display:grid; grid-template-columns:1fr; gap:6px; padding:10px; border-bottom:1px solid #eef2f7 }
-    .table-container table tbody td { display:grid; grid-template-columns: 160px 1fr; align-items:center }
-    .table-container table tbody td::before { content: attr(data-label); font-weight:600; color:#44536b }
+    .contract-wrapper { 
+      max-width: 95vw; 
+      padding: 0 16px;
+    }
+    
+    .card-body {
+      padding: 16px;
+    }
+    
+    .toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .toolbar-left, .toolbar-right {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    .table-container { 
+      overflow: auto;
+      border-radius: 8px;
+    }
+    
+    .table-container table thead { 
+      display: none; 
+    }
+    
+    .table-container table tbody tr { 
+      display: grid; 
+      grid-template-columns: 1fr; 
+      gap: 8px; 
+      padding: 16px; 
+      border-bottom: 2px solid rgba(226, 232, 240, 0.5);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      background: rgba(255, 255, 255, 0.7);
+    }
+    
+    .table-container table tbody td { 
+      display: grid; 
+      grid-template-columns: 140px 1fr; 
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+    }
+    
+    .table-container table tbody td::before { 
+      content: attr(data-label); 
+      font-weight: 600; 
+      color: #475569;
+      font-size: 0.85rem;
+    }
+    
+    .table-container table tbody td:last-child {
+      grid-template-columns: 1fr;
+      justify-items: center;
+    }
   }
 </style>
 
 <div class="contract-wrapper">
-  <div class="card">
-    <div class="card-header">Scorecard</div>
+  <div class="glass-card">
+    <div class="card-header">
+      <i class="fas fa-clipboard-list"></i>
+      <span>Scorecard Management</span>
+    </div>
     <div class="card-body">
       <div class="toolbar">
-        <button type="button" id="addRow" class="btn-chip"><i class="fa fa-plus-circle"></i> Add Row</button>
-        <span id="totalWeight">Total Weight: 0</span>
+        <div class="toolbar-left">
+          <button type="button" id="addRow" class="btn-chip">
+            <i class="fas fa-plus-circle"></i> Add Row
+          </button>
+          <span id="totalWeight">Total Weight: 0</span>
+        </div>
+        <div class="toolbar-right">
+          <button type="button" id="exportExcel" class="btn-success-modern btn-modern">
+            <i class="fas fa-file-excel"></i> Export Excel
+          </button>
+          <button type="button" id="exportPDF" class="btn-danger-modern btn-modern">
+            <i class="fas fa-file-pdf"></i> Export PDF
+          </button>
+        </div>
       </div>
       <div class="table-container" style="max-height: 65vh; overflow: auto;">
         <table class="table table-striped" id="scorecardTable">
@@ -70,7 +356,7 @@
               <td data-label="Target"><input type="text" name="target" class="target" value="{{ scorecard.target }}"></td>
               <td data-label="Weight"><input type="text" name="weight" class="weight" value="{{ scorecard.weight }}"></td>
               <td data-label="Action">
-                <button type="button" class="save-row btn-chip"><i class="fa fa-save"></i> Save</button>
+                <button type="button" class="save-row btn-chip"><i class="fas fa-save"></i> Save</button>
               </td>
             </tr>
             {% endfor %}
@@ -99,7 +385,137 @@
     }
   });
 
-  window.addEventListener('DOMContentLoaded', calculateTotalWeight);
+  window.addEventListener('DOMContentLoaded', function() {
+    calculateTotalWeight();
+    
+    // Export to Excel
+    const exportExcelBtn = document.getElementById('exportExcel');
+    if (exportExcelBtn) {
+      exportExcelBtn.addEventListener('click', function() {
+    const table = document.getElementById('scorecardTable');
+    const wb = XLSX.utils.book_new();
+    
+    // Get table data
+    const data = [];
+    const headers = [];
+    
+    // Get headers
+    table.querySelectorAll('thead th').forEach(th => {
+      if (th.textContent.trim() !== 'Action') {
+        headers.push(th.textContent.trim());
+      }
+    });
+    data.push(headers);
+    
+    // Get rows data (excluding Action column)
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      const row = [];
+      tr.querySelectorAll('td').forEach((td, index) => {
+        if (index < 6) { // Exclude Action column (index 6)
+          const input = td.querySelector('input, select');
+          if (input) {
+            row.push(input.value || '');
+          } else {
+            row.push(td.textContent.trim());
+          }
+        }
+      });
+      data.push(row);
+    });
+    
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Scorecard');
+    
+    // Generate filename with current date
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const filename = `Scorecard_${dateStr}.xlsx`;
+    
+    XLSX.writeFile(wb, filename);
+      });
+    }
+    
+    // Export to PDF
+    const exportPDFBtn = document.getElementById('exportPDF');
+    if (exportPDFBtn) {
+      exportPDFBtn.addEventListener('click', function() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Get table data
+    const headers = [];
+    const rows = [];
+    
+    // Get headers (excluding Action)
+    document.querySelectorAll('#scorecardTable thead th').forEach(th => {
+      if (th.textContent.trim() !== 'Action') {
+        headers.push(th.textContent.trim());
+      }
+    });
+    
+    // Get rows data (excluding Action column)
+    document.querySelectorAll('#scorecardTable tbody tr').forEach(tr => {
+      const row = [];
+      tr.querySelectorAll('td').forEach((td, index) => {
+        if (index < 6) { // Exclude Action column
+          const input = td.querySelector('input, select');
+          if (input) {
+            row.push(input.value || '');
+          } else {
+            row.push(td.textContent.trim());
+          }
+        }
+      });
+      rows.push(row);
+    });
+    
+    // Add title
+    doc.setFontSize(18);
+    doc.text('Scorecard Report', 14, 20);
+    
+    // Add date
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated on: ${dateStr}`, 14, 28);
+    
+    // Add total weight
+    const totalWeight = document.getElementById('totalWeight').textContent;
+    doc.text(totalWeight, 14, 35);
+    
+    // Add table
+    doc.autoTable({
+      head: [headers],
+      body: rows,
+      startY: 42,
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+      },
+      headStyles: {
+        fillColor: [99, 102, 241],
+        textColor: 255,
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [245, 247, 250],
+      },
+      margin: { top: 42, left: 14, right: 14 },
+    });
+    
+    // Generate filename with current date
+    const dateStrFile = now.toISOString().split('T')[0];
+    const filename = `Scorecard_${dateStrFile}.pdf`;
+    
+    doc.save(filename);
+      });
+    }
+  });
 </script>
 
 <script>
@@ -128,7 +544,7 @@
           <td data-label="Target"><input type="text" name="target" class="target"></td>
           <td data-label="Weight"><input type="text" name="weight" class="weight"></td>
           <td data-label="Action">
-            <button type="button" class="save-row btn-chip"><i class="fa fa-save"></i> Save</button>
+            <button type="button" class="save-row btn-chip"><i class="fas fa-save"></i> Save</button>
           </td>
         </tr>`;
       $('#scorecardTable tbody').append(newRow);

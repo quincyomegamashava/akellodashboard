@@ -11237,6 +11237,1004 @@ def school_profile_usage(school_id):
     )
 
 
+@app.route('/api/learner-profile/<username>', methods=['GET'])
+@login_required
+def get_learner_profile(username):
+    """Get learner profile data by username"""
+    try:
+        conn = get_ruzivo_conn()
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT 
+                s.username,
+                s.name,
+                s.grade,
+                s.last_login,
+                s.school_id,
+                s.access_sdate,
+                s.access_edate,
+                t.school_name,
+                t.school_province
+            FROM vwstudent s
+            JOIN tblschools t ON s.school_id = t.school_id
+            WHERE s.username = %s
+            LIMIT 1
+        """
+        cursor.execute(query, (username,))
+        row = cursor.fetchone()
+        
+        if not row:
+            return jsonify({'error': 'Learner not found'}), 404
+        
+        # Format datetime fields - rows are dicts from DictCursor
+        def format_datetime(dt):
+            if dt:
+                if hasattr(dt, 'strftime'):
+                    return dt.strftime('%Y-%m-%d %H:%M:%S')
+            return None
+        
+        profile_data = {
+            'username': row.get('username'),
+            'name': row.get('name'),
+            'grade': row.get('grade'),
+            'last_login': format_datetime(row.get('last_login')),
+            'school_id': row.get('school_id'),
+            'access_sdate': format_datetime(row.get('access_sdate')),
+            'access_edate': format_datetime(row.get('access_edate')),
+            'school_name': row.get('school_name'),
+            'school_province': row.get('school_province')
+        }
+        
+        return jsonify(profile_data), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/learner-profile/<username>', methods=['GET'])
+@login_required
+def learner_profile(username):
+    """Display learner profile page"""
+    current_username = current_user.username
+    role = current_user.userRole
+    
+    return render_template(
+        'learner_profile.html',
+        username=current_username,
+        role=role,
+        learner_username=username,
+        title='Learner Profile'
+    )
+
+
+@app.route('/api/search-learners', methods=['GET'])
+@login_required
+def search_learners():
+    """Search learners by name, surname, or username"""
+    try:
+        search_term = request.args.get('q', '').strip()
+        if not search_term:
+            return jsonify({'error': 'Search term is required'}), 400
+        
+        conn = get_ruzivo_conn()
+        cursor = conn.cursor()
+        
+        # Split search term into words to handle name and surname searches
+        search_words = search_term.split()
+        search_pattern = f'%{search_term}%'
+        
+        # Build query to search by username or name
+        # Parse name field to extract first name and surname
+        query = """
+            SELECT 
+                s.username,
+                s.name,
+                s.grade,
+                s.last_login,
+                s.school_id,
+                t.school_name,
+                t.school_province
+            FROM vwstudent s
+            JOIN tblschools t ON s.school_id = t.school_id
+            WHERE s.username LIKE %s
+               OR s.name LIKE %s
+        """
+        
+        # If search term has multiple words, also try matching first word and last word separately
+        if len(search_words) >= 2:
+            # Multiple words: try matching first word and last word in the name
+            first_word_pattern = f'%{search_words[0]}%'
+            last_word_pattern = f'%{search_words[-1]}%'
+            query += """
+               OR (s.name LIKE %s AND s.name LIKE %s)
+            """
+            cursor.execute(query, (
+                search_pattern, search_pattern,
+                first_word_pattern, last_word_pattern
+            ))
+        else:
+            # Single word: search in username or name
+            cursor.execute(query, (search_pattern, search_pattern))
+        
+        rows = cursor.fetchall()
+        
+        learners = []
+        for row in rows:
+            full_name = row.get('name') or ''
+            
+            # Parse name to extract first name and surname
+            name_parts = full_name.strip().split() if full_name else []
+            if len(name_parts) >= 2:
+                firstname = name_parts[0]
+                surname = ' '.join(name_parts[1:])  # In case surname has multiple words
+            elif len(name_parts) == 1:
+                firstname = name_parts[0]
+                surname = ''
+            else:
+                firstname = ''
+                surname = ''
+            
+            learners.append({
+                'username': row.get('username'),
+                'name': firstname,
+                'surname': surname,
+                'full_name': full_name,
+                'grade': row.get('grade'),
+                'last_login': row.get('last_login').strftime('%Y-%m-%d %H:%M:%S') if row.get('last_login') else None,
+                'school_id': row.get('school_id'),
+                'school_name': row.get('school_name'),
+                'school_province': row.get('school_province')
+            })
+        
+        return jsonify({'learners': learners, 'count': len(learners)}), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/learner-platform-stats/<username>', methods=['GET'])
+@login_required
+def get_learner_platform_stats(username):
+    """Get platform statistics for a learner across Library and SmartLearning platforms"""
+    try:
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        if not start_date or not end_date:
+            return jsonify({'error': 'start_date and end_date are required'}), 400
+        
+        # Get student_id and name from username for SmartLearning
+        conn_ruzivo = get_ruzivo_conn()
+        cursor_ruzivo = conn_ruzivo.cursor()
+        
+        student_query = """
+            SELECT student_id, name FROM vwstudent WHERE username = %s LIMIT 1
+        """
+        cursor_ruzivo.execute(student_query, (username,))
+        student_row = cursor_ruzivo.fetchone()
+        
+        if not student_row:
+            return jsonify({'error': 'Learner not found'}), 404
+        
+        student_id = student_row.get('student_id') if isinstance(student_row, dict) else student_row[0]
+        student_name = student_row.get('name') if isinstance(student_row, dict) else student_row[1]
+        
+        if not student_id:
+            return jsonify({'error': 'Student ID not found for this learner'}), 404
+        
+        # Parse name into first_name and last_name for library search
+        # Handle cases where name might have multiple parts
+        name_parts = student_name.strip().split() if student_name else []
+        if len(name_parts) >= 2:
+            first_name = name_parts[0].strip()
+            last_name = ' '.join(name_parts[1:]).strip()  # All remaining parts as last_name
+        elif len(name_parts) == 1:
+            first_name = name_parts[0].strip()
+            last_name = ''  # No last name available
+        else:
+            first_name = ''
+            last_name = ''
+        
+        # Excluded student IDs
+        excluded_ids = [356,905,30843,265227,265228,265230,3223972,406978,516518,577527,1032617,1621500,1632975,1660731,1660834,1661007,1661053,1661353,1662420,1662839,1664013,1664021,1664698,1684433,1685102]
+        
+        # SmartLearning Platform Queries
+        smartlearning_stats = {}
+        
+        # Build NOT IN clause with placeholders
+        excluded_placeholders = ','.join(['%s'] * len(excluded_ids))
+        
+        # 1. Primary content access - check if student accessed primary content
+        primary_content_query = f"""
+            SELECT COUNT(DISTINCT student_id) AS total_primary_content 
+            FROM tblcontent_access 
+            WHERE start_time BETWEEN %s AND %s
+            AND student_id = %s
+            AND student_id NOT IN ({excluded_placeholders})
+        """
+        cursor_ruzivo.execute(primary_content_query, (start_date, end_date, student_id, *excluded_ids))
+        result = cursor_ruzivo.fetchone()
+        smartlearning_stats['total_primary_content'] = result.get('total_primary_content') if result else 0
+        
+        # 2. Secondary content access
+        sec_content_query = f"""
+            SELECT COUNT(DISTINCT student_id) AS total_sec_content 
+            FROM tblcontent_access_hs 
+            WHERE start_time BETWEEN %s AND %s
+            AND student_id = %s
+            AND student_id NOT IN ({excluded_placeholders})
+        """
+        cursor_ruzivo.execute(sec_content_query, (start_date, end_date, student_id, *excluded_ids))
+        result = cursor_ruzivo.fetchone()
+        smartlearning_stats['total_sec_content'] = result.get('total_sec_content') if result else 0
+        
+        # 3. Primary exercises by category
+        primary_exercise_query = f"""
+            SELECT category, COUNT(DISTINCT student_id) AS total_primary_exercise 
+            FROM tblresults 
+            WHERE date_added BETWEEN %s AND %s
+            AND student_id = %s
+            AND student_id NOT IN ({excluded_placeholders})
+            GROUP BY category
+        """
+        cursor_ruzivo.execute(primary_exercise_query, (start_date, end_date, student_id, *excluded_ids))
+        primary_exercises = cursor_ruzivo.fetchall()
+        smartlearning_stats['primary_exercises'] = {row.get('category'): row.get('total_primary_exercise') for row in primary_exercises}
+        
+        # 4. Secondary exercises by category
+        sec_exercise_query = f"""
+            SELECT category, COUNT(DISTINCT student_id) AS total_sec_exercise 
+            FROM tblresults_hs 
+            WHERE date_added BETWEEN %s AND %s
+            AND student_id = %s
+            AND student_id NOT IN ({excluded_placeholders})
+            GROUP BY category
+        """
+        cursor_ruzivo.execute(sec_exercise_query, (start_date, end_date, student_id, *excluded_ids))
+        sec_exercises = cursor_ruzivo.fetchall()
+        smartlearning_stats['secondary_exercises'] = {row.get('category'): row.get('total_sec_exercise') for row in sec_exercises}
+        
+        # 5. Zimsec access
+        zimsec_query = f"""
+            SELECT COUNT(DISTINCT student_id) AS total_zimsec_access 
+            FROM tblcontent_access_zimsec
+            WHERE start_time BETWEEN %s AND %s
+            AND student_id = %s
+            AND student_id NOT IN ({excluded_placeholders})
+        """
+        cursor_ruzivo.execute(zimsec_query, (start_date, end_date, student_id, *excluded_ids))
+        result = cursor_ruzivo.fetchone()
+        smartlearning_stats['total_zimsec_access'] = result.get('total_zimsec_access') if result else 0
+        
+        # 6. Teacher access
+        teacher_access_query = f"""
+            SELECT COUNT(DISTINCT student_id) AS teacher_access
+            FROM tblclass_activity_results
+            WHERE date_added BETWEEN %s AND %s
+            AND student_id = %s
+            AND student_id NOT IN ({excluded_placeholders})
+        """
+        cursor_ruzivo.execute(teacher_access_query, (start_date, end_date, student_id, *excluded_ids))
+        result = cursor_ruzivo.fetchone()
+        smartlearning_stats['teacher_access'] = result.get('teacher_access') if result else 0
+        
+        # Library Platform Query
+        library_stats = {}
+        try:
+            conn_library = get_direct_library_conn()
+            cursor_library = conn_library.cursor()
+            
+            library_user_id = None
+            search_attempts = []
+            
+            # Strategy 1: Search by username (exact match)
+            library_user_query = """
+                SELECT id FROM users 
+                WHERE TRIM(LOWER(username)) = TRIM(LOWER(%s))
+                LIMIT 1
+            """
+            cursor_library.execute(library_user_query, (username,))
+            library_user_row = cursor_library.fetchone()
+            search_attempts.append(f"Username match: '{username}'")
+            
+            if library_user_row:
+                library_user_id = library_user_row.get('id') if isinstance(library_user_row, dict) else library_user_row[0]
+            
+            # Strategy 2: If no match by username, try by first_name and last_name (fallback)
+            if not library_user_id and first_name and last_name:
+                library_user_query = """
+                    SELECT id FROM users 
+                    WHERE TRIM(LOWER(first_name)) = TRIM(LOWER(%s)) 
+                    AND TRIM(LOWER(last_name)) = TRIM(LOWER(%s))
+                    LIMIT 1
+                """
+                cursor_library.execute(library_user_query, (first_name, last_name))
+                library_user_row = cursor_library.fetchone()
+                search_attempts.append(f"Name fallback: '{first_name}' '{last_name}'")
+                
+                if library_user_row:
+                    library_user_id = library_user_row.get('id') if isinstance(library_user_row, dict) else library_user_row[0]
+            
+            if library_user_id:
+                # Query total duration and average duration for this user
+                library_duration_query = """
+                    SELECT 
+                        SUM(duration_minutes) AS total_duration_minutes,
+                        AVG(duration_minutes) AS avg_duration_minutes,
+                        COUNT(*) AS reading_sessions
+                    FROM read_trackers 
+                    WHERE duration_minutes != 0
+                    AND user_id = %s
+                    AND DATE(created_at) BETWEEN DATE(%s) AND DATE(%s)
+                """
+                cursor_library.execute(library_duration_query, (library_user_id, start_date, end_date))
+                result = cursor_library.fetchone()
+                
+                total_minutes = float(result.get('total_duration_minutes')) if result and result.get('total_duration_minutes') else 0
+                avg_minutes = float(result.get('avg_duration_minutes')) if result and result.get('avg_duration_minutes') else 0
+                sessions = int(result.get('reading_sessions')) if result and result.get('reading_sessions') else 0
+                
+                # Convert to hours and minutes for display
+                total_hours = int(total_minutes // 60)
+                total_mins = int(total_minutes % 60)
+                
+                library_stats['total_duration_minutes'] = total_minutes
+                library_stats['avg_duration_minutes'] = avg_minutes
+                library_stats['reading_sessions'] = sessions
+                library_stats['formatted_time'] = f"{total_hours}h {total_mins}m" if total_hours > 0 else f"{total_mins}m"
+                library_stats['found'] = True
+            else:
+                library_stats['avg_duration_minutes'] = 0
+                library_stats['note'] = f'User not found in library platform. Searched with: {"; ".join(search_attempts)}. Full name from SmartLearning: "{student_name}"'
+            
+            if cursor_library:
+                cursor_library.close()
+            if conn_library:
+                conn_library.close()
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            library_stats['error'] = str(e)
+            library_stats['avg_duration_minutes'] = 0
+        
+        return jsonify({
+            'smartlearning': smartlearning_stats,
+            'library': library_stats
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/learner-time-spent/<username>', methods=['GET'])
+@login_required
+def get_learner_time_spent(username):
+    """Get time spent on platform for a learner in a specific time period"""
+    try:
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        if not start_date or not end_date:
+            return jsonify({'error': 'start_date and end_date are required'}), 400
+        
+        conn = get_ruzivo_conn()
+        cursor = conn.cursor()
+        
+        # Get student_id from vwstudent (it has student_id based on other queries)
+        student_query = """
+            SELECT student_id FROM vwstudent WHERE username = %s LIMIT 1
+        """
+        cursor.execute(student_query, (username,))
+        student_row = cursor.fetchone()
+        
+        if not student_row:
+            return jsonify({'error': 'Learner not found'}), 404
+        
+        student_id = student_row.get('student_id') if isinstance(student_row, dict) else student_row[0]
+        
+        if not student_id:
+            return jsonify({'error': 'Student ID not found for this learner'}), 404
+        
+        # Calculate total time spent from content access tables
+        # Sum up durations from primary, secondary, and zimsec content access
+        time_query = """
+            SELECT 
+                COALESCE(SUM(
+                    TIMESTAMPDIFF(SECOND, 
+                        COALESCE(ca1.start_time, ca2.start_time, ca3.start_time),
+                        COALESCE(ca1.end_time, ca2.end_time, ca3.end_time)
+                    )
+                ), 0) AS total_seconds
+            FROM (
+                SELECT student_id, start_time, end_time, NULL as dummy1, NULL as dummy2
+                FROM tblcontent_access
+                WHERE student_id = %s 
+                  AND start_time BETWEEN %s AND %s
+                
+                UNION ALL
+                
+                SELECT student_id, start_time, end_time, NULL, NULL
+                FROM tblcontent_access_hs
+                WHERE student_id = %s 
+                  AND start_time BETWEEN %s AND %s
+                
+                UNION ALL
+                
+                SELECT student_id, start_time, end_time, NULL, NULL
+                FROM tblcontent_access_zimsec
+                WHERE student_id = %s 
+                  AND start_time BETWEEN %s AND %s
+            ) AS combined
+            LEFT JOIN tblcontent_access ca1 ON combined.student_id = ca1.student_id 
+                AND combined.start_time = ca1.start_time
+            LEFT JOIN tblcontent_access_hs ca2 ON combined.student_id = ca2.student_id 
+                AND combined.start_time = ca2.start_time
+            LEFT JOIN tblcontent_access_zimsec ca3 ON combined.student_id = ca3.student_id 
+                AND combined.start_time = ca3.start_time
+        """
+        
+        # Simplified approach - calculate from each table separately
+        total_seconds = 0
+        
+        # Primary content access
+        primary_query = """
+            SELECT SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, start_time))) AS seconds
+            FROM tblcontent_access
+            WHERE student_id = %s AND start_time BETWEEN %s AND %s
+        """
+        cursor.execute(primary_query, (student_id, start_date, end_date))
+        result = cursor.fetchone()
+        if result and result.get('seconds'):
+            total_seconds += result.get('seconds') or 0
+        
+        # Secondary content access
+        secondary_query = """
+            SELECT SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, start_time))) AS seconds
+            FROM tblcontent_access_hs
+            WHERE student_id = %s AND start_time BETWEEN %s AND %s
+        """
+        cursor.execute(secondary_query, (student_id, start_date, end_date))
+        result = cursor.fetchone()
+        if result and result.get('seconds'):
+            total_seconds += result.get('seconds') or 0
+        
+        # Zimsec content access
+        zimsec_query = """
+            SELECT SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, start_time))) AS seconds
+            FROM tblcontent_access_zimsec
+            WHERE student_id = %s AND start_time BETWEEN %s AND %s
+        """
+        cursor.execute(zimsec_query, (student_id, start_date, end_date))
+        result = cursor.fetchone()
+        if result and result.get('seconds'):
+            total_seconds += result.get('seconds') or 0
+        
+        # Convert to hours, minutes, seconds
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        
+        # Calculate longest streak (consecutive days with activity)
+        # Get all unique dates with activity (from login or content access)
+        active_dates_query = """
+            SELECT DISTINCT DATE(activity_date) AS active_date
+            FROM (
+                SELECT DATE(login_date) AS activity_date
+                FROM tblstudents_login
+                WHERE student_id = %s AND login_date BETWEEN %s AND %s
+                
+                UNION
+                
+                SELECT DATE(start_time) AS activity_date
+                FROM tblcontent_access
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+                
+                UNION
+                
+                SELECT DATE(start_time) AS activity_date
+                FROM tblcontent_access_hs
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+                
+                UNION
+                
+                SELECT DATE(start_time) AS activity_date
+                FROM tblcontent_access_zimsec
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+            ) AS all_activities
+            ORDER BY active_date ASC
+        """
+        cursor.execute(active_dates_query, (
+            student_id, start_date, end_date,
+            student_id, start_date, end_date,
+            student_id, start_date, end_date,
+            student_id, start_date, end_date
+        ))
+        active_dates = cursor.fetchall()
+        
+        # Calculate longest streak
+        longest_streak = 0
+        current_streak = 0
+        prev_date = None
+        
+        for row in active_dates:
+            active_date = row.get('active_date') if isinstance(row, dict) else row[0]
+            if prev_date is None:
+                current_streak = 1
+            else:
+                # Check if consecutive
+                from datetime import timedelta
+                if active_date == prev_date + timedelta(days=1):
+                    current_streak += 1
+                else:
+                    longest_streak = max(longest_streak, current_streak)
+                    current_streak = 1
+            prev_date = active_date
+        
+        longest_streak = max(longest_streak, current_streak)
+        
+        # Find most active day (day with most time spent)
+        most_active_day_query = """
+            SELECT 
+                DATE(start_time) AS activity_date,
+                SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, start_time))) AS total_seconds
+            FROM (
+                SELECT start_time, end_time
+                FROM tblcontent_access
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+                
+                UNION ALL
+                
+                SELECT start_time, end_time
+                FROM tblcontent_access_hs
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+                
+                UNION ALL
+                
+                SELECT start_time, end_time
+                FROM tblcontent_access_zimsec
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+            ) AS all_content
+            GROUP BY DATE(start_time)
+            ORDER BY total_seconds DESC
+            LIMIT 1
+        """
+        cursor.execute(most_active_day_query, (
+            student_id, start_date, end_date,
+            student_id, start_date, end_date,
+            student_id, start_date, end_date
+        ))
+        most_active_day_result = cursor.fetchone()
+        
+        most_active_day = None
+        most_active_day_seconds = 0
+        if most_active_day_result:
+            most_active_day = most_active_day_result.get('activity_date') if isinstance(most_active_day_result, dict) else most_active_day_result[0]
+            most_active_day_seconds = most_active_day_result.get('total_seconds') if isinstance(most_active_day_result, dict) else most_active_day_result[1]
+            if most_active_day:
+                most_active_day = most_active_day.strftime('%Y-%m-%d') if hasattr(most_active_day, 'strftime') else str(most_active_day)
+        
+        # Find most active month (month with most time spent in the date range)
+        most_active_month_query = """
+            SELECT 
+                DATE_FORMAT(start_time, '%%Y-%%m') AS activity_month,
+                SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, start_time))) AS total_seconds
+            FROM (
+                SELECT start_time, end_time
+                FROM tblcontent_access
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+                
+                UNION ALL
+                
+                SELECT start_time, end_time
+                FROM tblcontent_access_hs
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+                
+                UNION ALL
+                
+                SELECT start_time, end_time
+                FROM tblcontent_access_zimsec
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+            ) AS all_content
+            GROUP BY DATE_FORMAT(start_time, '%%Y-%%m')
+            ORDER BY total_seconds DESC
+            LIMIT 1
+        """
+        cursor.execute(most_active_month_query, (
+            student_id, start_date, end_date,
+            student_id, start_date, end_date,
+            student_id, start_date, end_date
+        ))
+        most_active_month_result = cursor.fetchone()
+        
+        most_active_month = None
+        most_active_month_seconds = 0
+        if most_active_month_result:
+            most_active_month = most_active_month_result.get('activity_month') if isinstance(most_active_month_result, dict) else most_active_month_result[0]
+            most_active_month_seconds = most_active_month_result.get('total_seconds') if isinstance(most_active_month_result, dict) else most_active_month_result[1]
+        
+        # Format most active day time
+        most_active_day_hours = most_active_day_seconds // 3600
+        most_active_day_minutes = (most_active_day_seconds % 3600) // 60
+        most_active_day_formatted = f"{most_active_day_hours}h {most_active_day_minutes}m" if most_active_day_hours > 0 else f"{most_active_day_minutes}m"
+        
+        # Format most active month time
+        most_active_month_hours = most_active_month_seconds // 3600
+        most_active_month_minutes = (most_active_month_seconds % 3600) // 60
+        most_active_month_formatted = f"{most_active_month_hours}h {most_active_month_minutes}m" if most_active_month_hours > 0 else f"{most_active_month_minutes}m"
+        
+        # Format month name
+        if most_active_month:
+            try:
+                from datetime import datetime
+                month_date = datetime.strptime(most_active_month, '%Y-%m')
+                most_active_month_display = month_date.strftime('%B %Y')
+            except:
+                most_active_month_display = most_active_month
+        else:
+            most_active_month_display = None
+        
+        return jsonify({
+            'total_seconds': total_seconds,
+            'hours': hours,
+            'minutes': minutes,
+            'seconds': seconds,
+            'formatted': f"{hours}h {minutes}m {seconds}s" if hours > 0 else f"{minutes}m {seconds}s",
+            'longest_streak': longest_streak,
+            'most_active_day': most_active_day,
+            'most_active_day_seconds': most_active_day_seconds,
+            'most_active_day_formatted': most_active_day_formatted if most_active_day else None,
+            'most_active_month': most_active_month_display,
+            'most_active_month_seconds': most_active_month_seconds,
+            'most_active_month_formatted': most_active_month_formatted if most_active_month else None
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/search-learners', methods=['GET'])
+@login_required
+def search_learners_page():
+    """Display learner search page"""
+    username = current_user.username
+    role = current_user.userRole
+    
+    return render_template(
+        'search_learners.html',
+        username=username,
+        role=role,
+        title='Search Learners'
+    )
+
+
+@app.route('/api/top-learners', methods=['GET'])
+@login_required
+def get_top_learners():
+    """Get top 20 learners across platforms with various filters"""
+    try:
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        platform = request.args.get('platform', 'overall')  # overall, smartlearning, library
+        province = request.args.get('province')  # Optional province filter
+        gender = request.args.get('gender')  # Optional gender filter: male, female, unknown
+        
+        if not start_date or not end_date:
+            return jsonify({'error': 'start_date and end_date are required'}), 400
+        
+        excluded_ids = [356,905,30843,265227,265228,265230,3223972,406978,516518,577527,1032617,1621500,1632975,1660731,1660834,1661007,1661053,1661353,1662420,1662839,1664013,1664021,1664698,1684433,1685102]
+        excluded_placeholders = ','.join(['%s'] * len(excluded_ids))
+        
+        results = []
+        
+        # SmartLearning Platform Top Users
+        if platform in ['overall', 'smartlearning']:
+            conn_ruzivo = get_ruzivo_conn()
+            cursor_ruzivo = conn_ruzivo.cursor()
+            
+            # Build WHERE clause for province and gender
+            where_clauses = [
+                f"student_id NOT IN ({excluded_placeholders})",
+                "start_time BETWEEN %s AND %s"
+            ]
+            params = list(excluded_ids) + [start_date, end_date]
+            
+            if province:
+                where_clauses.append("s.school_province = %s")
+                params.append(province)
+            
+            if gender:
+                gender_condition = {
+                    'male': "UPPER(TRIM(vs.gender)) IN ('MALE','M')",
+                    'female': "UPPER(TRIM(vs.gender)) IN ('FEMALE','F')",
+                    'unknown': "UPPER(TRIM(vs.gender)) NOT IN ('MALE','M','FEMALE','F') OR vs.gender IS NULL"
+                }
+                if gender in gender_condition:
+                    where_clauses.append(gender_condition[gender])
+            
+            where_sql = " AND ".join(where_clauses)
+            
+            # Calculate total time spent per student
+            smartlearning_query = f"""
+                SELECT 
+                    vs.student_id,
+                    vs.username,
+                    vs.name,
+                    s.school_province,
+                    CASE
+                        WHEN UPPER(TRIM(vs.gender)) IN ('MALE','M') THEN 'Male'
+                        WHEN UPPER(TRIM(vs.gender)) IN ('FEMALE','F') THEN 'Female'
+                        ELSE 'Unknown'
+                    END AS gender,
+                    COALESCE(SUM(
+                        TIMESTAMPDIFF(SECOND, 
+                            COALESCE(ca1.start_time, ca2.start_time, ca3.start_time),
+                            COALESCE(ca1.end_time, ca2.end_time, ca3.end_time)
+                        )
+                    ), 0) AS total_seconds
+                FROM (
+                    SELECT student_id, start_time, end_time
+                    FROM tblcontent_access
+                    WHERE {where_sql.replace('s.school_province', '1=1').replace('vs.gender', '1=1')}
+                    
+                    UNION ALL
+                    
+                    SELECT student_id, start_time, end_time
+                    FROM tblcontent_access_hs
+                    WHERE {where_sql.replace('s.school_province', '1=1').replace('vs.gender', '1=1')}
+                    
+                    UNION ALL
+                    
+                    SELECT student_id, start_time, end_time
+                    FROM tblcontent_access_zimsec
+                    WHERE {where_sql.replace('s.school_province', '1=1').replace('vs.gender', '1=1')}
+                ) AS combined
+                LEFT JOIN tblcontent_access ca1 ON combined.student_id = ca1.student_id 
+                    AND combined.start_time = ca1.start_time
+                LEFT JOIN tblcontent_access_hs ca2 ON combined.student_id = ca2.student_id 
+                    AND combined.start_time = ca2.start_time
+                LEFT JOIN tblcontent_access_zimsec ca3 ON combined.student_id = ca3.student_id 
+                    AND combined.start_time = ca3.start_time
+                JOIN vwstudent vs ON vs.student_id = combined.student_id
+                JOIN tblschools s ON s.school_id = vs.school_id
+                WHERE {where_sql}
+                GROUP BY vs.student_id, vs.username, vs.name, s.school_province, vs.gender
+                ORDER BY total_seconds DESC
+                LIMIT 20
+            """
+            
+            # Simplified approach - calculate from each table separately and join
+            smartlearning_simple_query = f"""
+                SELECT 
+                    vs.student_id,
+                    vs.username,
+                    vs.name,
+                    s.school_province,
+                    CASE
+                        WHEN UPPER(TRIM(vs.gender)) IN ('MALE','M') THEN 'Male'
+                        WHEN UPPER(TRIM(vs.gender)) IN ('FEMALE','F') THEN 'Female'
+                        ELSE 'Unknown'
+                    END AS gender,
+                    COALESCE(SUM(
+                        TIMESTAMPDIFF(SECOND, ca.start_time, COALESCE(ca.end_time, ca.start_time))
+                    ), 0) AS total_seconds
+                FROM tblcontent_access ca
+                JOIN vwstudent vs ON vs.student_id = ca.student_id
+                JOIN tblschools s ON s.school_id = vs.school_id
+                WHERE ca.start_time BETWEEN %s AND %s
+                    AND ca.student_id NOT IN ({excluded_placeholders})
+            """
+            query_params = [start_date, end_date] + excluded_ids
+            
+            if province:
+                smartlearning_simple_query += " AND s.school_province = %s"
+                query_params.append(province)
+            
+            if gender:
+                if gender == 'male':
+                    smartlearning_simple_query += " AND UPPER(TRIM(vs.gender)) IN ('MALE','M')"
+                elif gender == 'female':
+                    smartlearning_simple_query += " AND UPPER(TRIM(vs.gender)) IN ('FEMALE','F')"
+                elif gender == 'unknown':
+                    smartlearning_simple_query += " AND (UPPER(TRIM(vs.gender)) NOT IN ('MALE','M','FEMALE','F') OR vs.gender IS NULL)"
+            
+            smartlearning_simple_query += """
+                GROUP BY vs.student_id, vs.username, vs.name, s.school_province, vs.gender
+            """
+            
+            # Also include secondary and zimsec
+            smartlearning_query_final = f"""
+                SELECT 
+                    student_id,
+                    username,
+                    name,
+                    school_province,
+                    gender,
+                    SUM(total_seconds) AS total_seconds
+                FROM (
+                    {smartlearning_simple_query.replace('tblcontent_access', 'tblcontent_access').replace('ca.', 'ca1.')}
+                    UNION ALL
+                    {smartlearning_simple_query.replace('tblcontent_access', 'tblcontent_access_hs').replace('ca.', 'ca2.')}
+                    UNION ALL
+                    {smartlearning_simple_query.replace('tblcontent_access', 'tblcontent_access_zimsec').replace('ca.', 'ca3.')}
+                ) AS combined
+                GROUP BY student_id, username, name, school_province, gender
+                ORDER BY total_seconds DESC
+                LIMIT 20
+            """
+            
+            # Use simpler approach - query each table and combine
+            all_sl_users = {}
+            
+            for table in ['tblcontent_access', 'tblcontent_access_hs', 'tblcontent_access_zimsec']:
+                table_query = f"""
+                    SELECT 
+                        vs.student_id,
+                        vs.username,
+                        vs.name,
+                        s.school_province,
+                        CASE
+                            WHEN UPPER(TRIM(vs.gender)) IN ('MALE','M') THEN 'Male'
+                            WHEN UPPER(TRIM(vs.gender)) IN ('FEMALE','F') THEN 'Female'
+                            ELSE 'Unknown'
+                        END AS gender,
+                        SUM(TIMESTAMPDIFF(SECOND, ca.start_time, COALESCE(ca.end_time, ca.start_time))) AS total_seconds
+                    FROM {table} ca
+                    JOIN vwstudent vs ON vs.student_id = ca.student_id
+                    JOIN tblschools s ON s.school_id = vs.school_id
+                    WHERE ca.start_time BETWEEN %s AND %s
+                        AND ca.student_id NOT IN ({excluded_placeholders})
+                """
+                table_params = [start_date, end_date] + excluded_ids
+                
+                if province:
+                    table_query += " AND s.school_province = %s"
+                    table_params.append(province)
+                
+                if gender:
+                    if gender == 'male':
+                        table_query += " AND UPPER(TRIM(vs.gender)) IN ('MALE','M')"
+                    elif gender == 'female':
+                        table_query += " AND UPPER(TRIM(vs.gender)) IN ('FEMALE','F')"
+                    elif gender == 'unknown':
+                        table_query += " AND (UPPER(TRIM(vs.gender)) NOT IN ('MALE','M','FEMALE','F') OR vs.gender IS NULL)"
+                
+                table_query += " GROUP BY vs.student_id, vs.username, vs.name, s.school_province, vs.gender"
+                
+                cursor_ruzivo.execute(table_query, table_params)
+                rows = cursor_ruzivo.fetchall()
+                
+                for row in rows:
+                    student_id = row.get('student_id') if isinstance(row, dict) else row[0]
+                    if student_id not in all_sl_users:
+                        all_sl_users[student_id] = {
+                            'student_id': student_id,
+                            'username': row.get('username') if isinstance(row, dict) else row[1],
+                            'name': row.get('name') if isinstance(row, dict) else row[2],
+                            'school_province': row.get('school_province') if isinstance(row, dict) else row[3],
+                            'gender': row.get('gender') if isinstance(row, dict) else row[4],
+                            'total_seconds': 0,
+                            'platform': 'SmartLearning'
+                        }
+                    all_sl_users[student_id]['total_seconds'] += row.get('total_seconds') if isinstance(row, dict) else (row[5] or 0)
+            
+            for user_data in all_sl_users.values():
+                hours = user_data['total_seconds'] // 3600
+                minutes = (user_data['total_seconds'] % 3600) // 60
+                user_data['formatted_time'] = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
+                user_data['hours'] = hours
+                user_data['minutes'] = minutes
+            
+            if platform == 'smartlearning':
+                results = sorted(list(all_sl_users.values()), key=lambda x: x['total_seconds'], reverse=True)[:20]
+            elif platform == 'overall':
+                # Add SmartLearning users to overall results
+                results.extend(sorted(list(all_sl_users.values()), key=lambda x: x['total_seconds'], reverse=True)[:20])
+        
+        # Library Platform Top Users
+        if platform in ['overall', 'library']:
+            try:
+                conn_library = get_direct_library_conn()
+                cursor_library = conn_library.cursor()
+                
+                library_query = """
+                    SELECT 
+                        u.id AS user_id,
+                        u.first_name,
+                        u.last_name,
+                        u.username,
+                        AVG(rt.duration_minutes) AS avg_duration_minutes,
+                        SUM(rt.duration_minutes) AS total_duration_minutes,
+                        COUNT(*) AS reading_sessions
+                    FROM read_trackers rt
+                    JOIN users u ON u.id = rt.user_id
+                    WHERE rt.duration_minutes != 0
+                        AND DATE(rt.created_at) BETWEEN DATE(%s) AND DATE(%s)
+                """
+                library_params = [start_date, end_date]
+                
+                # Note: Library database might not have province/gender fields easily accessible
+                # We'll add them if the schema supports it
+                
+                library_query += """
+                    GROUP BY u.id, u.first_name, u.last_name, u.username
+                    ORDER BY total_duration_minutes DESC
+                    LIMIT 20
+                """
+                
+                cursor_library.execute(library_query, library_params)
+                library_rows = cursor_library.fetchall()
+                
+                for row in library_rows:
+                    user_id = row.get('user_id') if isinstance(row, dict) else row[0]
+                    total_minutes = row.get('total_duration_minutes') if isinstance(row, dict) else (row[5] or 0)
+                    total_seconds = int(total_minutes * 60)
+                    hours = total_seconds // 3600
+                    minutes = (total_seconds % 3600) // 60
+                    
+                    library_user = {
+                        'user_id': user_id,
+                        'username': row.get('username') if isinstance(row, dict) else row[3],
+                        'name': f"{row.get('first_name', '') if isinstance(row, dict) else row[1]} {row.get('last_name', '') if isinstance(row, dict) else row[2]}".strip(),
+                        'school_province': 'N/A',  # Library might not have province
+                        'gender': 'Unknown',  # Library might not have gender
+                        'total_seconds': total_seconds,
+                        'formatted_time': f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m",
+                        'hours': hours,
+                        'minutes': minutes,
+                        'platform': 'Library',
+                        'avg_duration_minutes': float(row.get('avg_duration_minutes')) if isinstance(row, dict) else (row[4] or 0),
+                        'reading_sessions': row.get('reading_sessions') if isinstance(row, dict) else (row[6] or 0)
+                    }
+                    
+                    if platform == 'library':
+                        results.append(library_user)
+                    elif platform == 'overall':
+                        # For overall, we need to match by name and combine
+                        # This is complex, so we'll just add library users separately
+                        results.append(library_user)
+                
+                if cursor_library:
+                    cursor_library.close()
+                if conn_library:
+                    conn_library.close()
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                # Continue even if library query fails
+        
+        # Sort overall results
+        if platform == 'overall':
+            results = sorted(results, key=lambda x: x.get('total_seconds', 0), reverse=True)[:20]
+        elif platform == 'smartlearning':
+            results = sorted(results, key=lambda x: x.get('total_seconds', 0), reverse=True)[:20]
+        elif platform == 'library':
+            results = sorted(results, key=lambda x: x.get('total_seconds', 0), reverse=True)[:20]
+        
+        return jsonify({
+            'learners': results,
+            'count': len(results),
+            'platform': platform,
+            'province': province,
+            'gender': gender,
+            'start_date': start_date,
+            'end_date': end_date
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 
 
 
