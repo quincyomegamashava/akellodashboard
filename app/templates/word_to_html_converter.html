@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+</head>
+
+{% block content %}
+<style>
+  html, body, h1, h2, h3, h4, h5 {font-family: "Open Sans", sans-serif}
+  
+  .converter-wrapper { 
+    max-width: 1400px; 
+    margin: 60px auto 40px; 
+    padding: 0 24px; 
+  }
+  
+  .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  
+  .card-header { 
+    padding: 24px 28px; 
+    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+    font-weight: 700;
+    font-size: 1.5rem;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(255, 255, 255, 0.9) 100%);
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .card-header i {
+    color: #6366f1;
+    font-size: 1.75rem;
+  }
+  
+  .card-body { 
+    padding: 28px; 
+  }
+  
+  .input-mode-toggle {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid rgba(226, 232, 240, 0.5);
+    padding-bottom: 16px;
+  }
+  
+  .mode-btn {
+    flex: 1;
+    padding: 12px 24px;
+    border: 2px solid rgba(99, 102, 241, 0.2);
+    background: #fff;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    font-weight: 600;
+    color: #6366f1;
+  }
+  
+  .mode-btn.active {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border-color: #6366f1;
+  }
+  
+  .mode-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+  }
+  
+  .input-section {
+    display: none;
+  }
+  
+  .input-section.active {
+    display: block;
+  }
+  
+  .file-upload-area {
+    border: 2px dashed rgba(99, 102, 241, 0.3);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    background: rgba(99, 102, 241, 0.05);
+    transition: all 0.3s ease;
+  }
+  
+  .file-upload-area:hover {
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, 0.1);
+  }
+  
+  .file-upload-area.dragover {
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, 0.15);
+  }
+  
+  .text-area {
+    width: 100%;
+    min-height: 300px;
+    padding: 16px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-family: 'Courier New', monospace;
+    resize: vertical;
+  }
+  
+  .text-area:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+  
+  .convert-btn {
+    padding: 12px 32px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 20px 0;
+  }
+  
+  .convert-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  }
+  
+  .convert-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .preview-area {
+    background: #f8f9fa;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 12px;
+    padding: 24px;
+    min-height: 200px;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  
+  .action-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+  }
+  
+  .action-btn {
+    flex: 1;
+    padding: 10px 20px;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    background: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 600;
+    color: #6366f1;
+  }
+  
+  .action-btn:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: #6366f1;
+  }
+  
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #6b7a90;
+  }
+  
+  .error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    color: #dc2626;
+    margin: 16px 0;
+  }
+  
+  .success {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    color: #16a34a;
+    margin: 16px 0;
+  }
+</style>
+
+<div class="converter-wrapper">
+  <div class="glass-card">
+    <div class="card-header">
+      <i class="fas fa-file-word"></i>
+      <span>Word to HTML Converter</span>
+    </div>
+    <div class="card-body">
+      <div class="input-mode-toggle">
+        <div class="mode-btn active" id="fileModeBtn" onclick="switchMode('file')">
+          <i class="fas fa-upload"></i> Upload Word Document
+        </div>
+        <div class="mode-btn" id="textModeBtn" onclick="switchMode('text')">
+          <i class="fas fa-paste"></i> Paste Text Content
+        </div>
+      </div>
+      
+      <!-- File Upload Section -->
+      <div class="input-section active" id="fileSection">
+        <div class="file-upload-area" id="fileUploadArea" 
+             ondrop="handleDrop(event)" 
+             ondragover="handleDragOver(event)" 
+             ondragleave="handleDragLeave(event)">
+          <i class="fas fa-cloud-upload-alt fa-3x" style="color: #6366f1; margin-bottom: 16px;"></i>
+          <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 8px;">Drag & Drop Word Document</p>
+          <p style="color: #6b7a90; margin-bottom: 16px;">or</p>
+          <label for="fileInput" class="convert-btn" style="display: inline-flex; margin: 0;">
+            <i class="fas fa-folder-open"></i> Browse Files
+          </label>
+          <input type="file" id="fileInput" accept=".docx" style="display: none;" onchange="handleFileSelect(event)">
+          <p id="fileName" style="margin-top: 16px; color: #6366f1; font-weight: 600;"></p>
+        </div>
+      </div>
+      
+      <!-- Text Paste Section -->
+      <div class="input-section" id="textSection">
+        <textarea 
+          id="textContent" 
+          class="text-area" 
+          placeholder="Paste your Word document content here...&#10;&#10;Example:&#10;IDENTITY&#10;Roles of the family&#10;&#10;Objectives&#10;By the end of this lesson, you should be able to:&#10; Identify members of a family&#10; Explain the roles and status of family members"
+        ></textarea>
+      </div>
+      
+      <button class="convert-btn" id="convertBtn" onclick="convertToHtml()" disabled>
+        <i class="fas fa-magic"></i> Convert to HTML
+      </button>
+      
+      <div id="errorMessage" class="error" style="display: none;"></div>
+      <div id="successMessage" class="success" style="display: none;"></div>
+      
+      <div id="loadingState" class="loading" style="display: none;">
+        <i class="fas fa-spinner fa-spin fa-2x"></i>
+        <p style="margin-top: 12px">Converting document to HTML...</p>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Results Section -->
+  <div class="glass-card" id="resultsSection" style="display: none;">
+    <div class="card-header">
+      <i class="fas fa-code"></i>
+      <span>Generated HTML</span>
+    </div>
+    <div class="card-body">
+      <div class="action-buttons">
+        <button class="action-btn" onclick="copyToClipboard()">
+          <i class="fas fa-copy"></i> Copy HTML
+        </button>
+        <button class="action-btn" onclick="downloadHtml()">
+          <i class="fas fa-download"></i> Download HTML
+        </button>
+        <button class="action-btn" onclick="previewHtml()">
+          <i class="fas fa-eye"></i> Preview
+        </button>
+      </div>
+      
+      <div class="preview-area" id="htmlPreview">
+        <!-- HTML preview will be shown here -->
+      </div>
+      
+      <textarea 
+        id="htmlOutput" 
+        class="text-area" 
+        style="margin-top: 20px; min-height: 400px; font-family: 'Courier New', monospace; font-size: 0.85rem;"
+        readonly
+      ></textarea>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentMode = 'file';
+let htmlContent = '';
+
+function switchMode(mode) {
+  currentMode = mode;
+  
+  // Update button states
+  document.getElementById('fileModeBtn').classList.toggle('active', mode === 'file');
+  document.getElementById('textModeBtn').classList.toggle('active', mode === 'text');
+  
+  // Update section visibility
+  document.getElementById('fileSection').classList.toggle('active', mode === 'file');
+  document.getElementById('textSection').classList.toggle('active', mode === 'text');
+  
+  // Enable/disable convert button
+  updateConvertButton();
+}
+
+function updateConvertButton() {
+  const convertBtn = document.getElementById('convertBtn');
+  if (currentMode === 'file') {
+    const fileInput = document.getElementById('fileInput');
+    convertBtn.disabled = !fileInput.files || fileInput.files.length === 0;
+  } else {
+    const textContent = document.getElementById('textContent');
+    convertBtn.disabled = !textContent.value.trim();
+  }
+}
+
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (file) {
+    document.getElementById('fileName').textContent = `Selected: ${file.name}`;
+    updateConvertButton();
+  }
+}
+
+function handleDragOver(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.currentTarget.classList.add('dragover');
+}
+
+function handleDragLeave(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.currentTarget.classList.remove('dragover');
+}
+
+function handleDrop(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.currentTarget.classList.remove('dragover');
+  
+  const files = event.dataTransfer.files;
+  if (files.length > 0) {
+    const file = files[0];
+    if (file.name.endsWith('.docx')) {
+      document.getElementById('fileInput').files = files;
+      document.getElementById('fileName').textContent = `Selected: ${file.name}`;
+      updateConvertButton();
+    } else {
+      alert('Please upload a .docx file');
+    }
+  }
+}
+
+function convertToHtml() {
+  const loadingState = document.getElementById('loadingState');
+  const errorMessage = document.getElementById('errorMessage');
+  const successMessage = document.getElementById('successMessage');
+  const resultsSection = document.getElementById('resultsSection');
+  
+  // Hide previous messages
+  errorMessage.style.display = 'none';
+  successMessage.style.display = 'none';
+  resultsSection.style.display = 'none';
+  
+  // Show loading
+  loadingState.style.display = 'block';
+  
+  const formData = new FormData();
+  
+  if (currentMode === 'file') {
+    const fileInput = document.getElementById('fileInput');
+    if (!fileInput.files || fileInput.files.length === 0) {
+      errorMessage.textContent = 'Please select a Word document';
+      errorMessage.style.display = 'block';
+      loadingState.style.display = 'none';
+      return;
+    }
+    formData.append('file', fileInput.files[0]);
+  } else {
+    const textContent = document.getElementById('textContent').value.trim();
+    if (!textContent) {
+      errorMessage.textContent = 'Please paste some text content';
+      errorMessage.style.display = 'block';
+      loadingState.style.display = 'none';
+      return;
+    }
+    formData.append('text_content', textContent);
+  }
+  
+  fetch('/api/convert-word-to-html', {
+    method: 'POST',
+    body: formData
+  })
+    .then(response => response.json())
+    .then(data => {
+      loadingState.style.display = 'none';
+      
+      if (data.error) {
+        errorMessage.textContent = data.error;
+        errorMessage.style.display = 'block';
+        return;
+      }
+      
+      if (data.html) {
+        htmlContent = data.html;
+        document.getElementById('htmlOutput').value = htmlContent;
+        document.getElementById('htmlPreview').innerHTML = htmlContent;
+        resultsSection.style.display = 'block';
+        successMessage.textContent = 'HTML generated successfully!';
+        successMessage.style.display = 'block';
+        
+        // Scroll to results
+        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    })
+    .catch(error => {
+      loadingState.style.display = 'none';
+      errorMessage.textContent = 'Error converting document: ' + error.message;
+      errorMessage.style.display = 'block';
+      console.error('Error:', error);
+    });
+}
+
+function copyToClipboard() {
+  const htmlOutput = document.getElementById('htmlOutput');
+  htmlOutput.select();
+  htmlOutput.setSelectionRange(0, 99999); // For mobile devices
+  
+  try {
+    document.execCommand('copy');
+    const successMessage = document.getElementById('successMessage');
+    successMessage.textContent = 'HTML copied to clipboard!';
+    successMessage.style.display = 'block';
+    setTimeout(() => {
+      successMessage.style.display = 'none';
+    }, 3000);
+  } catch (err) {
+    alert('Failed to copy. Please select and copy manually.');
+  }
+}
+
+function downloadHtml() {
+  const htmlOutput = document.getElementById('htmlOutput').value;
+  const blob = new Blob([htmlOutput], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'converted_content.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function previewHtml() {
+  const htmlContent = document.getElementById('htmlOutput').value;
+  const newWindow = window.open('', '_blank');
+  newWindow.document.write(htmlContent);
+  newWindow.document.close();
+}
+
+// Update convert button state when text changes
+document.getElementById('textContent').addEventListener('input', updateConvertButton);
+</script>
+
+{% endblock %}
+
+
+
+
+

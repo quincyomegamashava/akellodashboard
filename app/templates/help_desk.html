@@ -134,6 +134,18 @@
             </div>
           </div>
         </div>
+        
+        <div class="w3-col s12 m4 w3-margin-bottom">
+          <div class="w3-card w3-white w3-round w3-hover-shadow w3-border" onclick="document.getElementById('searchLibraryUsersModal').style.display='block'" style="cursor:pointer;">
+            <div class="w3-container w3-orange w3-text-white w3-round-top w3-padding-small">
+              <b><i class="fa fa-search"></i> Search Library Users</b>
+            </div>
+            <div class="w3-container w3-padding">
+              <div class="w3-text-gray w3-tiny">Search users by email</div>
+              <h2 class="w3-text-orange" style="margin:5px 0;"><i class="fa fa-users"></i></h2>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -278,6 +290,86 @@
               {% endfor %}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Search Library Users Modal -->
+<div id="searchLibraryUsersModal" class="w3-modal" style="z-index:2950;">
+  <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 80vw; max-height: 85vh; overflow-y: auto;">
+    <header class="w3-container w3-padding" style="background: linear-gradient(135deg,#ff9800,#f57c00); color:#fff;">
+      <span onclick="document.getElementById('searchLibraryUsersModal').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <h5 class="w3-margin-0"><i class="fa fa-search"></i> Search Library Users</h5>
+    </header>
+    <div class="w3-container" style="padding:16px;">
+      <div class="w3-card w3-white w3-round w3-padding">
+        <h4 class="w3-text-orange">Search Library Users</h4>
+        
+        <!-- Basic Search: Email -->
+        <div class="w3-margin-bottom">
+          <label class="w3-small w3-text-gray"><i class="fa fa-envelope"></i> Email Address</label>
+          <input class="w3-input w3-border w3-round" id="libraryUserEmailSearch" type="email" placeholder="Enter email address..." onkeypress="if(event.key==='Enter') searchLibraryUsers()">
+        </div>
+        
+        <!-- Advanced Search Toggle -->
+        <div class="w3-margin-bottom">
+          <button class="w3-button w3-small w3-light-gray w3-round" onclick="toggleAdvancedSearch()" id="toggleAdvancedSearchBtn">
+            <i class="fa fa-chevron-down" id="advancedSearchIcon"></i> Advanced Search (First Name / Last Name)
+          </button>
+        </div>
+        
+        <!-- Advanced Search Fields -->
+        <div id="advancedSearchSection" style="display:none;" class="w3-margin-bottom">
+          <div class="w3-panel w3-light-gray w3-round w3-padding-small">
+            <label class="w3-small w3-text-gray"><i class="fa fa-user"></i> First Name</label>
+            <input class="w3-input w3-border w3-round w3-margin-bottom" id="libraryUserFirstNameSearch" type="text" placeholder="Enter first name..." onkeypress="if(event.key==='Enter') searchLibraryUsers()">
+            
+            <label class="w3-small w3-text-gray"><i class="fa fa-user"></i> Last Name</label>
+            <input class="w3-input w3-border w3-round" id="libraryUserLastNameSearch" type="text" placeholder="Enter last name..." onkeypress="if(event.key==='Enter') searchLibraryUsers()">
+            
+            <p class="w3-tiny w3-text-gray w3-margin-top">
+              <i class="fa fa-info-circle"></i> You can search by email only, or use first name and/or last name. All fields use AND logic when multiple are provided.
+            </p>
+          </div>
+        </div>
+        
+        <!-- Search Button -->
+        <div class="w3-margin-bottom">
+          <button class="w3-button w3-orange w3-round w3-block" onclick="searchLibraryUsers()" id="searchLibraryUsersBtn">
+            <i class="fa fa-search"></i> Search
+          </button>
+        </div>
+        <div id="libraryUsersLoadingIndicator" style="display:none;" class="w3-center w3-padding">
+          <i class="fa fa-spinner fa-spin fa-2x w3-text-orange"></i>
+          <p class="w3-text-gray">Searching...</p>
+        </div>
+        <div id="libraryUsersResults" style="display:none;">
+          <div class="w3-margin-bottom">
+            <p class="w3-text-gray w3-small">Found <span id="libraryUsersCount">0</span> user(s)</p>
+          </div>
+          <div class="w3-responsive" style="max-height: 50vh; overflow:auto;">
+            <table class="w3-table-all w3-small w3-hoverable" id="libraryUsersTable">
+              <thead>
+                <tr class="w3-orange">
+                  <th>ID</th>
+                  <th>Email</th>
+                  <th>Username</th>
+                  <th>First Name</th>
+                  <th>Last Name</th>
+                  <th>Mobile</th>
+                  <th>Created At</th>
+                  <th>Updated At</th>
+                </tr>
+              </thead>
+              <tbody id="libraryUsersTableBody">
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div id="libraryUsersError" style="display:none;" class="w3-panel w3-red w3-round w3-padding">
+          <p class="w3-margin-0" id="libraryUsersErrorMessage"></p>
         </div>
       </div>
     </div>
@@ -877,6 +969,119 @@
       alert('Resolution email sent successfully!');
     } catch (error) {
       alert('Error sending email: ' + error.message);
+    }
+  }
+  
+  // ===== Search Library Users Functions =====
+  
+  function toggleAdvancedSearch() {
+    const advancedSection = document.getElementById('advancedSearchSection');
+    const icon = document.getElementById('advancedSearchIcon');
+    const isVisible = advancedSection.style.display !== 'none';
+    
+    if (isVisible) {
+      advancedSection.style.display = 'none';
+      icon.className = 'fa fa-chevron-down';
+    } else {
+      advancedSection.style.display = 'block';
+      icon.className = 'fa fa-chevron-up';
+    }
+  }
+  
+  async function searchLibraryUsers() {
+    const emailInput = document.getElementById('libraryUserEmailSearch');
+    const firstNameInput = document.getElementById('libraryUserFirstNameSearch');
+    const lastNameInput = document.getElementById('libraryUserLastNameSearch');
+    
+    const email = emailInput.value.trim();
+    const firstName = firstNameInput ? firstNameInput.value.trim() : '';
+    const lastName = lastNameInput ? lastNameInput.value.trim() : '';
+    
+    const loadingIndicator = document.getElementById('libraryUsersLoadingIndicator');
+    const resultsDiv = document.getElementById('libraryUsersResults');
+    const errorDiv = document.getElementById('libraryUsersError');
+    const tbody = document.getElementById('libraryUsersTableBody');
+    const countElement = document.getElementById('libraryUsersCount');
+    
+    // Hide previous results and errors
+    resultsDiv.style.display = 'none';
+    errorDiv.style.display = 'none';
+    
+    // At least one search parameter is required
+    if (!email && !firstName && !lastName) {
+      errorDiv.style.display = 'block';
+      document.getElementById('libraryUsersErrorMessage').textContent = 'Please enter at least one search parameter (email, first name, or last name)';
+      return;
+    }
+    
+    // Validate email format if provided
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        errorDiv.style.display = 'block';
+        document.getElementById('libraryUsersErrorMessage').textContent = 'Please enter a valid email address';
+        return;
+      }
+    }
+    
+    loadingIndicator.style.display = 'block';
+    tbody.innerHTML = '<tr><td colspan="8" class="w3-center w3-text-gray">Searching...</td></tr>';
+    
+    try {
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (email) params.append('email', email);
+      if (firstName) params.append('first_name', firstName);
+      if (lastName) params.append('last_name', lastName);
+      
+      const response = await fetch(`/api/search-library-users?${params.toString()}`);
+      const data = await response.json();
+      
+      loadingIndicator.style.display = 'none';
+      
+      if (!response.ok) {
+        errorDiv.style.display = 'block';
+        document.getElementById('libraryUsersErrorMessage').textContent = data.error || 'Error searching for users';
+        return;
+      }
+      
+      const users = data.users || [];
+      countElement.textContent = users.length;
+      
+      if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="w3-center w3-text-gray">No users found matching your search criteria</td></tr>';
+        resultsDiv.style.display = 'block';
+      } else {
+        // Escape HTML to prevent XSS
+        const escapeHtml = (text) => {
+          if (text === null || text === undefined) return '';
+          const div = document.createElement('div');
+          div.textContent = String(text);
+          return div.innerHTML;
+        };
+        
+        tbody.innerHTML = users.map(user => {
+          return `
+            <tr>
+              <td>${escapeHtml(user.id || '')}</td>
+              <td>${escapeHtml(user.email || '')}</td>
+              <td>${escapeHtml(user.username || '')}</td>
+              <td>${escapeHtml(user.first_name || '')}</td>
+              <td>${escapeHtml(user.last_name || '')}</td>
+              <td>${escapeHtml(user.mobile_number || '')}</td>
+              <td>${escapeHtml(user.created_at || '')}</td>
+              <td>${escapeHtml(user.updated_at || '')}</td>
+            </tr>
+          `;
+        }).join('');
+        
+        resultsDiv.style.display = 'block';
+      }
+    } catch (error) {
+      loadingIndicator.style.display = 'none';
+      errorDiv.style.display = 'block';
+      document.getElementById('libraryUsersErrorMessage').textContent = 'Error: ' + error.message;
+      console.error('Error searching library users:', error);
     }
   }
 </script>

@@ -7,6 +7,8 @@ from urllib.parse import urlsplit
 from flask import jsonify, render_template, flash, redirect, render_template_string, session, url_for, request, send_file, Response, stream_with_context
 from flask_login import login_user, logout_user, current_user, login_required
 import sqlalchemy as sa
+from docx import Document
+import re
 from app import app, db
 from app.forms import EventForm, LoginForm, PerfomanceTargetsForm, RegistrationForm, BookAllocationForm, ReportForm, WorkspaceForm, ProjectForm, TaskForm, CSVUploadForm, ChampionCSVUploadForm, ChampionSchoolForm, AkelloSimEventForm
 from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, Event, WeeklyReport, TaskA, ColumnA, ProjectA, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore
@@ -11916,6 +11918,487 @@ def search_learners_page():
     )
 
 
+@app.route('/word-to-html-converter', methods=['GET'])
+@login_required
+def word_to_html_converter():
+    """Display Word to HTML converter page"""
+    username = current_user.username
+    role = current_user.userRole
+    
+    return render_template(
+        'word_to_html_converter.html',
+        username=username,
+        role=role,
+        title='Word to HTML Converter'
+    )
+
+
+@app.route('/api/convert-word-to-html', methods=['POST'])
+@login_required
+def api_convert_word_to_html():
+    """Convert Word document or text to HTML"""
+    try:
+        # Check if file was uploaded
+        if 'file' in request.files:
+            file = request.files['file']
+            if file.filename == '':
+                return jsonify({'error': 'No file selected'}), 400
+            
+            if not file.filename.endswith('.docx'):
+                return jsonify({'error': 'Only .docx files are supported'}), 400
+            
+            # Save uploaded file temporarily
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_file:
+                file.save(tmp_file.name)
+                tmp_path = tmp_file.name
+            
+            try:
+                # Parse Word document
+                doc = Document(tmp_path)
+                content_lines = []
+                images = []
+                
+                # Extract images
+                image_dir = os.path.join(app.root_path, 'static', 'uploads', 'word_images')
+                os.makedirs(image_dir, exist_ok=True)
+                
+                # Extract images from document
+                for rel in doc.part.rels.values():
+                    if "image" in rel.target_ref:
+                        image_data = rel.target_part.blob
+                        image_ext = rel.target_ref.split('.')[-1] if '.' in rel.target_ref else 'png'
+                        image_filename = f"{secrets.token_hex(8)}.{image_ext}"
+                        image_path = os.path.join(image_dir, image_filename)
+                        
+                        with open(image_path, 'wb') as img_file:
+                            img_file.write(image_data)
+                        
+                        image_url = f"/static/uploads/word_images/{image_filename}"
+                        images.append({'url': image_url, 'path': image_path})
+                
+                # Extract text content
+                for paragraph in doc.paragraphs:
+                    if paragraph.text.strip():
+                        content_lines.append(paragraph.text)
+                
+                # Also check tables
+                for table in doc.tables:
+                    for row in table.rows:
+                        row_text = ' | '.join([cell.text.strip() for cell in row.cells if cell.text.strip()])
+                        if row_text:
+                            content_lines.append(row_text)
+                
+                content = '\n'.join(content_lines)
+                
+            finally:
+                # Clean up temp file
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+        
+        # Check if text was pasted
+        elif 'text_content' in request.form:
+            content = request.form.get('text_content', '').strip()
+            images = []
+        
+        else:
+            return jsonify({'error': 'Either file or text_content must be provided'}), 400
+        
+        if not content:
+            return jsonify({'error': 'No content to convert'}), 400
+        
+        # Parse and convert to HTML
+        html_output = _generate_html_from_content(content, images)
+        
+        # Post-process HTML to match bash script behavior
+        html_output = _post_process_html(html_output)
+        
+        return jsonify({
+            'html': html_output,
+            'images': [img['url'] for img in images],
+            'success': True
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+def _generate_html_from_content(content, images):
+    """Generate HTML from parsed content - matches expected structure"""
+    lines = [l.strip() for l in content.split('\n') if l.strip()]
+    html_parts = []
+    image_index = 0
+    
+    # Add required scripts at the top
+    html_parts.append('<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>')
+    html_parts.append('<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>')
+    html_parts.append('<!-- CONTENT STARTS HERE -->')
+    html_parts.append('<div class="containerx">')
+    html_parts.append('    <div class="row">')
+    
+    i = 0
+    main_header = None
+    in_objectives = False
+    objectives_content = []
+    lesson_topic = None
+    in_main_content = False
+    main_content_start_idx = None
+    
+    # Find main header (first line, or first ALL CAPS line)
+    if len(lines) > 0:
+        first_line = lines[0]
+        if first_line.isupper() and len(first_line) > 2:
+            main_header = first_line
+        else:
+            # Use first line as header even if not all caps
+            main_header = first_line
+        html_parts.append('        <div class="col-md-12">')
+        html_parts.append(f'            <h2 class="bannerG">{main_header}</h2>')
+        html_parts.append('        </div>')
+        i = 1
+    
+    # Find lesson topic (line before "Objectives")
+    objectives_idx = None
+    for j in range(i, len(lines)):
+        if 'objectives' in lines[j].lower():
+            objectives_idx = j
+            # Look backwards for lesson topic (1-2 lines before objectives)
+            if j > 0:
+                for k in range(max(0, j-2), j):
+                    potential_topic = lines[k]
+                    if (potential_topic and len(potential_topic) > 5 and 
+                        not potential_topic.lower().startswith('objectives') and
+                        not potential_topic.isupper() and
+                        not potential_topic.startswith('-') and
+                        not potential_topic.startswith('•')):
+                        lesson_topic = potential_topic
+                        break
+            break
+    
+    # Find and process Objectives
+    while i < len(lines):
+        line = lines[i]
+        
+        if 'objectives' in line.lower():
+            in_objectives = True
+            objectives_content = []
+            i += 1
+            continue
+        
+        if in_objectives:
+            if 'by the end' in line.lower():
+                # Skip the "By the end" line, it's in the template
+                i += 1
+                continue
+            elif any(line.strip().startswith(verb) for verb in ['List', 'Identify', 'Explain', 'Demonstrate', 'Describe', 'Analyze', 'Compare', 'Define']):
+                # Objective item - remove leading dashes/bullets/numbers if any
+                clean_line = re.sub(r'^[-•]\s*|\d+[\.\)]\s*', '', line).strip()
+                if clean_line:
+                    objectives_content.append(clean_line)
+                i += 1
+                continue
+            elif (line.lower().startswith('the ') or line.lower().startswith('these ') or 
+                  line.lower().startswith('as the ') or 
+                  line.lower().startswith('natural ') or
+                  line.lower().startswith('types of') or
+                  len(line) > 30):
+                # End of objectives, format it
+                img_url = images[image_index]['url'] if image_index < len(images) else None
+                html_parts.append(_format_objectives_section(objectives_content, img_url))
+                if image_index < len(images):
+                    image_index += 1
+                in_objectives = False
+                
+                # Add lesson topic if we found it
+                if lesson_topic:
+                    html_parts.append('        <div class="col-md-12">')
+                    html_parts.append('            <div class="col-md-12">')
+                    html_parts.append(f'                <h2 class="bannerG">{lesson_topic}</h2>')
+                    html_parts.append('            </div>')
+                    html_parts.append('            <div class="col-md-12">')
+                
+                in_main_content = True
+                main_content_start_idx = i
+                break
+            else:
+                # Still collecting objectives or might be continuation
+                if objectives_content:  # If we have objectives, this might be end
+                    # Check if this looks like content (not an objective)
+                    if (len(line) > 30 or 
+                        line.lower().startswith('the ') or 
+                        line.lower().startswith('they ') or
+                        line.lower().startswith('types')):
+                        # End objectives
+                        img_url = images[image_index]['url'] if image_index < len(images) else None
+                        html_parts.append(_format_objectives_section(objectives_content, img_url))
+                        if image_index < len(images):
+                            image_index += 1
+                        in_objectives = False
+                        if lesson_topic:
+                            html_parts.append('        <div class="col-md-12">')
+                            html_parts.append('            <div class="col-md-12">')
+                            html_parts.append(f'                <h2 class="bannerG">{lesson_topic}</h2>')
+                            html_parts.append('            </div>')
+                            html_parts.append('            <div class="col-md-12">')
+                        in_main_content = True
+                        main_content_start_idx = i
+                        break
+                i += 1
+                continue
+    
+    # Process main content
+    if in_main_content and main_content_start_idx is not None:
+        main_content_lines = lines[main_content_start_idx:]
+        html_parts.extend(_process_main_content_advanced(main_content_lines, images, image_index))
+        html_parts.append('            </div>')
+        html_parts.append('        </div>')
+    elif not in_objectives:
+        # Process remaining lines as main content
+        remaining_lines = lines[i:]
+        if remaining_lines:
+            if not lesson_topic:
+                # Try to find lesson topic in remaining lines
+                for line in remaining_lines[:5]:
+                    if line and len(line) > 15 and not line.isupper() and not line.lower().startswith('objectives'):
+                        lesson_topic = line
+                        html_parts.append('        <div class="col-md-12">')
+                        html_parts.append('            <div class="col-md-12">')
+                        html_parts.append(f'                <h2 class="bannerG">{lesson_topic}</h2>')
+                        html_parts.append('            </div>')
+                        html_parts.append('            <div class="col-md-12">')
+                        remaining_lines = remaining_lines[1:]
+                        break
+            
+            if lesson_topic or any('the ' in l.lower()[:10] for l in remaining_lines[:3]):
+                html_parts.extend(_process_main_content_advanced(remaining_lines, images, image_index))
+                html_parts.append('            </div>')
+                html_parts.append('        </div>')
+    
+    # Close container divs
+    html_parts.append('        <!--end of st1-->')
+    html_parts.append('    </div>')
+    html_parts.append('</div>')
+    
+    return '\n'.join(html_parts)
+
+
+def _post_process_html(html):
+    """Post-process HTML to match bash script transformations"""
+    import re
+    
+    # Remove blockquotes
+    html = re.sub(r'<blockquote>', '', html)
+    html = re.sub(r'</blockquote>', '', html)
+    
+    # Convert <strong> to <b> and <em> to <i>
+    html = re.sub(r'<strong>', '<b>', html)
+    html = re.sub(r'</strong>', '</b>', html)
+    html = re.sub(r'<em>', '<i>', html)
+    html = re.sub(r'</em>', '</i>', html)
+    
+    # Remove <p> tags inside <li> tags (but keep the content)
+    # Pattern: <li><p>content</p></li> -> <li>content</li>
+    html = re.sub(r'<li>\s*<p>(.*?)</p>\s*</li>', r'<li>\1</li>', html, flags=re.DOTALL)
+    
+    # Handle paragraphs containing only images - convert to divs
+    # Pattern: <p><img ...></p> -> <div><img ...></div>
+    html = re.sub(r'<p>\s*(<img[^>]*>)\s*</p>', r'<div>\1</div>', html, flags=re.IGNORECASE)
+    
+    # Handle "Fig X" captions - add line break after <b>Fig X</b>
+    # Pattern: <p><b>Fig X</b> caption</p> -> <p><b>Fig X</b><br>caption</p>
+    html = re.sub(r'(<p><b>Fig\s+\d+[^<]*</b>)([^<])', r'\1<br>\2', html, flags=re.IGNORECASE)
+    
+    # Clean up any double line breaks
+    html = re.sub(r'<br>\s*<br>', '<br>', html)
+    
+    return html
+
+
+def _find_lesson_topic_before_objectives(lines, obj_idx):
+    """Find the lesson topic before objectives"""
+    # Look backwards from objectives (check 1-5 lines before)
+    for i in range(max(0, obj_idx - 5), obj_idx):
+        if i < len(lines):
+            line = lines[i]
+            # Lesson topic is usually a substantial line that's not ALL CAPS, not objectives, not a list item
+            if (line and len(line) > 15 and not line.isupper() and 
+                not line.lower().startswith('objectives') and
+                not line.lower().startswith('by the end') and
+                not line.startswith('-') and not line.startswith('•') and
+                not re.match(r'^\d+[\.\)]', line) and
+                not any(line.startswith(verb) for verb in ['List', 'Identify', 'Explain', 'Demonstrate'])):
+                return line
+    return None
+
+
+def _process_main_content_advanced(lines, images, image_index):
+    """Process main content - simplified and robust version"""
+    html_parts = []
+    i = 0
+    
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        if not line:
+            i += 1
+            continue
+        
+        # Check for "Fig X" pattern
+        fig_match = re.match(r'^Fig\s+(\d+)\s*(.*)$', line, re.IGNORECASE)
+        if fig_match:
+            fig_num = fig_match.group(1)
+            caption = fig_match.group(2).strip()
+            img_url = images[image_index]['url'] if image_index < len(images) else "https://smartlearning.akello.co/public/uploads/content/HBC%20Social%20Science%20Grade%207/Lesson%2001%20Respiratory%20System_files/media/image1.png"
+            html_parts.append(f'                <div><img src="{img_url}" style="width: 4.95689in; height: 4.18535in; display: block; margin-left: auto; margin-right: auto;" alt="image1.png (240 KB)" width="60%" height="40%" caption="false" /></div>')
+            html_parts.append(f'                <div style="text-align: center;">Fig {fig_num} {caption}</div>')
+            if image_index < len(images):
+                image_index += 1
+            i += 1
+            continue
+        
+        # Check for Activity
+        activity_match = re.match(r'^Activity\s+(\d+)\s*(.*)$', line, re.IGNORECASE)
+        if activity_match:
+            activity_num = activity_match.group(1)
+            activity_content = activity_match.group(2).strip()
+            html_parts.append('                <div class="col-md-12">')
+            html_parts.append('                    <div class="row banner-area1">')
+            html_parts.append('                        <div class="col-md-12">')
+            html_parts.append(f'                            <h2 class="primary-activity-banner">Activity {activity_num}</h2>')
+            html_parts.append('                        </div>')
+            html_parts.append('                        <div style="background-color: #f2f2f2; justify-content: center; width: 96%; margin: auto;">')
+            html_parts.append(f'                            {activity_content}')
+            html_parts.append('                        </div>')
+            html_parts.append('                    </div>')
+            html_parts.append('                </div>')
+            html_parts.append('                <br /><br />')
+            i += 1
+            continue
+        
+        # Check if line ends with colon and introduces a list
+        if line.endswith(':'):
+            html_parts.append(f'                <p>{line}</p>')
+            i += 1
+            # Collect list items
+            list_items = []
+            while i < len(lines):
+                next_line = lines[i].strip()
+                if not next_line:
+                    i += 1
+                    continue
+                # Check if it's a list item
+                if (next_line.startswith('-') or next_line.startswith('•') or
+                    re.match(r'^[A-Z][^:]*:', next_line) or  # "Earthquakes:", "Floods:", etc.
+                    (len(next_line.split()) <= 6 and next_line[0].isupper() and 
+                     not next_line.endswith('.') and not 'Fig' in next_line and
+                     not 'Activity' in next_line)):
+                    list_items.append(next_line)
+                    i += 1
+                else:
+                    break
+            
+            if list_items:
+                html_parts.append(_format_simple_list(list_items))
+                continue
+        
+        # Regular paragraph
+        html_parts.append(f'                <p>{line}</p>')
+        i += 1
+    
+    return html_parts
+
+
+def _format_simple_list(list_items):
+    """Format a simple list"""
+    html_parts = []
+    html_parts.append('                <ul>')
+    for item in list_items:
+        clean = re.sub(r'^[-•]\s*', '', item).strip()
+        # If item has colon, format as bold title
+        if ':' in clean:
+            parts = clean.split(':', 1)
+            html_parts.append(f'                    <li><b>{parts[0]}:</b>{parts[1] if len(parts) > 1 else ""}</li>')
+        else:
+            html_parts.append(f'                    <li>{clean}</li>')
+    html_parts.append('                </ul>')
+    return '\n'.join(html_parts)
+
+
+def _format_roman_list(list_items, all_lines, next_idx):
+    """Format a simple lower-roman list"""
+    html_parts = []
+    html_parts.append('                <ol style="list-style-type: lower-roman;">')
+    
+    for item in list_items:
+        clean = re.sub(r'^[-•]\s*|[a-z]\)\s*', '', item, flags=re.IGNORECASE).strip()
+        html_parts.append(f'                    <li>{clean}</li>')
+    
+    html_parts.append('                </ol>')
+    return '\n'.join(html_parts)
+
+
+def _format_nested_roman_list(main_items, all_lines):
+    """Format nested list with lower-roman outer and nested ul/ol inner"""
+    html_parts = []
+    html_parts.append('                <ol style="list-style-type: lower-roman;">')
+    
+    for idx, (line_idx, title) in enumerate(main_items):
+        html_parts.append('                    <li>')
+        html_parts.append(f'                        <p>{title}</p>')
+        
+        # Collect content for this item
+        start_idx = line_idx + 1
+        end_idx = main_items[idx + 1][0] if idx + 1 < len(main_items) else len(all_lines)
+        
+        item_content = []
+        for j in range(start_idx, end_idx):
+            if j < len(all_lines):
+                item_content.append(all_lines[j])
+        
+        if item_content:
+            html_parts.append('                        <ul>')
+            for content_line in item_content:
+                # Skip empty lines and figure captions (they'll be handled separately)
+                if not content_line.strip() or content_line.strip().startswith('Fig '):
+                    continue
+                clean = re.sub(r'^[-•]\s*', '', content_line).strip()
+                if clean:
+                    html_parts.append(f'                            <li>{clean}</li>')
+            html_parts.append('                        </ul>')
+        
+        html_parts.append('                    </li>')
+    
+    html_parts.append('                </ol>')
+    return '\n'.join(html_parts)
+
+
+def _format_objectives_section(content, image_url=None):
+    """Format objectives section with banner"""
+    html = []
+    html.append('        <div class="col-md-12">')
+    html.append('            <div class="row banner-area">')
+    
+    if image_url:
+        html.append(f'                <div class="col-md-6  banner-image"><img class="img-fluid" src="{image_url}" alt="Objective Icons" style="width: 100%;" caption="false" /></div>')
+    else:
+        html.append('                <div class="col-md-6  banner-image"><img class="img-fluid" src="https://asladmin.akello.co/public/uploads/content/Maths%20Grade%206/Objectives%20Icon%20/__54.png" alt="Objective Icons form 4-43.png (148 KB)" style="width: 100%;" caption="false" /></div>')
+    
+    html.append('                <div class="col-md-6">')
+    html.append('                    <h2>Objectives</h2>')
+    html.append('                    <h4 class="padding-5">By the end of this lesson, you should be able to:</h4>')
+    html.append('                    <ol type="1">')
+    for item in content:
+        if item.strip():
+            html.append(f'                        <li>{item.strip()}</li>')
+    html.append('                    </ol>')
+    html.append('                </div>')
+    html.append('            </div>')
+    html.append('        </div>')
+    return '\n'.join(html)
+
+
 @app.route('/api/top-learners', methods=['GET'])
 @login_required
 def get_top_learners():
@@ -14116,6 +14599,76 @@ def help_desk():
         my_queries = []
 
     return render_template('help_desk.html', form=form, queries=queries, my_queries=my_queries, title='Help desk')
+
+
+@app.route('/api/search-library-users', methods=['GET'])
+@login_required
+def search_library_users():
+    """Search library users by email, first_name, and/or last_name"""
+    email = request.args.get('email', '').strip()
+    first_name = request.args.get('first_name', '').strip()
+    last_name = request.args.get('last_name', '').strip()
+    
+    # At least one search parameter is required
+    if not email and not first_name and not last_name:
+        return jsonify({'success': False, 'error': 'At least one search parameter (email, first_name, or last_name) is required'}), 400
+    
+    conn = None
+    cursor = None
+    try:
+        conn = get_direct_library_conn()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        
+        # Build dynamic query based on provided parameters
+        conditions = []
+        params = []
+        
+        if email:
+            conditions.append("email = %s")
+            params.append(email)
+        
+        if first_name:
+            conditions.append("first_name LIKE %s")
+            params.append(f"%{first_name}%")
+        
+        if last_name:
+            conditions.append("last_name LIKE %s")
+            params.append(f"%{last_name}%")
+        
+        # Construct the query
+        query = f"SELECT * FROM users WHERE {' AND '.join(conditions)}"
+        cursor.execute(query, tuple(params))
+        results = cursor.fetchall()
+        
+        # Convert results to list of dictionaries
+        users = []
+        for row in results:
+            # Convert any datetime objects to strings
+            user_dict = {}
+            for key, value in row.items():
+                if hasattr(value, 'isoformat'):  # datetime objects
+                    user_dict[key] = value.isoformat()
+                else:
+                    user_dict[key] = value
+            users.append(user_dict)
+        
+        return jsonify({
+            'success': True,
+            'users': users,
+            'count': len(users)
+        }), 200
+        
+    except Exception as e:
+        app.logger.error(f"Error searching library users: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Error searching library users: {str(e)}'
+        }), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 # ===== Microsoft Graph API OAuth Routes =====
