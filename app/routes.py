@@ -60,6 +60,11 @@ import uuid
 from openai import OpenAI
 
 # Load .env variables
+# Try to load from project root directory
+from pathlib import Path
+env_path = Path(__file__).parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
+# Also try loading from current directory (fallback)
 load_dotenv()
 
 
@@ -6279,6 +6284,19 @@ def is_admin_user():
         # Fallback to privileges dict if present
         if hasattr(current_user, 'has_privilege'):
             return current_user.has_privilege('Super-admin') or current_user.has_privilege('Manager')
+    except Exception:
+        pass
+    return False
+
+def can_view_all_queries():
+    """Check if user can view all queries (admin or has Admin Queries Access privilege)."""
+    try:
+        # Admins can always view all queries
+        if getattr(current_user, 'userRole', None) == 'Admin':
+            return True
+        # Users with Admin Queries Access privilege can also view all queries
+        if hasattr(current_user, 'has_privilege'):
+            return current_user.has_privilege('Admin Queries Access')
     except Exception:
         pass
     return False
@@ -13760,11 +13778,19 @@ def fetch_gmail_emails():
         gmail_password = os.getenv('GOOGLE_APP_PASSWORD') or os.getenv('google_app_password')
         gmail_sender_filter = os.getenv('GMAIL_SENDER_FILTER', 'quincy.mashava@akello.co')
         
-        # Debug logging
-        print(f"Gmail Config Check - Email: {gmail_email}, Password set: {bool(gmail_password)}, Filter: {gmail_sender_filter}")
+        # Debug logging - check both variable names
+        gmail_password_upper = os.getenv('GOOGLE_APP_PASSWORD')
+        gmail_password_lower = os.getenv('google_app_password')
+        print(f"Gmail Config Check - Email: {gmail_email}")
+        print(f"  GOOGLE_APP_PASSWORD (upper): {'✓ SET' if gmail_password_upper else '✗ NOT SET'}")
+        print(f"  google_app_password (lower): {'✓ SET' if gmail_password_lower else '✗ NOT SET'}")
+        print(f"  Final password: {'✓ SET' if gmail_password else '✗ NOT SET'}")
+        print(f"  Filter: {gmail_sender_filter}")
         
         if not gmail_email or not gmail_password:
             error_msg = f'Gmail configuration not set. Email: {"✓" if gmail_email else "✗"}, Password: {"✓" if gmail_password else "✗"}'
+            if not gmail_password:
+                error_msg += '\n\nTo fix this:\n1. Get a Google App Password from: https://myaccount.google.com/apppasswords\n2. Add GOOGLE_APP_PASSWORD=your-password to your .env file\n3. Restart the Flask application'
             print(f"Gmail config error: {error_msg}")
             return jsonify({
                 'error': error_msg,
@@ -14320,17 +14346,102 @@ def convert_outlook_email_to_query(email_id):
                 pass  # Keep original if parsing fails
         
         # Create a help desk query from the email
-        from app.models import HelpDeskQuery
+        from app.models import HelpDeskQuery, Notification, User
+        from sqlalchemy import inspect
         
-        query = HelpDeskQuery(
-            query_title=subject,
-            query_description=f"From: {from_email}\n\n{body}",
-            query_type='Email',
-            created_by=from_email,
-            status='Not started'
-        )
+        # Get assigned user IDs from request
+        data = request.get_json() or {}
+        assigned_user_ids = data.get('assigned_user_ids', [])
         
-        db.session.add(query)
+        # Check if resolved_at column exists
+        try:
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
+            has_resolved_at = 'resolved_at' in columns
+        except Exception:
+            has_resolved_at = False
+        
+        # Create query using raw SQL if column doesn't exist to avoid INSERT error
+        if not has_resolved_at:
+            # Use raw SQL to insert without resolved_at column
+            result = db.session.execute(
+                text("""
+                    INSERT INTO helpdesk_queries (query_title, query_description, timestamp, query_type, created_by, image_path, status)
+                    VALUES (:title, :description, :timestamp, :type, :created_by, :image_path, :status)
+                """),
+                {
+                    'title': subject,
+                    'description': f"From: {from_email}\n\n{body}",
+                    'timestamp': datetime.utcnow(),
+                    'type': 'Email',
+                    'created_by': from_email,
+                    'image_path': None,
+                    'status': 'Not started'
+                }
+            )
+            db.session.flush()  # Don't commit yet, need to handle assignments
+            query_id = result.lastrowid
+            # Fetch query using raw SQL to avoid resolved_at column
+            query_row = db.session.execute(
+                text("SELECT id, query_title, query_description, timestamp, query_type, created_by, image_path, status FROM helpdesk_queries WHERE id = :id"),
+                {'id': query_id}
+            ).fetchone()
+            if query_row:
+                row_dict = dict(query_row._mapping)
+                # Convert timestamp string to datetime if needed
+                if 'timestamp' in row_dict and isinstance(row_dict['timestamp'], str):
+                    try:
+                        row_dict['timestamp'] = datetime.fromisoformat(row_dict['timestamp'].replace('Z', '+00:00'))
+                    except Exception:
+                        try:
+                            row_dict['timestamp'] = datetime.strptime(row_dict['timestamp'], '%Y-%m-%d %H:%M:%S')
+                        except Exception:
+                            row_dict['timestamp'] = None
+                query = HelpDeskQuery(**row_dict)
+            else:
+                raise Exception("Failed to retrieve created query")
+        else:
+            # Use ORM when column exists
+            query = HelpDeskQuery(
+                query_title=subject,
+                query_description=f"From: {from_email}\n\n{body}",
+                query_type='Email',
+                created_by=from_email,
+                status='Not started'
+            )
+            db.session.add(query)
+            db.session.flush()  # Get query.id before commit
+        
+        # Assign users if provided
+        if assigned_user_ids:
+            for user_id in assigned_user_ids:
+                user = User.query.get(user_id)
+                if user:
+                    # Use raw SQL to insert into query_assignees if table exists
+                    try:
+                        db.session.execute(
+                            text("INSERT INTO query_assignees (query_id, user_id) VALUES (:query_id, :user_id)"),
+                            {'query_id': query.id, 'user_id': user_id}
+                        )
+                    except Exception:
+                        # Table might not exist, try using relationship
+                        try:
+                            query.assignees.append(user)
+                        except Exception as e:
+                            app.logger.warning(f"Could not assign user: {str(e)}")
+                    
+                    # Create notification for assigned user
+                    try:
+                        notification = Notification(
+                            user_id=user_id,
+                            query_id=query.id,
+                            message=f"You have been assigned a new query: '{subject}'",
+                            notification_type='assignment'
+                        )
+                        db.session.add(notification)
+                    except Exception as e:
+                        app.logger.warning(f"Could not create notification: {str(e)}")
+        
         db.session.commit()
         
         return jsonify({'success': True, 'query_id': query.id}), 201
@@ -14420,17 +14531,102 @@ def convert_gmail_email_to_query(email_id):
         mail.logout()
         
         # Create a help desk query from the email
-        from app.models import HelpDeskQuery
+        from app.models import HelpDeskQuery, Notification, User
+        from sqlalchemy import inspect
         
-        query = HelpDeskQuery(
-            query_title=subject,
-            query_description=f"From: {from_email}\n\n{body}",
-            query_type='Email',
-            created_by=from_email,
-            status='Not started'
-        )
+        # Get assigned user IDs from request
+        data = request.get_json() or {}
+        assigned_user_ids = data.get('assigned_user_ids', [])
         
-        db.session.add(query)
+        # Check if resolved_at column exists
+        try:
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
+            has_resolved_at = 'resolved_at' in columns
+        except Exception:
+            has_resolved_at = False
+        
+        # Create query using raw SQL if column doesn't exist to avoid INSERT error
+        if not has_resolved_at:
+            # Use raw SQL to insert without resolved_at column
+            result = db.session.execute(
+                text("""
+                    INSERT INTO helpdesk_queries (query_title, query_description, timestamp, query_type, created_by, image_path, status)
+                    VALUES (:title, :description, :timestamp, :type, :created_by, :image_path, :status)
+                """),
+                {
+                    'title': subject,
+                    'description': f"From: {from_email}\n\n{body}",
+                    'timestamp': datetime.utcnow(),
+                    'type': 'Email',
+                    'created_by': from_email,
+                    'image_path': None,
+                    'status': 'Not started'
+                }
+            )
+            db.session.flush()  # Don't commit yet, need to handle assignments
+            query_id = result.lastrowid
+            # Fetch query using raw SQL to avoid resolved_at column
+            query_row = db.session.execute(
+                text("SELECT id, query_title, query_description, timestamp, query_type, created_by, image_path, status FROM helpdesk_queries WHERE id = :id"),
+                {'id': query_id}
+            ).fetchone()
+            if query_row:
+                row_dict = dict(query_row._mapping)
+                # Convert timestamp string to datetime if needed
+                if 'timestamp' in row_dict and isinstance(row_dict['timestamp'], str):
+                    try:
+                        row_dict['timestamp'] = datetime.fromisoformat(row_dict['timestamp'].replace('Z', '+00:00'))
+                    except Exception:
+                        try:
+                            row_dict['timestamp'] = datetime.strptime(row_dict['timestamp'], '%Y-%m-%d %H:%M:%S')
+                        except Exception:
+                            row_dict['timestamp'] = None
+                query = HelpDeskQuery(**row_dict)
+            else:
+                raise Exception("Failed to retrieve created query")
+        else:
+            # Use ORM when column exists
+            query = HelpDeskQuery(
+                query_title=subject,
+                query_description=f"From: {from_email}\n\n{body}",
+                query_type='Email',
+                created_by=from_email,
+                status='Not started'
+            )
+            db.session.add(query)
+            db.session.flush()  # Get query.id before commit
+        
+        # Assign users if provided
+        if assigned_user_ids:
+            for user_id in assigned_user_ids:
+                user = User.query.get(user_id)
+                if user:
+                    # Use raw SQL to insert into query_assignees if table exists
+                    try:
+                        db.session.execute(
+                            text("INSERT INTO query_assignees (query_id, user_id) VALUES (:query_id, :user_id)"),
+                            {'query_id': query.id, 'user_id': user_id}
+                        )
+                    except Exception:
+                        # Table might not exist, try using relationship
+                        try:
+                            query.assignees.append(user)
+                        except Exception as e:
+                            app.logger.warning(f"Could not assign user: {str(e)}")
+                    
+                    # Create notification for assigned user
+                    try:
+                        notification = Notification(
+                            user_id=user_id,
+                            query_id=query.id,
+                            message=f"You have been assigned a new query: '{subject}'",
+                            notification_type='assignment'
+                        )
+                        db.session.add(notification)
+                    except Exception as e:
+                        app.logger.warning(f"Could not create notification: {str(e)}")
+        
         db.session.commit()
         
         return jsonify({'success': True, 'query_id': query.id}), 201
@@ -14581,24 +14777,306 @@ def help_desk():
         return redirect(url_for('help_desk'))
 
     # Show newest first; admins see all; others see only their own and anonymous
+    # Check if resolved_at column exists to avoid query errors
     try:
-        if current_user.userRole == 'Admin':
-            queries = HelpDeskQuery.query.order_by(HelpDeskQuery.timestamp.desc()).all()
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
+        has_resolved_at = 'resolved_at' in columns
+    except Exception:
+        has_resolved_at = False
+    
+    try:
+        if has_resolved_at:
+            # Use ORM when column exists
+            if can_view_all_queries():
+                queries = HelpDeskQuery.query.order_by(HelpDeskQuery.timestamp.desc()).all()
+            else:
+                queries = HelpDeskQuery.query.filter(
+                    (HelpDeskQuery.created_by == current_user.username) | (HelpDeskQuery.created_by == 'anonymous')
+                ).order_by(HelpDeskQuery.timestamp.desc()).all()
+            
+            my_queries = HelpDeskQuery.query.filter(HelpDeskQuery.created_by == current_user.username) \
+                .order_by(HelpDeskQuery.timestamp.desc()).all()
+            
+            # Load assignees for each query
+            for query in queries + my_queries:
+                # Initialize assignees list to empty list
+                query._assignees_list = []
+                try:
+                    # Check if query_assignees table exists
+                    try:
+                        assignees_result = db.session.execute(
+                            text("SELECT u.id, u.username, u.email, u.firstname, u.lastname, u.userRole FROM query_assignees qa JOIN user u ON qa.user_id = u.id WHERE qa.query_id = :query_id"),
+                            {'query_id': query.id}
+                        ).fetchall()
+                        query._assignees_list = [dict(row._mapping) for row in assignees_result]
+                    except Exception:
+                        # Table doesn't exist or relationship not working, try using ORM
+                        try:
+                            if hasattr(query, 'assignees') and query.assignees:
+                                query._assignees_list = [{'id': u.id, 'username': u.username, 'email': u.email, 'firstname': u.firstname, 'lastname': u.lastname, 'userRole': u.userRole} for u in query.assignees]
+                        except Exception:
+                            pass  # Keep empty list
+                except Exception:
+                    pass  # Keep empty list
         else:
-            queries = HelpDeskQuery.query.filter(
-                (HelpDeskQuery.created_by == current_user.username) | (HelpDeskQuery.created_by == 'anonymous')
-            ).order_by(HelpDeskQuery.timestamp.desc()).all()
-    except Exception:
+            # Use raw SQL when column doesn't exist
+            # Need to manually construct objects and convert timestamp strings to datetime
+            if can_view_all_queries():
+                result = db.session.execute(
+                    text("SELECT * FROM helpdesk_queries ORDER BY timestamp DESC")
+                )
+            else:
+                result = db.session.execute(
+                    text("SELECT * FROM helpdesk_queries WHERE created_by = :username OR created_by = 'anonymous' ORDER BY timestamp DESC"),
+                    {'username': current_user.username}
+                )
+            
+            queries = []
+            for row in result:
+                row_dict = dict(row._mapping)
+                # Convert timestamp string to datetime if it's a string
+                if 'timestamp' in row_dict and isinstance(row_dict['timestamp'], str):
+                    try:
+                        row_dict['timestamp'] = datetime.fromisoformat(row_dict['timestamp'].replace('Z', '+00:00'))
+                    except Exception:
+                        try:
+                            row_dict['timestamp'] = datetime.strptime(row_dict['timestamp'], '%Y-%m-%d %H:%M:%S')
+                        except Exception:
+                            row_dict['timestamp'] = None
+                query_obj = HelpDeskQuery(**row_dict)
+                # Initialize and load assignees
+                query_obj._assignees_list = []
+                try:
+                    assignees_result = db.session.execute(
+                        text("SELECT u.id, u.username, u.email, u.firstname, u.lastname, u.userRole FROM query_assignees qa JOIN user u ON qa.user_id = u.id WHERE qa.query_id = :query_id"),
+                        {'query_id': query_obj.id}
+                    ).fetchall()
+                    query_obj._assignees_list = [dict(row._mapping) for row in assignees_result]
+                except Exception:
+                    pass  # Keep empty list
+                queries.append(query_obj)
+            
+            result = db.session.execute(
+                text("SELECT * FROM helpdesk_queries WHERE created_by = :username ORDER BY timestamp DESC"),
+                {'username': current_user.username}
+            )
+            
+            my_queries = []
+            for row in result:
+                row_dict = dict(row._mapping)
+                # Convert timestamp string to datetime if it's a string
+                if 'timestamp' in row_dict and isinstance(row_dict['timestamp'], str):
+                    try:
+                        row_dict['timestamp'] = datetime.fromisoformat(row_dict['timestamp'].replace('Z', '+00:00'))
+                    except Exception:
+                        try:
+                            row_dict['timestamp'] = datetime.strptime(row_dict['timestamp'], '%Y-%m-%d %H:%M:%S')
+                        except Exception:
+                            row_dict['timestamp'] = None
+                query_obj = HelpDeskQuery(**row_dict)
+                # Initialize and load assignees
+                query_obj._assignees_list = []
+                try:
+                    assignees_result = db.session.execute(
+                        text("SELECT u.id, u.username, u.email, u.firstname, u.lastname, u.userRole FROM query_assignees qa JOIN user u ON qa.user_id = u.id WHERE qa.query_id = :query_id"),
+                        {'query_id': query_obj.id}
+                    ).fetchall()
+                    query_obj._assignees_list = [dict(row._mapping) for row in assignees_result]
+                except Exception:
+                    pass  # Keep empty list
+                my_queries.append(query_obj)
+    except Exception as e:
+        app.logger.error(f"Error fetching queries: {str(e)}")
         queries = []
-
-    # My queries section: all queries created by the current user
-    try:
-        my_queries = HelpDeskQuery.query.filter(HelpDeskQuery.created_by == current_user.username) \
-            .order_by(HelpDeskQuery.timestamp.desc()).all()
-    except Exception:
         my_queries = []
 
     return render_template('help_desk.html', form=form, queries=queries, my_queries=my_queries, title='Help desk')
+
+
+@app.route('/api/help-desk/stats', methods=['GET'])
+@login_required
+def help_desk_stats():
+    """Get help desk statistics for dashboard"""
+    try:
+        from app.models import HelpDeskQuery
+        from datetime import datetime, timedelta
+        
+        # Check if resolved_at column exists
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
+            has_resolved_at = 'resolved_at' in columns
+        except Exception:
+            has_resolved_at = False
+        
+        # Basic counts - use raw SQL to avoid resolved_at column if it doesn't exist
+        if has_resolved_at:
+            total_queries = HelpDeskQuery.query.count()
+            resolved_queries = HelpDeskQuery.query.filter_by(status='Resolved').count()
+            not_started = HelpDeskQuery.query.filter_by(status='Not started').count()
+            looking_into = HelpDeskQuery.query.filter_by(status='Looking into it').count()
+            
+            # Queries over time (last 30 days)
+            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            
+            queries_last_30_days = HelpDeskQuery.query.filter(
+                HelpDeskQuery.timestamp >= thirty_days_ago
+            ).count()
+            
+            queries_last_7_days = HelpDeskQuery.query.filter(
+                HelpDeskQuery.timestamp >= seven_days_ago
+            ).count()
+            
+            # Daily breakdown for last 7 days
+            daily_data = []
+            for i in range(6, -1, -1):
+                day_start = (datetime.utcnow() - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+                day_end = day_start + timedelta(days=1)
+                count = HelpDeskQuery.query.filter(
+                    HelpDeskQuery.timestamp >= day_start,
+                    HelpDeskQuery.timestamp < day_end
+                ).count()
+                daily_data.append({
+                    'date': day_start.strftime('%Y-%m-%d'),
+                    'count': count
+                })
+            
+            # Average resolution time (for resolved queries)
+            avg_resolution_hours = 0
+            try:
+                resolved_with_times = HelpDeskQuery.query.filter(
+                    HelpDeskQuery.status == 'Resolved',
+                    HelpDeskQuery.resolved_at.isnot(None)
+                ).all()
+                
+                if resolved_with_times:
+                    total_hours = 0
+                    count = 0
+                    for query in resolved_with_times:
+                        if query.resolved_at and query.timestamp:
+                            delta = query.resolved_at - query.timestamp
+                            total_hours += delta.total_seconds() / 3600
+                            count += 1
+                    if count > 0:
+                        avg_resolution_hours = total_hours / count
+            except Exception:
+                avg_resolution_hours = 0
+        else:
+            # Use raw SQL queries to avoid resolved_at column
+            total_queries = db.session.execute(text("SELECT COUNT(*) FROM helpdesk_queries")).scalar()
+            resolved_queries = db.session.execute(text("SELECT COUNT(*) FROM helpdesk_queries WHERE status = 'Resolved'")).scalar()
+            not_started = db.session.execute(text("SELECT COUNT(*) FROM helpdesk_queries WHERE status = 'Not started'")).scalar()
+            looking_into = db.session.execute(text("SELECT COUNT(*) FROM helpdesk_queries WHERE status = 'Looking into it'")).scalar()
+            
+            # Queries over time (last 30 days)
+            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            
+            queries_last_30_days = db.session.execute(
+                text("SELECT COUNT(*) FROM helpdesk_queries WHERE timestamp >= :date"),
+                {'date': thirty_days_ago}
+            ).scalar()
+            
+            queries_last_7_days = db.session.execute(
+                text("SELECT COUNT(*) FROM helpdesk_queries WHERE timestamp >= :date"),
+                {'date': seven_days_ago}
+            ).scalar()
+            
+            # Daily breakdown for last 7 days
+            daily_data = []
+            for i in range(6, -1, -1):
+                day_start = (datetime.utcnow() - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+                day_end = day_start + timedelta(days=1)
+                count = db.session.execute(
+                    text("SELECT COUNT(*) FROM helpdesk_queries WHERE timestamp >= :start AND timestamp < :end"),
+                    {'start': day_start, 'end': day_end}
+                ).scalar()
+                daily_data.append({
+                    'date': day_start.strftime('%Y-%m-%d'),
+                    'count': count
+                })
+            
+            avg_resolution_hours = 0
+        
+        unresolved_queries = total_queries - resolved_queries
+        success_rate = (resolved_queries / total_queries * 100) if total_queries > 0 else 0
+        
+        return jsonify({
+            'success': True,
+            'stats': {
+                'total_queries': total_queries,
+                'resolved_queries': resolved_queries,
+                'unresolved_queries': unresolved_queries,
+                'success_rate': round(success_rate, 2),
+                'status_breakdown': {
+                    'not_started': not_started,
+                    'looking_into_it': looking_into,
+                    'resolved': resolved_queries
+                },
+                'queries_last_30_days': queries_last_30_days,
+                'queries_last_7_days': queries_last_7_days,
+                'daily_data': daily_data,
+                'avg_resolution_hours': round(avg_resolution_hours, 2)
+            }
+        }), 200
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching help desk stats: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': f'Error fetching stats: {str(e)}'
+        }), 500
+
+
+@app.route('/api/search-users', methods=['GET'])
+@login_required
+def search_users():
+    """Search registered users for assignment purposes"""
+    search_term = request.args.get('q', '').strip()
+    
+    if not search_term or len(search_term) < 2:
+        return jsonify({'success': False, 'error': 'Search term must be at least 2 characters'}), 400
+    
+    try:
+        from app.models import User
+        # Search by username, email, firstname, or lastname
+        search_pattern = f"%{search_term}%"
+        users = User.query.filter(
+            (User.username.ilike(search_pattern)) |
+            (User.email.ilike(search_pattern)) |
+            (User.firstname.ilike(search_pattern)) |
+            (User.lastname.ilike(search_pattern))
+        ).limit(20).all()
+        
+        users_data = []
+        for user in users:
+            users_data.append({
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'firstname': user.firstname,
+                'lastname': user.lastname,
+                'userRole': user.userRole
+            })
+        
+        return jsonify({
+            'success': True,
+            'users': users_data,
+            'count': len(users_data)
+        }), 200
+        
+    except Exception as e:
+        app.logger.error(f"Error searching users: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Error searching users: {str(e)}'
+        }), 500
 
 
 @app.route('/api/search-library-users', methods=['GET'])
@@ -14640,7 +15118,7 @@ def search_library_users():
         cursor.execute(query, tuple(params))
         results = cursor.fetchall()
         
-        # Convert results to list of dictionaries
+        # Convert results to list of dictionaries and fetch books for each user
         users = []
         for row in results:
             # Convert any datetime objects to strings
@@ -14650,6 +15128,55 @@ def search_library_users():
                     user_dict[key] = value.isoformat()
                 else:
                     user_dict[key] = value
+            
+            # Fetch books for this user through orders
+            user_id = row.get('id')
+            books = []
+            if user_id:
+                try:
+                    # Debug: Log user_id and type
+                    app.logger.info(f"Fetching books for user_id: {user_id} (type: {type(user_id)})")
+                    
+                    # Ensure user_id is the correct type (int)
+                    user_id_param = int(user_id) if user_id else None
+                    if user_id_param:
+                        # Query to get books through orders: users → orders → book_order → books
+                        books_query = """
+                            SELECT 
+                                b.id, b.author, b.title, b.price,
+                                bo.quantity, bo.total_cost,
+                                o.id as order_id, o.status, o.payment_method, o.total_amount, 
+                                o.created_at as order_created_at, o.updated_at as order_updated_at, o.phone
+                            FROM orders o
+                            INNER JOIN book_order bo ON o.id = bo.order_id
+                            INNER JOIN books b ON bo.book_id = b.id
+                            WHERE o.user_id = %s
+                            ORDER BY o.created_at DESC, b.title ASC
+                        """
+                        cursor.execute(books_query, (user_id_param,))
+                        books_results = cursor.fetchall()
+                        
+                        app.logger.info(f"Query executed for user_id {user_id_param}, found {len(books_results)} book records")
+                        
+                        # Convert books results to list of dictionaries
+                        for book_row in books_results:
+                            book_dict = {}
+                            for key, value in book_row.items():
+                                if hasattr(value, 'isoformat'):  # datetime objects
+                                    book_dict[key] = value.isoformat()
+                                else:
+                                    book_dict[key] = value
+                            books.append(book_dict)
+                    else:
+                        app.logger.warning(f"Invalid user_id: {user_id}")
+                except Exception as e:
+                    error_msg = f"Error fetching books for user {user_id}: {str(e)}"
+                    app.logger.error(error_msg)
+                    import traceback
+                    app.logger.error(traceback.format_exc())
+                    # Continue without books if query fails
+            
+            user_dict['books'] = books
             users.append(user_dict)
         
         return jsonify({
@@ -14757,22 +15284,247 @@ def microsoft_auth_status():
     })
 
 
+# Notification endpoints
+@app.route('/api/notifications', methods=['GET'])
+@login_required
+def get_notifications():
+    """Get current user's notifications"""
+    try:
+        from app.models import Notification
+        notifications = db.session.query(Notification).filter_by(user_id=current_user.id)\
+            .order_by(Notification.created_at.desc())\
+            .limit(50).all()
+        
+        notifications_data = []
+        for notif in notifications:
+            notifications_data.append({
+                'id': notif.id,
+                'query_id': notif.query_id,
+                'message': notif.message,
+                'notification_type': notif.notification_type,
+                'read': notif.read,
+                'created_at': notif.created_at.isoformat() if notif.created_at else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'notifications': notifications_data
+        }), 200
+    except Exception as e:
+        app.logger.error(f"Error fetching notifications: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/help-desk/notifications', methods=['GET'])
+@login_required
+def get_helpdesk_notifications():
+    """Get query-related notifications for current user (help desk specific)"""
+    try:
+        from app.models import Notification
+        # Get only notifications that have a query_id (help desk related)
+        notifications = db.session.query(Notification).filter(
+            Notification.user_id == current_user.id,
+            Notification.query_id.isnot(None)
+        ).order_by(Notification.created_at.desc()).limit(50).all()
+        
+        notifications_data = []
+        for notif in notifications:
+            notifications_data.append({
+                'id': notif.id,
+                'query_id': notif.query_id,
+                'message': notif.message,
+                'notification_type': notif.notification_type,
+                'read': notif.read,
+                'created_at': notif.created_at.isoformat() if notif.created_at else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'notifications': notifications_data
+        }), 200
+    except Exception as e:
+        app.logger.error(f"Error fetching help desk notifications: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/notifications/unread-count', methods=['GET'])
+@login_required
+def get_unread_notification_count():
+    """Get count of unread notifications for current user"""
+    try:
+        from app.models import Notification
+        count = db.session.query(Notification).filter_by(user_id=current_user.id, read=False).count()
+        return jsonify({
+            'success': True,
+            'count': count
+        }), 200
+    except Exception as e:
+        app.logger.error(f"Error getting unread count: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/notifications/<int:notification_id>/read', methods=['PATCH'])
+@login_required
+def mark_notification_read(notification_id):
+    """Mark a notification as read"""
+    try:
+        from app.models import Notification
+        notification = db.session.get(Notification, notification_id)
+        if not notification:
+            return jsonify({'error': 'Notification not found'}), 404
+        
+        # Ensure user owns this notification
+        if notification.user_id != current_user.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        notification.read = True
+        db.session.commit()
+        
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error marking notification as read: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # Update help desk query status (Admin only)
 @app.route('/help-desk/<int:query_id>/status', methods=['PATCH'])
 @login_required
 def update_helpdesk_status(query_id):
-    if current_user.userRole != 'Admin':
+    # Admins and users with Admin Queries Access privilege can update status
+    if not can_view_all_queries():
         return jsonify({'error': 'Unauthorized'}), 403
-    from app.models import HelpDeskQuery
-    q = HelpDeskQuery.query.get_or_404(query_id)
-    data = request.get_json() or {}
-    new_status = data.get('status')
-    allowed = ['Not started', 'Looking into it', 'Resolved']
-    if new_status not in allowed:
-        return jsonify({'error': 'Invalid status'}), 400
-    q.status = new_status
-    db.session.commit()
-    return jsonify({'message': 'Status updated', 'status': q.status})
+    from app.models import HelpDeskQuery, Notification, User
+    from sqlalchemy import text, inspect
+    
+    try:
+        # Check if resolved_at column exists
+        try:
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
+            has_resolved_at = 'resolved_at' in columns
+        except Exception:
+            has_resolved_at = False
+        
+        data = request.get_json() or {}
+        new_status = data.get('status')
+        allowed = ['Not started', 'Looking into it', 'Resolved']
+        if new_status not in allowed:
+            return jsonify({'error': 'Invalid status'}), 400
+        
+        if has_resolved_at:
+            # Use ORM when column exists
+            q = HelpDeskQuery.query.get_or_404(query_id)
+            old_status = q.status
+            q.status = new_status
+            
+            # If status changed to "Resolved", set resolved_at
+            if new_status == 'Resolved' and old_status != 'Resolved':
+                if hasattr(q, 'resolved_at'):
+                    try:
+                        q.resolved_at = datetime.utcnow()
+                    except Exception:
+                        pass
+        else:
+            # Use raw SQL when column doesn't exist
+            # First get the old status and other info
+            result = db.session.execute(
+                text("SELECT status, query_title, created_by FROM helpdesk_queries WHERE id = :query_id"),
+                {'query_id': query_id}
+            ).fetchone()
+            
+            if not result:
+                return jsonify({'error': 'Query not found'}), 404
+            
+            old_status = result.status
+            query_title = result.query_title
+            created_by = result.created_by
+            
+            # Update status using raw SQL
+            db.session.execute(
+                text("UPDATE helpdesk_queries SET status = :status WHERE id = :query_id"),
+                {'status': new_status, 'query_id': query_id}
+            )
+            
+            # Create a minimal query object for notification purposes
+            class QueryObj:
+                def __init__(self):
+                    self.id = query_id
+                    self.query_title = query_title
+                    self.created_by = created_by
+            
+            q = QueryObj()
+        
+        # Get all assignees for this query
+        assignees = []
+        try:
+            if has_resolved_at and hasattr(q, 'assignees'):
+                # Use ORM relationship
+                assignees = q.assignees
+            else:
+                # Use raw SQL to get assignees
+                assignees_result = db.session.execute(
+                    text("SELECT u.id, u.username, u.email FROM query_assignees qa JOIN user u ON qa.user_id = u.id WHERE qa.query_id = :query_id"),
+                    {'query_id': query_id}
+                ).fetchall()
+                assignees = [User.query.get(row.id) for row in assignees_result if row.id]
+        except Exception as e:
+            app.logger.warning(f"Could not load assignees: {str(e)}")
+            assignees = []
+        
+        # Create notifications for all assignees when status changes
+        if old_status != new_status:
+            status_messages = {
+                'Not started': 'has been set to Not started',
+                'Looking into it': 'is now being looked into',
+                'Resolved': 'has been resolved'
+            }
+            message_template = status_messages.get(new_status, f'status has been changed to {new_status}')
+            
+            for assignee in assignees:
+                if assignee:
+                    try:
+                        notification = Notification(
+                            user_id=assignee.id,
+                            query_id=q.id,
+                            message=f"Query '{q.query_title}' {message_template}.",
+                            notification_type='status_change' if new_status != 'Resolved' else 'resolution'
+                        )
+                        db.session.add(notification)
+                    except Exception as e:
+                        app.logger.warning(f"Could not create notification for assignee: {str(e)}")
+        
+        # If status changed to "Resolved", also create notification for query creator
+        if new_status == 'Resolved' and old_status != 'Resolved':
+            # Find the creator user (created_by might be username or email)
+            creator_user = None
+            if q.created_by:
+                # Try to find by username first
+                creator_user = User.query.filter_by(username=q.created_by).first()
+                # If not found, try by email
+                if not creator_user:
+                    creator_user = User.query.filter_by(email=q.created_by).first()
+            
+            # Only notify creator if they're not already an assignee (to avoid duplicate notifications)
+            if creator_user and creator_user not in assignees:
+                try:
+                    notification = Notification(
+                        user_id=creator_user.id,
+                        query_id=q.id,
+                        message=f"Your query '{q.query_title}' has been resolved.",
+                        notification_type='resolution'
+                    )
+                    db.session.add(notification)
+                except Exception as e:
+                    app.logger.warning(f"Could not create notification for creator: {str(e)}")
+        
+        db.session.commit()
+        return jsonify({'message': 'Status updated', 'status': new_status})
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error updating query status: {str(e)}")
+        return jsonify({'error': 'Failed to update status'}), 500
 
 
 # Delete help desk query (Admin only)
@@ -14782,18 +15534,310 @@ def delete_helpdesk_query(query_id):
     if current_user.userRole != 'Admin':
         return jsonify({'error': 'Unauthorized'}), 403
     from app.models import HelpDeskQuery
-    q = HelpDeskQuery.query.get_or_404(query_id)
-    # optionally remove file
+    from sqlalchemy import text, inspect
+    
     try:
-        if q.image_path and q.image_path.startswith('/static/uploads/helpdesk/'):
-            fs_path = q.image_path.lstrip('/')
-            if os.path.exists(fs_path):
-                os.remove(fs_path)
-    except Exception:
-        pass
-    db.session.delete(q)
-    db.session.commit()
-    return jsonify({'message': 'Deleted'})
+        # Check if resolved_at column exists
+        try:
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
+            has_resolved_at = 'resolved_at' in columns
+        except Exception:
+            has_resolved_at = False
+        
+        # Get image_path before deleting (needed for file removal)
+        image_path = None
+        if has_resolved_at:
+            # Use ORM when column exists
+            q = HelpDeskQuery.query.get_or_404(query_id)
+            image_path = q.image_path
+            db.session.delete(q)
+        else:
+            # Use raw SQL when column doesn't exist
+            # First get the image_path
+            result = db.session.execute(
+                text("SELECT image_path FROM helpdesk_queries WHERE id = :query_id"),
+                {'query_id': query_id}
+            ).fetchone()
+            
+            if not result:
+                return jsonify({'error': 'Query not found'}), 404
+            
+            image_path = result.image_path if result else None
+            
+            # Delete using raw SQL
+            db.session.execute(
+                text("DELETE FROM helpdesk_queries WHERE id = :query_id"),
+                {'query_id': query_id}
+            )
+        
+        # Optionally remove file
+        try:
+            if image_path and image_path.startswith('/static/uploads/helpdesk/'):
+                fs_path = image_path.lstrip('/')
+                if os.path.exists(fs_path):
+                    os.remove(fs_path)
+        except Exception:
+            pass
+        
+        db.session.commit()
+        return jsonify({'message': 'Deleted'})
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting query: {str(e)}")
+        return jsonify({'error': 'Failed to delete query'}), 500
+
+
+# Get help desk query details
+@app.route('/api/help-desk/query/<int:query_id>', methods=['GET'])
+@login_required
+def get_helpdesk_query_details(query_id):
+    """Get detailed information about a specific help desk query"""
+    from app.models import HelpDeskQuery, User
+    from sqlalchemy import text, inspect
+    
+    try:
+        # Check if resolved_at column exists
+        try:
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
+            has_resolved_at = 'resolved_at' in columns
+        except Exception:
+            has_resolved_at = False
+        
+        # Use raw SQL to avoid loading non-existent columns
+        if has_resolved_at:
+            # Use ORM when column exists
+            q = HelpDeskQuery.query.get_or_404(query_id)
+            query_id_val = q.id
+            created_by_val = q.created_by
+            resolved_at_val = q.resolved_at if hasattr(q, 'resolved_at') else None
+            
+            # Check permissions: admins and privilege holders can see all, others can only see their own or anonymous queries
+            if not can_view_all_queries():
+                if created_by_val != current_user.username and created_by_val != 'anonymous':
+                    return jsonify({'error': 'Unauthorized'}), 403
+        else:
+            # Use raw SQL when column doesn't exist
+            result = db.session.execute(
+                text("SELECT id, query_title, query_description, query_type, created_by, timestamp, image_path, status FROM helpdesk_queries WHERE id = :query_id"),
+                {'query_id': query_id}
+            ).fetchone()
+            
+            if not result:
+                return jsonify({'error': 'Query not found'}), 404
+            
+            row_dict = dict(result._mapping)
+            query_id_val = row_dict['id']
+            created_by_val = row_dict['created_by']
+            resolved_at_val = None
+            
+            # Check permissions: admins and privilege holders can see all, others can only see their own or anonymous queries
+            if not can_view_all_queries():
+                if created_by_val != current_user.username and created_by_val != 'anonymous':
+                    return jsonify({'error': 'Unauthorized'}), 403
+            
+            # Build response from raw SQL result
+            assignees_list = []
+            try:
+                assignees_result = db.session.execute(
+                    text("SELECT u.id, u.username, u.email, u.firstname, u.lastname, u.userRole FROM query_assignees qa JOIN user u ON qa.user_id = u.id WHERE qa.query_id = :query_id"),
+                    {'query_id': query_id_val}
+                ).fetchall()
+                assignees_list = [dict(row._mapping) for row in assignees_result]
+            except Exception as e:
+                app.logger.warning(f"Could not load assignees: {str(e)}")
+                assignees_list = []
+            
+            # Convert timestamp string to datetime if needed
+            timestamp_val = row_dict.get('timestamp')
+            if isinstance(timestamp_val, str):
+                try:
+                    timestamp_val = datetime.fromisoformat(timestamp_val.replace('Z', '+00:00'))
+                except Exception:
+                    try:
+                        timestamp_val = datetime.strptime(timestamp_val, '%Y-%m-%d %H:%M:%S')
+                    except Exception:
+                        timestamp_val = None
+            
+            response_data = {
+                'id': query_id_val,
+                'query_title': row_dict.get('query_title', ''),
+                'query_description': row_dict.get('query_description', ''),
+                'query_type': row_dict.get('query_type', ''),
+                'created_by': created_by_val,
+                'status': row_dict.get('status') or 'Not started',
+                'timestamp': timestamp_val.isoformat() if timestamp_val else None,
+                'image_path': row_dict.get('image_path'),
+                'assignees': assignees_list,
+                'resolved_at': None
+            }
+            
+            return jsonify(response_data), 200
+        
+        # Check permissions: admins can see all, others can only see their own or anonymous queries
+        if current_user.userRole != 'Admin':
+            if created_by_val != current_user.username and created_by_val != 'anonymous':
+                return jsonify({'error': 'Unauthorized'}), 403
+        
+        # Load assignees with their roles
+        assignees_list = []
+        try:
+            # Try using ORM first
+            if hasattr(q, 'assignees') and q.assignees:
+                assignees_list = [{
+                    'id': u.id,
+                    'username': u.username,
+                    'email': u.email,
+                    'firstname': u.firstname,
+                    'lastname': u.lastname,
+                    'userRole': u.userRole
+                } for u in q.assignees]
+            else:
+                # Fallback to raw SQL
+                assignees_result = db.session.execute(
+                    text("SELECT u.id, u.username, u.email, u.firstname, u.lastname, u.userRole FROM query_assignees qa JOIN user u ON qa.user_id = u.id WHERE qa.query_id = :query_id"),
+                    {'query_id': query_id_val}
+                ).fetchall()
+                assignees_list = [dict(row._mapping) for row in assignees_result]
+        except Exception as e:
+            app.logger.warning(f"Could not load assignees: {str(e)}")
+            assignees_list = []
+        
+        # Build response
+        response_data = {
+            'id': q.id,
+            'query_title': q.query_title,
+            'query_description': q.query_description,
+            'query_type': q.query_type,
+            'created_by': q.created_by,
+            'status': q.status or 'Not started',
+            'timestamp': q.timestamp.isoformat() if q.timestamp else None,
+            'image_path': q.image_path,
+            'assignees': assignees_list,
+            'resolved_at': resolved_at_val.isoformat() if resolved_at_val else None
+        }
+        
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching query details: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to fetch query details'}), 500
+
+
+# Update query assignments
+@app.route('/api/help-desk/query/<int:query_id>/assignments', methods=['PUT'])
+@login_required
+def update_query_assignments(query_id):
+    """Update assignees for a help desk query"""
+    from app.models import HelpDeskQuery, User, Notification
+    from sqlalchemy import text, inspect
+    
+    try:
+        # Check permissions: admins and users with Admin Queries Access privilege can assign queries
+        if not can_view_all_queries():
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        data = request.get_json() or {}
+        user_ids = data.get('user_ids', [])
+        
+        if not isinstance(user_ids, list):
+            return jsonify({'error': 'user_ids must be a list'}), 400
+        
+        # Check if resolved_at column exists
+        try:
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
+            has_resolved_at = 'resolved_at' in columns
+        except Exception:
+            has_resolved_at = False
+        
+        # Get query
+        if has_resolved_at:
+            q = HelpDeskQuery.query.get_or_404(query_id)
+        else:
+            # Use raw SQL to check if query exists
+            result = db.session.execute(
+                text("SELECT id, query_title FROM helpdesk_queries WHERE id = :query_id"),
+                {'query_id': query_id}
+            ).fetchone()
+            if not result:
+                return jsonify({'error': 'Query not found'}), 404
+            # Create minimal query object
+            class QueryObj:
+                def __init__(self):
+                    self.id = result.id
+                    self.query_title = result.query_title
+            q = QueryObj()
+        
+        # Remove all existing assignments
+        try:
+            db.session.execute(
+                text("DELETE FROM query_assignees WHERE query_id = :query_id"),
+                {'query_id': query_id}
+            )
+        except Exception as e:
+            app.logger.warning(f"Could not delete existing assignments: {str(e)}")
+        
+        # Add new assignments
+        assigned_users = []
+        for user_id in user_ids:
+            try:
+                user = User.query.get(user_id)
+                if user:
+                    # Insert assignment
+                    try:
+                        db.session.execute(
+                            text("INSERT INTO query_assignees (query_id, user_id) VALUES (:query_id, :user_id)"),
+                            {'query_id': query_id, 'user_id': user_id}
+                        )
+                    except Exception:
+                        # Try using ORM if raw SQL fails
+                        if has_resolved_at:
+                            q_obj = HelpDeskQuery.query.get(query_id)
+                            if q_obj and user not in q_obj.assignees:
+                                q_obj.assignees.append(user)
+                    
+                    assigned_users.append({
+                        'id': user.id,
+                        'username': user.username,
+                        'email': user.email,
+                        'firstname': user.firstname,
+                        'lastname': user.lastname,
+                        'userRole': user.userRole
+                    })
+                    
+                    # Create notification for assigned user
+                    try:
+                        notification = Notification(
+                            user_id=user.id,
+                            query_id=query_id,
+                            message=f"You have been assigned to query: '{q.query_title if hasattr(q, 'query_title') else 'Query #' + str(query_id)}'",
+                            notification_type='assignment'
+                        )
+                        db.session.add(notification)
+                    except Exception as e:
+                        app.logger.warning(f"Could not create notification: {str(e)}")
+            except Exception as e:
+                app.logger.warning(f"Could not assign user {user_id}: {str(e)}")
+                continue
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Assignments updated successfully',
+            'assigned_users': assigned_users
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error updating query assignments: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to update assignments'}), 500
 
 
 # Update champion's school details
@@ -15128,8 +16172,8 @@ def mobile_help_desk():
     if request.method == 'GET':
         # Fetch help desk queries for mobile
         try:
-            # Show newest first; admins see all; others see only their own and anonymous
-            if current_user.userRole == 'Admin':
+            # Show newest first; admins and privilege holders see all; others see only their own and anonymous
+            if can_view_all_queries():
                 queries = HelpDeskQuery.query.order_by(HelpDeskQuery.timestamp.desc()).all()
             else:
                 queries = HelpDeskQuery.query.filter(
@@ -15155,7 +16199,7 @@ def mobile_help_desk():
                 'success': True,
                 'queries': queries_data,
                 'current_user': current_user.username,
-                'is_admin': current_user.userRole == 'Admin'
+                'is_admin': can_view_all_queries()
             }), 200
             
         except Exception as e:

@@ -773,7 +773,7 @@
       setTitle('User Privileges');
       let privs = {};
       try { privs = JSON.parse(privJson || '{}'); } catch (e) { privs = {}; }
-      const items = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events"];
+      const items = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access"];
       const html = `
     <div class="w3-small">
       <p>Manage privileges for <b>${username}</b> (ID: ${id}).</p>

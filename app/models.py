@@ -30,6 +30,13 @@ task_assigneesA = db.Table(
     db.Column("user_id", db.Integer, db.ForeignKey("user.id"), primary_key=True)
 )
 
+# Association table for help desk query assignees
+query_assignees = db.Table(
+    "query_assignees",
+    db.Column("query_id", db.Integer, db.ForeignKey("helpdesk_queries.id"), primary_key=True),
+    db.Column("user_id", db.Integer, db.ForeignKey("user.id"), primary_key=True)
+)
+
 
 class User(UserMixin, db.Model):
     id: so.Mapped[int] = so.mapped_column(primary_key=True)
@@ -95,7 +102,7 @@ class User(UserMixin, db.Model):
 
     def get_privileges(self):
         """Ensure all expected privileges exist in dict, default False."""
-        all_privs = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events"]
+        all_privs = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access"]
         if not self.privileges:
             self.privileges = {}
         for p in all_privs:
@@ -527,6 +534,29 @@ class HelpDeskQuery(db.Model):
     created_by = db.Column(db.String(100), nullable=False)
     image_path = db.Column(db.String(255), nullable=True)  # relative path to static file
     status = db.Column(db.String(30), nullable=False, default='Not started')  # Not started, Looking into it, Resolved
+    resolved_at = db.Column(db.DateTime, nullable=True)  # Track when query was resolved
+    
+    # Many-to-many relationship with User for assignees
+    assignees = db.relationship("User", secondary=query_assignees, backref="assigned_queries")
+
+
+# ----------------------
+# Notification Model
+# ----------------------
+class Notification(db.Model):
+    __tablename__ = 'notifications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    query_id = db.Column(db.Integer, db.ForeignKey('helpdesk_queries.id'), nullable=True)
+    message = db.Column(db.Text, nullable=False)
+    notification_type = db.Column(db.String(50), nullable=False)  # 'assignment', 'resolution'
+    read = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    
+    # Relationships
+    user = db.relationship("User", backref="notifications")
+    query = db.relationship("HelpDeskQuery", backref="notifications")
 
 
 # ----------------------
