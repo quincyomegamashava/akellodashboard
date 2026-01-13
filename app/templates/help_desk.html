@@ -19,6 +19,12 @@
     body {
       background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 50%, #f0f4f8 100%) !important;
       min-height: 100vh;
+      overflow-x: hidden; /* Prevent horizontal scrolling */
+      box-sizing: border-box;
+    }
+    
+    * {
+      box-sizing: border-box;
     }
     
     /* Fix nav bar font size - ensure sidebar nav is not affected by w3-small or any other styles */
@@ -62,6 +68,9 @@
       margin: 0 auto;
       padding: 20px;
       position: relative;
+      width: 100%;
+      overflow-x: hidden;
+      box-sizing: border-box;
     }
     
     .modern-card {
@@ -221,6 +230,20 @@
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      table-layout: auto;
+    }
+    
+    /* Responsive table wrapper */
+    .w3-responsive {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      width: 100%;
+    }
+    
+    .w3-responsive table {
+      min-width: 100%;
+      width: auto;
     }
     
     .modern-table thead {
@@ -404,12 +427,289 @@
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
     }
+    
+    /* Ensure stat cards stack properly on all screen sizes */
+    #helpDeskDashboard .w3-col {
+      width: 100%;
+      float: left;
+      box-sizing: border-box;
+    }
+    
+    @media screen and (min-width: 601px) {
+      #helpDeskDashboard .w3-col.m3 {
+        width: 50%;
+      }
+    }
+    
+    @media screen and (min-width: 993px) {
+      #helpDeskDashboard .w3-col.m3 {
+        width: 25%;
+      }
+    }
+    
+    /* Responsive Media Queries */
+    /* Tablets and smaller laptops (768px - 1024px) */
+    @media screen and (max-width: 1024px) {
+      .help-desk-container {
+        padding: 16px;
+      }
+      
+      .stat-card h4, .stat-card h2 {
+        font-size: 2em;
+      }
+      
+      .action-card {
+        padding: 24px;
+      }
+      
+      .action-card i {
+        font-size: 2.5em;
+      }
+      
+      .feature-card-body h2 {
+        font-size: 1.75em;
+      }
+      
+      .modal-header-modern {
+        padding: 20px;
+      }
+    }
+    
+    /* Small laptops and tablets in landscape (768px - 991px) */
+    @media screen and (max-width: 991px) {
+      .help-desk-container {
+        padding: 12px;
+      }
+      
+      .stat-card {
+        padding: 20px;
+      }
+      
+      .stat-card h4, .stat-card h2 {
+        font-size: 1.75em;
+      }
+      
+      .action-card {
+        padding: 20px;
+      }
+      
+      .feature-card-body {
+        padding: 16px;
+      }
+      
+      .feature-card-body h2 {
+        font-size: 1.5em;
+      }
+      
+      .modern-card {
+        padding: 20px;
+      }
+    }
+    
+    /* Tablets in portrait and small devices (max-width: 767px) */
+    @media screen and (max-width: 767px) {
+      .help-desk-container {
+        padding: 10px;
+      }
+      
+      .stat-card {
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      
+      .stat-card h4, .stat-card h2 {
+        font-size: 1.5em;
+      }
+      
+      .stat-card p {
+        font-size: 0.85em;
+      }
+      
+      .action-card {
+        padding: 20px;
+      }
+      
+      .action-card i {
+        font-size: 2em;
+      }
+      
+      .action-card h4 {
+        font-size: 1.25em;
+      }
+      
+      .feature-card-header {
+        padding: 12px 16px;
+        font-size: 0.9em;
+      }
+      
+      .feature-card-body {
+        padding: 12px;
+      }
+      
+      .feature-card-body h2 {
+        font-size: 1.5em;
+      }
+      
+      .modern-card {
+        padding: 16px;
+      }
+      
+      .modal-header-modern {
+        padding: 16px;
+      }
+      
+      .glass-header {
+        padding: 20px;
+      }
+      
+      .glass-header h2 {
+        font-size: 2em;
+      }
+      
+      .modern-table thead th {
+        padding: 12px 8px;
+        font-size: 0.85em;
+      }
+      
+      .modern-table tbody td {
+        padding: 8px;
+        font-size: 0.85em;
+      }
+    }
+    
+    /* Small mobile devices (max-width: 480px) */
+    @media screen and (max-width: 480px) {
+      .help-desk-container {
+        padding: 8px;
+      }
+      
+      .stat-card {
+        padding: 12px;
+      }
+      
+      .stat-card h4, .stat-card h2 {
+        font-size: 1.25em;
+      }
+      
+      .action-card {
+        padding: 16px;
+      }
+      
+      .action-card i {
+        font-size: 1.75em;
+      }
+      
+      .action-card h4 {
+        font-size: 1.1em;
+      }
+      
+      .feature-card-header {
+        padding: 10px 12px;
+        font-size: 0.85em;
+      }
+      
+      .feature-card-body {
+        padding: 10px;
+      }
+      
+      .feature-card-body h2 {
+        font-size: 1.25em;
+      }
+      
+      .modern-card {
+        padding: 12px;
+      }
+      
+      .modal-header-modern {
+        padding: 12px;
+      }
+      
+      .glass-header {
+        padding: 16px;
+      }
+      
+      .glass-header h2 {
+        font-size: 1.5em;
+      }
+    }
   </style>
 {% endblock %}
 
 {% block content %}
 
 <div class="help-desk-container">
+  <!-- Action/Feature Cards Section -->
+  <div class="w3-row-padding" style="margin-bottom: 32px;">
+    <div class="w3-col s12 m12 l6" style="margin-bottom: 20px;">
+      <div class="action-card" onclick="openCreateQueryModal()">
+        <i class="fa fa-plus-circle"></i>
+        <h4>Create a Query</h4>
+        <p class="w3-text-gray">Click to create a new support query</p>
+      </div>
+    </div>
+
+    <!-- Query Management Cards - Restructured to avoid nested columns -->
+    <div class="w3-col s12 m6 l3" style="margin-bottom: 16px;">
+      <div class="feature-card" onclick="document.getElementById('recentQueriesModal').style.display='block'">
+        <div class="feature-card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+          <b><i class="fa fa-list"></i> Recent Queries</b>
+        </div>
+        <div class="feature-card-body">
+          <div class="w3-text-gray w3-small">View all recent support queries</div>
+          <h2 style="color: #6366f1; margin:8px 0;">{{ queries|length }}</h2>
+        </div>
+      </div>
+    </div>
+    
+    <div class="w3-col s12 m6 l3" style="margin-bottom: 16px;">
+      <div class="feature-card" onclick="document.getElementById('myQueriesModal').style.display='block'">
+        <div class="feature-card-header">
+          <b><i class="fa fa-user"></i> My Queries</b>
+        </div>
+        <div class="feature-card-body">
+          <div class="w3-text-gray w3-small">View your submitted queries</div>
+          <h2 style="color: #6366f1; margin:8px 0;">{{ my_queries|length }}</h2>
+        </div>
+      </div>
+    </div>
+    
+    <div class="w3-col s12 m6 l3" style="margin-bottom: 16px;">
+      <div class="feature-card" onclick="openEmailQueriesModal()">
+        <div class="feature-card-header">
+          <b><i class="fa fa-envelope"></i> Email Queries</b>
+        </div>
+        <div class="feature-card-body">
+          <div class="w3-text-gray w3-small">Queries from email</div>
+          <h2 style="color: #6366f1; margin:8px 0;" id="emailQueryCount">0</h2>
+        </div>
+      </div>
+    </div>
+    
+    <div class="w3-col s12 m6 l3" style="margin-bottom: 16px;">
+      <div class="feature-card" onclick="document.getElementById('searchLibraryUsersModal').style.display='block'">
+        <div class="feature-card-header">
+          <b><i class="fa fa-search"></i> Search Library Users</b>
+        </div>
+        <div class="feature-card-body">
+          <div class="w3-text-gray w3-small">Search users by email</div>
+          <h2 style="color: #6366f1; margin:8px 0;"><i class="fa fa-users"></i></h2>
+        </div>
+      </div>
+    </div>
+    
+    <div class="w3-col s12 m6 l3" style="margin-bottom: 16px;">
+      <div class="feature-card" onclick="document.getElementById('helpDeskNotificationsModal').style.display='block'; loadHelpDeskNotifications();">
+        <div class="feature-card-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+          <b><i class="fa fa-bell"></i> Notifications</b>
+        </div>
+        <div class="feature-card-body">
+          <div class="w3-text-gray w3-small">View your query notifications</div>
+          <h2 style="color: #6366f1; margin:8px 0;" id="helpDeskNotificationCount">0</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Dashboard Section -->
   <div id="helpDeskDashboard" style="margin-bottom: 32px;">
     <div class="w3-row-padding">
@@ -456,86 +756,11 @@
       </div>
     </div>
   </div>
-
-  <div class="w3-row-padding" style="margin-top: 24px;">
-    <div class="w3-col s12 m6" style="margin-bottom: 20px;">
-      <div class="action-card" onclick="openCreateQueryModal()">
-        <i class="fa fa-plus-circle"></i>
-        <h4>Create a Query</h4>
-        <p class="w3-text-gray">Click to create a new support query</p>
-      </div>
-    </div>
-
-    <div class="w3-col s12 m6">
-      <!-- Query Management Cards -->
-      <div class="w3-row-padding">
-        <div class="w3-col s12 m6" style="margin-bottom: 16px;">
-          <div class="feature-card" onclick="document.getElementById('recentQueriesModal').style.display='block'">
-            <div class="feature-card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-              <b><i class="fa fa-list"></i> Recent Queries</b>
-            </div>
-            <div class="feature-card-body">
-              <div class="w3-text-gray w3-small">View all recent support queries</div>
-              <h2 style="color: #6366f1; margin:8px 0;">{{ queries|length }}</h2>
-            </div>
-          </div>
-        </div>
-        
-        <div class="w3-col s12 m6" style="margin-bottom: 16px;">
-            <div class="feature-card" onclick="document.getElementById('myQueriesModal').style.display='block'">
-            <div class="feature-card-header">
-              <b><i class="fa fa-user"></i> My Queries</b>
-            </div>
-            <div class="feature-card-body">
-              <div class="w3-text-gray w3-small">View your submitted queries</div>
-              <h2 style="color: #6366f1; margin:8px 0;">{{ my_queries|length }}</h2>
-            </div>
-          </div>
-        </div>
-        
-        <div class="w3-col s12 m6" style="margin-bottom: 16px;">
-            <div class="feature-card" onclick="openEmailQueriesModal()">
-            <div class="feature-card-header">
-              <b><i class="fa fa-envelope"></i> Email Queries</b>
-            </div>
-            <div class="feature-card-body">
-              <div class="w3-text-gray w3-small">Queries from email</div>
-              <h2 style="color: #6366f1; margin:8px 0;" id="emailQueryCount">0</h2>
-            </div>
-          </div>
-        </div>
-        
-        <div class="w3-col s12 m6" style="margin-bottom: 16px;">
-            <div class="feature-card" onclick="document.getElementById('searchLibraryUsersModal').style.display='block'">
-            <div class="feature-card-header">
-              <b><i class="fa fa-search"></i> Search Library Users</b>
-            </div>
-            <div class="feature-card-body">
-              <div class="w3-text-gray w3-small">Search users by email</div>
-              <h2 style="color: #6366f1; margin:8px 0;"><i class="fa fa-users"></i></h2>
-            </div>
-          </div>
-        </div>
-        
-        <div class="w3-col s12 m6" style="margin-bottom: 16px;">
-            <div class="feature-card" onclick="document.getElementById('helpDeskNotificationsModal').style.display='block'; loadHelpDeskNotifications();">
-            <div class="feature-card-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-              <b><i class="fa fa-bell"></i> Notifications</b>
-            </div>
-            <div class="feature-card-body">
-              <div class="w3-text-gray w3-small">View your query notifications</div>
-              <h2 style="color: #6366f1; margin:8px 0;" id="helpDeskNotificationCount">0</h2>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- Recent Queries Modal -->
 <div id="recentQueriesModal" class="w3-modal" style="z-index:2950;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 80vw; max-height: 85vh; overflow-y: auto;">
+  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
     <header class="modal-header-modern">
       <span onclick="document.getElementById('recentQueriesModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-list"></i> Recent Queries</h5>
@@ -639,7 +864,7 @@
 
 <!-- Query Details Modal -->
 <div id="queryDetailsModal" class="w3-modal" style="z-index:3000;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 80vw; max-width: 900px; max-height: 90vh; overflow-y: auto;">
+  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 900px; max-height: 90vh; overflow-y: auto;">
     <header class="modal-header-modern">
       <span onclick="document.getElementById('queryDetailsModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-info-circle"></i> Query Details</h5>
@@ -657,7 +882,7 @@
 
 <!-- My Queries Modal -->
 <div id="myQueriesModal" class="w3-modal" style="z-index:2950;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 80vw; max-height: 85vh; overflow-y: auto;">
+  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
     <header class="modal-header-modern">
       <span onclick="document.getElementById('myQueriesModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-user"></i> My Queries</h5>
@@ -717,7 +942,7 @@
 
 <!-- Help Desk Notifications Modal -->
 <div id="helpDeskNotificationsModal" class="w3-modal" style="z-index:2950;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 80vw; max-width: 600px; max-height: 85vh; overflow-y: auto;">
+  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 600px; max-height: 85vh; overflow-y: auto;">
     <header class="modal-header-modern">
       <span onclick="document.getElementById('helpDeskNotificationsModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-bell"></i> Query Notifications</h5>
@@ -744,7 +969,7 @@
 
 <!-- Search Library Users Modal -->
 <div id="searchLibraryUsersModal" class="w3-modal" style="z-index:2950;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 80vw; max-height: 85vh; overflow-y: auto;">
+  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
     <header class="modal-header-modern">
       <span onclick="document.getElementById('searchLibraryUsersModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-search"></i> Search Library Users</h5>
@@ -825,7 +1050,7 @@
 
 <!-- Create Query Modal -->
 <div id="createQueryModal" class="w3-modal" style="z-index:2950;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 80vw; max-width: 700px;">
+  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 700px;">
     <header class="modal-header-modern">
       <span onclick="document.getElementById('createQueryModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-plus-circle"></i> Create a Query</h5>
@@ -899,7 +1124,7 @@
 
 <!-- User Assignment Modal -->
 <div id="userAssignmentModal" class="w3-modal" style="z-index:3000;">
-  <div class="w3-modal-content w3-animate-top w3-card-4 modal-modern" style="width: 60vw; max-width: 600px;">
+  <div class="w3-modal-content w3-animate-top w3-card-4 modal-modern" style="width: 95vw; max-width: 600px;">
     <header class="modal-header-modern">
       <span onclick="closeUserAssignmentModal()" class="w3-button w3-display-topright" style="color: white; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" id="assignmentModalTitle"><i class="fa fa-users"></i> Assign Query to Users</h5>
@@ -934,7 +1159,7 @@
 
 <!-- Email Queries Modal -->
 <div id="emailQueriesModal" class="w3-modal" style="z-index:2950;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 80vw; max-height: 85vh; overflow-y: auto;">
+  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
     <header class="modal-header-modern">
       <span onclick="document.getElementById('emailQueriesModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-envelope"></i> Email Queries</h5>
@@ -1431,15 +1656,52 @@
         console.log(`Fetching emails from ${source}...`);
         const response = await fetch(`/api/email-queries?source=${source}`);
       
+      // Check Content-Type header
+      const contentType = response.headers.get('content-type') || '';
+      const isJson = contentType.includes('application/json');
+      
       // Get response text first to handle both JSON and text errors
       const responseText = await response.text();
       let data;
       
+      // Handle empty response
+      if (!responseText || responseText.trim() === '') {
+        console.error('Empty response received from server');
+        throw new Error('Server returned an empty response. Please check server logs or try again later.');
+      }
+      
+      // Try to parse as JSON
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        console.error('Failed to parse response as JSON:', parseError, 'Response:', responseText.substring(0, 200));
-        throw new Error(`Invalid response format: ${responseText.substring(0, 100)}`);
+        console.error('Failed to parse response as JSON:', {
+          error: parseError,
+          contentType: contentType,
+          status: response.status,
+          statusText: response.statusText,
+          responsePreview: responseText.substring(0, 500),
+          source: source
+        });
+        
+        // Provide more helpful error message
+        let errorMessage = 'Invalid response format from server. ';
+        if (!isJson) {
+          errorMessage += `Expected JSON but received ${contentType || 'unknown content type'}. `;
+        }
+        if (response.status >= 500) {
+          errorMessage += 'Server error occurred. Please check server logs.';
+        } else if (response.status === 404) {
+          errorMessage += 'API endpoint not found.';
+        } else if (response.status === 403) {
+          errorMessage += 'Access forbidden.';
+        } else {
+          errorMessage += `Response preview: ${responseText.substring(0, 100)}...`;
+        }
+        
+        // Log full response for debugging (truncated)
+        console.error('Full response (first 1000 chars):', responseText.substring(0, 1000));
+        
+        throw new Error(errorMessage);
       }
       
       if (!response.ok) {
@@ -1564,11 +1826,37 @@
         }
       }
     } catch (error) {
+      console.error('Error fetching emails:', {
+        error: error,
+        message: error.message,
+        stack: error.stack,
+        source: source,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Create user-friendly error message
+      let userMessage = error.message || 'An unknown error occurred';
+      if (userMessage.includes('Invalid response format')) {
+        userMessage = 'Server returned an invalid response. This may be a server configuration issue. Please contact the administrator or try again later.';
+      } else if (userMessage.includes('Failed to fetch') || userMessage.includes('NetworkError')) {
+        userMessage = 'Network error. Please check your internet connection and try again.';
+      }
+      
+      // Simple HTML escape for error messages
+      const escapeHtmlSimple = (text) => {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = String(text);
+        return div.innerHTML;
+      };
+      
       tbody.innerHTML = `<tr><td colspan="6" class="w3-center w3-text-red">
-        <p><i class="fa fa-exclamation-circle"></i> Error: ${error.message}</p>
-        <p class="w3-small w3-text-gray">Check browser console for details</p>
+        <p><i class="fa fa-exclamation-circle"></i> <strong>Error:</strong> ${escapeHtmlSimple(userMessage)}</p>
+        <p class="w3-small w3-text-gray">Source: ${escapeHtmlSimple(source)} | Check browser console (F12) for technical details</p>
+        <button class="w3-button w3-small w3-indigo w3-round w3-margin-top" onclick="fetchEmailQueries()">
+          <i class="fa fa-refresh"></i> Retry
+        </button>
       </td></tr>`;
-      console.error('Error fetching emails:', error);
       
       // Update Gmail config status on error
       if (source === 'gmail') {
@@ -1576,7 +1864,7 @@
         const gmailConfigMsg = document.getElementById('gmailConfigMessage');
         if (gmailConfigDiv) {
           gmailConfigDiv.className = 'w3-margin-bottom w3-panel w3-red w3-round';
-          gmailConfigMsg.innerHTML = '<i class="fa fa-exclamation-triangle"></i> Error fetching Gmail emails: ' + error.message;
+          gmailConfigMsg.innerHTML = '<i class="fa fa-exclamation-triangle"></i> Error fetching Gmail emails: ' + escapeHtmlSimple(userMessage);
         }
       }
     } finally {
