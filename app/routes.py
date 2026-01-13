@@ -15959,6 +15959,15 @@ def help_desk():
 
     form = HelpDeskForm()
     if form.validate_on_submit():
+        # Check if resolved_at column exists to avoid insert errors
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
+            has_resolved_at = 'resolved_at' in columns
+        except Exception:
+            has_resolved_at = False
+        
         qtype = form.query_type.data
         created_by = 'anonymous' if qtype == 'anonymous' else current_user.username
         image_path = None
@@ -15969,15 +15978,39 @@ def help_desk():
                 save_path = os.path.join(app.config['HELP_DESK_UPLOAD_FOLDER'], filename)
                 file.save(save_path)
                 image_path = '/' + save_path  # make it web path
-        q = HelpDeskQuery(
-            query_title=form.query_title.data,
-            query_description=form.query_description.data,
-            query_type=qtype,
-            created_by=created_by,
-            image_path=image_path
-        )
-        db.session.add(q)
-        db.session.commit()
+        
+        if has_resolved_at:
+            # Use ORM when column exists
+            q = HelpDeskQuery(
+                query_title=form.query_title.data,
+                query_description=form.query_description.data,
+                query_type=qtype,
+                created_by=created_by,
+                image_path=image_path
+            )
+            db.session.add(q)
+            db.session.commit()
+        else:
+            # Use raw SQL when column doesn't exist
+            timestamp = datetime.utcnow()
+            db.session.execute(
+                text("""
+                    INSERT INTO helpdesk_queries 
+                    (query_title, query_description, timestamp, query_type, created_by, image_path, status) 
+                    VALUES (:title, :description, :timestamp, :qtype, :created_by, :image_path, :status)
+                """),
+                {
+                    'title': form.query_title.data,
+                    'description': form.query_description.data,
+                    'timestamp': timestamp,
+                    'qtype': qtype,
+                    'created_by': created_by,
+                    'image_path': image_path,
+                    'status': 'Not started'
+                }
+            )
+            db.session.commit()
+        
         flash('Your query has been submitted.', 'success')
         return redirect(url_for('help_desk'))
 
