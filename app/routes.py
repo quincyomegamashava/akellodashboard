@@ -4,6 +4,8 @@ import calendar
 import json
 import time
 import os
+import socket
+import ssl
 from urllib import parse
 from urllib.parse import urlsplit
 from flask import jsonify, render_template, flash, redirect, render_template_string, session, url_for, request, send_file, Response, stream_with_context
@@ -14384,8 +14386,9 @@ def ensure_json_response(data, status_code=200):
     try:
         with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
             f.write(json.dumps(log_entry) + '\n')
-    except:
-        pass
+        app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+    except Exception as e:
+        app.logger.error(f"[DEBUG] Failed to write log: {e}")
     # #endregion
     
     try:
@@ -14406,8 +14409,9 @@ def ensure_json_response(data, status_code=200):
         try:
             with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                 f.write(json.dumps(log_entry) + '\n')
-        except:
-            pass
+            app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+        except Exception as e:
+            app.logger.error(f"[DEBUG] Failed to write log: {e}")
         # #endregion
         
         # Create response with explicit Content-Type
@@ -14428,8 +14432,9 @@ def ensure_json_response(data, status_code=200):
         try:
             with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                 f.write(json.dumps(log_entry) + '\n')
-        except:
-            pass
+            app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+        except Exception as e:
+            app.logger.error(f"[DEBUG] Failed to write log: {e}")
         # #endregion
         
         return response
@@ -14477,8 +14482,9 @@ def get_email_queries():
     try:
         with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
             f.write(json.dumps(log_entry) + '\n')
-    except:
-        pass
+        app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+    except Exception as e:
+        app.logger.error(f"[DEBUG] Failed to write log: {e}")
     # #endregion
     
     try:
@@ -14500,8 +14506,9 @@ def get_email_queries():
             try:
                 with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                     f.write(json.dumps(log_entry) + '\n')
-            except:
-                pass
+                app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+            except Exception as e:
+                app.logger.error(f"[DEBUG] Failed to write log: {e}")
             # #endregion
             
             if email_source == 'gmail':
@@ -14523,8 +14530,9 @@ def get_email_queries():
             try:
                 with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                     f.write(json.dumps(log_entry) + '\n')
-            except:
-                pass
+                app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+            except Exception as e:
+                app.logger.error(f"[DEBUG] Failed to write log: {e}")
             # #endregion
             
             # ensure_json_response returns a Response object with status_code already set
@@ -14543,8 +14551,9 @@ def get_email_queries():
             try:
                 with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                     f.write(json.dumps(log_entry) + '\n')
-            except:
-                pass
+                app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+            except Exception as e:
+                app.logger.error(f"[DEBUG] Failed to write log: {e}")
             # #endregion
             
             if isinstance(result, tuple):
@@ -14567,8 +14576,9 @@ def get_email_queries():
                 try:
                     with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                         f.write(json.dumps(log_entry) + '\n')
-                except:
-                    pass
+                    app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+                except Exception as e:
+                    app.logger.error(f"[DEBUG] Failed to write log: {e}")
                 # #endregion
                 
                 return response_obj, status_code
@@ -14592,8 +14602,9 @@ def get_email_queries():
                 try:
                     with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                         f.write(json.dumps(log_entry) + '\n')
-                except:
-                    pass
+                    app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+                except Exception as e:
+                    app.logger.error(f"[DEBUG] Failed to write log: {e}")
                 # #endregion
                 
                 return result
@@ -14753,8 +14764,9 @@ def fetch_gmail_emails():
     try:
         with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
             f.write(json.dumps(log_entry) + '\n')
-    except:
-        pass
+        app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+    except Exception as e:
+        app.logger.error(f"[DEBUG] Failed to write log: {e}")
     # #endregion
     
     mail = None
@@ -14802,11 +14814,17 @@ def fetch_gmail_emails():
             try:
                 with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                     f.write(json.dumps(log_entry) + '\n')
-            except:
-                pass
+                app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+            except Exception as e:
+                app.logger.error(f"[DEBUG] Failed to write log: {e}")
             # #endregion
             
+            # Create IMAP connection with socket timeout to prevent hanging
+            # Set socket timeout to 30 seconds to prevent Cloudflare 502 errors
+            socket.setdefaulttimeout(30)
             mail = imaplib.IMAP4_SSL(gmail_imap_server, gmail_imap_port)
+            # Set timeout on the IMAP connection itself
+            mail.sock.settimeout(30)
             mail.login(gmail_email, gmail_password)
             mail.select('inbox')
             
@@ -14824,8 +14842,9 @@ def fetch_gmail_emails():
             try:
                 with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                     f.write(json.dumps(log_entry) + '\n')
-            except:
-                pass
+                app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+            except Exception as e:
+                app.logger.error(f"[DEBUG] Failed to write log: {e}")
             # #endregion
         except imaplib.IMAP4.error as imap_error:
             error_msg = str(imap_error)
@@ -14890,9 +14909,14 @@ def fetch_gmail_emails():
         # Load existing statuses
         email_statuses = load_email_statuses()
         
-        # Fetch last 50 emails (most recent)
+        # Limit to last 20 emails to prevent timeout (reduced from 50)
+        # This ensures faster response times and prevents Cloudflare 502 errors
+        max_emails = 20
+        emails_to_fetch = email_ids[-max_emails:] if len(email_ids) > max_emails else email_ids
+        print(f"Fetching {len(emails_to_fetch)} email(s) (limited from {len(email_ids)})")
+        
         emails = []
-        for email_id in email_ids[-50:]:
+        for email_id in emails_to_fetch:
             try:
                 email_id_str = email_id.decode() if isinstance(email_id, bytes) else str(email_id)
                 status, msg_data = mail.fetch(email_id, '(RFC822)')
@@ -15002,8 +15026,9 @@ def fetch_gmail_emails():
         try:
             with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                 f.write(json.dumps(log_entry) + '\n')
-        except:
-            pass
+            app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+        except Exception as e:
+            app.logger.error(f"[DEBUG] Failed to write log: {e}")
         # #endregion
         
         if mail:
@@ -15023,8 +15048,9 @@ def fetch_gmail_emails():
                 try:
                     with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                         f.write(json.dumps(log_entry) + '\n')
-                except:
-                    pass
+                    app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+                except Exception as e:
+                    app.logger.error(f"[DEBUG] Failed to write log: {e}")
                 # #endregion
             except Exception as close_error:
                 # #region agent log
@@ -15040,8 +15066,9 @@ def fetch_gmail_emails():
                 try:
                     with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                         f.write(json.dumps(log_entry) + '\n')
-                except:
-                    pass
+                    app.logger.error(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+                except Exception as e:
+                    app.logger.error(f"[DEBUG] Failed to write log: {e}")
                 # #endregion
                 pass
         
@@ -15064,8 +15091,9 @@ def fetch_gmail_emails():
         try:
             with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                 f.write(json.dumps(log_entry) + '\n')
-        except:
-            pass
+            app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+        except Exception as e:
+            app.logger.error(f"[DEBUG] Failed to write log: {e}")
         # #endregion
         
         print(f"Successfully fetched {len(emails)} Gmail email(s)")
@@ -15085,8 +15113,9 @@ def fetch_gmail_emails():
         try:
             with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
                 f.write(json.dumps(log_entry) + '\n')
-        except:
-            pass
+            app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
+        except Exception as e:
+            app.logger.error(f"[DEBUG] Failed to write log: {e}")
         # #endregion
         
         return response
