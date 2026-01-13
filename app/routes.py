@@ -14416,18 +14416,22 @@ def get_email_queries():
             else:
                 result = fetch_outlook_emails()
             
-            # Ensure result is a Response object with JSON content
+            # ensure_json_response returns a Response object with status_code already set
+            # If result is a tuple, extract response and status_code
             if isinstance(result, tuple):
                 response_obj, status_code = result
+                # Ensure Content-Type is set
+                if hasattr(response_obj, 'headers'):
+                    response_obj.headers['Content-Type'] = 'application/json; charset=utf-8'
+                response_obj.status_code = status_code
+                return response_obj, status_code
             else:
-                response_obj = result
-                status_code = 200
-            
-            # Ensure Content-Type is set to application/json
-            if hasattr(response_obj, 'headers'):
-                response_obj.headers['Content-Type'] = 'application/json'
-            
-            return response_obj if isinstance(result, tuple) else (response_obj, status_code) if status_code != 200 else response_obj
+                # Result is already a Response object from ensure_json_response
+                # Just ensure Content-Type is set (it should already be set)
+                if hasattr(result, 'headers'):
+                    if 'Content-Type' not in result.headers or 'application/json' not in result.headers.get('Content-Type', ''):
+                        result.headers['Content-Type'] = 'application/json; charset=utf-8'
+                return result
             
         except Exception as fetch_error:
             # Catch any errors from fetch functions and ensure JSON response

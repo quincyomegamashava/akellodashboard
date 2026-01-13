@@ -1651,37 +1651,78 @@
       loadingIndicator.style.display = 'block';
       tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">Loading...</td></tr>';
       
+      // Store response details for debugging
+      let responseDetails = {
+        status: null,
+        statusText: null,
+        headers: {},
+        contentType: null,
+        responseText: null,
+        responseLength: null
+      };
+      
       try {
         const startTime = performance.now();
         console.log(`Fetching emails from ${source}...`);
         const response = await fetch(`/api/email-queries?source=${source}`);
       
+      // Capture response details
+      responseDetails.status = response.status;
+      responseDetails.statusText = response.statusText;
+      responseDetails.contentType = response.headers.get('content-type') || '';
+      
+      // Capture all headers
+      response.headers.forEach((value, key) => {
+        responseDetails.headers[key] = value;
+      });
+      
       // Check Content-Type header
-      const contentType = response.headers.get('content-type') || '';
+      const contentType = responseDetails.contentType;
       const isJson = contentType.includes('application/json');
       
       // Get response text first to handle both JSON and text errors
       const responseText = await response.text();
+      responseDetails.responseText = responseText;
+      responseDetails.responseLength = responseText.length;
+      
       let data;
       
       // Handle empty response
       if (!responseText || responseText.trim() === '') {
-        console.error('Empty response received from server');
-        throw new Error('Server returned an empty response. Please check server logs or try again later.');
+        console.error('Empty response received from server', responseDetails);
+        // Store error details for display
+        window.lastEmailError = {
+          error: new Error('Server returned an empty response. Please check server logs or try again later.'),
+          responseDetails: responseDetails
+        };
+        throw window.lastEmailError.error;
       }
       
       // Try to parse as JSON
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        console.error('Failed to parse response as JSON:', {
+        // Store full error details for debugging
+        const errorDetails = {
           error: parseError,
           contentType: contentType,
           status: response.status,
           statusText: response.statusText,
           responsePreview: responseText.substring(0, 500),
-          source: source
-        });
+          fullResponse: responseText,
+          responseLength: responseText.length,
+          source: source,
+          headers: responseDetails.headers
+        };
+        
+        console.error('Failed to parse response as JSON:', errorDetails);
+        
+        // Store error details globally for display
+        window.lastEmailError = {
+          error: parseError,
+          responseDetails: responseDetails,
+          errorDetails: errorDetails
+        };
         
         // Provide more helpful error message
         let errorMessage = 'Invalid response format from server. ';
@@ -1698,8 +1739,9 @@
           errorMessage += `Response preview: ${responseText.substring(0, 100)}...`;
         }
         
-        // Log full response for debugging (truncated)
-        console.error('Full response (first 1000 chars):', responseText.substring(0, 1000));
+        // Log full response for debugging
+        console.error('Full response:', responseText);
+        console.error('Response details:', responseDetails);
         
         throw new Error(errorMessage);
       }
@@ -1826,12 +1868,19 @@
         }
       }
     } catch (error) {
+      // Get stored error details if available
+      const storedError = window.lastEmailError || {};
+      const errorResponseDetails = storedError.responseDetails || responseDetails || {};
+      const errorDetails = storedError.errorDetails || {};
+      
       console.error('Error fetching emails:', {
         error: error,
         message: error.message,
         stack: error.stack,
         source: source,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        responseDetails: errorResponseDetails,
+        errorDetails: errorDetails
       });
       
       // Create user-friendly error message
@@ -1850,9 +1899,40 @@
         return div.innerHTML;
       };
       
+      // Build debug information HTML
+      const responseText = errorResponseDetails.responseText || '';
+      const responsePreview = responseText.length > 0 ? responseText.substring(0, 1000) : 'No response text available';
+      const debugInfoId = 'emailErrorDebug_' + Date.now();
+      
+      const debugInfoHtml = `
+        <div class="w3-margin-top w3-panel w3-light-gray w3-round" style="text-align: left; max-height: 400px; overflow-y: auto;">
+          <h6 class="w3-text-gray"><i class="fa fa-bug"></i> Debug Information</h6>
+          <div class="w3-small">
+            <p><strong>Status Code:</strong> ${errorResponseDetails.status || 'N/A'} ${errorResponseDetails.statusText || ''}</p>
+            <p><strong>Content-Type:</strong> ${escapeHtmlSimple(errorResponseDetails.contentType || 'Not set')}</p>
+            <p><strong>Response Length:</strong> ${errorResponseDetails.responseLength || 0} characters</p>
+            <p><strong>Response Preview (first 1000 chars):</strong></p>
+            <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; max-height: 200px;">${escapeHtmlSimple(responsePreview)}</pre>
+            <button class="w3-button w3-tiny w3-blue w3-round w3-margin-top" onclick="copyResponseToClipboard('${debugInfoId}')">
+              <i class="fa fa-copy"></i> Copy Response
+            </button>
+            <button class="w3-button w3-tiny w3-green w3-round w3-margin-top" onclick="toggleFullResponse('${debugInfoId}')">
+              <i class="fa fa-expand"></i> Show Full Response
+            </button>
+            <div id="${debugInfoId}_full" style="display: none; margin-top: 10px;">
+              <p><strong>Full Response:</strong></p>
+              <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; max-height: 300px;">${escapeHtmlSimple(responseText)}</pre>
+            </div>
+            <p class="w3-margin-top"><strong>Response Headers:</strong></p>
+            <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; font-size: 0.85em;">${escapeHtmlSimple(JSON.stringify(errorResponseDetails.headers || {}, null, 2))}</pre>
+          </div>
+        </div>
+      `;
+      
       tbody.innerHTML = `<tr><td colspan="6" class="w3-center w3-text-red">
         <p><i class="fa fa-exclamation-circle"></i> <strong>Error:</strong> ${escapeHtmlSimple(userMessage)}</p>
         <p class="w3-small w3-text-gray">Source: ${escapeHtmlSimple(source)} | Check browser console (F12) for technical details</p>
+        ${debugInfoHtml}
         <button class="w3-button w3-small w3-indigo w3-round w3-margin-top" onclick="fetchEmailQueries()">
           <i class="fa fa-refresh"></i> Retry
         </button>
@@ -1869,6 +1949,30 @@
       }
     } finally {
       loadingIndicator.style.display = 'none';
+    }
+  }
+  
+  // Helper function to copy response to clipboard
+  function copyResponseToClipboard(debugInfoId) {
+    const fullResponseDiv = document.getElementById(debugInfoId + '_full');
+    const responseText = fullResponseDiv ? fullResponseDiv.querySelector('pre').textContent : '';
+    if (responseText) {
+      navigator.clipboard.writeText(responseText).then(() => {
+        alert('Response copied to clipboard!');
+      }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy to clipboard. Check console for details.');
+      });
+    } else {
+      alert('No response text available to copy.');
+    }
+  }
+  
+  // Helper function to toggle full response display
+  function toggleFullResponse(debugInfoId) {
+    const fullResponseDiv = document.getElementById(debugInfoId + '_full');
+    if (fullResponseDiv) {
+      fullResponseDiv.style.display = fullResponseDiv.style.display === 'none' ? 'block' : 'none';
     }
   }
   
