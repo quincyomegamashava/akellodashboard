@@ -11936,6 +11936,738 @@ def search_learners_page():
     )
 
 
+def _fetch_learner_profile_data(username):
+    """Helper function to fetch basic learner profile data"""
+    try:
+        conn = get_ruzivo_conn()
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT 
+                s.username,
+                s.name,
+                s.grade,
+                s.last_login,
+                s.school_id,
+                s.access_sdate,
+                s.access_edate,
+                t.school_name,
+                t.school_province
+            FROM vwstudent s
+            JOIN tblschools t ON s.school_id = t.school_id
+            WHERE s.username = %s
+            LIMIT 1
+        """
+        cursor.execute(query, (username,))
+        row = cursor.fetchone()
+        
+        if not row:
+            return None
+        
+        def format_datetime(dt):
+            if dt:
+                if hasattr(dt, 'strftime'):
+                    return dt.strftime('%Y-%m-%d %H:%M:%S')
+            return None
+        
+        return {
+            'username': row.get('username'),
+            'name': row.get('name'),
+            'grade': row.get('grade'),
+            'last_login': format_datetime(row.get('last_login')),
+            'school_id': row.get('school_id'),
+            'access_sdate': format_datetime(row.get('access_sdate')),
+            'access_edate': format_datetime(row.get('access_edate')),
+            'school_name': row.get('school_name'),
+            'school_province': row.get('school_province')
+        }
+    except Exception as e:
+        return None
+
+
+def _fetch_learner_time_spent_data(username, start_date, end_date):
+    """Helper function to fetch time spent data for a learner"""
+    try:
+        conn = get_ruzivo_conn()
+        cursor = conn.cursor()
+        
+        student_query = """
+            SELECT student_id FROM vwstudent WHERE username = %s LIMIT 1
+        """
+        cursor.execute(student_query, (username,))
+        student_row = cursor.fetchone()
+        
+        if not student_row:
+            return None
+        
+        student_id = student_row.get('student_id') if isinstance(student_row, dict) else student_row[0]
+        
+        if not student_id:
+            return None
+        
+        total_seconds = 0
+        
+        # Primary content access
+        primary_query = """
+            SELECT SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, start_time))) AS seconds
+            FROM tblcontent_access
+            WHERE student_id = %s AND start_time BETWEEN %s AND %s
+        """
+        cursor.execute(primary_query, (student_id, start_date, end_date))
+        result = cursor.fetchone()
+        if result and result.get('seconds'):
+            total_seconds += result.get('seconds') or 0
+        
+        # Secondary content access
+        secondary_query = """
+            SELECT SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, start_time))) AS seconds
+            FROM tblcontent_access_hs
+            WHERE student_id = %s AND start_time BETWEEN %s AND %s
+        """
+        cursor.execute(secondary_query, (student_id, start_date, end_date))
+        result = cursor.fetchone()
+        if result and result.get('seconds'):
+            total_seconds += result.get('seconds') or 0
+        
+        # Zimsec content access
+        zimsec_query = """
+            SELECT SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, start_time))) AS seconds
+            FROM tblcontent_access_zimsec
+            WHERE student_id = %s AND start_time BETWEEN %s AND %s
+        """
+        cursor.execute(zimsec_query, (student_id, start_date, end_date))
+        result = cursor.fetchone()
+        if result and result.get('seconds'):
+            total_seconds += result.get('seconds') or 0
+        
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        
+        # Calculate longest streak
+        active_dates_query = """
+            SELECT DISTINCT DATE(activity_date) AS active_date
+            FROM (
+                SELECT DATE(login_date) AS activity_date
+                FROM tblstudents_login
+                WHERE student_id = %s AND login_date BETWEEN %s AND %s
+                
+                UNION
+                
+                SELECT DATE(start_time) AS activity_date
+                FROM tblcontent_access
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+                
+                UNION
+                
+                SELECT DATE(start_time) AS activity_date
+                FROM tblcontent_access_hs
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+                
+                UNION
+                
+                SELECT DATE(start_time) AS activity_date
+                FROM tblcontent_access_zimsec
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+            ) AS all_activities
+            ORDER BY active_date ASC
+        """
+        cursor.execute(active_dates_query, (
+            student_id, start_date, end_date,
+            student_id, start_date, end_date,
+            student_id, start_date, end_date,
+            student_id, start_date, end_date
+        ))
+        active_dates = cursor.fetchall()
+        
+        longest_streak = 0
+        current_streak = 0
+        prev_date = None
+        
+        for row in active_dates:
+            active_date = row.get('active_date') if isinstance(row, dict) else row[0]
+            if prev_date is None:
+                current_streak = 1
+            else:
+                if active_date == prev_date + timedelta(days=1):
+                    current_streak += 1
+                else:
+                    longest_streak = max(longest_streak, current_streak)
+                    current_streak = 1
+            prev_date = active_date
+        
+        longest_streak = max(longest_streak, current_streak)
+        
+        # Most active day
+        most_active_day_query = """
+            SELECT 
+                DATE(start_time) AS activity_date,
+                SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, start_time))) AS total_seconds
+            FROM (
+                SELECT start_time, end_time
+                FROM tblcontent_access
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+                
+                UNION ALL
+                
+                SELECT start_time, end_time
+                FROM tblcontent_access_hs
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+                
+                UNION ALL
+                
+                SELECT start_time, end_time
+                FROM tblcontent_access_zimsec
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+            ) AS all_content
+            GROUP BY DATE(start_time)
+            ORDER BY total_seconds DESC
+            LIMIT 1
+        """
+        cursor.execute(most_active_day_query, (
+            student_id, start_date, end_date,
+            student_id, start_date, end_date,
+            student_id, start_date, end_date
+        ))
+        most_active_day_result = cursor.fetchone()
+        
+        most_active_day = None
+        most_active_day_seconds = 0
+        if most_active_day_result:
+            most_active_day = most_active_day_result.get('activity_date') if isinstance(most_active_day_result, dict) else most_active_day_result[0]
+            most_active_day_seconds = most_active_day_result.get('total_seconds') if isinstance(most_active_day_result, dict) else most_active_day_result[1]
+            if most_active_day:
+                most_active_day = most_active_day.strftime('%Y-%m-%d') if hasattr(most_active_day, 'strftime') else str(most_active_day)
+        
+        # Most active month
+        most_active_month_query = """
+            SELECT 
+                DATE_FORMAT(start_time, '%%Y-%%m') AS activity_month,
+                SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, start_time))) AS total_seconds
+            FROM (
+                SELECT start_time, end_time
+                FROM tblcontent_access
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+                
+                UNION ALL
+                
+                SELECT start_time, end_time
+                FROM tblcontent_access_hs
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+                
+                UNION ALL
+                
+                SELECT start_time, end_time
+                FROM tblcontent_access_zimsec
+                WHERE student_id = %s AND start_time BETWEEN %s AND %s
+            ) AS all_content
+            GROUP BY DATE_FORMAT(start_time, '%%Y-%%m')
+            ORDER BY total_seconds DESC
+            LIMIT 1
+        """
+        cursor.execute(most_active_month_query, (
+            student_id, start_date, end_date,
+            student_id, start_date, end_date,
+            student_id, start_date, end_date
+        ))
+        most_active_month_result = cursor.fetchone()
+        
+        most_active_month = None
+        most_active_month_seconds = 0
+        if most_active_month_result:
+            most_active_month = most_active_month_result.get('activity_month') if isinstance(most_active_month_result, dict) else most_active_month_result[0]
+            most_active_month_seconds = most_active_month_result.get('total_seconds') if isinstance(most_active_month_result, dict) else most_active_month_result[1]
+        
+        most_active_day_hours = most_active_day_seconds // 3600
+        most_active_day_minutes = (most_active_day_seconds % 3600) // 60
+        most_active_day_formatted = f"{most_active_day_hours}h {most_active_day_minutes}m" if most_active_day_hours > 0 else f"{most_active_day_minutes}m"
+        
+        most_active_month_hours = most_active_month_seconds // 3600
+        most_active_month_minutes = (most_active_month_seconds % 3600) // 60
+        most_active_month_formatted = f"{most_active_month_hours}h {most_active_month_minutes}m" if most_active_month_hours > 0 else f"{most_active_month_minutes}m"
+        
+        if most_active_month:
+            try:
+                month_date = datetime.strptime(most_active_month, '%Y-%m')
+                most_active_month_display = month_date.strftime('%B %Y')
+            except:
+                most_active_month_display = most_active_month
+        else:
+            most_active_month_display = None
+        
+        return {
+            'total_seconds': total_seconds,
+            'hours': hours,
+            'minutes': minutes,
+            'seconds': seconds,
+            'formatted': f"{hours}h {minutes}m {seconds}s" if hours > 0 else f"{minutes}m {seconds}s",
+            'longest_streak': longest_streak,
+            'most_active_day': most_active_day,
+            'most_active_day_seconds': most_active_day_seconds,
+            'most_active_day_formatted': most_active_day_formatted if most_active_day else None,
+            'most_active_month': most_active_month_display,
+            'most_active_month_seconds': most_active_month_seconds,
+            'most_active_month_formatted': most_active_month_formatted if most_active_month else None
+        }
+    except Exception as e:
+        return None
+
+
+def _fetch_learner_platform_stats_data(username, start_date, end_date):
+    """Helper function to fetch platform statistics for a learner"""
+    try:
+        conn_ruzivo = get_ruzivo_conn()
+        cursor_ruzivo = conn_ruzivo.cursor()
+        
+        student_query = """
+            SELECT student_id, name FROM vwstudent WHERE username = %s LIMIT 1
+        """
+        cursor_ruzivo.execute(student_query, (username,))
+        student_row = cursor_ruzivo.fetchone()
+        
+        if not student_row:
+            return None
+        
+        student_id = student_row.get('student_id') if isinstance(student_row, dict) else student_row[0]
+        student_name = student_row.get('name') if isinstance(student_row, dict) else student_row[1]
+        
+        if not student_id:
+            return None
+        
+        name_parts = student_name.strip().split() if student_name else []
+        if len(name_parts) >= 2:
+            first_name = name_parts[0].strip()
+            last_name = ' '.join(name_parts[1:]).strip()
+        elif len(name_parts) == 1:
+            first_name = name_parts[0].strip()
+            last_name = ''
+        else:
+            first_name = ''
+            last_name = ''
+        
+        excluded_ids = [356,905,30843,265227,265228,265230,3223972,406978,516518,577527,1032617,1621500,1632975,1660731,1660834,1661007,1661053,1661353,1662420,1662839,1664013,1664021,1664698,1684433,1685102]
+        smartlearning_stats = {}
+        excluded_placeholders = ','.join(['%s'] * len(excluded_ids))
+        
+        # Primary content access
+        primary_content_query = f"""
+            SELECT COUNT(DISTINCT student_id) AS total_primary_content 
+            FROM tblcontent_access 
+            WHERE start_time BETWEEN %s AND %s
+            AND student_id = %s
+            AND student_id NOT IN ({excluded_placeholders})
+        """
+        cursor_ruzivo.execute(primary_content_query, (start_date, end_date, student_id, *excluded_ids))
+        result = cursor_ruzivo.fetchone()
+        smartlearning_stats['total_primary_content'] = result.get('total_primary_content') if result else 0
+        
+        # Secondary content access
+        sec_content_query = f"""
+            SELECT COUNT(DISTINCT student_id) AS total_sec_content 
+            FROM tblcontent_access_hs 
+            WHERE start_time BETWEEN %s AND %s
+            AND student_id = %s
+            AND student_id NOT IN ({excluded_placeholders})
+        """
+        cursor_ruzivo.execute(sec_content_query, (start_date, end_date, student_id, *excluded_ids))
+        result = cursor_ruzivo.fetchone()
+        smartlearning_stats['total_sec_content'] = result.get('total_sec_content') if result else 0
+        
+        # Primary exercises by category
+        primary_exercise_query = f"""
+            SELECT category, COUNT(DISTINCT student_id) AS total_primary_exercise 
+            FROM tblresults 
+            WHERE date_added BETWEEN %s AND %s
+            AND student_id = %s
+            AND student_id NOT IN ({excluded_placeholders})
+            GROUP BY category
+        """
+        cursor_ruzivo.execute(primary_exercise_query, (start_date, end_date, student_id, *excluded_ids))
+        primary_exercises = cursor_ruzivo.fetchall()
+        smartlearning_stats['primary_exercises'] = {row.get('category'): row.get('total_primary_exercise') for row in primary_exercises}
+        
+        # Secondary exercises by category
+        sec_exercise_query = f"""
+            SELECT category, COUNT(DISTINCT student_id) AS total_sec_exercise 
+            FROM tblresults_hs 
+            WHERE date_added BETWEEN %s AND %s
+            AND student_id = %s
+            AND student_id NOT IN ({excluded_placeholders})
+            GROUP BY category
+        """
+        cursor_ruzivo.execute(sec_exercise_query, (start_date, end_date, student_id, *excluded_ids))
+        sec_exercises = cursor_ruzivo.fetchall()
+        smartlearning_stats['secondary_exercises'] = {row.get('category'): row.get('total_sec_exercise') for row in sec_exercises}
+        
+        # Zimsec access
+        zimsec_query = f"""
+            SELECT COUNT(DISTINCT student_id) AS total_zimsec_access 
+            FROM tblcontent_access_zimsec
+            WHERE start_time BETWEEN %s AND %s
+            AND student_id = %s
+            AND student_id NOT IN ({excluded_placeholders})
+        """
+        cursor_ruzivo.execute(zimsec_query, (start_date, end_date, student_id, *excluded_ids))
+        result = cursor_ruzivo.fetchone()
+        smartlearning_stats['total_zimsec_access'] = result.get('total_zimsec_access') if result else 0
+        
+        # Teacher access
+        teacher_access_query = f"""
+            SELECT COUNT(DISTINCT student_id) AS teacher_access
+            FROM tblclass_activity_results
+            WHERE date_added BETWEEN %s AND %s
+            AND student_id = %s
+            AND student_id NOT IN ({excluded_placeholders})
+        """
+        cursor_ruzivo.execute(teacher_access_query, (start_date, end_date, student_id, *excluded_ids))
+        result = cursor_ruzivo.fetchone()
+        smartlearning_stats['teacher_access'] = result.get('teacher_access') if result else 0
+        
+        # Library Platform Query
+        library_stats = {}
+        try:
+            conn_library = get_direct_library_conn()
+            cursor_library = conn_library.cursor()
+            
+            library_user_id = None
+            
+            # Strategy 1: Search by username
+            library_user_query = """
+                SELECT id FROM users 
+                WHERE TRIM(LOWER(username)) = TRIM(LOWER(%s))
+                LIMIT 1
+            """
+            cursor_library.execute(library_user_query, (username,))
+            library_user_row = cursor_library.fetchone()
+            
+            if library_user_row:
+                library_user_id = library_user_row.get('id') if isinstance(library_user_row, dict) else library_user_row[0]
+            
+            # Strategy 2: Try by first_name and last_name
+            if not library_user_id and first_name and last_name:
+                library_user_query = """
+                    SELECT id FROM users 
+                    WHERE TRIM(LOWER(first_name)) = TRIM(LOWER(%s)) 
+                    AND TRIM(LOWER(last_name)) = TRIM(LOWER(%s))
+                    LIMIT 1
+                """
+                cursor_library.execute(library_user_query, (first_name, last_name))
+                library_user_row = cursor_library.fetchone()
+                
+                if library_user_row:
+                    library_user_id = library_user_row.get('id') if isinstance(library_user_row, dict) else library_user_row[0]
+            
+            if library_user_id:
+                library_duration_query = """
+                    SELECT 
+                        SUM(duration_minutes) AS total_duration_minutes,
+                        AVG(duration_minutes) AS avg_duration_minutes,
+                        COUNT(*) AS reading_sessions
+                    FROM read_trackers 
+                    WHERE duration_minutes != 0
+                    AND user_id = %s
+                    AND DATE(created_at) BETWEEN DATE(%s) AND DATE(%s)
+                """
+                cursor_library.execute(library_duration_query, (library_user_id, start_date, end_date))
+                result = cursor_library.fetchone()
+                
+                total_minutes = float(result.get('total_duration_minutes')) if result and result.get('total_duration_minutes') else 0
+                avg_minutes = float(result.get('avg_duration_minutes')) if result and result.get('avg_duration_minutes') else 0
+                sessions = int(result.get('reading_sessions')) if result and result.get('reading_sessions') else 0
+                
+                total_hours = int(total_minutes // 60)
+                total_mins = int(total_minutes % 60)
+                
+                library_stats['total_duration_minutes'] = total_minutes
+                library_stats['avg_duration_minutes'] = avg_minutes
+                library_stats['reading_sessions'] = sessions
+                library_stats['formatted_time'] = f"{total_hours}h {total_mins}m" if total_hours > 0 else f"{total_mins}m"
+                library_stats['found'] = True
+            else:
+                library_stats['avg_duration_minutes'] = 0
+                library_stats['note'] = f'User not found in library platform'
+            
+            if cursor_library:
+                cursor_library.close()
+            if conn_library:
+                conn_library.close()
+        except Exception as e:
+            library_stats['error'] = str(e)
+            library_stats['avg_duration_minutes'] = 0
+        
+        return {
+            'smartlearning': smartlearning_stats,
+            'library': library_stats
+        }
+    except Exception as e:
+        return None
+
+
+@app.route('/api/bulk-search-learners', methods=['POST'])
+@login_required
+def bulk_search_learners():
+    """Bulk search learners from Excel file upload"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if not file or not file.filename:
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Check file extension
+        if not (file.filename.lower().endswith('.xlsx') or file.filename.lower().endswith('.xls')):
+            return jsonify({'error': 'Please upload an Excel file (.xlsx or .xls)'}), 400
+        
+        # Get date range (optional)
+        start_date = request.form.get('start_date')
+        end_date = request.form.get('end_date')
+        include_stats = request.form.get('include_stats', 'false').lower() == 'true'
+        
+        # Validate date range if stats are requested
+        if include_stats:
+            if not start_date or not end_date:
+                return jsonify({'error': 'start_date and end_date are required when including statistics'}), 400
+            if start_date > end_date:
+                return jsonify({'error': 'start_date must be before or equal to end_date'}), 400
+        
+        # Read Excel file
+        try:
+            df = pd.read_excel(file)
+        except Exception as e:
+            return jsonify({'error': f'Error reading Excel file: {str(e)}'}), 400
+        
+        # Normalize column names (case-insensitive, handle variations)
+        df.columns = df.columns.str.strip().str.lower()
+        
+        # Map possible column names
+        column_mapping = {
+            'firstname': ['firstname', 'first_name', 'first name'],
+            'lastname': ['lastname', 'last_name', 'last name', 'surname'],
+            'username': ['username', 'user_name', 'user name']
+        }
+        
+        # Find actual column names
+        firstname_col = None
+        lastname_col = None
+        username_col = None
+        
+        for col in df.columns:
+            if col in column_mapping['firstname']:
+                firstname_col = col
+            elif col in column_mapping['lastname']:
+                lastname_col = col
+            elif col in column_mapping['username']:
+                username_col = col
+        
+        # Validate required columns
+        if not username_col and (not firstname_col or not lastname_col):
+            return jsonify({
+                'error': 'Missing required columns',
+                'required': 'Either "username" OR both "firstname" and "lastname" columns are required',
+                'found_columns': list(df.columns)
+            }), 400
+        
+        # Process each row
+        results = []
+        conn = get_ruzivo_conn()
+        cursor = conn.cursor()
+        
+        for idx, row in df.iterrows():
+            row_result = {
+                'row_number': idx + 2,  # +2 because Excel rows start at 1 and we skip header
+                'input_data': {},
+                'error': None,
+                'profile': None,
+                'time_spent': None,
+                'platform_stats': None
+            }
+            
+            # Extract input data
+            if username_col:
+                username_input = str(row[username_col]).strip() if pd.notna(row[username_col]) else ''
+                row_result['input_data']['username'] = username_input
+            else:
+                firstname_input = str(row[firstname_col]).strip() if pd.notna(row[firstname_col]) else ''
+                lastname_input = str(row[lastname_col]).strip() if pd.notna(row[lastname_col]) else ''
+                row_result['input_data']['firstname'] = firstname_input
+                row_result['input_data']['lastname'] = lastname_input
+            
+            # Find learner
+            matched_username = None
+            
+            if username_col and username_input:
+                # Match by username
+                query = """
+                    SELECT username FROM vwstudent WHERE username = %s LIMIT 1
+                """
+                cursor.execute(query, (username_input,))
+                match = cursor.fetchone()
+                if match:
+                    matched_username = match.get('username') if isinstance(match, dict) else match[0]
+            elif firstname_col and lastname_col and firstname_input and lastname_input:
+                # Match by firstname + lastname
+                full_name = f"{firstname_input} {lastname_input}".strip()
+                query = """
+                    SELECT username FROM vwstudent 
+                    WHERE name LIKE %s
+                    LIMIT 1
+                """
+                cursor.execute(query, (f"%{full_name}%",))
+                match = cursor.fetchone()
+                if match:
+                    matched_username = match.get('username') if isinstance(match, dict) else match[0]
+            
+            if not matched_username:
+                row_result['error'] = 'Learner not found'
+                results.append(row_result)
+                continue
+            
+            # Fetch profile data
+            profile_data = _fetch_learner_profile_data(matched_username)
+            if not profile_data:
+                row_result['error'] = 'Error fetching profile data'
+                results.append(row_result)
+                continue
+            
+            row_result['profile'] = profile_data
+            
+            # Fetch time spent and platform stats if requested
+            if include_stats and start_date and end_date:
+                time_spent_data = _fetch_learner_time_spent_data(matched_username, start_date, end_date)
+                row_result['time_spent'] = time_spent_data
+                
+                platform_stats_data = _fetch_learner_platform_stats_data(matched_username, start_date, end_date)
+                row_result['platform_stats'] = platform_stats_data
+            
+            results.append(row_result)
+        
+        return jsonify({
+            'results': results,
+            'total_rows': len(results),
+            'successful': len([r for r in results if r.get('profile')]),
+            'failed': len([r for r in results if r.get('error')])
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/download-bulk-learner-results', methods=['POST'])
+@login_required
+def download_bulk_learner_results():
+    """Download bulk learner results as Excel or CSV"""
+    try:
+        data = request.get_json()
+        if not data or 'results' not in data:
+            return jsonify({'error': 'No results data provided'}), 400
+        
+        format_type = request.args.get('format', 'excel').lower()
+        if format_type not in ['excel', 'csv']:
+            format_type = 'excel'
+        
+        results = data['results']
+        
+        # Prepare data for export
+        export_rows = []
+        for result in results:
+            if result.get('error'):
+                # Include error rows
+                export_rows.append({
+                    'Row Number': result.get('row_number', ''),
+                    'Error': result.get('error', ''),
+                    'Input Username': result.get('input_data', {}).get('username', ''),
+                    'Input First Name': result.get('input_data', {}).get('firstname', ''),
+                    'Input Last Name': result.get('input_data', {}).get('lastname', ''),
+                    'Username': '',
+                    'Full Name': '',
+                    'Grade': '',
+                    'School Name': '',
+                    'School Province': '',
+                    'Last Login': '',
+                    'Access Start Date': '',
+                    'Access End Date': '',
+                    'Total Time Spent': '',
+                    'Hours': '',
+                    'Minutes': '',
+                    'Seconds': '',
+                    'Longest Streak': '',
+                    'Most Active Day': '',
+                    'Most Active Month': '',
+                    'Primary Content Access': '',
+                    'Secondary Content Access': '',
+                    'Zimsec Access': '',
+                    'Teacher Activities': '',
+                    'Library Reading Time': '',
+                    'Library Sessions': '',
+                    'Library Avg Duration (min)': ''
+                })
+            else:
+                profile = result.get('profile', {})
+                time_spent = result.get('time_spent', {})
+                platform_stats = result.get('platform_stats', {})
+                smartlearning = platform_stats.get('smartlearning', {}) if platform_stats else {}
+                library = platform_stats.get('library', {}) if platform_stats else {}
+                
+                export_rows.append({
+                    'Row Number': result.get('row_number', ''),
+                    'Error': '',
+                    'Input Username': result.get('input_data', {}).get('username', ''),
+                    'Input First Name': result.get('input_data', {}).get('firstname', ''),
+                    'Input Last Name': result.get('input_data', {}).get('lastname', ''),
+                    'Username': profile.get('username', ''),
+                    'Full Name': profile.get('name', ''),
+                    'Grade': profile.get('grade', ''),
+                    'School Name': profile.get('school_name', ''),
+                    'School Province': profile.get('school_province', ''),
+                    'Last Login': profile.get('last_login', ''),
+                    'Access Start Date': profile.get('access_sdate', ''),
+                    'Access End Date': profile.get('access_edate', ''),
+                    'Total Time Spent': time_spent.get('formatted', '') if time_spent else '',
+                    'Hours': time_spent.get('hours', '') if time_spent else '',
+                    'Minutes': time_spent.get('minutes', '') if time_spent else '',
+                    'Seconds': time_spent.get('seconds', '') if time_spent else '',
+                    'Longest Streak': time_spent.get('longest_streak', '') if time_spent else '',
+                    'Most Active Day': time_spent.get('most_active_day', '') if time_spent else '',
+                    'Most Active Month': time_spent.get('most_active_month', '') if time_spent else '',
+                    'Primary Content Access': smartlearning.get('total_primary_content', ''),
+                    'Secondary Content Access': smartlearning.get('total_sec_content', ''),
+                    'Zimsec Access': smartlearning.get('total_zimsec_access', ''),
+                    'Teacher Activities': smartlearning.get('teacher_access', ''),
+                    'Library Reading Time': library.get('formatted_time', '') if library else '',
+                    'Library Sessions': library.get('reading_sessions', '') if library else '',
+                    'Library Avg Duration (min)': round(library.get('avg_duration_minutes', 0), 2) if library else ''
+                })
+        
+        df = pd.DataFrame(export_rows)
+        
+        if format_type == 'excel':
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Learner Results')
+            output.seek(0)
+            filename = f'bulk_learner_results_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+            return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 
+                           as_attachment=True, download_name=filename)
+        else:
+            output = io.StringIO()
+            df.to_csv(output, index=False)
+            output.seek(0)
+            filename = f'bulk_learner_results_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+            return Response(
+                output.getvalue(),
+                mimetype='text/csv',
+                headers={'Content-Disposition': f'attachment; filename={filename}'}
+            )
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/word-to-html-converter', methods=['GET'])
 @login_required
 def word_to_html_converter():

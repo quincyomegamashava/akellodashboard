@@ -212,6 +212,272 @@
     margin-bottom: 16px;
   }
   
+  .bulk-upload-section {
+    margin-bottom: 24px;
+  }
+  
+  .file-upload-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .file-input-wrapper {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .file-input-wrapper input[type="file"] {
+    position: absolute;
+    opacity: 0;
+    width: 0.1px;
+    height: 0.1px;
+    overflow: hidden;
+    z-index: -1;
+  }
+  
+  .file-input-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+  }
+  
+  .file-input-label:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  }
+  
+  .file-name-display {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: #6b7a90;
+  }
+  
+  .date-range-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 12px;
+    align-items: end;
+  }
+  
+  .date-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .date-input-group label {
+    font-size: 0.85rem;
+    color: #6b7a90;
+    font-weight: 600;
+  }
+  
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+  }
+  
+  .checkbox-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+  }
+  
+  .checkbox-group label {
+    font-size: 0.9rem;
+    color: #1e293b;
+    cursor: pointer;
+    margin: 0;
+  }
+  
+  .bulk-results-container {
+    margin-top: 24px;
+  }
+  
+  .bulk-results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .download-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .download-btn {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+  }
+  
+  .download-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  }
+  
+  .download-btn.csv {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  }
+  
+  .download-btn.csv:hover {
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  }
+  
+  .learner-result-card {
+    background: #fff;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    transition: all 0.2s ease;
+  }
+  
+  .learner-result-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  
+  .learner-result-card.error {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.05);
+  }
+  
+  .learner-result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+  }
+  
+  .learner-result-title {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #1e293b;
+  }
+  
+  .learner-result-title.error {
+    color: #ef4444;
+  }
+  
+  .expand-btn {
+    background: transparent;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #6366f1;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+  }
+  
+  .expand-btn:hover {
+    background: rgba(99, 102, 241, 0.1);
+  }
+  
+  .learner-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+  }
+  
+  .detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .detail-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #77849a;
+    font-weight: 600;
+  }
+  
+  .detail-value {
+    font-size: 0.95rem;
+    color: #1e293b;
+    font-weight: 500;
+  }
+  
+  .stats-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(226, 232, 240, 0.5);
+  }
+  
+  .stats-section-title {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #1e293b;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  
+  .stat-item {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 8px;
+  }
+  
+  .stat-item-label {
+    font-size: 0.75rem;
+    color: #6b7a90;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  
+  .stat-item-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+  }
+  
+  .collapsible-content {
+    display: none;
+  }
+  
+  .collapsible-content.expanded {
+    display: block;
+  }
+  
   @media (max-width: 780px) {
     .search-wrapper {
       max-width: 95vw;
@@ -234,6 +500,69 @@
 </style>
 
 <div class="search-wrapper">
+  <!-- Bulk Upload Section -->
+  <div class="glass-card bulk-upload-section">
+    <div class="card-header">
+      <i class="fas fa-file-excel"></i>
+      <span class="w3-small">Bulk Upload Learners</span>
+    </div>
+    <div class="card-body">
+      <div class="file-upload-container">
+        <div>
+          <div class="file-input-wrapper">
+            <input type="file" id="excelFileInput" accept=".xlsx,.xls" />
+            <label for="excelFileInput" class="file-input-label">
+              <i class="fas fa-upload"></i> Choose Excel File
+            </label>
+          </div>
+          <div id="fileNameDisplay" class="file-name-display" style="display: none;"></div>
+        </div>
+        
+        <div class="date-range-container">
+          <div class="date-input-group">
+            <label for="bulkStartDate">Start Date (for statistics)</label>
+            <input type="date" id="bulkStartDate" class="search-input" />
+          </div>
+          <div class="date-input-group">
+            <label for="bulkEndDate">End Date (for statistics)</label>
+            <input type="date" id="bulkEndDate" class="search-input" />
+          </div>
+          <div class="checkbox-group">
+            <input type="checkbox" id="includeStatsCheckbox" />
+            <label for="includeStatsCheckbox">Include Time Spent & Platform Stats</label>
+          </div>
+        </div>
+        
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <button class="search-btn" onclick="processBulkUpload()">
+            <i class="fas fa-upload"></i> Upload and Process
+          </button>
+          <div style="font-size: 0.85rem; color: #6b7a90;">
+            <i class="fas fa-info-circle"></i> Excel file should contain columns: <strong>firstname</strong>, <strong>lastname</strong> (or <strong>username</strong>)
+          </div>
+        </div>
+      </div>
+      
+      <div id="bulkResultsContainer" class="bulk-results-container" style="display: none;">
+        <div class="bulk-results-header">
+          <div>
+            <div class="results-count" id="bulkResultsCount"></div>
+          </div>
+          <div class="download-buttons">
+            <button class="download-btn" onclick="downloadBulkResults('excel')">
+              <i class="fas fa-file-excel"></i> Download Excel
+            </button>
+            <button class="download-btn csv" onclick="downloadBulkResults('csv')">
+              <i class="fas fa-file-csv"></i> Download CSV
+            </button>
+          </div>
+        </div>
+        <div id="bulkResultsContent"></div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Regular Search Section -->
   <div class="glass-card">
     <div class="card-header">
       <i class="fas fa-search"></i>
@@ -264,6 +593,269 @@
 </div>
 
 <script>
+// Set default dates for bulk upload
+document.addEventListener('DOMContentLoaded', function() {
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  document.getElementById('bulkStartDate').value = firstDay.toISOString().split('T')[0];
+  document.getElementById('bulkEndDate').value = today.toISOString().split('T')[0];
+  
+  // File input change handler
+  document.getElementById('excelFileInput').addEventListener('change', function(e) {
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
+    if (e.target.files.length > 0) {
+      fileNameDisplay.textContent = 'Selected: ' + e.target.files[0].name;
+      fileNameDisplay.style.display = 'block';
+    } else {
+      fileNameDisplay.style.display = 'none';
+    }
+  });
+});
+
+// Store bulk results globally
+window.bulkResultsData = null;
+
+function processBulkUpload() {
+  const fileInput = document.getElementById('excelFileInput');
+  const startDate = document.getElementById('bulkStartDate').value;
+  const endDate = document.getElementById('bulkEndDate').value;
+  const includeStats = document.getElementById('includeStatsCheckbox').checked;
+  const resultsContainer = document.getElementById('bulkResultsContainer');
+  const resultsContent = document.getElementById('bulkResultsContent');
+  
+  if (!fileInput.files || fileInput.files.length === 0) {
+    alert('Please select an Excel file');
+    return;
+  }
+  
+  if (includeStats && (!startDate || !endDate)) {
+    alert('Please select both start and end dates when including statistics');
+    return;
+  }
+  
+  if (includeStats && startDate > endDate) {
+    alert('Start date must be before or equal to end date');
+    return;
+  }
+  
+  // Show loading
+  resultsContainer.style.display = 'block';
+  resultsContent.innerHTML = `
+    <div class="loading">
+      <i class="fas fa-spinner fa-spin fa-2x"></i>
+      <p style="margin-top: 12px">Processing Excel file and fetching learner data...</p>
+    </div>
+  `;
+  
+  // Prepare form data
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  if (includeStats) {
+    formData.append('start_date', startDate);
+    formData.append('end_date', endDate);
+  }
+  formData.append('include_stats', includeStats.toString());
+  
+  // Send request
+  fetch('/api/bulk-search-learners', {
+    method: 'POST',
+    body: formData
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.error) {
+        resultsContent.innerHTML = `
+          <div class="no-results">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p>${escapeHtml(data.error)}</p>
+          </div>
+        `;
+        return;
+      }
+      
+      // Store results for download
+      window.bulkResultsData = data;
+      
+      // Display results
+      displayBulkResults(data);
+    })
+    .catch(error => {
+      console.error('Error processing bulk upload:', error);
+      resultsContent.innerHTML = `
+        <div class="no-results">
+          <i class="fas fa-exclamation-triangle"></i>
+          <p>Error processing file. Please try again.</p>
+        </div>
+      `;
+    });
+}
+
+function displayBulkResults(data) {
+  const resultsContent = document.getElementById('bulkResultsContent');
+  const resultsCount = document.getElementById('bulkResultsCount');
+  
+  resultsCount.innerHTML = `
+    Processed <strong>${data.total_rows}</strong> row${data.total_rows !== 1 ? 's' : ''} | 
+    <span style="color: #10b981;">${data.successful} successful</span> | 
+    <span style="color: #ef4444;">${data.failed} failed</span>
+  `;
+  
+  let html = '';
+  
+  data.results.forEach((result, index) => {
+    const isError = result.error || !result.profile;
+    const cardClass = isError ? 'learner-result-card error' : 'learner-result-card';
+    
+    html += `<div class="${cardClass}" id="resultCard${index}">`;
+    html += `<div class="learner-result-header">`;
+    html += `<div class="learner-result-title ${isError ? 'error' : ''}">`;
+    if (isError) {
+      html += `<i class="fas fa-exclamation-circle"></i> Row ${result.row_number}: ${escapeHtml(result.error || 'Error')}`;
+    } else {
+      const profile = result.profile;
+      html += `<i class="fas fa-user-check"></i> ${escapeHtml(profile.name || profile.username || 'Unknown')} (${escapeHtml(profile.username || 'N/A')})`;
+    }
+    html += `</div>`;
+    if (!isError) {
+      html += `<button class="expand-btn" onclick="toggleResultDetails(${index})">
+        <i class="fas fa-chevron-down" id="expandIcon${index}"></i> <span id="expandText${index}">Show Details</span>
+      </button>`;
+    }
+    html += `</div>`;
+    
+    if (!isError) {
+      const profile = result.profile;
+      html += `<div class="learner-details">`;
+      html += `<div class="detail-item"><div class="detail-label">Username</div><div class="detail-value">${escapeHtml(profile.username || '—')}</div></div>`;
+      html += `<div class="detail-item"><div class="detail-label">Full Name</div><div class="detail-value">${escapeHtml(profile.name || '—')}</div></div>`;
+      html += `<div class="detail-item"><div class="detail-label">Grade</div><div class="detail-value">${profile.grade ? 'Grade ' + profile.grade : '—'}</div></div>`;
+      html += `<div class="detail-item"><div class="detail-label">School</div><div class="detail-value">${escapeHtml(profile.school_name || '—')}</div></div>`;
+      html += `<div class="detail-item"><div class="detail-label">Province</div><div class="detail-value">${escapeHtml(profile.school_province || '—')}</div></div>`;
+      html += `<div class="detail-item"><div class="detail-label">Last Login</div><div class="detail-value">${escapeHtml(profile.last_login || '—')}</div></div>`;
+      html += `<div class="detail-item"><div class="detail-label">Access Start</div><div class="detail-value">${escapeHtml(profile.access_sdate || '—')}</div></div>`;
+      html += `<div class="detail-item"><div class="detail-label">Access End</div><div class="detail-value">${escapeHtml(profile.access_edate || '—')}</div></div>`;
+      html += `</div>`;
+      
+      // Time Spent Section
+      if (result.time_spent) {
+        const timeSpent = result.time_spent;
+        html += `<div class="stats-section collapsible-content" id="timeSpent${index}">`;
+        html += `<div class="stats-section-title"><i class="fas fa-clock"></i> Time Spent on Platform</div>`;
+        html += `<div class="stats-grid">`;
+        html += `<div class="stat-item"><div class="stat-item-label">Total Time</div><div class="stat-item-value">${escapeHtml(timeSpent.formatted || '0m 0s')}</div></div>`;
+        html += `<div class="stat-item"><div class="stat-item-label">Hours</div><div class="stat-item-value">${timeSpent.hours || 0}</div></div>`;
+        html += `<div class="stat-item"><div class="stat-item-label">Minutes</div><div class="stat-item-value">${timeSpent.minutes || 0}</div></div>`;
+        html += `<div class="stat-item"><div class="stat-item-label">Seconds</div><div class="stat-item-value">${timeSpent.seconds || 0}</div></div>`;
+        html += `<div class="stat-item"><div class="stat-item-label">Longest Streak</div><div class="stat-item-value">${timeSpent.longest_streak || 0} days</div></div>`;
+        html += `<div class="stat-item"><div class="stat-item-label">Most Active Day</div><div class="stat-item-value">${escapeHtml(timeSpent.most_active_day || '—')}</div></div>`;
+        html += `<div class="stat-item"><div class="stat-item-label">Most Active Month</div><div class="stat-item-value">${escapeHtml(timeSpent.most_active_month || '—')}</div></div>`;
+        html += `</div></div>`;
+      }
+      
+      // Platform Stats Section
+      if (result.platform_stats) {
+        const stats = result.platform_stats;
+        const sl = stats.smartlearning || {};
+        const lib = stats.library || {};
+        
+        html += `<div class="stats-section collapsible-content" id="platformStats${index}">`;
+        html += `<div class="stats-section-title"><i class="fas fa-chart-bar"></i> Platform Statistics</div>`;
+        html += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 12px;">`;
+        
+        // SmartLearning
+        html += `<div style="background: #f8f9fa; padding: 16px; border-radius: 8px;">`;
+        html += `<div style="font-weight: 700; margin-bottom: 12px; color: #6366f1;"><i class="fas fa-graduation-cap"></i> SmartLearning Platform</div>`;
+        html += `<div class="stats-grid">`;
+        html += `<div class="stat-item"><div class="stat-item-label">Primary Content</div><div class="stat-item-value">${sl.total_primary_content || 0}</div></div>`;
+        html += `<div class="stat-item"><div class="stat-item-label">Secondary Content</div><div class="stat-item-value">${sl.total_sec_content || 0}</div></div>`;
+        html += `<div class="stat-item"><div class="stat-item-label">Zimsec Access</div><div class="stat-item-value">${sl.total_zimsec_access || 0}</div></div>`;
+        html += `<div class="stat-item"><div class="stat-item-label">Teacher Activities</div><div class="stat-item-value">${sl.teacher_access || 0}</div></div>`;
+        html += `</div></div>`;
+        
+        // Library
+        html += `<div style="background: #f8f9fa; padding: 16px; border-radius: 8px;">`;
+        html += `<div style="font-weight: 700; margin-bottom: 12px; color: #6366f1;"><i class="fas fa-book"></i> Library Platform</div>`;
+        html += `<div class="stats-grid">`;
+        if (lib.error) {
+          html += `<div class="stat-item" style="grid-column: 1 / -1;"><div class="stat-item-label" style="color: #ef4444;">Error</div><div class="stat-item-value" style="color: #ef4444; font-size: 0.9rem;">${escapeHtml(lib.error)}</div></div>`;
+        } else {
+          html += `<div class="stat-item"><div class="stat-item-label">Reading Time</div><div class="stat-item-value">${escapeHtml(lib.formatted_time || '0m')}</div></div>`;
+          html += `<div class="stat-item"><div class="stat-item-label">Sessions</div><div class="stat-item-value">${lib.reading_sessions || 0}</div></div>`;
+          html += `<div class="stat-item"><div class="stat-item-label">Avg Duration</div><div class="stat-item-value">${lib.avg_duration_minutes ? lib.avg_duration_minutes.toFixed(2) : 0} min</div></div>`;
+        }
+        html += `</div></div>`;
+        
+        html += `</div></div>`;
+      }
+    }
+    
+    html += `</div>`;
+  });
+  
+  resultsContent.innerHTML = html;
+}
+
+function toggleResultDetails(index) {
+  const timeSpentSection = document.getElementById(`timeSpent${index}`);
+  const platformStatsSection = document.getElementById(`platformStats${index}`);
+  const expandIcon = document.getElementById(`expandIcon${index}`);
+  const expandText = document.getElementById(`expandText${index}`);
+  
+  if (timeSpentSection && platformStatsSection) {
+    const isExpanded = timeSpentSection.classList.contains('expanded');
+    
+    if (isExpanded) {
+      timeSpentSection.classList.remove('expanded');
+      platformStatsSection.classList.remove('expanded');
+      expandIcon.className = 'fas fa-chevron-down';
+      expandText.textContent = 'Show Details';
+    } else {
+      timeSpentSection.classList.add('expanded');
+      platformStatsSection.classList.add('expanded');
+      expandIcon.className = 'fas fa-chevron-up';
+      expandText.textContent = 'Hide Details';
+    }
+  }
+}
+
+function downloadBulkResults(format) {
+  if (!window.bulkResultsData) {
+    alert('No results to download');
+    return;
+  }
+  
+  fetch(`/api/download-bulk-learner-results?format=${format}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(window.bulkResultsData)
+  })
+    .then(response => {
+      if (!response.ok) {
+        return response.json().then(data => {
+          throw new Error(data.error || 'Download failed');
+        });
+      }
+      return response.blob();
+    })
+    .then(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const extension = format === 'excel' ? 'xlsx' : 'csv';
+      a.download = `bulk_learner_results_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.${extension}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    })
+    .catch(error => {
+      console.error('Download error:', error);
+      alert('Error downloading file: ' + error.message);
+    });
+}
+
 function searchLearners() {
   const searchTerm = document.getElementById('searchInput').value.trim();
   const resultsContainer = document.getElementById('resultsContainer');
