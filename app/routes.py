@@ -2,6 +2,8 @@
 from asyncio import open_connection
 import calendar
 import json
+import time
+import os
 from urllib import parse
 from urllib.parse import urlsplit
 from flask import jsonify, render_template, flash, redirect, render_template_string, session, url_for, request, send_file, Response, stream_with_context
@@ -14368,13 +14370,68 @@ def ensure_json_response(data, status_code=200):
     Returns:
         Flask Response object with JSON content and proper headers
     """
+    # #region agent log
+    serialize_start = time.time()
+    log_entry = {
+        'sessionId': 'debug-session',
+        'runId': 'run1',
+        'hypothesisId': 'B',
+        'location': 'routes.py:ensure_json_response:entry',
+        'message': 'ensure_json_response called',
+        'data': {'status_code': status_code, 'data_type': type(data).__name__, 'has_emails_key': 'emails' in data if isinstance(data, dict) else False, 'emails_count': len(data.get('emails', [])) if isinstance(data, dict) and 'emails' in data else 0},
+        'timestamp': int(time.time() * 1000)
+    }
+    try:
+        with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+            f.write(json.dumps(log_entry) + '\n')
+    except:
+        pass
+    # #endregion
+    
     try:
         # Validate that data can be serialized to JSON
         json_str = json.dumps(data)
+        serialize_time = (time.time() - serialize_start) * 1000
+        
+        # #region agent log
+        log_entry = {
+            'sessionId': 'debug-session',
+            'runId': 'run1',
+            'hypothesisId': 'B',
+            'location': 'routes.py:ensure_json_response:after_serialize',
+            'message': 'JSON serialization completed',
+            'data': {'serialization_time_ms': serialize_time, 'json_size_bytes': len(json_str), 'status_code': status_code},
+            'timestamp': int(time.time() * 1000)
+        }
+        try:
+            with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                f.write(json.dumps(log_entry) + '\n')
+        except:
+            pass
+        # #endregion
+        
         # Create response with explicit Content-Type
         response = jsonify(data)
         response.headers['Content-Type'] = 'application/json; charset=utf-8'
         response.status_code = status_code
+        
+        # #region agent log
+        log_entry = {
+            'sessionId': 'debug-session',
+            'runId': 'run1',
+            'hypothesisId': 'B',
+            'location': 'routes.py:ensure_json_response:before_return',
+            'message': 'Response object created, about to return',
+            'data': {'status_code': status_code, 'content_type': response.headers.get('Content-Type'), 'response_size_bytes': len(json_str)},
+            'timestamp': int(time.time() * 1000)
+        }
+        try:
+            with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                f.write(json.dumps(log_entry) + '\n')
+        except:
+            pass
+        # #endregion
+        
         return response
     except (TypeError, ValueError) as e:
         # If data can't be serialized, return error response
@@ -14406,24 +14463,114 @@ def ensure_json_response(data, status_code=200):
 @login_required
 def get_email_queries():
     """Fetch emails from Outlook (Graph API) or Gmail (IMAP) based on source parameter"""
+    # #region agent log
+    route_start_time = time.time()
+    log_entry = {
+        'sessionId': 'debug-session',
+        'runId': 'run1',
+        'hypothesisId': 'A',
+        'location': 'routes.py:get_email_queries:entry',
+        'message': 'get_email_queries route called',
+        'data': {'source': request.args.get('source', 'outlook')},
+        'timestamp': int(time.time() * 1000)
+    }
+    try:
+        with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+            f.write(json.dumps(log_entry) + '\n')
+    except:
+        pass
+    # #endregion
+    
     try:
         # Get email source from query parameter (default: 'outlook')
         email_source = request.args.get('source', 'outlook').lower()
         
         try:
+            # #region agent log
+            before_fetch_time = time.time()
+            log_entry = {
+                'sessionId': 'debug-session',
+                'runId': 'run1',
+                'hypothesisId': 'A',
+                'location': 'routes.py:get_email_queries:before_fetch',
+                'message': 'About to call fetch function',
+                'data': {'source': email_source, 'elapsed_ms': (before_fetch_time - route_start_time) * 1000},
+                'timestamp': int(time.time() * 1000)
+            }
+            try:
+                with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                    f.write(json.dumps(log_entry) + '\n')
+            except:
+                pass
+            # #endregion
+            
             if email_source == 'gmail':
                 result = fetch_gmail_emails()
             else:
                 result = fetch_outlook_emails()
             
+            # #region agent log
+            after_fetch_time = time.time()
+            log_entry = {
+                'sessionId': 'debug-session',
+                'runId': 'run1',
+                'hypothesisId': 'A',
+                'location': 'routes.py:get_email_queries:after_fetch',
+                'message': 'Fetch function returned',
+                'data': {'source': email_source, 'fetch_time_ms': (after_fetch_time - before_fetch_time) * 1000, 'result_type': type(result).__name__, 'is_tuple': isinstance(result, tuple), 'total_elapsed_ms': (after_fetch_time - route_start_time) * 1000},
+                'timestamp': int(time.time() * 1000)
+            }
+            try:
+                with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                    f.write(json.dumps(log_entry) + '\n')
+            except:
+                pass
+            # #endregion
+            
             # ensure_json_response returns a Response object with status_code already set
             # If result is a tuple, extract response and status_code
+            # #region agent log
+            before_return_time = time.time()
+            log_entry = {
+                'sessionId': 'debug-session',
+                'runId': 'run1',
+                'hypothesisId': 'A',
+                'location': 'routes.py:get_email_queries:before_return',
+                'message': 'About to return response',
+                'data': {'is_tuple': isinstance(result, tuple), 'result_type': type(result).__name__, 'total_elapsed_ms': (before_return_time - route_start_time) * 1000},
+                'timestamp': int(time.time() * 1000)
+            }
+            try:
+                with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                    f.write(json.dumps(log_entry) + '\n')
+            except:
+                pass
+            # #endregion
+            
             if isinstance(result, tuple):
                 response_obj, status_code = result
                 # Ensure Content-Type is set
                 if hasattr(response_obj, 'headers'):
                     response_obj.headers['Content-Type'] = 'application/json; charset=utf-8'
                 response_obj.status_code = status_code
+                
+                # #region agent log
+                log_entry = {
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'A',
+                    'location': 'routes.py:get_email_queries:returning_tuple',
+                    'message': 'Returning tuple response',
+                    'data': {'status_code': status_code, 'content_type': response_obj.headers.get('Content-Type'), 'total_elapsed_ms': (time.time() - route_start_time) * 1000},
+                    'timestamp': int(time.time() * 1000)
+                }
+                try:
+                    with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                        f.write(json.dumps(log_entry) + '\n')
+                except:
+                    pass
+                # #endregion
+                
                 return response_obj, status_code
             else:
                 # Result is already a Response object from ensure_json_response
@@ -14431,6 +14578,24 @@ def get_email_queries():
                 if hasattr(result, 'headers'):
                     if 'Content-Type' not in result.headers or 'application/json' not in result.headers.get('Content-Type', ''):
                         result.headers['Content-Type'] = 'application/json; charset=utf-8'
+                
+                # #region agent log
+                log_entry = {
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'A',
+                    'location': 'routes.py:get_email_queries:returning_response',
+                    'message': 'Returning Response object',
+                    'data': {'status_code': result.status_code, 'content_type': result.headers.get('Content-Type'), 'total_elapsed_ms': (time.time() - route_start_time) * 1000},
+                    'timestamp': int(time.time() * 1000)
+                }
+                try:
+                    with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                        f.write(json.dumps(log_entry) + '\n')
+                except:
+                    pass
+                # #endregion
+                
                 return result
             
         except Exception as fetch_error:
@@ -14574,6 +14739,24 @@ def fetch_outlook_emails():
 
 def fetch_gmail_emails():
     """Fetch emails from Gmail using IMAP"""
+    # #region agent log
+    request_start_time = time.time()
+    log_entry = {
+        'sessionId': 'debug-session',
+        'runId': 'run1',
+        'hypothesisId': 'A',
+        'location': 'routes.py:fetch_gmail_emails:entry',
+        'message': 'fetch_gmail_emails called',
+        'data': {'timestamp': request_start_time},
+        'timestamp': int(time.time() * 1000)
+    }
+    try:
+        with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+            f.write(json.dumps(log_entry) + '\n')
+    except:
+        pass
+    # #endregion
+    
     mail = None
     try:
         # Get Gmail configuration from environment
@@ -14605,9 +14788,45 @@ def fetch_gmail_emails():
         
         # Connect to Gmail IMAP server with error handling
         try:
+            # #region agent log
+            imap_connect_start = time.time()
+            log_entry = {
+                'sessionId': 'debug-session',
+                'runId': 'run1',
+                'hypothesisId': 'A',
+                'location': 'routes.py:fetch_gmail_emails:before_imap_connect',
+                'message': 'About to connect to IMAP',
+                'data': {'elapsed_ms': (imap_connect_start - request_start_time) * 1000},
+                'timestamp': int(time.time() * 1000)
+            }
+            try:
+                with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                    f.write(json.dumps(log_entry) + '\n')
+            except:
+                pass
+            # #endregion
+            
             mail = imaplib.IMAP4_SSL(gmail_imap_server, gmail_imap_port)
             mail.login(gmail_email, gmail_password)
             mail.select('inbox')
+            
+            # #region agent log
+            imap_connect_time = (time.time() - imap_connect_start) * 1000
+            log_entry = {
+                'sessionId': 'debug-session',
+                'runId': 'run1',
+                'hypothesisId': 'A',
+                'location': 'routes.py:fetch_gmail_emails:after_imap_connect',
+                'message': 'IMAP connection established',
+                'data': {'imap_connect_time_ms': imap_connect_time, 'total_elapsed_ms': (time.time() - request_start_time) * 1000},
+                'timestamp': int(time.time() * 1000)
+            }
+            try:
+                with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                    f.write(json.dumps(log_entry) + '\n')
+            except:
+                pass
+            # #endregion
         except imaplib.IMAP4.error as imap_error:
             error_msg = str(imap_error)
             print(f"Gmail IMAP connection error: {error_msg}")
@@ -14769,18 +14988,108 @@ def fetch_gmail_emails():
                 continue
         
         # Clean up IMAP connection
+        # #region agent log
+        before_close_time = time.time()
+        log_entry = {
+            'sessionId': 'debug-session',
+            'runId': 'run1',
+            'hypothesisId': 'C',
+            'location': 'routes.py:fetch_gmail_emails:before_close',
+            'message': 'About to close IMAP connection',
+            'data': {'emails_count': len(emails), 'total_elapsed_ms': (before_close_time - request_start_time) * 1000, 'mail_exists': mail is not None},
+            'timestamp': int(time.time() * 1000)
+        }
+        try:
+            with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                f.write(json.dumps(log_entry) + '\n')
+        except:
+            pass
+        # #endregion
+        
         if mail:
             try:
                 mail.close()
                 mail.logout()
-            except:
+                # #region agent log
+                log_entry = {
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'C',
+                    'location': 'routes.py:fetch_gmail_emails:after_close',
+                    'message': 'IMAP connection closed',
+                    'data': {'close_time_ms': (time.time() - before_close_time) * 1000},
+                    'timestamp': int(time.time() * 1000)
+                }
+                try:
+                    with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                        f.write(json.dumps(log_entry) + '\n')
+                except:
+                    pass
+                # #endregion
+            except Exception as close_error:
+                # #region agent log
+                log_entry = {
+                    'sessionId': 'debug-session',
+                    'runId': 'run1',
+                    'hypothesisId': 'C',
+                    'location': 'routes.py:fetch_gmail_emails:close_error',
+                    'message': 'Error closing IMAP connection',
+                    'data': {'error': str(close_error)},
+                    'timestamp': int(time.time() * 1000)
+                }
+                try:
+                    with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                        f.write(json.dumps(log_entry) + '\n')
+                except:
+                    pass
+                # #endregion
                 pass
         
         # Sort by date (most recent first)
         emails.sort(key=lambda x: x.get('date', ''), reverse=True)
         
+        # #region agent log
+        before_response_time = time.time()
+        total_elapsed = (before_response_time - request_start_time) * 1000
+        emails_data_size = len(json.dumps(emails)) if emails else 0
+        log_entry = {
+            'sessionId': 'debug-session',
+            'runId': 'run1',
+            'hypothesisId': 'A,D',
+            'location': 'routes.py:fetch_gmail_emails:before_response',
+            'message': 'About to create response',
+            'data': {'emails_count': len(emails), 'total_elapsed_ms': total_elapsed, 'emails_data_size_bytes': emails_data_size},
+            'timestamp': int(time.time() * 1000)
+        }
+        try:
+            with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                f.write(json.dumps(log_entry) + '\n')
+        except:
+            pass
+        # #endregion
+        
         print(f"Successfully fetched {len(emails)} Gmail email(s)")
-        return ensure_json_response({'emails': emails}, 200)
+        response = ensure_json_response({'emails': emails}, 200)
+        
+        # #region agent log
+        after_response_time = time.time()
+        log_entry = {
+            'sessionId': 'debug-session',
+            'runId': 'run1',
+            'hypothesisId': 'A,B',
+            'location': 'routes.py:fetch_gmail_emails:after_response',
+            'message': 'Response created, about to return',
+            'data': {'response_creation_time_ms': (after_response_time - before_response_time) * 1000, 'total_elapsed_ms': (after_response_time - request_start_time) * 1000},
+            'timestamp': int(time.time() * 1000)
+        }
+        try:
+            with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
+                f.write(json.dumps(log_entry) + '\n')
+        except:
+            pass
+        # #endregion
+        
+        return response
         
     except imaplib.IMAP4.error as e:
         error_msg = str(e)
