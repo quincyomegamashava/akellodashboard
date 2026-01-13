@@ -14356,6 +14356,50 @@ def save_email_status(email_id, status):
         json.dump(statuses, f, indent=2)
 
 
+def ensure_json_response(data, status_code=200):
+    """
+    Helper function to ensure all API responses are valid JSON with proper headers.
+    Validates the data can be serialized to JSON and creates a proper Flask response.
+    
+    Args:
+        data: Dictionary or data structure to return as JSON
+        status_code: HTTP status code (default: 200)
+    
+    Returns:
+        Flask Response object with JSON content and proper headers
+    """
+    try:
+        # Validate that data can be serialized to JSON
+        json_str = json.dumps(data)
+        # Create response with explicit Content-Type
+        response = jsonify(data)
+        response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        response.status_code = status_code
+        return response
+    except (TypeError, ValueError) as e:
+        # If data can't be serialized, return error response
+        print(f"Error serializing response to JSON: {str(e)}")
+        error_response = {
+            'error': 'Internal server error: Failed to format response',
+            'details': str(e) if app.debug else None
+        }
+        response = jsonify(error_response)
+        response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        response.status_code = 500
+        return response
+    except Exception as e:
+        # Catch any other unexpected errors
+        print(f"Unexpected error creating JSON response: {str(e)}")
+        error_response = {
+            'error': 'Internal server error: Unexpected error formatting response',
+            'details': str(e) if app.debug else None
+        }
+        response = jsonify(error_response)
+        response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        response.status_code = 500
+        return response
+
+
 # ===== API Endpoints =====
 
 @app.route('/api/email-queries', methods=['GET'])
@@ -14390,20 +14434,16 @@ def get_email_queries():
             print(f"Error in fetch function ({email_source}): {str(fetch_error)}")
             import traceback
             traceback.print_exc()
-            response = jsonify({
+            return ensure_json_response({
                 'error': f'Error fetching emails from {email_source}: {str(fetch_error)}',
                 'source': email_source
-            })
-            response.headers['Content-Type'] = 'application/json'
-            return response, 500
+            }, 500)
             
     except Exception as e:
         print(f"Unexpected error in get_email_queries: {str(e)}")
         import traceback
         traceback.print_exc()
-        response = jsonify({'error': f'Unexpected error: {str(e)}'})
-        response.headers['Content-Type'] = 'application/json'
-        return response, 500
+        return ensure_json_response({'error': f'Unexpected error: {str(e)}'}, 500)
 
 
 def fetch_outlook_emails():
@@ -14554,12 +14594,10 @@ def fetch_gmail_emails():
             if not gmail_password:
                 error_msg += '\n\nTo fix this:\n1. Get a Google App Password from: https://myaccount.google.com/apppasswords\n2. Add GOOGLE_APP_PASSWORD=your-password to your .env file\n3. Restart the Flask application'
             print(f"Gmail config error: {error_msg}")
-            response = jsonify({
+            return ensure_json_response({
                 'error': error_msg,
                 'requires_config': True
-            })
-            response.headers['Content-Type'] = 'application/json'
-            return response, 500
+            }, 500)
         
         # Connect to Gmail IMAP server with error handling
         try:
@@ -14576,15 +14614,11 @@ def fetch_gmail_emails():
                 except:
                     pass
             if 'LOGIN' in error_msg or 'AUTHENTICATE' in error_msg:
-                response = jsonify({
+                return ensure_json_response({
                     'error': 'Gmail authentication failed. Please check your Gmail app password.',
                     'requires_config': True
-                })
-                response.headers['Content-Type'] = 'application/json'
-                return response, 401
-            response = jsonify({'error': f'Gmail IMAP connection error: {error_msg}'})
-            response.headers['Content-Type'] = 'application/json'
-            return response, 500
+                }, 401)
+            return ensure_json_response({'error': f'Gmail IMAP connection error: {error_msg}'}, 500)
         except Exception as conn_error:
             error_msg = str(conn_error)
             print(f"Gmail connection error: {error_msg}")
@@ -14594,9 +14628,7 @@ def fetch_gmail_emails():
                     mail.logout()
                 except:
                     pass
-            response = jsonify({'error': f'Gmail connection error: {error_msg}'})
-            response.headers['Content-Type'] = 'application/json'
-            return response, 500
+            return ensure_json_response({'error': f'Gmail connection error: {error_msg}'}, 500)
         
         # Search for emails from specific sender
         try:
@@ -14611,11 +14643,13 @@ def fetch_gmail_emails():
             if status != 'OK':
                 error_msg = f'Failed to search emails. Status: {status}'
                 print(f"Gmail search error: {error_msg}")
-                mail.close()
-                mail.logout()
-                response = jsonify({'error': error_msg})
-                response.headers['Content-Type'] = 'application/json'
-                return response, 500
+                if mail:
+                    try:
+                        mail.close()
+                        mail.logout()
+                    except:
+                        pass
+                return ensure_json_response({'error': error_msg}, 500)
         except Exception as search_error:
             error_msg = str(search_error)
             print(f"Gmail search error: {error_msg}")
@@ -14625,9 +14659,7 @@ def fetch_gmail_emails():
                     mail.logout()
                 except:
                     pass
-            response = jsonify({'error': f'Gmail search error: {error_msg}'})
-            response.headers['Content-Type'] = 'application/json'
-            return response, 500
+            return ensure_json_response({'error': f'Gmail search error: {error_msg}'}, 500)
         
         email_ids = messages[0].split() if messages and messages[0] else []
         print(f"Found {len(email_ids)} email(s) matching the filter")
@@ -14744,9 +14776,7 @@ def fetch_gmail_emails():
         emails.sort(key=lambda x: x.get('date', ''), reverse=True)
         
         print(f"Successfully fetched {len(emails)} Gmail email(s)")
-        response = jsonify({'emails': emails})
-        response.headers['Content-Type'] = 'application/json'
-        return response, 200
+        return ensure_json_response({'emails': emails}, 200)
         
     except imaplib.IMAP4.error as e:
         error_msg = str(e)
@@ -14758,15 +14788,11 @@ def fetch_gmail_emails():
             except:
                 pass
         if 'LOGIN' in error_msg or 'AUTHENTICATE' in error_msg:
-            response = jsonify({
+            return ensure_json_response({
                 'error': 'Gmail authentication failed. Please check your Gmail app password.',
                 'requires_config': True
-            })
-            response.headers['Content-Type'] = 'application/json'
-            return response, 401
-        response = jsonify({'error': f'Gmail IMAP error: {error_msg}'})
-        response.headers['Content-Type'] = 'application/json'
-        return response, 500
+            }, 401)
+        return ensure_json_response({'error': f'Gmail IMAP error: {error_msg}'}, 500)
     except Exception as e:
         print(f"Unexpected error fetching Gmail emails: {str(e)}")
         import traceback
@@ -14777,9 +14803,7 @@ def fetch_gmail_emails():
                 mail.logout()
             except:
                 pass
-        response = jsonify({'error': f'Unexpected error: {str(e)}'})
-        response.headers['Content-Type'] = 'application/json'
-        return response, 500
+        return ensure_json_response({'error': f'Unexpected error: {str(e)}'}, 500)
 
 
 @app.route('/api/email-queries/<email_id>', methods=['GET'])
