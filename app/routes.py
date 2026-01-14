@@ -9272,15 +9272,42 @@ def api_institution_analytics():
     try:
         country = request.args.get('country')
         province = request.args.get('province')
+        search = request.args.get('search', '').strip()
+        page = int(request.args.get('page', 1))
+        per_page = min(int(request.args.get('per_page', 50)), 100)  # Max 100 per page
         
         if not country or not province:
             return jsonify({"error": "Both country and province parameters are required"}), 400
+        
+        if page < 1:
+            page = 1
+        offset = (page - 1) * per_page
             
         conn = get_direct_library_conn()
         
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Main query to get institutions with user counts
-            query = """
+            # Build WHERE clause with optional search
+            where_clause = "WHERE i.country = %s AND i.province = %s"
+            params = [country, province]
+            
+            if search:
+                where_clause += " AND i.name LIKE %s"
+                params.append(f"%{search}%")
+            
+            # Get total count for pagination
+            count_query = f"""
+                SELECT COUNT(DISTINCT i.id) AS total
+                FROM institutions i
+                JOIN institution_user iu ON i.id = iu.institution_id
+                JOIN users u ON iu.user_id = u.id
+                {where_clause}
+            """
+            cursor.execute(count_query, params)
+            total_count = cursor.fetchone()['total']
+            total_pages = (total_count + per_page - 1) // per_page  # Ceiling division
+            
+            # Main query to get institutions with user counts (with pagination)
+            query = f"""
                 SELECT DISTINCT 
                     i.id AS institution_id,
                     i.name AS institution_name,
@@ -9289,69 +9316,111 @@ def api_institution_analytics():
                 FROM institutions i
                 JOIN institution_user iu ON i.id = iu.institution_id
                 JOIN users u ON iu.user_id = u.id
-                WHERE i.country = %s AND i.province = %s
+                {where_clause}
                 GROUP BY i.id, i.name, i.level
                 ORDER BY i.name ASC
+                LIMIT %s OFFSET %s
             """
-            cursor.execute(query, (country, province))
+            params_with_limit = params + [per_page, offset]
+            cursor.execute(query, params_with_limit)
             institutions = cursor.fetchall()
             
-            # For each institution, get subject groups
+            if not institutions:
+                return jsonify({
+                    'results': [],
+                    'pagination': {
+                        'total_count': total_count,
+                        'total_pages': total_pages,
+                        'current_page': page,
+                        'per_page': per_page
+                    }
+                })
+            
+            # Get all institution IDs
+            institution_ids = [inst['institution_id'] for inst in institutions]
+            placeholders = ','.join(['%s'] * len(institution_ids))
+            
+            # OPTIMIZED: Get all subject groups for all institutions in one query
+            # This replaces the N+1 query problem
+            all_sg_query = f"""
+                SELECT 
+                    iu.institution_id,
+                    sg.id AS sg_id,
+                    sg.name AS sg_name,
+                    COUNT(DISTINCT u.id) AS user_count
+                FROM institution_user iu
+                JOIN users u ON iu.user_id = u.id
+                JOIN subject_group_user sgu ON u.id = sgu.user_id
+                JOIN subject_groups sg ON sgu.subject_group_id = sg.id
+                WHERE iu.institution_id IN ({placeholders})
+                GROUP BY iu.institution_id, sg.id, sg.name
+                ORDER BY iu.institution_id, sg.name ASC
+            """
+            cursor.execute(all_sg_query, institution_ids)
+            all_sg_results = cursor.fetchall()
+            
+            # OPTIMIZED: Get subject groups with books for all institutions in one query
+            sg_books_query = f"""
+                SELECT 
+                    iu.institution_id,
+                    sg.id AS sg_id,
+                    sg.name AS sg_name,
+                    COUNT(DISTINCT u.id) AS user_count
+                FROM institution_user iu
+                JOIN users u ON iu.user_id = u.id
+                JOIN subject_group_user sgu ON u.id = sgu.user_id
+                JOIN subject_groups sg ON sgu.subject_group_id = sg.id
+                JOIN book_subject_group bsg ON sg.id = bsg.subject_group_id
+                WHERE iu.institution_id IN ({placeholders})
+                GROUP BY iu.institution_id, sg.id, sg.name
+                ORDER BY iu.institution_id, sg.name ASC
+            """
+            cursor.execute(sg_books_query, institution_ids)
+            sg_books_results = cursor.fetchall()
+            
+            # Group subject groups by institution_id in Python
+            all_sg_by_inst = {}
+            for row in all_sg_results:
+                inst_id = row['institution_id']
+                if inst_id not in all_sg_by_inst:
+                    all_sg_by_inst[inst_id] = []
+                all_sg_by_inst[inst_id].append({
+                    'name': row['sg_name'],
+                    'user_count': row['user_count']
+                })
+            
+            sg_books_by_inst = {}
+            for row in sg_books_results:
+                inst_id = row['institution_id']
+                if inst_id not in sg_books_by_inst:
+                    sg_books_by_inst[inst_id] = []
+                sg_books_by_inst[inst_id].append({
+                    'name': row['sg_name'],
+                    'user_count': row['user_count']
+                })
+            
+            # Build results
             results = []
             for inst in institutions:
                 inst_id = inst['institution_id']
-                
-                # Get all subject groups for this institution with user counts
-                sg_query = """
-                    SELECT 
-                        sg.id, 
-                        sg.name,
-                        COUNT(DISTINCT u.id) AS user_count
-                    FROM institution_user iu
-                    JOIN users u ON iu.user_id = u.id
-                    JOIN subject_group_user sgu ON u.id = sgu.user_id
-                    JOIN subject_groups sg ON sgu.subject_group_id = sg.id
-                    WHERE iu.institution_id = %s
-                    GROUP BY sg.id, sg.name
-                    ORDER BY sg.name ASC
-                """
-                cursor.execute(sg_query, (inst_id,))
-                all_subject_groups = cursor.fetchall()
-                
-                # Get subject groups that have books with user counts
-                sg_books_query = """
-                    SELECT 
-                        sg.id, 
-                        sg.name,
-                        COUNT(DISTINCT u.id) AS user_count
-                    FROM institution_user iu
-                    JOIN users u ON iu.user_id = u.id
-                    JOIN subject_group_user sgu ON u.id = sgu.user_id
-                    JOIN subject_groups sg ON sgu.subject_group_id = sg.id
-                    JOIN book_subject_group bsg ON sg.id = bsg.subject_group_id
-                    WHERE iu.institution_id = %s
-                    GROUP BY sg.id, sg.name
-                    ORDER BY sg.name ASC
-                """
-                cursor.execute(sg_books_query, (inst_id,))
-                subject_groups_with_books = cursor.fetchall()
-                
                 results.append({
                     'institution_id': inst_id,
                     'institution_name': inst['institution_name'],
                     'institution_level': inst['institution_level'] or 'N/A',
                     'user_count': inst['user_count'],
-                    'all_subject_groups': [
-                        {'name': sg['name'], 'user_count': sg['user_count']} 
-                        for sg in all_subject_groups
-                    ],
-                    'subject_groups_with_books': [
-                        {'name': sg['name'], 'user_count': sg['user_count']} 
-                        for sg in subject_groups_with_books
-                    ]
+                    'all_subject_groups': all_sg_by_inst.get(inst_id, []),
+                    'subject_groups_with_books': sg_books_by_inst.get(inst_id, [])
                 })
             
-        return jsonify(results)
+        return jsonify({
+            'results': results,
+            'pagination': {
+                'total_count': total_count,
+                'total_pages': total_pages,
+                'current_page': page,
+                'per_page': per_page
+            }
+        })
         
     except Exception as e:
         import traceback

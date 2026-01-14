@@ -17,6 +17,11 @@
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 
+  <!-- Export Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
 
   <style>
     .asl-color{
@@ -710,22 +715,34 @@ new Chart(ctx, {
     <div class="w3-container w3-padding" style="max-height:75vh; overflow:auto; background:#ffffff;">
       <!-- Filter Section -->
       <div class="w3-row-padding" style="margin-bottom:16px; padding:16px; background:linear-gradient(135deg, #f9fafb 0%, #f0fdf4 100%); border:1px solid #86efac; border-radius:10px;">
-        <div class="w3-half" style="padding:4px">
+        <div class="w3-third" style="padding:4px">
           <label style="color:#047857; font-weight:600;"><b>Country</b></label>
           <select id="analyticsCountrySelect" class="w3-input w3-border" onchange="loadInstitutionProvinces(this.value)" style="border:2px solid #86efac; border-radius:8px;">
             <option value="">Select Country</option>
           </select>
         </div>
-        <div class="w3-half" style="padding:4px">
+        <div class="w3-third" style="padding:4px">
           <label style="color:#047857; font-weight:600;"><b>Province</b></label>
           <select id="analyticsProvinceSelect" class="w3-input w3-border" disabled style="border:2px solid #86efac; border-radius:8px;">
             <option value="">Select Province</option>
           </select>
         </div>
+        <div class="w3-third" style="padding:4px">
+          <label style="color:#047857; font-weight:600;"><b>Search Institution</b></label>
+          <input type="text" id="analyticsSearchInput" class="w3-input w3-border" placeholder="Type institution name..." style="border:2px solid #86efac; border-radius:8px;" onkeyup="debounceSearch()">
+        </div>
       </div>
-      <button onclick="loadInstitutionAnalytics()" class="w3-button w3-round" style="margin-bottom:16px; background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none; padding:10px 20px; font-weight:600; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25);">
-        <i class="fa fa-filter"></i> Apply Filters
-      </button>
+      <div style="margin-bottom:16px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button onclick="loadInstitutionAnalytics(1)" class="w3-button w3-round" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none; padding:10px 20px; font-weight:600; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25);">
+          <i class="fa fa-filter"></i> Apply Filters
+        </button>
+        <button id="exportExcelBtn" onclick="exportInstitutionAnalyticsToExcel()" class="w3-button w3-round" style="display:none; background:linear-gradient(135deg, #059669 0%, #047857 100%); color:white; border:none; padding:10px 20px; font-weight:600; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25);">
+          <i class="fa fa-file-excel-o"></i> Export Excel
+        </button>
+        <button id="exportPDFBtn" onclick="exportInstitutionAnalyticsToPDF()" class="w3-button w3-round" style="display:none; background:linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color:white; border:none; padding:10px 20px; font-weight:600; box-shadow:0 4px 12px rgba(220, 38, 38, 0.25);">
+          <i class="fa fa-file-pdf-o"></i> Export PDF
+        </button>
+      </div>
       
       <!-- Loading Indicator -->
       <div id="analyticsLoading" class="w3-center w3-padding" style="display:none; color:#10b981;">
@@ -744,19 +761,36 @@ new Chart(ctx, {
       </div>
       
       <!-- Results Section -->
-      <div id="analyticsResults" style="display:none; overflow:auto; max-height:50vh; margin-top:16px; border:1px solid #86efac; border-radius:10px;">
-        <table class="w3-table-all w3-small w3-striped w3-hoverable" style="margin:0;">
-          <thead style="background:linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%);">
-            <tr>
-              <th style="color:#065f46; font-weight:700;">Institution Name</th>
-              <th style="color:#065f46; font-weight:700;">Level</th>
-              <th class="text-right" style="color:#065f46; font-weight:700;">User Count</th>
-              <th style="color:#065f46; font-weight:700;">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="analyticsTableBody">
-          </tbody>
-        </table>
+      <div id="analyticsResults" style="display:none; margin-top:16px;">
+        <!-- Pagination Info -->
+        <div id="analyticsPaginationInfo" style="margin-bottom:12px; padding:8px; background:#f0fdf4; border-radius:6px; color:#047857; font-size:14px; text-align:center;"></div>
+        
+        <!-- Table -->
+        <div style="overflow:auto; max-height:50vh; border:1px solid #86efac; border-radius:10px;">
+          <table id="analyticsTable" class="w3-table-all w3-small w3-striped w3-hoverable" style="margin:0;">
+            <thead style="background:linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%);">
+              <tr>
+                <th style="color:#065f46; font-weight:700;">Institution Name</th>
+                <th style="color:#065f46; font-weight:700;">Level</th>
+                <th class="text-right" style="color:#065f46; font-weight:700;">User Count</th>
+                <th style="color:#065f46; font-weight:700;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="analyticsTableBody">
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Pagination Controls -->
+        <div id="analyticsPagination" style="margin-top:12px; text-align:center; display:none;">
+          <button id="prevPageBtn" onclick="changePage(-1)" class="w3-button w3-small w3-round" style="background:#10b981; color:white; border:none; margin:0 4px;">
+            <i class="fa fa-chevron-left"></i> Previous
+          </button>
+          <span id="pageNumbers" style="margin:0 8px; color:#047857;"></span>
+          <button id="nextPageBtn" onclick="changePage(1)" class="w3-button w3-small w3-round" style="background:#10b981; color:white; border:none; margin:0 4px;">
+            Next <i class="fa fa-chevron-right"></i>
+          </button>
+        </div>
       </div>
       
       <!-- No Results Message -->
@@ -1061,14 +1095,42 @@ async function loadInstitutionProvinces(country) {
   }
 }
 
-async function loadInstitutionAnalytics() {
+// Global variables for pagination
+let currentPage = 1;
+let totalPages = 1;
+let currentSearch = '';
+
+// Debounce function for search
+let searchTimeout;
+function debounceSearch() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    currentSearch = document.getElementById('analyticsSearchInput').value.trim();
+    loadInstitutionAnalytics(1); // Reset to page 1 on search
+  }, 300);
+}
+
+// Change page function
+function changePage(direction) {
+  const newPage = currentPage + direction;
+  if (newPage >= 1 && newPage <= totalPages) {
+    loadInstitutionAnalytics(newPage);
+  }
+}
+
+async function loadInstitutionAnalytics(page = 1) {
   const country = document.getElementById('analyticsCountrySelect').value;
   const province = document.getElementById('analyticsProvinceSelect').value;
+  const search = document.getElementById('analyticsSearchInput').value.trim();
   const loadingDiv = document.getElementById('analyticsLoading');
   const errorDiv = document.getElementById('analyticsError');
   const resultsDiv = document.getElementById('analyticsResults');
   const noResultsDiv = document.getElementById('analyticsNoResults');
   const tbody = document.getElementById('analyticsTableBody');
+  const paginationDiv = document.getElementById('analyticsPagination');
+  const paginationInfo = document.getElementById('analyticsPaginationInfo');
+  const exportExcelBtn = document.getElementById('exportExcelBtn');
+  const exportPDFBtn = document.getElementById('exportPDFBtn');
   
   // Validation
   if (!country || !province) {
@@ -1081,13 +1143,28 @@ async function loadInstitutionAnalytics() {
   errorDiv.style.display = 'none';
   resultsDiv.style.display = 'none';
   noResultsDiv.style.display = 'none';
+  paginationDiv.style.display = 'none';
+  exportExcelBtn.style.display = 'none';
+  exportPDFBtn.style.display = 'none';
   document.getElementById('analyticsSearchContainer').style.display = 'none';
   document.getElementById('analyticsTableSearch').value = '';
   loadingDiv.style.display = 'block';
   tbody.innerHTML = '';
+  currentPage = page;
   
   try {
-    const response = await fetch(`/api/institution-analytics?country=${encodeURIComponent(country)}&province=${encodeURIComponent(province)}`);
+    // Build query parameters
+    const params = new URLSearchParams({
+      country: country,
+      province: province,
+      page: page,
+      per_page: 50
+    });
+    if (search) {
+      params.append('search', search);
+    }
+    
+    const response = await fetch(`/api/institution-analytics?${params.toString()}`);
     const data = await response.json();
     
     loadingDiv.style.display = 'none';
@@ -1096,13 +1173,23 @@ async function loadInstitutionAnalytics() {
       throw new Error(data.error || 'Failed to load institution analytics');
     }
     
-    if (!data || data.length === 0) {
+    // Handle new response format with pagination
+    const results = data.results || [];
+    const pagination = data.pagination || {};
+    
+    if (!results || results.length === 0) {
       noResultsDiv.style.display = 'block';
       return;
     }
     
+    // Update pagination info
+    totalPages = pagination.total_pages || 1;
+    currentPage = pagination.current_page || 1;
+    
+    paginationInfo.textContent = `Showing ${((currentPage - 1) * pagination.per_page) + 1} to ${Math.min(currentPage * pagination.per_page, pagination.total_count)} of ${pagination.total_count} institutions`;
+    
     // Build table rows
-    tbody.innerHTML = data.map((inst, index) => {
+    tbody.innerHTML = results.map((inst, index) => {
       const rowId = `inst-row-${index}`;
       
       // Handle both old format (array of strings) and new format (array of objects)
@@ -1165,7 +1252,14 @@ async function loadInstitutionAnalytics() {
     }).join('');
     
     resultsDiv.style.display = 'block';
-    document.getElementById('analyticsSearchContainer').style.display = 'block';
+    exportExcelBtn.style.display = 'inline-block';
+    exportPDFBtn.style.display = 'inline-block';
+    
+    // Show pagination if more than one page
+    if (totalPages > 1) {
+      paginationDiv.style.display = 'block';
+      updatePaginationControls();
+    }
     
   } catch (error) {
     loadingDiv.style.display = 'none';
@@ -1173,6 +1267,50 @@ async function loadInstitutionAnalytics() {
     errorDiv.style.display = 'block';
     console.error('Error loading institution analytics:', error);
   }
+}
+
+function updatePaginationControls() {
+  const prevBtn = document.getElementById('prevPageBtn');
+  const nextBtn = document.getElementById('nextPageBtn');
+  const pageNumbers = document.getElementById('pageNumbers');
+  
+  // Enable/disable buttons
+  prevBtn.disabled = currentPage === 1;
+  nextBtn.disabled = currentPage === totalPages;
+  
+  // Show page numbers (show current and adjacent pages)
+  let pageNumbersHtml = '';
+  const maxPagesToShow = 5;
+  let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+  let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+  
+  if (endPage - startPage < maxPagesToShow - 1) {
+    startPage = Math.max(1, endPage - maxPagesToShow + 1);
+  }
+  
+  if (startPage > 1) {
+    pageNumbersHtml += `<span onclick="loadInstitutionAnalytics(1)" style="cursor:pointer; padding:4px 8px; margin:0 2px; border-radius:4px;">1</span>`;
+    if (startPage > 2) {
+      pageNumbersHtml += `<span style="padding:4px;">...</span>`;
+    }
+  }
+  
+  for (let i = startPage; i <= endPage; i++) {
+    if (i === currentPage) {
+      pageNumbersHtml += `<span style="background:#10b981; color:white; padding:4px 8px; margin:0 2px; border-radius:4px; font-weight:bold;">${i}</span>`;
+    } else {
+      pageNumbersHtml += `<span onclick="loadInstitutionAnalytics(${i})" style="cursor:pointer; padding:4px 8px; margin:0 2px; border-radius:4px; background:#f0fdf4; color:#047857;">${i}</span>`;
+    }
+  }
+  
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) {
+      pageNumbersHtml += `<span style="padding:4px;">...</span>`;
+    }
+    pageNumbersHtml += `<span onclick="loadInstitutionAnalytics(${totalPages})" style="cursor:pointer; padding:4px 8px; margin:0 2px; border-radius:4px;">${totalPages}</span>`;
+  }
+  
+  pageNumbers.innerHTML = pageNumbersHtml;
 }
 
 function toggleInstitutionDetails(rowId) {
@@ -1185,6 +1323,174 @@ function toggleInstitutionDetails(rowId) {
   } else {
     detailRow.style.display = 'none';
     icon.className = 'fa fa-chevron-down';
+  }
+}
+
+// Export to Excel function
+function exportInstitutionAnalyticsToExcel() {
+  try {
+    if (typeof XLSX === 'undefined') {
+      alert('XLSX library not loaded. Please refresh the page.');
+      return;
+    }
+    
+    const table = document.getElementById('analyticsTable');
+    if (!table) {
+      alert('Table not found');
+      return;
+    }
+    
+    const wb = XLSX.utils.book_new();
+    
+    // Get table data including headers
+    const ws_data = [];
+    const headers = [];
+    const headerRow = table.querySelectorAll('thead th');
+    headerRow.forEach(th => {
+      headers.push(th.textContent.trim());
+    });
+    ws_data.push(headers);
+    
+    // Get visible rows (excluding detail rows)
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(tr => {
+      // Skip detail rows (they have colspan)
+      if (tr.querySelector('td[colspan]')) {
+        return;
+      }
+      
+      const rowData = [];
+      tr.querySelectorAll('td').forEach((td, index) => {
+        // Skip Actions column (last column)
+        if (index < headerRow.length - 1) {
+          rowData.push(td.textContent.trim());
+        }
+      });
+      ws_data.push(rowData);
+    });
+    
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    
+    // Set column widths
+    const colWidths = [
+      { wch: 40 }, // Institution Name
+      { wch: 15 }, // Level
+      { wch: 12 }  // User Count
+    ];
+    ws['!cols'] = colWidths;
+    
+    XLSX.utils.book_append_sheet(wb, ws, 'Institution Analytics');
+    
+    // Generate filename with timestamp
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const filename = `institution_analytics_${timestamp}.xlsx`;
+    
+    XLSX.writeFile(wb, filename);
+  } catch (error) {
+    console.error('Error exporting to Excel:', error);
+    alert('Failed to export to Excel. Please try again.');
+  }
+}
+
+// Export to PDF function
+function exportInstitutionAnalyticsToPDF() {
+  try {
+    if (typeof window.jspdf === 'undefined') {
+      alert('jsPDF library not loaded. Please refresh the page.');
+      return;
+    }
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape', 'pt', 'a4');
+    
+    const table = document.getElementById('analyticsTable');
+    if (!table) {
+      alert('Table not found');
+      return;
+    }
+    
+    // Get filter info
+    const country = document.getElementById('analyticsCountrySelect').value;
+    const province = document.getElementById('analyticsProvinceSelect').value;
+    const search = document.getElementById('analyticsSearchInput').value.trim();
+    
+    // Add title
+    doc.setFontSize(16);
+    doc.setTextColor(6, 95, 70); // #065f46
+    doc.text('Institution Analytics Report', 40, 30);
+    
+    // Add filter info
+    doc.setFontSize(10);
+    doc.setTextColor(4, 120, 87); // #047857
+    let yPos = 50;
+    doc.text(`Country: ${country || 'All'}`, 40, yPos);
+    doc.text(`Province: ${province || 'All'}`, 200, yPos);
+    if (search) {
+      doc.text(`Search: ${search}`, 360, yPos);
+    }
+    
+    // Get table data
+    const headers = [];
+    const rows = [];
+    
+    // Get headers
+    table.querySelectorAll('thead th').forEach(th => {
+      // Skip Actions column
+      if (th.textContent.trim() !== 'Actions') {
+        headers.push(th.textContent.trim());
+      }
+    });
+    
+    // Get visible rows (excluding detail rows)
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      // Skip detail rows
+      if (tr.querySelector('td[colspan]')) {
+        return;
+      }
+      
+      const rowData = [];
+      tr.querySelectorAll('td').forEach((td, index) => {
+        // Skip Actions column
+        if (index < headers.length) {
+          rowData.push(td.textContent.trim());
+        }
+      });
+      if (rowData.length > 0) {
+        rows.push(rowData);
+      }
+    });
+    
+    // Add table using autoTable
+    doc.autoTable({
+      head: [headers],
+      body: rows,
+      startY: yPos + 20,
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+        overflow: 'linebreak'
+      },
+      headStyles: {
+        fillColor: [16, 185, 129], // #10b981
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      alternateRowStyles: {
+        fillColor: [240, 253, 244] // #f0fdf4
+      },
+      margin: { top: yPos + 20, left: 40, right: 40 }
+    });
+    
+    // Generate filename with timestamp
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const filename = `institution_analytics_${timestamp}.pdf`;
+    
+    doc.save(filename);
+  } catch (error) {
+    console.error('Error exporting to PDF:', error);
+    alert('Failed to export to PDF. Please try again.');
   }
 }
 
