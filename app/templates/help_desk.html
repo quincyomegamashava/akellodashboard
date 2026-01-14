@@ -27,48 +27,25 @@
       box-sizing: border-box;
     }
     
-    /* Fix nav bar font size - ensure sidebar nav is not affected by w3-small or any other styles */
-    aside,
-    aside * {
-      font-size: inherit !important;
-    }
-    
+    /* Slightly increase sidebar nav font size */
     aside nav {
-      font-size: 0.875rem !important; /* 14px - standard text-sm size */
+      font-size: 0.9375rem !important; /* 15px - slightly larger than default text-sm (14px) */
     }
     
     aside .nav-link {
-      font-size: 0.875rem !important; /* 14px */
-    }
-    
-    aside .text-sm {
-      font-size: 0.875rem !important; /* 14px */
-    }
-    
-    aside .text-xs {
-      font-size: 0.75rem !important; /* 12px */
-    }
-    
-    aside .text-l {
-      font-size: 1.125rem !important; /* 18px */
+      font-size: 0.9375rem !important; /* 15px */
     }
     
     aside a {
-      font-size: 0.875rem !important; /* 14px */
-    }
-    
-    /* Ensure no w3-small is affecting the sidebar */
-    aside.w3-small,
-    aside .w3-small {
-      font-size: 0.875rem !important;
+      font-size: 0.9375rem !important; /* 15px */
     }
     
     .help-desk-container {
-      max-width: 1400px;
+      max-width: 1200px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 16px;
       position: relative;
-      width: 100%;
+      width: 80%;
       overflow-x: hidden;
       box-sizing: border-box;
     }
@@ -77,7 +54,7 @@
       background: rgba(255, 255, 255, 0.75);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border-radius: 20px;
+      border-radius: 16px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
       transition: all 0.3s ease;
       border: 1px solid rgba(255, 255, 255, 0.3);
@@ -95,8 +72,8 @@
       backdrop-filter: blur(20px) !important;
       -webkit-backdrop-filter: blur(20px) !important;
       color: #1f2937 !important;
-      border-radius: 20px !important;
-      padding: 24px;
+      border-radius: 16px !important;
+      padding: 18px;
       text-align: center;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
       border: 1px solid rgba(255, 255, 255, 0.3) !important;
@@ -135,7 +112,7 @@
     
     .stat-card h4, .stat-card h2 {
       margin: 0;
-      font-size: 2.5em;
+      font-size: 2.2em;
       font-weight: 700;
       color: #1f2937;
     }
@@ -152,8 +129,8 @@
       background: rgba(255, 255, 255, 0.75);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border-radius: 20px;
-      padding: 32px;
+      border-radius: 16px;
+      padding: 24px;
       text-align: center;
       cursor: pointer;
       border: 1px solid rgba(255, 255, 255, 0.3);
@@ -169,9 +146,9 @@
     }
     
     .action-card i {
-      font-size: 3em;
+      font-size: 2.5em;
       color: #6366f1;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       filter: drop-shadow(0 2px 4px rgba(99, 102, 241, 0.2));
     }
     
@@ -186,7 +163,7 @@
       background: rgba(255, 255, 255, 0.75);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border-radius: 20px;
+      border-radius: 16px;
       overflow: hidden;
       border: 1px solid rgba(255, 255, 255, 0.3);
       transition: all 0.3s ease;
@@ -201,7 +178,7 @@
     }
     
     .feature-card-header {
-      padding: 16px 20px;
+      padding: 12px 16px;
       font-weight: 600;
       color: white;
       background: rgba(99, 102, 241, 0.8);
@@ -211,13 +188,13 @@
     }
     
     .feature-card-body {
-      padding: 20px;
+      padding: 16px;
       background: rgba(255, 255, 255, 0.5);
     }
     
     .feature-card-body h2 {
       margin: 8px 0;
-      font-size: 2em;
+      font-size: 1.75em;
       color: #1f2937;
     }
     
@@ -256,7 +233,7 @@
     
     .modern-table thead th {
       font-weight: 600;
-      padding: 16px;
+      padding: 12px;
     }
     
     .modern-table tbody tr {
@@ -270,14 +247,14 @@
     }
     
     .modern-table tbody td {
-      padding: 12px 16px;
+      padding: 10px 12px;
       border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     }
     
     /* Glass Morphism Buttons */
     .btn-modern {
-      border-radius: 12px;
-      padding: 10px 20px;
+      border-radius: 10px;
+      padding: 8px 16px;
       font-weight: 500;
       transition: all 0.2s ease;
       border: 1px solid rgba(255, 255, 255, 0.3);
@@ -344,7 +321,7 @@
     
     /* Glass Morphism Modal */
     .modal-modern {
-      border-radius: 24px;
+      border-radius: 20px;
       overflow: hidden;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
       background: rgba(255, 255, 255, 0.9);
@@ -357,15 +334,15 @@
       background: rgba(255, 255, 255, 0.8);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      padding: 24px;
+      padding: 20px;
       color: #1f2937;
       border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     }
     
     .input-modern {
-      border-radius: 12px;
+      border-radius: 10px;
       border: 1px solid rgba(0, 0, 0, 0.1);
-      padding: 12px 16px;
+      padding: 10px 14px;
       transition: all 0.2s ease;
       background: rgba(255, 255, 255, 0.8);
       backdrop-filter: blur(10px);
@@ -398,9 +375,9 @@
       background: rgba(255, 255, 255, 0.8);
       backdrop-filter: blur(30px);
       -webkit-backdrop-filter: blur(30px);
-      border-radius: 20px;
-      padding: 32px;
-      margin-bottom: 32px;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
       border: 1px solid rgba(255, 255, 255, 0.3);
       text-align: center;
@@ -408,7 +385,7 @@
     
     .glass-header h2 {
       margin: 0;
-      font-size: 2.5em;
+      font-size: 2.2em;
       font-weight: 700;
       color: #1f2937;
       text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
@@ -455,23 +432,23 @@
       }
       
       .stat-card h4, .stat-card h2 {
-        font-size: 2em;
+        font-size: 1.8em;
       }
       
       .action-card {
-        padding: 24px;
+        padding: 20px;
       }
       
       .action-card i {
-        font-size: 2.5em;
+        font-size: 2.2em;
       }
       
       .feature-card-body h2 {
-        font-size: 1.75em;
+        font-size: 1.5em;
       }
       
       .modal-header-modern {
-        padding: 20px;
+        padding: 16px;
       }
     }
     

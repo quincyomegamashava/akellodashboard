@@ -9205,6 +9205,161 @@ def allocate_books():
         print("Form Errors:", allocate_form.errors)
 
 
+# ===== Institution Analytics API Endpoints =====
+
+@app.route('/api/institution-countries', methods=['GET'])
+@login_required
+def api_institution_countries():
+    """Get distinct countries from institutions table"""
+    try:
+        conn = get_direct_library_conn()
+        
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            query = """
+                SELECT DISTINCT country 
+                FROM institutions 
+                WHERE country IS NOT NULL AND country != ''
+                ORDER BY country ASC
+            """
+            cursor.execute(query)
+            results = cursor.fetchall()
+            
+        countries = [row['country'] for row in results if row.get('country')]
+        return jsonify(countries)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        app.logger.error(f"Error fetching countries: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/institution-provinces', methods=['GET'])
+@login_required
+def api_institution_provinces():
+    """Get distinct provinces for a selected country"""
+    try:
+        country = request.args.get('country')
+        if not country:
+            return jsonify({"error": "Country parameter is required"}), 400
+            
+        conn = get_direct_library_conn()
+        
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            query = """
+                SELECT DISTINCT province 
+                FROM institutions 
+                WHERE country = %s AND province IS NOT NULL AND province != ''
+                ORDER BY province ASC
+            """
+            cursor.execute(query, (country,))
+            results = cursor.fetchall()
+            
+        provinces = [row['province'] for row in results if row.get('province')]
+        return jsonify(provinces)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        app.logger.error(f"Error fetching provinces: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/institution-analytics', methods=['GET'])
+@login_required
+def api_institution_analytics():
+    """Get institutions with user counts and subject groups filtered by country and province"""
+    try:
+        country = request.args.get('country')
+        province = request.args.get('province')
+        
+        if not country or not province:
+            return jsonify({"error": "Both country and province parameters are required"}), 400
+            
+        conn = get_direct_library_conn()
+        
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # Main query to get institutions with user counts
+            query = """
+                SELECT DISTINCT 
+                    i.id AS institution_id,
+                    i.name AS institution_name,
+                    i.level AS institution_level,
+                    COUNT(DISTINCT u.id) AS user_count
+                FROM institutions i
+                JOIN institution_user iu ON i.id = iu.institution_id
+                JOIN users u ON iu.user_id = u.id
+                WHERE i.country = %s AND i.province = %s
+                GROUP BY i.id, i.name, i.level
+                ORDER BY i.name ASC
+            """
+            cursor.execute(query, (country, province))
+            institutions = cursor.fetchall()
+            
+            # For each institution, get subject groups
+            results = []
+            for inst in institutions:
+                inst_id = inst['institution_id']
+                
+                # Get all subject groups for this institution with user counts
+                sg_query = """
+                    SELECT 
+                        sg.id, 
+                        sg.name,
+                        COUNT(DISTINCT u.id) AS user_count
+                    FROM institution_user iu
+                    JOIN users u ON iu.user_id = u.id
+                    JOIN subject_group_user sgu ON u.id = sgu.user_id
+                    JOIN subject_groups sg ON sgu.subject_group_id = sg.id
+                    WHERE iu.institution_id = %s
+                    GROUP BY sg.id, sg.name
+                    ORDER BY sg.name ASC
+                """
+                cursor.execute(sg_query, (inst_id,))
+                all_subject_groups = cursor.fetchall()
+                
+                # Get subject groups that have books with user counts
+                sg_books_query = """
+                    SELECT 
+                        sg.id, 
+                        sg.name,
+                        COUNT(DISTINCT u.id) AS user_count
+                    FROM institution_user iu
+                    JOIN users u ON iu.user_id = u.id
+                    JOIN subject_group_user sgu ON u.id = sgu.user_id
+                    JOIN subject_groups sg ON sgu.subject_group_id = sg.id
+                    JOIN book_subject_group bsg ON sg.id = bsg.subject_group_id
+                    WHERE iu.institution_id = %s
+                    GROUP BY sg.id, sg.name
+                    ORDER BY sg.name ASC
+                """
+                cursor.execute(sg_books_query, (inst_id,))
+                subject_groups_with_books = cursor.fetchall()
+                
+                results.append({
+                    'institution_id': inst_id,
+                    'institution_name': inst['institution_name'],
+                    'institution_level': inst['institution_level'] or 'N/A',
+                    'user_count': inst['user_count'],
+                    'all_subject_groups': [
+                        {'name': sg['name'], 'user_count': sg['user_count']} 
+                        for sg in all_subject_groups
+                    ],
+                    'subject_groups_with_books': [
+                        {'name': sg['name'], 'user_count': sg['user_count']} 
+                        for sg in subject_groups_with_books
+                    ]
+                })
+            
+        return jsonify(results)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        app.logger.error(f"Error fetching institution analytics: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ===== Book Allocation Request API Endpoints =====
 
 @app.route('/api/champion-schools-by-user/<username>', methods=['GET'])
@@ -12407,6 +12562,46 @@ def _fetch_learner_platform_stats_data(username, start_date, end_date):
         return None
 
 
+def _normalize_column_name(col_name):
+    """Normalize column name for flexible matching"""
+    if pd.isna(col_name):
+        return ""
+    # Convert to string, lowercase, remove all spaces and special chars
+    normalized = str(col_name).lower().strip()
+    # Remove spaces, underscores, hyphens for comparison
+    normalized = normalized.replace(' ', '').replace('_', '').replace('-', '')
+    return normalized
+
+
+def _find_column(df, possible_names):
+    """Find column in dataframe that matches any of the possible names"""
+    # First try exact match after basic normalization (lowercase, strip)
+    df_cols_basic_normalized = {str(col).lower().strip(): col for col in df.columns}
+    
+    for possible in possible_names:
+        normalized_possible = str(possible).lower().strip()
+        if normalized_possible in df_cols_basic_normalized:
+            return df_cols_basic_normalized[normalized_possible]
+    
+    # Try aggressive normalization (remove spaces, underscores, hyphens)
+    df_cols_normalized = {_normalize_column_name(col): col for col in df.columns}
+    
+    for possible in possible_names:
+        normalized_possible = _normalize_column_name(possible)
+        if normalized_possible in df_cols_normalized:
+            return df_cols_normalized[normalized_possible]
+    
+    # Try contains matching (check if normalized column contains or is contained by normalized possible)
+    for col in df.columns:
+        col_normalized = _normalize_column_name(col)
+        for possible in possible_names:
+            possible_normalized = _normalize_column_name(possible)
+            if possible_normalized in col_normalized or col_normalized in possible_normalized:
+                return col
+    
+    return None
+
+
 @app.route('/api/bulk-search-learners', methods=['POST'])
 @login_required
 def bulk_search_learners():
@@ -12441,9 +12636,6 @@ def bulk_search_learners():
         except Exception as e:
             return jsonify({'error': f'Error reading Excel file: {str(e)}'}), 400
         
-        # Normalize column names (case-insensitive, handle variations)
-        df.columns = df.columns.str.strip().str.lower()
-        
         # Map possible column names
         column_mapping = {
             'firstname': ['firstname', 'first_name', 'first name'],
@@ -12451,25 +12643,32 @@ def bulk_search_learners():
             'username': ['username', 'user_name', 'user name']
         }
         
-        # Find actual column names
-        firstname_col = None
-        lastname_col = None
-        username_col = None
-        
-        for col in df.columns:
-            if col in column_mapping['firstname']:
-                firstname_col = col
-            elif col in column_mapping['lastname']:
-                lastname_col = col
-            elif col in column_mapping['username']:
-                username_col = col
+        # Find actual column names using flexible matching
+        firstname_col = _find_column(df, column_mapping['firstname'])
+        lastname_col = _find_column(df, column_mapping['lastname'])
+        username_col = _find_column(df, column_mapping['username'])
         
         # Validate required columns
         if not username_col and (not firstname_col or not lastname_col):
+            # Build helpful error message
+            found_cols = list(df.columns)
+            error_msg = 'Missing required columns. '
+            if username_col:
+                error_msg += 'Found "username" column. '
+            elif firstname_col and not lastname_col:
+                error_msg += f'Found "firstname" column ("{firstname_col}") but missing "lastname". '
+            elif lastname_col and not firstname_col:
+                error_msg += f'Found "lastname" column ("{lastname_col}") but missing "firstname". '
+            else:
+                error_msg += 'Need either "username" OR both "firstname" and "lastname" columns. '
+            
+            error_msg += f'Found columns: {", ".join(found_cols)}. '
+            error_msg += 'Acceptable column names: firstname/first_name/first name, lastname/last_name/last name/surname, username/user_name/user name'
+            
             return jsonify({
-                'error': 'Missing required columns',
+                'error': error_msg,
                 'required': 'Either "username" OR both "firstname" and "lastname" columns are required',
-                'found_columns': list(df.columns)
+                'found_columns': found_cols
             }), 400
         
         # Process each row

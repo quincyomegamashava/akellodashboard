@@ -2,6 +2,7 @@ python3 -m venv venv
 source venv/bin/activate   - for linux
 venv\Scripts\activate      - for windows
 or venv\Scripts\Activate.ps1
+source akellodashboard/Scripts/activate
 pip install flask
 
 flask db stamp head

@@ -28,7 +28,7 @@
 {% block content %}
 
 <style>
-  .alloc-wrapper { max-width: 95vw; margin: 40px auto; padding: 0 16px; }
+  .alloc-wrapper { width: 80%; max-width: 1200px; margin: 40px auto; padding: 0 16px; }
   .alloc-header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin-bottom:16px }
   .alloc-actions { display:flex; gap:10px; flex-wrap:wrap }
   .btn-chip { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius: 999px; border:1px solid #dbe4f0; background:#fff; color:#0b213f; text-decoration:none; box-shadow:0 4px 12px rgba(10,31,68,.06) }
@@ -42,8 +42,125 @@
   thead th { background:#f1f5fb; font-weight:600 }
   th, td { padding:10px 8px; vertical-align:middle }
   .tags span { display:inline-block; margin:2px 6px 2px 0; padding:6px 10px; border-radius:999px; font-size:.8rem; background:#00407d; color:#fff }
+  
+  /* Institution Analytics Card Styles - Green Theme */
+  .institution-analytics-card {
+    background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+    border: 2px solid #86efac;
+    border-radius: 16px;
+    padding: 24px;
+    margin: 20px 0;
+    max-width: 50%;
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.12);
+    transition: all 0.3s ease;
+  }
+  .institution-analytics-card:hover {
+    box-shadow: 0 12px 32px rgba(16, 185, 129, 0.18);
+    transform: translateY(-2px);
+  }
+  .analytics-card-content {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .analytics-icon {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 28px;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  }
+  .analytics-text {
+    flex: 1;
+    min-width: 200px;
+  }
+  .analytics-text h4 {
+    margin: 0 0 8px 0;
+    color: #065f46;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .analytics-text p {
+    margin: 0;
+    color: #047857;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .analytics-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+  }
+  .analytics-btn:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+    transform: translateY(-1px);
+  }
+  .analytics-btn:active {
+    transform: translateY(0);
+  }
+  .analytics-btn i {
+    transition: transform 0.3s ease;
+  }
+  .analytics-btn:hover i {
+    transform: translateX(4px);
+  }
+  
+  /* Analytics Search Filter Styles */
+  .analytics-search-container {
+    position: relative;
+    margin-bottom: 16px;
+  }
+  .analytics-search-input {
+    width: 100%;
+    padding: 12px 16px 12px 40px;
+    border: 2px solid #86efac;
+    border-radius: 10px;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    background: white;
+  }
+  .analytics-search-input:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    background: #f0fdf4;
+  }
+  .analytics-search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #10b981;
+    font-size: 16px;
+  }
+  
   @media (max-width: 1100px) { .alloc-grid { grid-template-columns: 1fr 1fr } }
-  @media (max-width: 780px)  { .alloc-grid { grid-template-columns: 1fr } .alloc-header { justify-content:center } .alloc-actions { justify-content:center } .alloc-wrapper { max-width: 85vw; } }
+  @media (max-width: 780px)  { 
+    .alloc-grid { grid-template-columns: 1fr } 
+    .alloc-header { justify-content:center } 
+    .alloc-actions { justify-content:center } 
+    .alloc-wrapper { max-width: 85vw; }
+    .institution-analytics-card { max-width: 100%; }
+    .analytics-card-content { flex-direction: column; text-align: center; }
+    .analytics-btn { width: 100%; justify-content: center; }
+  }
 </style>
 
 <div class="alloc-wrapper w3-small">
@@ -80,19 +197,36 @@
         Provincial Totals
       </a>
     </div>
-    <input id="allocationsSearchInput" class="search-input" type="text" placeholder="Search allocations..." onkeyup="filterAllocations()" />
+    <!-- <input id="allocationsSearchInput" class="search-input" type="text" placeholder="Search allocations..." onkeyup="filterAllocations()" /> -->
+  </div>
+
+  <!-- Institution Analytics Section -->
+  <div class="institution-analytics-card">
+    <div class="analytics-card-content">
+      <div class="analytics-icon">
+        <i class="fa fa-university"></i>
+      </div>
+      <div class="analytics-text">
+        <h4>Institution Analytics</h4>
+        <p>View institutions, user counts, and subject groups by country and province</p>
+      </div>
+      <button class="analytics-btn" onclick="openInstitutionAnalytics()">
+        View Analytics
+        <i class="fa fa-arrow-right"></i>
+      </button>
+    </div>
   </div>
 
   <!-- Keep scripts and DT init -->
   <script>
-    function filterAllocations() {
-      const input = document.getElementById('allocationsSearchInput');
-      const filter = input.value.toLowerCase();
-      const trs = document.querySelectorAll('#allocTable tbody tr');
-      trs.forEach(tr => {
-        tr.style.display = tr.textContent.toLowerCase().includes(filter) ? '' : 'none';
-      })
-    }
+    // function filterAllocations() {
+    //   const input = document.getElementById('allocationsSearchInput');
+    //   const filter = input.value.toLowerCase();
+    //   const trs = document.querySelectorAll('#allocTable tbody tr');
+    //   trs.forEach(tr => {
+    //     tr.style.display = tr.textContent.toLowerCase().includes(filter) ? '' : 'none';
+    //   })
+    // }
     $(document).ready(function () { $('#allocTable').DataTable({ pageLength: 10 }); });
   </script>
 
@@ -566,6 +700,77 @@ new Chart(ctx, {
   </div>
 </div>
 
+<!-- Institution Analytics Modal -->
+<div id="institutionAnalyticsModal" class="w3-modal" style="z-index:3000;">
+  <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 95vw; max-width: 1400px; border: 2px solid #86efac;">
+    <header class="w3-container w3-padding" style="background:linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%); color:#065f46; border-bottom:2px solid #86efac;">
+      <span onclick="document.getElementById('institutionAnalyticsModal').style.display='none'" class="w3-button w3-display-topright" style="color:#065f46; font-size:24px; font-weight:bold;">&times;</span>
+      <h5 class="w3-margin-0" style="color:#065f46; font-weight:700;"><i class="fa fa-university"></i> Institution Analytics</h5>
+    </header>
+    <div class="w3-container w3-padding" style="max-height:75vh; overflow:auto; background:#ffffff;">
+      <!-- Filter Section -->
+      <div class="w3-row-padding" style="margin-bottom:16px; padding:16px; background:linear-gradient(135deg, #f9fafb 0%, #f0fdf4 100%); border:1px solid #86efac; border-radius:10px;">
+        <div class="w3-half" style="padding:4px">
+          <label style="color:#047857; font-weight:600;"><b>Country</b></label>
+          <select id="analyticsCountrySelect" class="w3-input w3-border" onchange="loadInstitutionProvinces(this.value)" style="border:2px solid #86efac; border-radius:8px;">
+            <option value="">Select Country</option>
+          </select>
+        </div>
+        <div class="w3-half" style="padding:4px">
+          <label style="color:#047857; font-weight:600;"><b>Province</b></label>
+          <select id="analyticsProvinceSelect" class="w3-input w3-border" disabled style="border:2px solid #86efac; border-radius:8px;">
+            <option value="">Select Province</option>
+          </select>
+        </div>
+      </div>
+      <button onclick="loadInstitutionAnalytics()" class="w3-button w3-round" style="margin-bottom:16px; background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none; padding:10px 20px; font-weight:600; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25);">
+        <i class="fa fa-filter"></i> Apply Filters
+      </button>
+      
+      <!-- Loading Indicator -->
+      <div id="analyticsLoading" class="w3-center w3-padding" style="display:none; color:#10b981;">
+        <i class="fa fa-spinner fa-spin" style="font-size:24px;"></i> <span style="margin-left:8px;">Loading...</span>
+      </div>
+      
+      <!-- Error Message -->
+      <div id="analyticsError" class="w3-panel" style="display:none; margin-top:16px; background:#fee2e2; color:#991b1b; border-left:4px solid #dc2626; padding:12px; border-radius:6px;"></div>
+      
+      <!-- Search Filter for Results Table -->
+      <div id="analyticsSearchContainer" class="analytics-search-container" style="display:none; margin-bottom:12px;">
+        <input type="text" id="analyticsTableSearch" class="analytics-search-input" 
+               placeholder="Search institutions..." 
+               onkeyup="filterAnalyticsTable()">
+        <i class="fa fa-search analytics-search-icon"></i>
+      </div>
+      
+      <!-- Results Section -->
+      <div id="analyticsResults" style="display:none; overflow:auto; max-height:50vh; margin-top:16px; border:1px solid #86efac; border-radius:10px;">
+        <table class="w3-table-all w3-small w3-striped w3-hoverable" style="margin:0;">
+          <thead style="background:linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%);">
+            <tr>
+              <th style="color:#065f46; font-weight:700;">Institution Name</th>
+              <th style="color:#065f46; font-weight:700;">Level</th>
+              <th class="text-right" style="color:#065f46; font-weight:700;">User Count</th>
+              <th style="color:#065f46; font-weight:700;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="analyticsTableBody">
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- No Results Message -->
+      <div id="analyticsNoResults" class="w3-center w3-padding" style="display:none; color:#047857; padding:24px;">
+        <i class="fa fa-info-circle" style="font-size:32px; margin-bottom:8px;"></i>
+        <p style="margin:8px 0;">No institutions found for the selected filters.</p>
+      </div>
+    </div>
+    <footer class="w3-container w3-padding" style="background:#f0fdf4; border-top:2px solid #86efac;">
+      <button class="w3-button w3-round" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none; padding:10px 24px; font-weight:600; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25);" onclick="document.getElementById('institutionAnalyticsModal').style.display='none'">Close</button>
+    </footer>
+  </div>
+</div>
+
 <script>
 function openTab(evt, tabName) {
   var i, x, tablinks;
@@ -774,6 +979,273 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 });
+
+// Institution Analytics Functions
+function openInstitutionAnalytics() {
+  document.getElementById('institutionAnalyticsModal').style.display = 'block';
+  loadInstitutionCountries();
+}
+
+async function loadInstitutionCountries() {
+  const countrySelect = document.getElementById('analyticsCountrySelect');
+  const provinceSelect = document.getElementById('analyticsProvinceSelect');
+  
+  try {
+    countrySelect.innerHTML = '<option value="">Loading...</option>';
+    const response = await fetch('/api/institution-countries');
+    const countries = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(countries.error || 'Failed to load countries');
+    }
+    
+    countrySelect.innerHTML = '<option value="">Select Country</option>';
+    countries.forEach(country => {
+      countrySelect.innerHTML += `<option value="${country}">${country}</option>`;
+    });
+    
+    // Reset province dropdown
+    provinceSelect.innerHTML = '<option value="">Select Province</option>';
+    provinceSelect.disabled = true;
+    
+    // Clear previous results
+    document.getElementById('analyticsResults').style.display = 'none';
+    document.getElementById('analyticsNoResults').style.display = 'none';
+    document.getElementById('analyticsError').style.display = 'none';
+    document.getElementById('analyticsSearchContainer').style.display = 'none';
+    document.getElementById('analyticsTableSearch').value = '';
+    
+  } catch (error) {
+    console.error('Error loading countries:', error);
+    countrySelect.innerHTML = '<option value="">Error loading countries</option>';
+  }
+}
+
+async function loadInstitutionProvinces(country) {
+  const provinceSelect = document.getElementById('analyticsProvinceSelect');
+  
+  if (!country) {
+    provinceSelect.innerHTML = '<option value="">Select Province</option>';
+    provinceSelect.disabled = true;
+    return;
+  }
+  
+  try {
+    provinceSelect.innerHTML = '<option value="">Loading...</option>';
+    provinceSelect.disabled = true;
+    
+    const response = await fetch(`/api/institution-provinces?country=${encodeURIComponent(country)}`);
+    const provinces = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(provinces.error || 'Failed to load provinces');
+    }
+    
+    provinceSelect.innerHTML = '<option value="">Select Province</option>';
+    provinces.forEach(province => {
+      provinceSelect.innerHTML += `<option value="${province}">${province}</option>`;
+    });
+    
+    provinceSelect.disabled = false;
+    
+    // Clear previous results
+    document.getElementById('analyticsResults').style.display = 'none';
+    document.getElementById('analyticsNoResults').style.display = 'none';
+    document.getElementById('analyticsSearchContainer').style.display = 'none';
+    document.getElementById('analyticsTableSearch').value = '';
+    
+  } catch (error) {
+    console.error('Error loading provinces:', error);
+    provinceSelect.innerHTML = '<option value="">Error loading provinces</option>';
+    provinceSelect.disabled = true;
+  }
+}
+
+async function loadInstitutionAnalytics() {
+  const country = document.getElementById('analyticsCountrySelect').value;
+  const province = document.getElementById('analyticsProvinceSelect').value;
+  const loadingDiv = document.getElementById('analyticsLoading');
+  const errorDiv = document.getElementById('analyticsError');
+  const resultsDiv = document.getElementById('analyticsResults');
+  const noResultsDiv = document.getElementById('analyticsNoResults');
+  const tbody = document.getElementById('analyticsTableBody');
+  
+  // Validation
+  if (!country || !province) {
+    errorDiv.textContent = 'Please select both country and province';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // Hide previous messages
+  errorDiv.style.display = 'none';
+  resultsDiv.style.display = 'none';
+  noResultsDiv.style.display = 'none';
+  document.getElementById('analyticsSearchContainer').style.display = 'none';
+  document.getElementById('analyticsTableSearch').value = '';
+  loadingDiv.style.display = 'block';
+  tbody.innerHTML = '';
+  
+  try {
+    const response = await fetch(`/api/institution-analytics?country=${encodeURIComponent(country)}&province=${encodeURIComponent(province)}`);
+    const data = await response.json();
+    
+    loadingDiv.style.display = 'none';
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to load institution analytics');
+    }
+    
+    if (!data || data.length === 0) {
+      noResultsDiv.style.display = 'block';
+      return;
+    }
+    
+    // Build table rows
+    tbody.innerHTML = data.map((inst, index) => {
+      const rowId = `inst-row-${index}`;
+      
+      // Handle both old format (array of strings) and new format (array of objects)
+      const normalizeSG = (sg) => {
+        if (typeof sg === 'string') {
+          return { name: sg, user_count: 0 };
+        }
+        return { name: sg.name || sg, user_count: sg.user_count || 0 };
+      };
+      
+      const allSGs = (inst.all_subject_groups || []).map(normalizeSG);
+      const sgsWithBooks = (inst.subject_groups_with_books || []).map(normalizeSG);
+      
+      // Create a map for quick lookup
+      const sgsWithBooksMap = new Map(sgsWithBooks.map(sg => [sg.name, sg]));
+      
+      // Find subject groups without books
+      const sgsWithoutBooks = allSGs.filter(sg => !sgsWithBooksMap.has(sg.name));
+      
+      return `
+        <tr>
+          <td><b>${inst.institution_name || 'N/A'}</b></td>
+          <td>${inst.institution_level || 'N/A'}</td>
+          <td class="text-right">${inst.user_count || 0}</td>
+          <td>
+            <button class="w3-button w3-small w3-round" onclick="toggleInstitutionDetails('${rowId}')" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none;">
+              <i class="fa fa-chevron-down" id="icon-${rowId}"></i> View Details
+            </button>
+          </td>
+        </tr>
+        <tr id="${rowId}" style="display:none;">
+          <td colspan="4" style="padding-left:40px; background:linear-gradient(135deg, #f9fafb 0%, #f0fdf4 100%); border-left:4px solid #10b981;">
+            <div style="margin:12px 0;">
+              <h6 style="margin:8px 0 4px 0; color:#065f46;"><b>All Subject Groups (${allSGs.length})</b></h6>
+              <div style="margin-bottom:12px;">
+                ${allSGs.length > 0 
+                  ? allSGs.map(sg => `<span class="w3-tag w3-small" style="margin:2px; background:#86efac; color:#065f46;">${sg.name} (${sg.user_count || 0} users)</span>`).join('')
+                  : '<span class="w3-text-gray">No subject groups</span>'
+                }
+              </div>
+              
+              <h6 style="margin:8px 0 4px 0; color:#065f46;"><b>Subject Groups with Books (${sgsWithBooks.length})</b></h6>
+              <div style="margin-bottom:12px;">
+                ${sgsWithBooks.length > 0 
+                  ? sgsWithBooks.map(sg => `<span class="w3-tag w3-small" style="margin:2px; background:#10b981; color:white;">${sg.name} (${sg.user_count || 0} users)</span>`).join('')
+                  : '<span class="w3-text-gray">No subject groups with books</span>'
+                }
+              </div>
+              
+              ${sgsWithoutBooks.length > 0 ? `
+                <h6 style="margin:8px 0 4px 0; color:#065f46;"><b>Subject Groups without Books (${sgsWithoutBooks.length})</b></h6>
+                <div>
+                  ${sgsWithoutBooks.map(sg => `<span class="w3-tag w3-small" style="margin:2px; background:#fbbf24; color:#78350f;">${sg.name} (${sg.user_count || 0} users)</span>`).join('')}
+                </div>
+              ` : ''}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    
+    resultsDiv.style.display = 'block';
+    document.getElementById('analyticsSearchContainer').style.display = 'block';
+    
+  } catch (error) {
+    loadingDiv.style.display = 'none';
+    errorDiv.textContent = error.message;
+    errorDiv.style.display = 'block';
+    console.error('Error loading institution analytics:', error);
+  }
+}
+
+function toggleInstitutionDetails(rowId) {
+  const detailRow = document.getElementById(rowId);
+  const icon = document.getElementById(`icon-${rowId}`);
+  
+  if (detailRow.style.display === 'none') {
+    detailRow.style.display = '';
+    icon.className = 'fa fa-chevron-up';
+  } else {
+    detailRow.style.display = 'none';
+    icon.className = 'fa fa-chevron-down';
+  }
+}
+
+function filterAnalyticsTable() {
+  const input = document.getElementById('analyticsTableSearch');
+  const filter = input.value.toLowerCase();
+  const table = document.getElementById('analyticsTableBody');
+  const rows = table.getElementsByTagName('tr');
+  
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    // Skip detail rows (they will be shown/hidden with their parent)
+    if (row.id && row.id.startsWith('inst-row-')) {
+      continue;
+    }
+    
+    const cells = row.getElementsByTagName('td');
+    let found = false;
+    
+    // Search in institution name, level, and user count
+    for (let j = 0; j < Math.min(3, cells.length); j++) {
+      const cellText = cells[j].textContent || cells[j].innerText;
+      if (cellText.toLowerCase().indexOf(filter) > -1) {
+        found = true;
+        break;
+      }
+    }
+    
+    // Show/hide the row and its associated detail row
+    if (found) {
+      row.style.display = '';
+      // Also show the detail row if it exists and was previously visible
+      const detailRowId = row.querySelector('button')?.getAttribute('onclick')?.match(/inst-row-\d+/)?.[0];
+      if (detailRowId) {
+        const detailRow = document.getElementById(detailRowId);
+        if (detailRow && detailRow.style.display !== 'none') {
+          detailRow.style.display = '';
+        }
+      }
+    } else {
+      row.style.display = 'none';
+      // Hide associated detail row
+      const button = row.querySelector('button[onclick*="toggleInstitutionDetails"]');
+      if (button) {
+        const onclickAttr = button.getAttribute('onclick');
+        const match = onclickAttr.match(/inst-row-\d+/);
+        if (match) {
+          const detailRow = document.getElementById(match[0]);
+          if (detailRow) {
+            detailRow.style.display = 'none';
+            // Reset icon
+            const icon = document.getElementById(`icon-${match[0]}`);
+            if (icon) {
+              icon.className = 'fa fa-chevron-down';
+            }
+          }
+        }
+      }
+    }
+  }
+}
 </script>
 
 {% endblock %}
