@@ -1099,6 +1099,8 @@ async function loadInstitutionProvinces(country) {
 let currentPage = 1;
 let totalPages = 1;
 let currentSearch = '';
+// Global variable to store institution analytics data for exports
+let institutionAnalyticsData = [];
 
 // Debounce function for search
 let searchTimeout;
@@ -1179,8 +1181,12 @@ async function loadInstitutionAnalytics(page = 1) {
     
     if (!results || results.length === 0) {
       noResultsDiv.style.display = 'block';
+      institutionAnalyticsData = []; // Clear data if no results
       return;
     }
+    
+    // Store results globally for export functions
+    institutionAnalyticsData = results;
     
     // Update pagination info
     totalPages = pagination.total_pages || 1;
@@ -1326,6 +1332,24 @@ function toggleInstitutionDetails(rowId) {
   }
 }
 
+// Helper function to format subject groups for export
+function formatSubjectGroupsForExport(subjectGroups) {
+  if (!subjectGroups || subjectGroups.length === 0) {
+    return '';
+  }
+  
+  const normalizeSG = (sg) => {
+    if (typeof sg === 'string') {
+      return { name: sg, user_count: 0 };
+    }
+    return { name: sg.name || sg, user_count: sg.user_count || 0 };
+  };
+  
+  return subjectGroups.map(normalizeSG)
+    .map(sg => `${sg.name} (${sg.user_count || 0} users)`)
+    .join(', ');
+}
+
 // Export to Excel function
 function exportInstitutionAnalyticsToExcel() {
   try {
@@ -1334,38 +1358,59 @@ function exportInstitutionAnalyticsToExcel() {
       return;
     }
     
-    const table = document.getElementById('analyticsTable');
-    if (!table) {
-      alert('Table not found');
+    if (!institutionAnalyticsData || institutionAnalyticsData.length === 0) {
+      alert('No data to export. Please load institution analytics first.');
       return;
     }
     
     const wb = XLSX.utils.book_new();
     
-    // Get table data including headers
-    const ws_data = [];
-    const headers = [];
-    const headerRow = table.querySelectorAll('thead th');
-    headerRow.forEach(th => {
-      headers.push(th.textContent.trim());
-    });
-    ws_data.push(headers);
+    // Build headers with subject groups columns
+    const headers = [
+      'Institution Name',
+      'Level',
+      'User Count',
+      'All Subject Groups',
+      'Subject Groups with Books',
+      'Subject Groups without Books'
+    ];
     
-    // Get visible rows (excluding detail rows)
-    const rows = table.querySelectorAll('tbody tr');
-    rows.forEach(tr => {
-      // Skip detail rows (they have colspan)
-      if (tr.querySelector('td[colspan]')) {
-        return;
-      }
-      
-      const rowData = [];
-      tr.querySelectorAll('td').forEach((td, index) => {
-        // Skip Actions column (last column)
-        if (index < headerRow.length - 1) {
-          rowData.push(td.textContent.trim());
+    const ws_data = [headers];
+    
+    // Process each institution
+    institutionAnalyticsData.forEach(inst => {
+      // Normalize subject groups
+      const normalizeSG = (sg) => {
+        if (typeof sg === 'string') {
+          return { name: sg, user_count: 0 };
         }
-      });
+        return { name: sg.name || sg, user_count: sg.user_count || 0 };
+      };
+      
+      const allSGs = (inst.all_subject_groups || []).map(normalizeSG);
+      const sgsWithBooks = (inst.subject_groups_with_books || []).map(normalizeSG);
+      
+      // Create a map for quick lookup
+      const sgsWithBooksMap = new Map(sgsWithBooks.map(sg => [sg.name, sg]));
+      
+      // Find subject groups without books
+      const sgsWithoutBooks = allSGs.filter(sg => !sgsWithBooksMap.has(sg.name));
+      
+      // Format subject groups
+      const allSGsFormatted = formatSubjectGroupsForExport(allSGs);
+      const sgsWithBooksFormatted = formatSubjectGroupsForExport(sgsWithBooks);
+      const sgsWithoutBooksFormatted = formatSubjectGroupsForExport(sgsWithoutBooks);
+      
+      // Build row data
+      const rowData = [
+        inst.institution_name || 'N/A',
+        inst.institution_level || 'N/A',
+        inst.user_count || 0,
+        allSGsFormatted,
+        sgsWithBooksFormatted,
+        sgsWithoutBooksFormatted
+      ];
+      
       ws_data.push(rowData);
     });
     
@@ -1375,9 +1420,24 @@ function exportInstitutionAnalyticsToExcel() {
     const colWidths = [
       { wch: 40 }, // Institution Name
       { wch: 15 }, // Level
-      { wch: 12 }  // User Count
+      { wch: 12 }, // User Count
+      { wch: 50 }, // All Subject Groups
+      { wch: 50 }, // Subject Groups with Books
+      { wch: 50 }  // Subject Groups without Books
     ];
     ws['!cols'] = colWidths;
+    
+    // Enable text wrapping for subject groups columns (columns D, E, F)
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let row = 1; row <= range.e.r; row++) {
+      for (let col = 3; col <= 5; col++) { // Columns D, E, F (0-indexed: 3, 4, 5)
+        const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+        if (!ws[cellAddress]) continue;
+        ws[cellAddress].s = {
+          alignment: { wrapText: true, vertical: 'top' }
+        };
+      }
+    }
     
     XLSX.utils.book_append_sheet(wb, ws, 'Institution Analytics');
     
@@ -1401,14 +1461,13 @@ function exportInstitutionAnalyticsToPDF() {
       return;
     }
     
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('landscape', 'pt', 'a4');
-    
-    const table = document.getElementById('analyticsTable');
-    if (!table) {
-      alert('Table not found');
+    if (!institutionAnalyticsData || institutionAnalyticsData.length === 0) {
+      alert('No data to export. Please load institution analytics first.');
       return;
     }
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape', 'pt', 'a4');
     
     // Get filter info
     const country = document.getElementById('analyticsCountrySelect').value;
@@ -1430,35 +1489,53 @@ function exportInstitutionAnalyticsToPDF() {
       doc.text(`Search: ${search}`, 360, yPos);
     }
     
-    // Get table data
-    const headers = [];
+    // Build headers
+    const headers = [
+      'Institution Name',
+      'Level',
+      'User Count',
+      'All Subject Groups',
+      'Subject Groups with Books',
+      'Subject Groups without Books'
+    ];
+    
+    // Build rows from institutionAnalyticsData
     const rows = [];
     
-    // Get headers
-    table.querySelectorAll('thead th').forEach(th => {
-      // Skip Actions column
-      if (th.textContent.trim() !== 'Actions') {
-        headers.push(th.textContent.trim());
-      }
-    });
-    
-    // Get visible rows (excluding detail rows)
-    table.querySelectorAll('tbody tr').forEach(tr => {
-      // Skip detail rows
-      if (tr.querySelector('td[colspan]')) {
-        return;
-      }
-      
-      const rowData = [];
-      tr.querySelectorAll('td').forEach((td, index) => {
-        // Skip Actions column
-        if (index < headers.length) {
-          rowData.push(td.textContent.trim());
+    institutionAnalyticsData.forEach(inst => {
+      // Normalize subject groups
+      const normalizeSG = (sg) => {
+        if (typeof sg === 'string') {
+          return { name: sg, user_count: 0 };
         }
-      });
-      if (rowData.length > 0) {
-        rows.push(rowData);
-      }
+        return { name: sg.name || sg, user_count: sg.user_count || 0 };
+      };
+      
+      const allSGs = (inst.all_subject_groups || []).map(normalizeSG);
+      const sgsWithBooks = (inst.subject_groups_with_books || []).map(normalizeSG);
+      
+      // Create a map for quick lookup
+      const sgsWithBooksMap = new Map(sgsWithBooks.map(sg => [sg.name, sg]));
+      
+      // Find subject groups without books
+      const sgsWithoutBooks = allSGs.filter(sg => !sgsWithBooksMap.has(sg.name));
+      
+      // Format subject groups
+      const allSGsFormatted = formatSubjectGroupsForExport(allSGs);
+      const sgsWithBooksFormatted = formatSubjectGroupsForExport(sgsWithBooks);
+      const sgsWithoutBooksFormatted = formatSubjectGroupsForExport(sgsWithoutBooks);
+      
+      // Build row data
+      const rowData = [
+        inst.institution_name || 'N/A',
+        inst.institution_level || 'N/A',
+        inst.user_count || 0,
+        allSGsFormatted || 'None',
+        sgsWithBooksFormatted || 'None',
+        sgsWithoutBooksFormatted || 'None'
+      ];
+      
+      rows.push(rowData);
     });
     
     // Add table using autoTable
@@ -1467,19 +1544,30 @@ function exportInstitutionAnalyticsToPDF() {
       body: rows,
       startY: yPos + 20,
       styles: {
-        fontSize: 8,
-        cellPadding: 3,
-        overflow: 'linebreak'
+        fontSize: 7,
+        cellPadding: 2,
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
       },
       headStyles: {
         fillColor: [16, 185, 129], // #10b981
         textColor: 255,
-        fontStyle: 'bold'
+        fontStyle: 'bold',
+        fontSize: 8
       },
       alternateRowStyles: {
         fillColor: [240, 253, 244] // #f0fdf4
       },
-      margin: { top: yPos + 20, left: 40, right: 40 }
+      columnStyles: {
+        0: { cellWidth: 100 }, // Institution Name
+        1: { cellWidth: 50 },  // Level
+        2: { cellWidth: 50 },  // User Count
+        3: { cellWidth: 120, cellPadding: 2 }, // All Subject Groups
+        4: { cellWidth: 120, cellPadding: 2 }, // Subject Groups with Books
+        5: { cellWidth: 120, cellPadding: 2 }  // Subject Groups without Books
+      },
+      margin: { top: yPos + 20, left: 40, right: 40 },
+      tableWidth: 'auto'
     });
     
     // Generate filename with timestamp

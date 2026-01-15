@@ -9151,8 +9151,87 @@ def check_columns():
 @app.route('/schooltracker', methods=['GET', 'POST'])
 @login_required
 def schooltracker():
-
-    return render_template('schooltracker.html', title='School tracker')
+    # Get country filter from request
+    selected_country = request.args.get('country', '') or request.form.get('country', '')
+    
+    countries = []
+    schools = []
+    champion_map = {}
+    
+    conn = None
+    cursor = None
+    
+    try:
+        # Get database connection
+        pool = get_ruzivo_pool()
+        if pool is None:
+            flash('Database connection not available', 'error')
+            return render_template('schooltracker.html', 
+                                title='School tracker',
+                                countries=[],
+                                schools=[],
+                                selected_country='')
+        
+        conn = pool.connection()
+        import pymysql.cursors
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        
+        # Fetch distinct countries
+        cursor.execute("""
+            SELECT DISTINCT school_country 
+            FROM tblschools 
+            WHERE school_country IS NOT NULL AND school_country != ''
+            ORDER BY school_country
+        """)
+        countries = [row['school_country'] for row in cursor.fetchall()]
+        
+        # If a country is selected, fetch schools for that country
+        if selected_country:
+            cursor.execute("""
+                SELECT school_id, school_name, school_city, school_province, school_country, contact
+                FROM tblschools
+                WHERE school_country = %s
+                ORDER BY school_name
+            """, (selected_country,))
+            schools = cursor.fetchall()
+            
+            # Load all ChampionSchool records and create mapping
+            champions = ChampionSchool.query.all()
+            for champ in champions:
+                champ_schools = champ.get_schools() or []
+                for school in champ_schools:
+                    asl_id = school.get('asl_school_id')
+                    if asl_id:
+                        # Convert to string for comparison, handle both int and str
+                        asl_id_str = str(asl_id).strip()
+                        if asl_id_str:
+                            champion_map[asl_id_str] = f"{champ.firstname} {champ.lastname}"
+            
+            # Add champion name to each school
+            for school in schools:
+                school_id_str = str(school['school_id']).strip()
+                school['champion_name'] = champion_map.get(school_id_str, '')
+        
+    except Exception as e:
+        app.logger.error(f"Error in schooltracker route: {e}")
+        flash(f'Error loading school data: {str(e)}', 'error')
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    
+    return render_template('schooltracker.html', 
+                        title='School tracker',
+                        countries=countries,
+                        schools=schools,
+                        selected_country=selected_country)
 
 
 @app.route('/bookallocations', methods=['GET', 'POST'])

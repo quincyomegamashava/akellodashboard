@@ -1,142 +1,392 @@
 {% extends "base.html" %}
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.anychart.com/releases/8.10.0/js/anychart-bundle.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> -->
-
+{% block head_extra %}
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
 
   <style>
-    .asl-color{
-      background-color: yellow !important;
+    /* Universal box-sizing to prevent overflow */
+    * {
+      box-sizing: border-box;
     }
     
+    :root {
+      --ak-primary: #00407d;
+      --ak-accent: #0ea5e9;
+      --ak-muted: #6b7280;
+      --ak-bg: #f8fafc;
+    }
+    
+    .page-header {
+      background: linear-gradient(135deg, var(--ak-primary), #2563eb);
+      color: #fff;
+      border-radius: 14px;
+      box-shadow: 0 10px 24px rgba(0,0,0,.08);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-sizing: border-box;
+    }
+    
+    .page-header h1 {
+      font-weight: 800;
+      letter-spacing: .3px;
+      margin: 0 0 16px 0;
+    }
+    
+    .filter-section {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.06);
+      border: 1px solid #e5e7eb;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-sizing: border-box;
+    }
+    
+    .filter-section label {
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+      display: block;
+    }
+    
+    .filter-section select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+      color: #111827;
+      transition: border-color 0.2s ease;
+    }
+    
+    .filter-section select:focus {
+      outline: none;
+      border-color: var(--ak-primary);
+      box-shadow: 0 0 0 3px rgba(0, 64, 125, 0.1);
+    }
+    
+    .search-section {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.06);
+      border: 1px solid #e5e7eb;
+      padding: 20px;
+      margin-bottom: 24px;
+      position: relative;
+      box-sizing: border-box;
+    }
+    
+    .search-section label {
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+      display: block;
+    }
+    
+    .search-section .search-input-wrapper {
+      position: relative;
+    }
+    
+    .search-section .search-input-wrapper i {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--ak-muted);
+      font-size: 14px;
+    }
+    
+    .search-section input {
+      width: 100%;
+      padding: 10px 14px 10px 40px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+      color: #111827;
+      transition: border-color 0.2s ease;
+    }
+    
+    .search-section input:focus {
+      outline: none;
+      border-color: var(--ak-primary);
+      box-shadow: 0 0 0 3px rgba(0, 64, 125, 0.1);
+    }
+    
+    /* Modern table styling */
+    .table-container {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.06);
+      border: 1px solid #e5e7eb;
+      overflow-x: auto;
+      overflow-y: visible;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    .table-modern {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: 0;
+    }
+    
+    .table-modern thead th {
+      background: #f3f4f6;
+      color: #111827;
+      font-weight: 600;
+      padding: 14px 16px;
+      text-align: left;
+      border-bottom: 2px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    
+    .table-modern tbody tr {
+      transition: background 0.2s ease;
+    }
+    
+    .table-modern tbody tr:nth-child(even) {
+      background: #fafafa;
+    }
+    
+    .table-modern tbody tr:hover {
+      background: #eef2ff;
+    }
+    
+    .table-modern td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      vertical-align: middle;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      max-width: 300px;
+    }
+    
+    .table-modern tbody tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .school-name-link {
+      color: var(--ak-primary);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.2s ease;
+    }
+    
+    .school-name-link:hover {
+      color: var(--ak-accent);
+      text-decoration: underline;
+    }
+    
+    .champion-badge {
+      display: inline-block;
+      background: rgba(13, 148, 136, 0.1);
+      color: #0f766e;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--ak-muted);
+    }
+    
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+    
+    .empty-state-message {
+      font-size: 16px;
+      font-weight: 500;
+    }
+    
+    @media (max-width: 768px) {
+      .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .table-modern {
+        min-width: 800px;
+      }
+      
+      .filter-section,
+      .search-section,
+      .page-header {
+        padding: 16px;
+      }
+      
+      .w3-container[style*="max-width: 90%"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0 10px;
+      }
+    }
   </style>
-</head>
+{% endblock %}
+
 {% block content %}
-<div class="container" style="margin-top: 50%;">
-  <div class="w3-display-middle w3-padding w3-margin" style="width:85vw; height: 90vh; margin-left: -20%; overflow-y: auto;">
-    <div class="w3-animate-bottom " style="width: 80vw; margin-top: 4%;   height: 86vh;">
-      <div class="w3-bar w3-margin-top w3-center tabs-container w3-round container-fluid image-star-background"
-        style="width: 76vw; height: 85vh; overflow-y: auto;margin-right: 5%; ">
 
+<div class="w3-container w3-small" style="width: 100vw; max-width: 90vw; margin: 0 auto; box-sizing: border-box;">
+  
+  <!-- Page Header -->
+  <div class="page-header" style="width:70vw ;">
+    <h1><i class="fas fa-school w3-margin-right"></i>School Tracker</h1>
+    <p style="margin: 0; opacity: 0.9;">Browse and filter schools by country</p>
+  </div>
 
-          <div id="Overview" class="menu" >
-            
-            <div class="container-fluid">
+  <!-- Filter Section -->
+  <div class="filter-section" style="width:70vw ;">
+    <form method="GET" action="{{ url_for('schooltracker') }}" id="countryFilterForm">
+      <label for="countrySelect">
+        <i class="fas fa-globe w3-margin-right"></i>Select Country
+      </label>
+      <select name="country" id="countrySelect" onchange="document.getElementById('countryFilterForm').submit();">
+        <option value="">-- All Countries --</option>
+        {% for country in countries %}
+        <option value="{{ country }}" {% if country == selected_country %}selected{% endif %}>
+          {{ country }}
+        </option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
 
-              <div class="col-sm-12 w3-margin-top w3-round">
-                <span class="w3-center">
-                                <!-- Search input -->
-                                <input type="text" id="userSearchInput" onkeyup="filterUsers()" placeholder="Search for users..." style="border-radius: 25px 25px 25px 25px; width: 60%;" class=" w3-padding w3-input w3-card w3-border w3-round w3-margin" />
-                            </span>
-                            <table class="table table-striped col-sm-12 w3-card w3-border w3-round">
-                                <thead style="background-color: #e6f0ff;">
-                                    <tr>
-                                        <th><b>School</b></th>
-                                        <th><b>Province</b></th>
-                                        <th><b>District</b></th>
-                                        <th><b>ASL MTD</b></th>
-                                        <th><b>AL MTD</b></th>
-                                        <th><b>Total MTD</b></th>
-                                        <th><b>BA</b></th>
-                                    </tr>
-                                </thead>
-                                <tbody style="text-align: left;">
-                                    <tr>
-                                      <td>siun</td>
-                                      <td>asc</td>
-                                      <td>ac</td>
-                                      <td>acasa</td>
-                                      <td>ftjhb</td>
-                                      <td>bmghfh</td>
-                                      <td>nbfdn</td>
-                                    </tr>
-                                    <tr>
-                                      <td>siun</td>
-                                      <td>asc</td>
-                                      <td>ac</td>
-                                      <td>acasa</td>
-                                      <td>ftjhb</td>
-                                      <td>bmghfh</td>
-                                      <td>nbfdn</td>
-                                    </tr>
-                                    <tr>
-                                      <td>siun</td>
-                                      <td>asc</td>
-                                      <td>ac</td>
-                                      <td>acasa</td>
-                                      <td>ftjhb</td>
-                                      <td>bmghfh</td>
-                                      <td>nbfdn</td>
-                                    </tr>
-                                    <tr>
-                                      <td>siun</td>
-                                      <td>asc</td>
-                                      <td>ac</td>
-                                      <td>acasa</td>
-                                      <td>ftjhb</td>
-                                      <td>bmghfh</td>
-                                      <td>nbfdn</td>
-                                    </tr>
-                                    <tr>
-                                      <td>siun</td>
-                                      <td>asc</td>
-                                      <td>ac</td>
-                                      <td>acasa</td>
-                                      <td>ftjhb</td>
-                                      <td>bmghfh</td>
-                                      <td>nbfdn</td>
-                                    </tr>
-                                    <tr>
-                                      <td>siun</td>
-                                      <td>asc</td>
-                                      <td>ac</td>
-                                      <td>acasa</td>
-                                      <td>ftjhb</td>
-                                      <td>bmghfh</td>
-                                      <td>nbfdn</td>
-                                    </tr>
-                                    <tr>
-                                      <td>siun</td>
-                                      <td>asc</td>
-                                      <td>ac</td>
-                                      <td>acasa</td>
-                                      <td>ftjhb</td>
-                                      <td>bmghfh</td>
-                                      <td>nbfdn</td>
-                                    </tr>
-                                    <tr>
-                                      <td>siun</td>
-                                      <td>asc</td>
-                                      <td>ac</td>
-                                      <td>acasa</td>
-                                      <td>ftjhb</td>
-                                      <td>bmghfh</td>
-                                      <td>nbfdn</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-              </div>
-                        
-            </div>
-
+  <!-- Schools Table -->
+  {% if selected_country %}
+    {% if schools %}
+      <!-- Search Section -->
+      <div class="search-section" style="width:70vw ;">
+        <label for="schoolSearch">
+          <i class="fas fa-search w3-margin-right"></i>Search Schools
+        </label>
+        <div class="search-input-wrapper">
+          <i class="fas fa-search"></i>
+          <input type="text" id="schoolSearch" placeholder="Search by school name, city, province, contact, or champion...">
+        </div>
+      </div>
+      
+      <div class="table-container" style="width: 71vw;">
+        <table class="table-modern table-responsive table" style="width:70vw ;">
+          <thead>
+            <tr>
+              <th>School Name</th>
+              <th>City</th>
+              <th>Province</th>
+              <th>Contact</th>
+              <th>Champion</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for school in schools %}
+            <tr>
+              <td>
+                <a href="{{ url_for('school_profile_usage', school_id=school.school_id) }}" class="school-name-link">
+                  {{ school.school_name or 'N/A' }}
+                </a>
+              </td>
+              <td>{{ school.school_city or 'N/A' }}</td>
+              <td>{{ school.school_province or 'N/A' }}</td>
+              <td>{{ school.contact or 'N/A' }}</td>
+              <td>
+                {% if school.champion_name %}
+                  <span class="champion-badge">
+                    <i class="fas fa-user-tie w3-margin-right"></i>{{ school.champion_name }}
+                  </span>
+                {% else %}
+                  <span style="color: var(--ak-muted);">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="table-container">
+        <div class="empty-state">
+          <div class="empty-state-icon">
+            <i class="fas fa-search"></i>
           </div>
-          <!-- <div id="Library" class="menu" style="display:none;">Content for Library</div>
-          <div id="Smartlearning" class="menu" style="display:none;">Content for C4K</div> -->
-
-
+          <div class="empty-state-message">
+            No schools found for the selected country.
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="table-container">
+      <div class="empty-state">
+        <div class="empty-state-icon">
+          <i class="fas fa-globe"></i>
+        </div>
+        <div class="empty-state-message">
+          Please select a country from the dropdown above to view schools.
+        </div>
       </div>
     </div>
-  </div>
+  {% endif %}
+
 </div>
 
+{% endblock %}
 
-
+{% block scripts %}
+<script>
+  // Auto-submit form on country change (already handled by onchange, but keeping for clarity)
+  document.addEventListener('DOMContentLoaded', function() {
+    const countrySelect = document.getElementById('countrySelect');
+    if (countrySelect) {
+      countrySelect.addEventListener('change', function() {
+        // Form submission is handled by onchange attribute
+        // This ensures it works even if JavaScript is disabled
+      });
+    }
+    
+    // Table search filter functionality
+    const searchInput = document.getElementById('schoolSearch');
+    if (searchInput) {
+      searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.trim().toLowerCase();
+        const table = document.querySelector('.table-modern');
+        
+        if (!table) return;
+        
+        const rows = table.querySelectorAll('tbody tr');
+        
+        rows.forEach(function(row) {
+          const cells = row.querySelectorAll('td');
+          let found = false;
+          
+          // Check each cell for a match
+          cells.forEach(function(cell) {
+            const cellText = cell.textContent || cell.innerText;
+            if (cellText.toLowerCase().includes(searchTerm)) {
+              found = true;
+            }
+          });
+          
+          // Show or hide the row based on match
+          if (found || searchTerm === '') {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+      });
+    }
+  });
+</script>
 {% endblock %}
