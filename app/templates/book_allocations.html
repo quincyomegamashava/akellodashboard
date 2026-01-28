@@ -13,41 +13,125 @@
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
 
   <!-- DataTables CSS + JS -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 
   <!-- Export Libraries -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
 
   <style>
-    .asl-color{
+    .asl-color {
       background-color: yellow !important;
     }
-    
   </style>
 </head>
 {% block content %}
 
 <style>
-  .alloc-wrapper { width: 80%; max-width: 1200px; margin: 40px auto; padding: 0 16px; }
-  .alloc-header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin-bottom:16px }
-  .alloc-actions { display:flex; gap:10px; flex-wrap:wrap }
-  .btn-chip { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius: 999px; border:1px solid #dbe4f0; background:#fff; color:#0b213f; text-decoration:none; box-shadow:0 4px 12px rgba(10,31,68,.06) }
-  .btn-chip:hover { background:#0d6efd; color:#fff; border-color:#0d6efd }
-  .search-input { width:100%; max-width:360px; padding:10px 14px; border-radius:999px; border:1px solid #dbe4f0; box-shadow:0 3px 10px rgba(10,31,68,.04) }
-  .alloc-grid { display:grid; grid-template-columns: 1.2fr .9fr .9fr; gap:16px }
-  .card { background:#fff; border-radius:14px; box-shadow:0 8px 20px rgba(10,31,68,.08); overflow:hidden }
-  .card-header { padding:14px 16px; border-bottom:1px solid #eef2f7; font-weight:700; background:linear-gradient(180deg,#f7faff,#fff) }
-  .card-body { padding:14px 16px }
-  table { width:100%; background:#fff }
-  thead th { background:#f1f5fb; font-weight:600 }
-  th, td { padding:10px 8px; vertical-align:middle }
-  .tags span { display:inline-block; margin:2px 6px 2px 0; padding:6px 10px; border-radius:999px; font-size:.8rem; background:#00407d; color:#fff }
-  
+  .alloc-wrapper {
+    width: 80%;
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 0 16px;
+  }
+
+  .alloc-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px
+  }
+
+  .alloc-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap
+  }
+
+  .btn-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid #dbe4f0;
+    background: #fff;
+    color: #0b213f;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(10, 31, 68, .06)
+  }
+
+  .btn-chip:hover {
+    background: #0d6efd;
+    color: #fff;
+    border-color: #0d6efd
+  }
+
+  .search-input {
+    width: 100%;
+    max-width: 360px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid #dbe4f0;
+    box-shadow: 0 3px 10px rgba(10, 31, 68, .04)
+  }
+
+  .alloc-grid {
+    display: grid;
+    grid-template-columns: 1.2fr .9fr .9fr;
+    gap: 16px
+  }
+
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 8px 20px rgba(10, 31, 68, .08);
+    overflow: hidden
+  }
+
+  .card-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid #eef2f7;
+    font-weight: 700;
+    background: linear-gradient(180deg, #f7faff, #fff)
+  }
+
+  .card-body {
+    padding: 14px 16px
+  }
+
+  table {
+    width: 100%;
+    background: #fff
+  }
+
+  thead th {
+    background: #f1f5fb;
+    font-weight: 600
+  }
+
+  th,
+  td {
+    padding: 10px 8px;
+    vertical-align: middle
+  }
+
+  .tags span {
+    display: inline-block;
+    margin: 2px 6px 2px 0;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: .8rem;
+    background: #00407d;
+    color: #fff
+  }
+
   /* Institution Analytics Card Styles - Green Theme */
   .institution-analytics-card {
     background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
@@ -59,16 +143,19 @@
     box-shadow: 0 8px 24px rgba(16, 185, 129, 0.12);
     transition: all 0.3s ease;
   }
+
   .institution-analytics-card:hover {
     box-shadow: 0 12px 32px rgba(16, 185, 129, 0.18);
     transform: translateY(-2px);
   }
+
   .analytics-card-content {
     display: flex;
     align-items: center;
     gap: 20px;
     flex-wrap: wrap;
   }
+
   .analytics-icon {
     width: 64px;
     height: 64px;
@@ -81,22 +168,26 @@
     font-size: 28px;
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
   }
+
   .analytics-text {
     flex: 1;
     min-width: 200px;
   }
+
   .analytics-text h4 {
     margin: 0 0 8px 0;
     color: #065f46;
     font-size: 20px;
     font-weight: 700;
   }
+
   .analytics-text p {
     margin: 0;
     color: #047857;
     font-size: 14px;
     line-height: 1.5;
   }
+
   .analytics-btn {
     display: inline-flex;
     align-items: center;
@@ -112,26 +203,31 @@
     transition: all 0.3s ease;
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
   }
+
   .analytics-btn:hover {
     background: linear-gradient(135deg, #059669 0%, #047857 100%);
     box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
     transform: translateY(-1px);
   }
+
   .analytics-btn:active {
     transform: translateY(0);
   }
+
   .analytics-btn i {
     transition: transform 0.3s ease;
   }
+
   .analytics-btn:hover i {
     transform: translateX(4px);
   }
-  
+
   /* Analytics Search Filter Styles */
   .analytics-search-container {
     position: relative;
     margin-bottom: 16px;
   }
+
   .analytics-search-input {
     width: 100%;
     padding: 12px 16px 12px 40px;
@@ -141,12 +237,14 @@
     transition: all 0.3s ease;
     background: white;
   }
+
   .analytics-search-input:focus {
     outline: none;
     border-color: #10b981;
     box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
     background: #f0fdf4;
   }
+
   .analytics-search-icon {
     position: absolute;
     left: 14px;
@@ -155,16 +253,43 @@
     color: #10b981;
     font-size: 16px;
   }
-  
-  @media (max-width: 1100px) { .alloc-grid { grid-template-columns: 1fr 1fr } }
-  @media (max-width: 780px)  { 
-    .alloc-grid { grid-template-columns: 1fr } 
-    .alloc-header { justify-content:center } 
-    .alloc-actions { justify-content:center } 
-    .alloc-wrapper { max-width: 85vw; }
-    .institution-analytics-card { max-width: 100%; }
-    .analytics-card-content { flex-direction: column; text-align: center; }
-    .analytics-btn { width: 100%; justify-content: center; }
+
+  @media (max-width: 1100px) {
+    .alloc-grid {
+      grid-template-columns: 1fr 1fr
+    }
+  }
+
+  @media (max-width: 780px) {
+    .alloc-grid {
+      grid-template-columns: 1fr
+    }
+
+    .alloc-header {
+      justify-content: center
+    }
+
+    .alloc-actions {
+      justify-content: center
+    }
+
+    .alloc-wrapper {
+      max-width: 85vw;
+    }
+
+    .institution-analytics-card {
+      max-width: 100%;
+    }
+
+    .analytics-card-content {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .analytics-btn {
+      width: 100%;
+      justify-content: center;
+    }
   }
 </style>
 
@@ -184,7 +309,8 @@
         Request Book Allocation
       </a>
       {% if current_user.userRole == 'Admin' %}
-      <a href="#" class="btn-chip" onclick="document.getElementById('manageRequestsModal').style.display='block'; loadRequests();">
+      <a href="#" class="btn-chip"
+        onclick="document.getElementById('manageRequestsModal').style.display='block'; loadRequests();">
         <i class="fa fa-tasks"></i>
         Manage Requests
       </a>
@@ -200,6 +326,11 @@
       <a href="#" class="btn-chip" onclick="document.getElementById('provinceTotalsW3').style.display='block'">
         <i class="fa fa-map"></i>
         Provincial Totals
+      </a>
+      <a href="#" class="btn-chip"
+        onclick="document.getElementById('bookGenresModal').style.display='block'; loadBookGenres();">
+        <i class="fa fa-tags"></i>
+        View Book Genres
       </a>
     </div>
     <!-- <input id="allocationsSearchInput" class="search-input" type="text" placeholder="Search allocations..." onkeyup="filterAllocations()" /> -->
@@ -321,6 +452,151 @@
       loadpubData();
       loadData();
     });
+
+    async function loadBookGenres() {
+      const loading = document.getElementById("bookGenresLoading");
+      const error = document.getElementById("bookGenresError");
+      const tbody = document.getElementById("bookGenresResults");
+
+      // Show loading, hide error
+      loading.style.display = "block";
+      error.style.display = "none";
+      tbody.innerHTML = '<tr><td colspan="2" class="w3-center w3-text-gray">Loading...</td></tr>';
+
+      try {
+        const res = await fetch("/api/book-genres");
+        const data = await res.json();
+
+        loading.style.display = "none";
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to load book genres");
+        }
+
+        tbody.innerHTML = "";
+
+        if (data.data && data.data.length > 0) {
+          data.data.forEach(row => {
+            tbody.innerHTML += `
+              <tr>
+                <td>${row.title || '-'}</td>
+                <td>${row.name || '-'}</td>
+              </tr>
+            `;
+          });
+        } else {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="2" class="w3-center w3-text-gray">No books found for the selected genres</td>
+            </tr>
+          `;
+        }
+      } catch (err) {
+        loading.style.display = "none";
+        error.style.display = "block";
+        error.innerText = "Error: " + err.message;
+        tbody.innerHTML = '<tr><td colspan="2" class="w3-center w3-text-gray">Error loading data</td></tr>';
+      }
+    }
+
+    // Export book genres to Excel
+    function exportBookGenresToExcel() {
+      const tbody = document.getElementById("bookGenresResults");
+      const rows = tbody.getElementsByTagName("tr");
+
+      if (rows.length === 0 || (rows.length === 1 && rows[0].cells.length === 1)) {
+        alert("No data to export. Please load the data first.");
+        return;
+      }
+
+      // Prepare data for Excel
+      const data = [["Book Title", "Genre"]]; // Header row
+
+      for (let i = 0; i < rows.length; i++) {
+        const cells = rows[i].getElementsByTagName("td");
+        if (cells.length === 2) {
+          const title = cells[0].textContent.trim();
+          const genre = cells[1].textContent.trim();
+          if (title !== '-' || genre !== '-') {
+            data.push([title, genre]);
+          }
+        }
+      }
+
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(data);
+
+      // Set column widths
+      ws['!cols'] = [
+        { wch: 50 }, // Book Title
+        { wch: 40 }  // Genre
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, "Book Genres");
+
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename = `Book_Genres_${timestamp}.xlsx`;
+
+      // Download file
+      XLSX.writeFile(wb, filename);
+    }
+
+    // Export book genres to PDF
+    function exportBookGenresToPDF() {
+      const tbody = document.getElementById("bookGenresResults");
+      const rows = tbody.getElementsByTagName("tr");
+
+      if (rows.length === 0 || (rows.length === 1 && rows[0].cells.length === 1)) {
+        alert("No data to export. Please load the data first.");
+        return;
+      }
+
+      // Prepare data for PDF
+      const data = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const cells = rows[i].getElementsByTagName("td");
+        if (cells.length === 2) {
+          const title = cells[0].textContent.trim();
+          const genre = cells[1].textContent.trim();
+          if (title !== '-' || genre !== '-') {
+            data.push([title, genre]);
+          }
+        }
+      }
+
+      // Create PDF
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      // Add title
+      doc.setFontSize(16);
+      doc.text("Book Genres - HBC PlusOne Primary", 14, 15);
+
+      // Add timestamp
+      doc.setFontSize(10);
+      const timestamp = new Date().toLocaleString();
+      doc.text(`Generated: ${timestamp}`, 14, 22);
+
+      // Add table
+      doc.autoTable({
+        head: [['Book Title', 'Genre']],
+        body: data,
+        startY: 28,
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [0, 64, 125] },
+        margin: { top: 28 }
+      });
+
+      // Generate filename with timestamp
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `Book_Genres_${dateStr}.pdf`;
+
+      // Download file
+      doc.save(filename);
+    }
   </script>
 
 </div>
@@ -330,53 +606,57 @@
 
 
 <!-- view aslhome modal -->
-                <div id="allocate_books" class="w3-modal w3-white w3-card w3-border">
-                    <div class="w3-modal-content w3-white w3-padding w3-card w3-border" style="width: 85vw; height: 80vh;">
-                        <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
-                            <span onclick="document.getElementById('allocate_books').style.display='none'" 
-                            class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
-                            <span class="w3-large"><b>Add New Allocation Record</b></span>
-                            <br>
-                        </header>
-                        <div class="w3-container w3-margin-top">
-                            <form method="POST" action="{{ url_for('allocate_books') }}" class="modal-content">
-      {{ allocate_form.hidden_tag() }}
-      <!-- <div class="modal-header"><h5 class="modal-title">Add Allocation</h5></div> -->
-      <div class="modal-body w3-padding">
-        <div class="form-group">{{ allocate_form.school_name.label }}{{ allocate_form.school_name(class="form-control") }}</div>
-        <div class="form-group">{{ allocate_form.school_province.label }}{{ allocate_form.school_province(class="form-control") }}</div>
-        <div class="form-group">{{ allocate_form.books_allocated.label }}{{ allocate_form.books_allocated(class="form-control", multiple=True) }}</div>
-      </div>
-      <div class="modal-footer">
-        {{ allocate_form.submit(class="btn btn-success") }}
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-    </form>
-                            <script>
-                            function filterUsers() {
-                            const input = document.getElementById("userSearchInput");
-                            const filter = input.value.toLowerCase();
-                            const table = document.getElementById("aslhome");
-                            const trs = table.getElementsByTagName("tr");
+<div id="allocate_books" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-padding w3-card w3-border" style="width: 85vw; height: 80vh;">
+    <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;">
+      <span onclick="document.getElementById('allocate_books').style.display='none'"
+        class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Add New Allocation Record</b></span>
+      <br>
+    </header>
+    <div class="w3-container w3-margin-top">
+      <form method="POST" action="{{ url_for('allocate_books') }}" class="modal-content">
+        {{ allocate_form.hidden_tag() }}
+        <!-- <div class="modal-header"><h5 class="modal-title">Add Allocation</h5></div> -->
+        <div class="modal-body w3-padding">
+          <div class="form-group">{{ allocate_form.school_name.label }}{{
+            allocate_form.school_name(class="form-control") }}</div>
+          <div class="form-group">{{ allocate_form.school_province.label }}{{
+            allocate_form.school_province(class="form-control") }}</div>
+          <div class="form-group">{{ allocate_form.books_allocated.label }}{{
+            allocate_form.books_allocated(class="form-control", multiple=True) }}</div>
+        </div>
+        <div class="modal-footer">
+          {{ allocate_form.submit(class="btn btn-success") }}
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </form>
+      <script>
+        function filterUsers() {
+          const input = document.getElementById("userSearchInput");
+          const filter = input.value.toLowerCase();
+          const table = document.getElementById("aslhome");
+          const trs = table.getElementsByTagName("tr");
 
-                            for (let i = 1; i < trs.length; i++) {
-                                const rowText = trs[i].textContent.toLowerCase();
-                                trs[i].style.display = rowText.includes(filter) ? "" : "none";
-                            }
-                            }
-                            </script>
-                        </div>
+          for (let i = 1; i < trs.length; i++) {
+            const rowText = trs[i].textContent.toLowerCase();
+            trs[i].style.display = rowText.includes(filter) ? "" : "none";
+          }
+        }
+      </script>
+    </div>
 
-                    </div>
-                </div>
-                 <!-- visuals-->
+  </div>
+</div>
+<!-- visuals-->
 
 
 <!-- Publisher Totals Modal -->
 <div id="publisherTotalsW3" class="w3-modal" style="z-index:3000;">
   <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 90vw; max-width: 1100px;">
     <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
-      <span onclick="document.getElementById('publisherTotalsW3').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <span onclick="document.getElementById('publisherTotalsW3').style.display='none'"
+        class="w3-button w3-display-topright">&times;</span>
       <h6 class="w3-margin-0">Publisher totals</h6>
     </header>
     <div class="w3-container w3-padding" style="max-height:75vh; overflow:auto;">
@@ -384,7 +664,8 @@
         <div class="w3-half" style="padding:4px"><input id="pubstart_date" type="date" class="w3-input"></div>
         <div class="w3-half" style="padding:4px"><input id="pubend_date" type="date" class="w3-input"></div>
       </div>
-      <button onclick="loadpubData()" class="w3-button w3-indigo w3-round w3-small" style="margin-bottom:10px"><i class="fa fa-filter"></i> Filter</button>
+      <button onclick="loadpubData()" class="w3-button w3-indigo w3-round w3-small" style="margin-bottom:10px"><i
+          class="fa fa-filter"></i> Filter</button>
       <div style="overflow:auto; max-height:48vh">
         <table class="w3-table-all w3-small w3-striped w3-hoverable">
           <thead>
@@ -406,7 +687,8 @@
       </div>
     </div>
     <footer class="w3-container w3-padding w3-light-grey">
-      <button class="w3-button w3-teal w3-small" onclick="document.getElementById('publisherTotalsW3').style.display='none'">Close</button>
+      <button class="w3-button w3-teal w3-small"
+        onclick="document.getElementById('publisherTotalsW3').style.display='none'">Close</button>
     </footer>
   </div>
 </div>
@@ -415,7 +697,8 @@
 <div id="provinceTotalsW3" class="w3-modal" style="z-index:3000;">
   <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 90vw; max-width: 1000px;">
     <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
-      <span onclick="document.getElementById('provinceTotalsW3').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <span onclick="document.getElementById('provinceTotalsW3').style.display='none'"
+        class="w3-button w3-display-topright">&times;</span>
       <h6 class="w3-margin-0">Provincial totals</h6>
     </header>
     <div class="w3-container w3-padding" style="max-height:75vh; overflow:auto;">
@@ -423,7 +706,8 @@
         <div class="w3-half" style="padding:4px"><input id="start_date" type="date" class="w3-input"></div>
         <div class="w3-half" style="padding:4px"><input id="end_date" type="date" class="w3-input"></div>
       </div>
-      <button onclick="loadData()" class="w3-button w3-indigo w3-round w3-small" style="margin-bottom:10px"><i class="fa fa-filter"></i> Filter</button>
+      <button onclick="loadData()" class="w3-button w3-indigo w3-round w3-small" style="margin-bottom:10px"><i
+          class="fa fa-filter"></i> Filter</button>
       <div style="overflow:auto; max-height:48vh">
         <table class="w3-table-all w3-small w3-striped w3-hoverable">
           <thead>
@@ -443,80 +727,131 @@
       </div>
     </div>
     <footer class="w3-container w3-padding w3-light-grey">
-      <button class="w3-button w3-teal w3-small" onclick="document.getElementById('provinceTotalsW3').style.display='none'">Close</button>
+      <button class="w3-button w3-teal w3-small"
+        onclick="document.getElementById('provinceTotalsW3').style.display='none'">Close</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Book Genres Modal -->
+<div id="bookGenresModal" class="w3-modal" style="z-index:3000;">
+  <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 90vw; max-width: 1000px;">
+    <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
+      <span onclick="document.getElementById('bookGenresModal').style.display='none'"
+        class="w3-button w3-display-topright">&times;</span>
+      <h6 class="w3-margin-0">Book Genres - HBC PlusOne Primary</h6>
+    </header>
+    <div class="w3-container w3-padding" style="max-height:75vh; overflow:auto;">
+      <div id="bookGenresLoading" class="w3-center w3-padding" style="display:none;">
+        <i class="fa fa-spinner fa-spin" style="font-size:24px;"></i> <span>Loading...</span>
+      </div>
+      <div id="bookGenresError" class="w3-panel w3-red" style="display:none;"></div>
+
+      <!-- Export Buttons -->
+      <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button onclick="exportBookGenresToExcel()" class="w3-button w3-green w3-small w3-round">
+          <i class="fa fa-file-excel-o"></i> Export to Excel
+        </button>
+        <button onclick="exportBookGenresToPDF()" class="w3-button w3-red w3-small w3-round">
+          <i class="fa fa-file-pdf-o"></i> Export to PDF
+        </button>
+      </div>
+
+      <div style="overflow:auto; max-height:60vh">
+        <table class="w3-table-all w3-small w3-striped w3-hoverable">
+          <thead>
+            <tr>
+              <th>Book Title</th>
+              <th>Genre</th>
+            </tr>
+          </thead>
+          <tbody id="bookGenresResults">
+            <tr>
+              <td colspan="2" class="w3-center w3-text-gray">Click "Apply Filters" to load data</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <footer class="w3-container w3-padding w3-light-grey">
+      <button class="w3-button w3-teal w3-small"
+        onclick="document.getElementById('bookGenresModal').style.display='none'">Close</button>
     </footer>
   </div>
 </div>
 
 
 
+
 <!-- visuals modal -->
-                <div id="provincevisuals" class="w3-modal w3-white w3-card w3-border">
-                    <div class="w3-modal-content w3-white w3-card w3-border" style="width: 85vw; height: 80vh;">
-                        <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;"> 
-                            <span onclick="document.getElementById('provincevisuals').style.display='none'" 
-                            class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
-                            <span class="w3-large"><b>Akello books</b></span>
-                            <br>
-                        </header>
-                        <div class="w3-container w3-margin-top">
-                           <h4>Book Allocations by Province</h4>
-<canvas id="provincePieChart" width="400" height="400"></canvas>
+<div id="provincevisuals" class="w3-modal w3-white w3-card w3-border">
+  <div class="w3-modal-content w3-white w3-card w3-border" style="width: 85vw; height: 80vh;">
+    <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff;">
+      <span onclick="document.getElementById('provincevisuals').style.display='none'"
+        class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
+      <span class="w3-large"><b>Akello books</b></span>
+      <br>
+    </header>
+    <div class="w3-container w3-margin-top">
+      <h4>Book Allocations by Province</h4>
+      <canvas id="provincePieChart" width="400" height="400"></canvas>
 
-<!-- Chart.js CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      <!-- Chart.js CDN -->
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<script>
-const ctx = document.getElementById('provincePieChart').getContext('2d');
-new Chart(ctx, {
-    type: 'pie',
-    data: {
-        labels: {{ province_labels|tojson }},
-        datasets: [{
+      <script>
+        const ctx = document.getElementById('provincePieChart').getContext('2d');
+        new Chart(ctx, {
+          type: 'pie',
+          data: {
+            labels: {{ province_labels| tojson }},
+          datasets: [{
             label: 'Allocations by Province',
-            data: {{ province_counts|tojson }},
-            backgroundColor: [
-                '#4e79a7', '#f28e2c', '#e15759', '#76b7b2', '#59a14f',
-                '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ab'
-            ],
-            borderWidth: 1
+            data: {{ province_counts| tojson }},
+          backgroundColor: [
+            '#4e79a7', '#f28e2c', '#e15759', '#76b7b2', '#59a14f',
+            '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ab'
+          ],
+          borderWidth: 1
         }]
     },
-    options: {
-        responsive: true,
-        plugins: {
+          options: {
+          responsive: true,
+          plugins: {
             legend: {
-                position: 'right'
+              position: 'right'
             },
             title: {
-                display: true,
-                text: 'Allocations by Province'
+              display: true,
+              text: 'Allocations by Province'
             }
+          }
         }
-    }
 });
-</script>
+      </script>
 
-                        </div>
+    </div>
 
-                    </div>
-                </div>
-                 <!-- visuals-->
+  </div>
+</div>
+<!-- visuals-->
 
 <!-- Summary and Allocations Combined Modal -->
 <div id="summaryAllocationsModal" class="w3-modal" style="z-index:3000;">
   <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 90vw; max-width: 1200px;">
     <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
-      <span onclick="document.getElementById('summaryAllocationsModal').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <span onclick="document.getElementById('summaryAllocationsModal').style.display='none'"
+        class="w3-button w3-display-topright">&times;</span>
       <h5 class="w3-margin-0">Summary & Allocations</h5>
     </header>
     <div class="w3-container w3-padding" style="max-height:75vh; overflow:auto;">
       <!-- Tabs -->
       <div class="w3-bar w3-border-bottom" style="margin-bottom:16px">
-        <button class="w3-bar-item w3-button tablink w3-bottombar w3-border-indigo" onclick="openTab(event, 'SummaryTab')">Quick Summary</button>
+        <button class="w3-bar-item w3-button tablink w3-bottombar w3-border-indigo"
+          onclick="openTab(event, 'SummaryTab')">Quick Summary</button>
         <button class="w3-bar-item w3-button tablink" onclick="openTab(event, 'AllocationsTab')">Allocations</button>
       </div>
-      
+
       <!-- Summary Tab -->
       <div id="SummaryTab" class="w3-container tabcontent">
         {% if province_summary %}
@@ -525,7 +860,8 @@ new Chart(ctx, {
           <div class="card-body">
             <div style="display:flex; flex-wrap:wrap; gap:8px">
               {% for province, count in province_summary.items() %}
-                <span class="btn-chip" style="padding:6px 10px"><i class="fa fa-map-marker"></i> {{ province }}: {{ count }}</span>
+              <span class="btn-chip" style="padding:6px 10px"><i class="fa fa-map-marker"></i> {{ province }}: {{ count
+                }}</span>
               {% endfor %}
             </div>
           </div>
@@ -534,7 +870,7 @@ new Chart(ctx, {
         <p class="w3-text-gray">No summary data available</p>
         {% endif %}
       </div>
-      
+
       <!-- Allocations Tab -->
       <div id="AllocationsTab" class="w3-container tabcontent" style="display:none">
         <div class="card">
@@ -551,19 +887,19 @@ new Chart(ctx, {
               </thead>
               <tbody>
                 {% for alloc in allocations %}
-                  <tr>
-                    <td>{{ alloc.school_name }}</td>
-                    <td>{{ alloc.school_province }}</td>
-                    <td class="tags">
-                      {% for book in alloc.books_allocated.split(',') %}
-                        <span>{{ book.strip() }}</span>
-                      {% endfor %}
-                    </td>
-                    <td>
-                      <button class="btn-chip" title="Edit"><i class="fa fa-pencil"></i></button>
-                      <button class="btn-chip" title="Delete" style="color:#c1121f"><i class="fa fa-trash"></i></button>
-                    </td>
-                  </tr>
+                <tr>
+                  <td>{{ alloc.school_name }}</td>
+                  <td>{{ alloc.school_province }}</td>
+                  <td class="tags">
+                    {% for book in alloc.books_allocated.split(',') %}
+                    <span>{{ book.strip() }}</span>
+                    {% endfor %}
+                  </td>
+                  <td>
+                    <button class="btn-chip" title="Edit"><i class="fa fa-pencil"></i></button>
+                    <button class="btn-chip" title="Delete" style="color:#c1121f"><i class="fa fa-trash"></i></button>
+                  </td>
+                </tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -572,7 +908,8 @@ new Chart(ctx, {
       </div>
     </div>
     <footer class="w3-container w3-padding w3-light-grey">
-      <button class="w3-button w3-teal w3-small" onclick="document.getElementById('summaryAllocationsModal').style.display='none'">Close</button>
+      <button class="w3-button w3-teal w3-small"
+        onclick="document.getElementById('summaryAllocationsModal').style.display='none'">Close</button>
     </footer>
   </div>
 </div>
@@ -581,7 +918,8 @@ new Chart(ctx, {
 <div id="requestAllocationModal" class="w3-modal" style="z-index:3000;">
   <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 90vw; max-width: 800px;">
     <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
-      <span onclick="document.getElementById('requestAllocationModal').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <span onclick="document.getElementById('requestAllocationModal').style.display='none'"
+        class="w3-button w3-display-topright">&times;</span>
       <h5 class="w3-margin-0">Request Book Allocation</h5>
     </header>
     <div class="w3-container w3-padding">
@@ -603,7 +941,7 @@ new Chart(ctx, {
           </label>
           {% endif %}
         </div>
-        
+
         <div class="w3-margin-bottom">
           <label class="w3-text-gray"><b>School Province</b></label>
           <select id="schoolProvince" class="w3-input w3-border" required>
@@ -620,7 +958,7 @@ new Chart(ctx, {
             <option value="Midlands">Midlands</option>
           </select>
         </div>
-        
+
         <div class="w3-margin-bottom">
           <label class="w3-text-gray"><b>School Grade</b></label>
           <select id="schoolGrade" class="w3-input w3-border" required>
@@ -637,29 +975,30 @@ new Chart(ctx, {
             <option value="Form6">Form 6</option>
           </select>
         </div>
-        
+
         <div class="w3-margin-bottom">
           <label class="w3-text-gray"><b>Quantity</b></label>
           <input type="number" id="quantity" class="w3-input w3-border" value="1" min="1" required>
         </div>
-        
+
         <div class="w3-margin-bottom">
           <label class="w3-text-gray"><b>Notes (Optional)</b></label>
           <textarea id="notes" class="w3-input w3-border" rows="3" placeholder="Additional notes..."></textarea>
         </div>
-        
+
         <div class="w3-margin-bottom">
           <label class="w3-text-gray"><b>Requested Date (Optional)</b></label>
           <input type="date" id="requestedDate" class="w3-input w3-border">
         </div>
-        
+
         <div id="requestError" class="w3-panel w3-red" style="display:none; margin-top:16px"></div>
         <div id="requestSuccess" class="w3-panel w3-green" style="display:none; margin-top:16px"></div>
       </form>
     </div>
     <footer class="w3-container w3-padding w3-light-grey">
       <button class="w3-button w3-indigo w3-small" onclick="submitRequest()">Submit Request</button>
-      <button class="w3-button w3-teal w3-small" onclick="document.getElementById('requestAllocationModal').style.display='none'">Close</button>
+      <button class="w3-button w3-teal w3-small"
+        onclick="document.getElementById('requestAllocationModal').style.display='none'">Close</button>
     </footer>
   </div>
 </div>
@@ -668,7 +1007,8 @@ new Chart(ctx, {
 <div id="manageRequestsModal" class="w3-modal" style="z-index:3000;">
   <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 95vw; max-width: 1400px;">
     <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
-      <span onclick="document.getElementById('manageRequestsModal').style.display='none'" class="w3-button w3-display-topright">&times;</span>
+      <span onclick="document.getElementById('manageRequestsModal').style.display='none'"
+        class="w3-button w3-display-topright">&times;</span>
       <h5 class="w3-margin-0">Manage Book Allocation Requests</h5>
     </header>
     <div class="w3-container w3-padding">
@@ -677,7 +1017,7 @@ new Chart(ctx, {
         <button class="w3-button w3-bar-item" onclick="loadRequests('Not allocated')">Not Allocated</button>
         <button class="w3-button w3-bar-item" onclick="loadRequests('Allocated')">Allocated</button>
       </div>
-      
+
       <div style="overflow:auto; max-height:60vh">
         <table class="w3-table-all w3-small w3-striped w3-hoverable">
           <thead>
@@ -694,77 +1034,94 @@ new Chart(ctx, {
             </tr>
           </thead>
           <tbody id="requestsTableBody">
-            <tr><td colspan="9" class="w3-center w3-text-gray">Loading requests...</td></tr>
+            <tr>
+              <td colspan="9" class="w3-center w3-text-gray">Loading requests...</td>
+            </tr>
           </tbody>
         </table>
       </div>
     </div>
     <footer class="w3-container w3-padding w3-light-grey">
-      <button class="w3-button w3-teal w3-small" onclick="document.getElementById('manageRequestsModal').style.display='none'">Close</button>
+      <button class="w3-button w3-teal w3-small"
+        onclick="document.getElementById('manageRequestsModal').style.display='none'">Close</button>
     </footer>
   </div>
 </div>
 
 <!-- Institution Analytics Modal -->
 <div id="institutionAnalyticsModal" class="w3-modal" style="z-index:3000;">
-  <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 95vw; max-width: 1400px; border: 2px solid #86efac;">
-    <header class="w3-container w3-padding" style="background:linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%); color:#065f46; border-bottom:2px solid #86efac;">
-      <span onclick="document.getElementById('institutionAnalyticsModal').style.display='none'" class="w3-button w3-display-topright" style="color:#065f46; font-size:24px; font-weight:bold;">&times;</span>
-      <h5 class="w3-margin-0" style="color:#065f46; font-weight:700;"><i class="fa fa-university"></i> Institution Analytics</h5>
+  <div class="w3-modal-content w3-animate-top w3-card-4"
+    style="width: 95vw; max-width: 1400px; border: 2px solid #86efac;">
+    <header class="w3-container w3-padding"
+      style="background:linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%); color:#065f46; border-bottom:2px solid #86efac;">
+      <span onclick="document.getElementById('institutionAnalyticsModal').style.display='none'"
+        class="w3-button w3-display-topright" style="color:#065f46; font-size:24px; font-weight:bold;">&times;</span>
+      <h5 class="w3-margin-0" style="color:#065f46; font-weight:700;"><i class="fa fa-university"></i> Institution
+        Analytics</h5>
     </header>
     <div class="w3-container w3-padding" style="max-height:75vh; overflow:auto; background:#ffffff;">
       <!-- Filter Section -->
-      <div class="w3-row-padding" style="margin-bottom:16px; padding:16px; background:linear-gradient(135deg, #f9fafb 0%, #f0fdf4 100%); border:1px solid #86efac; border-radius:10px;">
+      <div class="w3-row-padding"
+        style="margin-bottom:16px; padding:16px; background:linear-gradient(135deg, #f9fafb 0%, #f0fdf4 100%); border:1px solid #86efac; border-radius:10px;">
         <div class="w3-third" style="padding:4px">
           <label style="color:#047857; font-weight:600;"><b>Country</b></label>
-          <select id="analyticsCountrySelect" class="w3-input w3-border" onchange="loadInstitutionProvinces(this.value)" style="border:2px solid #86efac; border-radius:8px;">
+          <select id="analyticsCountrySelect" class="w3-input w3-border" onchange="loadInstitutionProvinces(this.value)"
+            style="border:2px solid #86efac; border-radius:8px;">
             <option value="">Select Country</option>
           </select>
         </div>
         <div class="w3-third" style="padding:4px">
           <label style="color:#047857; font-weight:600;"><b>Province</b></label>
-          <select id="analyticsProvinceSelect" class="w3-input w3-border" disabled style="border:2px solid #86efac; border-radius:8px;">
+          <select id="analyticsProvinceSelect" class="w3-input w3-border" disabled
+            style="border:2px solid #86efac; border-radius:8px;">
             <option value="">Select Province</option>
           </select>
         </div>
         <div class="w3-third" style="padding:4px">
           <label style="color:#047857; font-weight:600;"><b>Search Institution</b></label>
-          <input type="text" id="analyticsSearchInput" class="w3-input w3-border" placeholder="Type institution name..." style="border:2px solid #86efac; border-radius:8px;" onkeyup="debounceSearch()">
+          <input type="text" id="analyticsSearchInput" class="w3-input w3-border" placeholder="Type institution name..."
+            style="border:2px solid #86efac; border-radius:8px;" onkeyup="debounceSearch()">
         </div>
       </div>
       <div style="margin-bottom:16px; display:flex; gap:8px; flex-wrap:wrap;">
-        <button onclick="loadInstitutionAnalytics(1)" class="w3-button w3-round" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none; padding:10px 20px; font-weight:600; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25);">
+        <button onclick="loadInstitutionAnalytics(1)" class="w3-button w3-round"
+          style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none; padding:10px 20px; font-weight:600; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25);">
           <i class="fa fa-filter"></i> Apply Filters
         </button>
-        <button id="exportExcelBtn" onclick="exportInstitutionAnalyticsToExcel()" class="w3-button w3-round" style="display:none; background:linear-gradient(135deg, #059669 0%, #047857 100%); color:white; border:none; padding:10px 20px; font-weight:600; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25);">
+        <button id="exportExcelBtn" onclick="exportInstitutionAnalyticsToExcel()" class="w3-button w3-round"
+          style="display:none; background:linear-gradient(135deg, #059669 0%, #047857 100%); color:white; border:none; padding:10px 20px; font-weight:600; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25);">
           <i class="fa fa-file-excel-o"></i> Export Excel
         </button>
-        <button id="exportPDFBtn" onclick="exportInstitutionAnalyticsToPDF()" class="w3-button w3-round" style="display:none; background:linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color:white; border:none; padding:10px 20px; font-weight:600; box-shadow:0 4px 12px rgba(220, 38, 38, 0.25);">
+        <button id="exportPDFBtn" onclick="exportInstitutionAnalyticsToPDF()" class="w3-button w3-round"
+          style="display:none; background:linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color:white; border:none; padding:10px 20px; font-weight:600; box-shadow:0 4px 12px rgba(220, 38, 38, 0.25);">
           <i class="fa fa-file-pdf-o"></i> Export PDF
         </button>
       </div>
-      
+
       <!-- Loading Indicator -->
       <div id="analyticsLoading" class="w3-center w3-padding" style="display:none; color:#10b981;">
         <i class="fa fa-spinner fa-spin" style="font-size:24px;"></i> <span style="margin-left:8px;">Loading...</span>
       </div>
-      
+
       <!-- Error Message -->
-      <div id="analyticsError" class="w3-panel" style="display:none; margin-top:16px; background:#fee2e2; color:#991b1b; border-left:4px solid #dc2626; padding:12px; border-radius:6px;"></div>
-      
+      <div id="analyticsError" class="w3-panel"
+        style="display:none; margin-top:16px; background:#fee2e2; color:#991b1b; border-left:4px solid #dc2626; padding:12px; border-radius:6px;">
+      </div>
+
       <!-- Search Filter for Results Table -->
       <div id="analyticsSearchContainer" class="analytics-search-container" style="display:none; margin-bottom:12px;">
-        <input type="text" id="analyticsTableSearch" class="analytics-search-input" 
-               placeholder="Search institutions..." 
-               onkeyup="filterAnalyticsTable()">
+        <input type="text" id="analyticsTableSearch" class="analytics-search-input" placeholder="Search institutions..."
+          onkeyup="filterAnalyticsTable()">
         <i class="fa fa-search analytics-search-icon"></i>
       </div>
-      
+
       <!-- Results Section -->
       <div id="analyticsResults" style="display:none; margin-top:16px;">
         <!-- Pagination Info -->
-        <div id="analyticsPaginationInfo" style="margin-bottom:12px; padding:8px; background:#f0fdf4; border-radius:6px; color:#047857; font-size:14px; text-align:center;"></div>
-        
+        <div id="analyticsPaginationInfo"
+          style="margin-bottom:12px; padding:8px; background:#f0fdf4; border-radius:6px; color:#047857; font-size:14px; text-align:center;">
+        </div>
+
         <!-- Table -->
         <div style="overflow:auto; max-height:50vh; border:1px solid #86efac; border-radius:10px;">
           <table id="analyticsTable" class="w3-table-all w3-small w3-striped w3-hoverable" style="margin:0;">
@@ -780,19 +1137,21 @@ new Chart(ctx, {
             </tbody>
           </table>
         </div>
-        
+
         <!-- Pagination Controls -->
         <div id="analyticsPagination" style="margin-top:12px; text-align:center; display:none;">
-          <button id="prevPageBtn" onclick="changePage(-1)" class="w3-button w3-small w3-round" style="background:#10b981; color:white; border:none; margin:0 4px;">
+          <button id="prevPageBtn" onclick="changePage(-1)" class="w3-button w3-small w3-round"
+            style="background:#10b981; color:white; border:none; margin:0 4px;">
             <i class="fa fa-chevron-left"></i> Previous
           </button>
           <span id="pageNumbers" style="margin:0 8px; color:#047857;"></span>
-          <button id="nextPageBtn" onclick="changePage(1)" class="w3-button w3-small w3-round" style="background:#10b981; color:white; border:none; margin:0 4px;">
+          <button id="nextPageBtn" onclick="changePage(1)" class="w3-button w3-small w3-round"
+            style="background:#10b981; color:white; border:none; margin:0 4px;">
             Next <i class="fa fa-chevron-right"></i>
           </button>
         </div>
       </div>
-      
+
       <!-- No Results Message -->
       <div id="analyticsNoResults" class="w3-center w3-padding" style="display:none; color:#047857; padding:24px;">
         <i class="fa fa-info-circle" style="font-size:32px; margin-bottom:8px;"></i>
@@ -800,167 +1159,169 @@ new Chart(ctx, {
       </div>
     </div>
     <footer class="w3-container w3-padding" style="background:#f0fdf4; border-top:2px solid #86efac;">
-      <button class="w3-button w3-round" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none; padding:10px 24px; font-weight:600; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25);" onclick="document.getElementById('institutionAnalyticsModal').style.display='none'">Close</button>
+      <button class="w3-button w3-round"
+        style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none; padding:10px 24px; font-weight:600; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25);"
+        onclick="document.getElementById('institutionAnalyticsModal').style.display='none'">Close</button>
     </footer>
   </div>
 </div>
 
 <script>
-function openTab(evt, tabName) {
-  var i, x, tablinks;
-  x = document.getElementsByClassName("tabcontent");
-  for (i = 0; i < x.length; i++) {
-    x[i].style.display = "none";
+  function openTab(evt, tabName) {
+    var i, x, tablinks;
+    x = document.getElementsByClassName("tabcontent");
+    for (i = 0; i < x.length; i++) {
+      x[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tablink");
+    for (i = 0; i < tablinks.length; i++) {
+      tablinks[i].classList.remove("w3-border-indigo");
+    }
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.classList.add("w3-border-indigo");
   }
-  tablinks = document.getElementsByClassName("tablink");
-  for (i = 0; i < tablinks.length; i++) {
-    tablinks[i].classList.remove("w3-border-indigo");
-  }
-  document.getElementById(tabName).style.display = "block";
-  evt.currentTarget.classList.add("w3-border-indigo");
-}
 
-async function loadSchoolsForRequest() {
-  const schoolSelect = document.getElementById('schoolSelect');
-  const isBA = '{{ current_user.userRole }}' === 'Brand Ambassador';
-  
-  try {
-    if (isBA) {
-      const response = await fetch(`/api/champion-schools-by-user/{{ current_user.username }}`);
-      const data = await response.json();
-      schoolSelect.innerHTML = '<option value="">Select School</option>';
-      if (data.schools && data.schools.length > 0) {
-        data.schools.forEach(school => {
-          schoolSelect.innerHTML += `<option value="${school}">${school}</option>`;
-        });
+  async function loadSchoolsForRequest() {
+    const schoolSelect = document.getElementById('schoolSelect');
+    const isBA = '{{ current_user.userRole }}' === 'Brand Ambassador';
+
+    try {
+      if (isBA) {
+        const response = await fetch(`/api/champion-schools-by-user/{{ current_user.username }}`);
+        const data = await response.json();
+        schoolSelect.innerHTML = '<option value="">Select School</option>';
+        if (data.schools && data.schools.length > 0) {
+          data.schools.forEach(school => {
+            schoolSelect.innerHTML += `<option value="${school}">${school}</option>`;
+          });
+        } else {
+          schoolSelect.innerHTML = '<option value="">No schools assigned</option>';
+        }
       } else {
-        schoolSelect.innerHTML = '<option value="">No schools assigned</option>';
+        const response = await fetch('/api/all-champion-schools');
+        const data = await response.json();
+        schoolSelect.innerHTML = '<option value="">Select School</option>';
+        if (data.schools && data.schools.length > 0) {
+          data.schools.forEach(school => {
+            schoolSelect.innerHTML += `<option value="${school}">${school}</option>`;
+          });
+        }
       }
+    } catch (error) {
+      console.error('Error loading schools:', error);
+      schoolSelect.innerHTML = '<option value="">Error loading schools</option>';
+    }
+  }
+
+  function toggleManualSchool() {
+    const checkbox = document.getElementById('addNewSchoolCheck');
+    const selectContainer = document.getElementById('schoolSelectContainer');
+    const manualContainer = document.getElementById('manualSchoolContainer');
+
+    if (checkbox && checkbox.checked) {
+      selectContainer.style.display = 'none';
+      manualContainer.style.display = 'block';
+      document.getElementById('manualSchoolName').required = true;
+      document.getElementById('schoolSelect').required = false;
     } else {
-      const response = await fetch('/api/all-champion-schools');
-      const data = await response.json();
-      schoolSelect.innerHTML = '<option value="">Select School</option>';
-      if (data.schools && data.schools.length > 0) {
-        data.schools.forEach(school => {
-          schoolSelect.innerHTML += `<option value="${school}">${school}</option>`;
-        });
+      selectContainer.style.display = 'block';
+      manualContainer.style.display = 'none';
+      if (document.getElementById('manualSchoolName')) {
+        document.getElementById('manualSchoolName').required = false;
       }
+      document.getElementById('schoolSelect').required = true;
     }
-  } catch (error) {
-    console.error('Error loading schools:', error);
-    schoolSelect.innerHTML = '<option value="">Error loading schools</option>';
   }
-}
 
-function toggleManualSchool() {
-  const checkbox = document.getElementById('addNewSchoolCheck');
-  const selectContainer = document.getElementById('schoolSelectContainer');
-  const manualContainer = document.getElementById('manualSchoolContainer');
-  
-  if (checkbox && checkbox.checked) {
-    selectContainer.style.display = 'none';
-    manualContainer.style.display = 'block';
-    document.getElementById('manualSchoolName').required = true;
-    document.getElementById('schoolSelect').required = false;
-  } else {
-    selectContainer.style.display = 'block';
-    manualContainer.style.display = 'none';
-    if (document.getElementById('manualSchoolName')) {
-      document.getElementById('manualSchoolName').required = false;
-    }
-    document.getElementById('schoolSelect').required = true;
-  }
-}
+  async function submitRequest() {
+    const errorDiv = document.getElementById('requestError');
+    const successDiv = document.getElementById('requestSuccess');
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
 
-async function submitRequest() {
-  const errorDiv = document.getElementById('requestError');
-  const successDiv = document.getElementById('requestSuccess');
-  errorDiv.style.display = 'none';
-  successDiv.style.display = 'none';
-  
-  const addNewSchool = document.getElementById('addNewSchoolCheck')?.checked || false;
-  const schoolName = addNewSchool 
-    ? document.getElementById('manualSchoolName').value.trim()
-    : document.getElementById('schoolSelect').value;
-  
-  if (!schoolName) {
-    errorDiv.textContent = 'Please select or enter a school name';
-    errorDiv.style.display = 'block';
-    return;
-  }
-  
-  const data = {
-    school_name: schoolName,
-    school_province: document.getElementById('schoolProvince').value,
-    school_grade: document.getElementById('schoolGrade').value,
-    quantity: parseInt(document.getElementById('quantity').value) || 1,
-    notes: document.getElementById('notes').value.trim() || null,
-    requested_date: document.getElementById('requestedDate').value || null
-  };
-  
-  try {
-    const response = await fetch('/api/book-allocation-requests', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(data)
-    });
-    
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error || 'Failed to submit request');
-    }
-    
-    successDiv.textContent = 'Request submitted successfully!';
-    successDiv.style.display = 'block';
-    
-    document.getElementById('requestAllocationForm').reset();
-    if (addNewSchool) {
-      document.getElementById('addNewSchoolCheck').checked = false;
-      toggleManualSchool();
-    }
-    
-    setTimeout(() => {
-      document.getElementById('requestAllocationModal').style.display = 'none';
-    }, 1500);
-  } catch (error) {
-    errorDiv.textContent = error.message;
-    errorDiv.style.display = 'block';
-  }
-}
+    const addNewSchool = document.getElementById('addNewSchoolCheck')?.checked || false;
+    const schoolName = addNewSchool
+      ? document.getElementById('manualSchoolName').value.trim()
+      : document.getElementById('schoolSelect').value;
 
-async function loadRequests(status = '') {
-  const tbody = document.getElementById('requestsTableBody');
-  if (!tbody) return;
-  
-  tbody.innerHTML = '<tr><td colspan="9" class="w3-center w3-text-gray">Loading...</td></tr>';
-  
-  try {
-    const url = status ? `/api/book-allocation-requests?status=${encodeURIComponent(status)}` : '/api/book-allocation-requests';
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to load requests');
-    }
-    
-    if (!data.requests || data.requests.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="w3-center w3-text-gray">No requests found</td></tr>';
+    if (!schoolName) {
+      errorDiv.textContent = 'Please select or enter a school name';
+      errorDiv.style.display = 'block';
       return;
     }
-    
-    tbody.innerHTML = data.requests.map(req => {
-      const createdDate = req.created_at ? new Date(req.created_at).toLocaleDateString() : 'N/A';
-      const requestedDate = req.requested_date ? new Date(req.requested_date).toLocaleDateString() : 'N/A';
-      const statusBadge = req.status === 'Allocated' 
-        ? '<span class="w3-badge w3-green">Allocated</span>'
-        : '<span class="w3-badge w3-orange">Not Allocated</span>';
-      
-      const approveBtn = req.status === 'Not allocated'
-        ? `<button class="w3-button w3-small w3-green" onclick="approveRequest(${req.id})">Approve & Allocate</button>`
-        : '<span class="w3-text-gray">Already allocated</span>';
-      
-      return `
+
+    const data = {
+      school_name: schoolName,
+      school_province: document.getElementById('schoolProvince').value,
+      school_grade: document.getElementById('schoolGrade').value,
+      quantity: parseInt(document.getElementById('quantity').value) || 1,
+      notes: document.getElementById('notes').value.trim() || null,
+      requested_date: document.getElementById('requestedDate').value || null
+    };
+
+    try {
+      const response = await fetch('/api/book-allocation-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to submit request');
+      }
+
+      successDiv.textContent = 'Request submitted successfully!';
+      successDiv.style.display = 'block';
+
+      document.getElementById('requestAllocationForm').reset();
+      if (addNewSchool) {
+        document.getElementById('addNewSchoolCheck').checked = false;
+        toggleManualSchool();
+      }
+
+      setTimeout(() => {
+        document.getElementById('requestAllocationModal').style.display = 'none';
+      }, 1500);
+    } catch (error) {
+      errorDiv.textContent = error.message;
+      errorDiv.style.display = 'block';
+    }
+  }
+
+  async function loadRequests(status = '') {
+    const tbody = document.getElementById('requestsTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="9" class="w3-center w3-text-gray">Loading...</td></tr>';
+
+    try {
+      const url = status ? `/api/book-allocation-requests?status=${encodeURIComponent(status)}` : '/api/book-allocation-requests';
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load requests');
+      }
+
+      if (!data.requests || data.requests.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="w3-center w3-text-gray">No requests found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.requests.map(req => {
+        const createdDate = req.created_at ? new Date(req.created_at).toLocaleDateString() : 'N/A';
+        const requestedDate = req.requested_date ? new Date(req.requested_date).toLocaleDateString() : 'N/A';
+        const statusBadge = req.status === 'Allocated'
+          ? '<span class="w3-badge w3-green">Allocated</span>'
+          : '<span class="w3-badge w3-orange">Not Allocated</span>';
+
+        const approveBtn = req.status === 'Not allocated'
+          ? `<button class="w3-button w3-small w3-green" onclick="approveRequest(${req.id})">Approve & Allocate</button>`
+          : '<span class="w3-text-gray">Already allocated</span>';
+
+        return `
         <tr>
           <td>${req.requester_username}</td>
           <td>${req.school_name}</td>
@@ -973,249 +1334,249 @@ async function loadRequests(status = '') {
           <td>${approveBtn}</td>
         </tr>
       `;
-    }).join('');
-  } catch (error) {
-    tbody.innerHTML = `<tr><td colspan="9" class="w3-center w3-text-red">Error: ${error.message}</td></tr>`;
-  }
-}
-
-async function approveRequest(requestId) {
-  if (!confirm('Approve this request and create allocation?')) return;
-  
-  try {
-    const response = await fetch(`/api/book-allocation-requests/${requestId}/approve`, {
-      method: 'POST'
-    });
-    
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error || 'Failed to approve request');
+      }).join('');
+    } catch (error) {
+      tbody.innerHTML = `<tr><td colspan="9" class="w3-center w3-text-red">Error: ${error.message}</td></tr>`;
     }
-    
-    alert('Request approved and allocation created successfully!');
-    loadRequests();
-  } catch (error) {
-    alert('Error: ' + error.message);
   }
-}
 
-document.addEventListener('DOMContentLoaded', function() {
-  const openBtn = document.querySelector('[onclick*="requestAllocationModal"]');
-  if (openBtn) {
-    openBtn.addEventListener('click', function() {
-      setTimeout(() => {
-        const schoolSelect = document.getElementById('schoolSelect');
-        if (schoolSelect && (schoolSelect.options.length <= 1 || schoolSelect.options[0].text === 'Loading schools...')) {
-          loadSchoolsForRequest();
-        }
-      }, 100);
-    });
-  }
-});
+  async function approveRequest(requestId) {
+    if (!confirm('Approve this request and create allocation?')) return;
 
-// Institution Analytics Functions
-function openInstitutionAnalytics() {
-  document.getElementById('institutionAnalyticsModal').style.display = 'block';
-  loadInstitutionCountries();
-}
+    try {
+      const response = await fetch(`/api/book-allocation-requests/${requestId}/approve`, {
+        method: 'POST'
+      });
 
-async function loadInstitutionCountries() {
-  const countrySelect = document.getElementById('analyticsCountrySelect');
-  const provinceSelect = document.getElementById('analyticsProvinceSelect');
-  
-  try {
-    countrySelect.innerHTML = '<option value="">Loading...</option>';
-    const response = await fetch('/api/institution-countries');
-    const countries = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(countries.error || 'Failed to load countries');
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to approve request');
+      }
+
+      alert('Request approved and allocation created successfully!');
+      loadRequests();
+    } catch (error) {
+      alert('Error: ' + error.message);
     }
-    
-    countrySelect.innerHTML = '<option value="">Select Country</option>';
-    countries.forEach(country => {
-      countrySelect.innerHTML += `<option value="${country}">${country}</option>`;
-    });
-    
-    // Reset province dropdown
-    provinceSelect.innerHTML = '<option value="">Select Province</option>';
-    provinceSelect.disabled = true;
-    
-    // Clear previous results
-    document.getElementById('analyticsResults').style.display = 'none';
-    document.getElementById('analyticsNoResults').style.display = 'none';
-    document.getElementById('analyticsError').style.display = 'none';
-    document.getElementById('analyticsSearchContainer').style.display = 'none';
-    document.getElementById('analyticsTableSearch').value = '';
-    
-  } catch (error) {
-    console.error('Error loading countries:', error);
-    countrySelect.innerHTML = '<option value="">Error loading countries</option>';
   }
-}
 
-async function loadInstitutionProvinces(country) {
-  const provinceSelect = document.getElementById('analyticsProvinceSelect');
-  
-  if (!country) {
-    provinceSelect.innerHTML = '<option value="">Select Province</option>';
-    provinceSelect.disabled = true;
-    return;
-  }
-  
-  try {
-    provinceSelect.innerHTML = '<option value="">Loading...</option>';
-    provinceSelect.disabled = true;
-    
-    const response = await fetch(`/api/institution-provinces?country=${encodeURIComponent(country)}`);
-    const provinces = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(provinces.error || 'Failed to load provinces');
+  document.addEventListener('DOMContentLoaded', function () {
+    const openBtn = document.querySelector('[onclick*="requestAllocationModal"]');
+    if (openBtn) {
+      openBtn.addEventListener('click', function () {
+        setTimeout(() => {
+          const schoolSelect = document.getElementById('schoolSelect');
+          if (schoolSelect && (schoolSelect.options.length <= 1 || schoolSelect.options[0].text === 'Loading schools...')) {
+            loadSchoolsForRequest();
+          }
+        }, 100);
+      });
     }
-    
-    provinceSelect.innerHTML = '<option value="">Select Province</option>';
-    provinces.forEach(province => {
-      provinceSelect.innerHTML += `<option value="${province}">${province}</option>`;
-    });
-    
-    provinceSelect.disabled = false;
-    
-    // Clear previous results
-    document.getElementById('analyticsResults').style.display = 'none';
-    document.getElementById('analyticsNoResults').style.display = 'none';
-    document.getElementById('analyticsSearchContainer').style.display = 'none';
-    document.getElementById('analyticsTableSearch').value = '';
-    
-  } catch (error) {
-    console.error('Error loading provinces:', error);
-    provinceSelect.innerHTML = '<option value="">Error loading provinces</option>';
-    provinceSelect.disabled = true;
+  });
+
+  // Institution Analytics Functions
+  function openInstitutionAnalytics() {
+    document.getElementById('institutionAnalyticsModal').style.display = 'block';
+    loadInstitutionCountries();
   }
-}
 
-// Global variables for pagination
-let currentPage = 1;
-let totalPages = 1;
-let currentSearch = '';
-// Global variable to store institution analytics data for exports
-let institutionAnalyticsData = [];
+  async function loadInstitutionCountries() {
+    const countrySelect = document.getElementById('analyticsCountrySelect');
+    const provinceSelect = document.getElementById('analyticsProvinceSelect');
 
-// Debounce function for search
-let searchTimeout;
-function debounceSearch() {
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => {
-    currentSearch = document.getElementById('analyticsSearchInput').value.trim();
-    loadInstitutionAnalytics(1); // Reset to page 1 on search
-  }, 300);
-}
+    try {
+      countrySelect.innerHTML = '<option value="">Loading...</option>';
+      const response = await fetch('/api/institution-countries');
+      const countries = await response.json();
 
-// Change page function
-function changePage(direction) {
-  const newPage = currentPage + direction;
-  if (newPage >= 1 && newPage <= totalPages) {
-    loadInstitutionAnalytics(newPage);
-  }
-}
+      if (!response.ok) {
+        throw new Error(countries.error || 'Failed to load countries');
+      }
 
-async function loadInstitutionAnalytics(page = 1) {
-  const country = document.getElementById('analyticsCountrySelect').value;
-  const province = document.getElementById('analyticsProvinceSelect').value;
-  const search = document.getElementById('analyticsSearchInput').value.trim();
-  const loadingDiv = document.getElementById('analyticsLoading');
-  const errorDiv = document.getElementById('analyticsError');
-  const resultsDiv = document.getElementById('analyticsResults');
-  const noResultsDiv = document.getElementById('analyticsNoResults');
-  const tbody = document.getElementById('analyticsTableBody');
-  const paginationDiv = document.getElementById('analyticsPagination');
-  const paginationInfo = document.getElementById('analyticsPaginationInfo');
-  const exportExcelBtn = document.getElementById('exportExcelBtn');
-  const exportPDFBtn = document.getElementById('exportPDFBtn');
-  
-  // Validation
-  if (!country || !province) {
-    errorDiv.textContent = 'Please select both country and province';
-    errorDiv.style.display = 'block';
-    return;
-  }
-  
-  // Hide previous messages
-  errorDiv.style.display = 'none';
-  resultsDiv.style.display = 'none';
-  noResultsDiv.style.display = 'none';
-  paginationDiv.style.display = 'none';
-  exportExcelBtn.style.display = 'none';
-  exportPDFBtn.style.display = 'none';
-  document.getElementById('analyticsSearchContainer').style.display = 'none';
-  document.getElementById('analyticsTableSearch').value = '';
-  loadingDiv.style.display = 'block';
-  tbody.innerHTML = '';
-  currentPage = page;
-  
-  try {
-    // Build query parameters
-    const params = new URLSearchParams({
-      country: country,
-      province: province,
-      page: page,
-      per_page: 50
-    });
-    if (search) {
-      params.append('search', search);
+      countrySelect.innerHTML = '<option value="">Select Country</option>';
+      countries.forEach(country => {
+        countrySelect.innerHTML += `<option value="${country}">${country}</option>`;
+      });
+
+      // Reset province dropdown
+      provinceSelect.innerHTML = '<option value="">Select Province</option>';
+      provinceSelect.disabled = true;
+
+      // Clear previous results
+      document.getElementById('analyticsResults').style.display = 'none';
+      document.getElementById('analyticsNoResults').style.display = 'none';
+      document.getElementById('analyticsError').style.display = 'none';
+      document.getElementById('analyticsSearchContainer').style.display = 'none';
+      document.getElementById('analyticsTableSearch').value = '';
+
+    } catch (error) {
+      console.error('Error loading countries:', error);
+      countrySelect.innerHTML = '<option value="">Error loading countries</option>';
     }
-    
-    const response = await fetch(`/api/institution-analytics?${params.toString()}`);
-    const data = await response.json();
-    
-    loadingDiv.style.display = 'none';
-    
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to load institution analytics');
-    }
-    
-    // Handle new response format with pagination
-    const results = data.results || [];
-    const pagination = data.pagination || {};
-    
-    if (!results || results.length === 0) {
-      noResultsDiv.style.display = 'block';
-      institutionAnalyticsData = []; // Clear data if no results
+  }
+
+  async function loadInstitutionProvinces(country) {
+    const provinceSelect = document.getElementById('analyticsProvinceSelect');
+
+    if (!country) {
+      provinceSelect.innerHTML = '<option value="">Select Province</option>';
+      provinceSelect.disabled = true;
       return;
     }
-    
-    // Store results globally for export functions
-    institutionAnalyticsData = results;
-    
-    // Update pagination info
-    totalPages = pagination.total_pages || 1;
-    currentPage = pagination.current_page || 1;
-    
-    paginationInfo.textContent = `Showing ${((currentPage - 1) * pagination.per_page) + 1} to ${Math.min(currentPage * pagination.per_page, pagination.total_count)} of ${pagination.total_count} institutions`;
-    
-    // Build table rows
-    tbody.innerHTML = results.map((inst, index) => {
-      const rowId = `inst-row-${index}`;
-      
-      // Handle both old format (array of strings) and new format (array of objects)
-      const normalizeSG = (sg) => {
-        if (typeof sg === 'string') {
-          return { name: sg, user_count: 0 };
-        }
-        return { name: sg.name || sg, user_count: sg.user_count || 0 };
-      };
-      
-      const allSGs = (inst.all_subject_groups || []).map(normalizeSG);
-      const sgsWithBooks = (inst.subject_groups_with_books || []).map(normalizeSG);
-      
-      // Create a map for quick lookup
-      const sgsWithBooksMap = new Map(sgsWithBooks.map(sg => [sg.name, sg]));
-      
-      // Find subject groups without books
-      const sgsWithoutBooks = allSGs.filter(sg => !sgsWithBooksMap.has(sg.name));
-      
-      return `
+
+    try {
+      provinceSelect.innerHTML = '<option value="">Loading...</option>';
+      provinceSelect.disabled = true;
+
+      const response = await fetch(`/api/institution-provinces?country=${encodeURIComponent(country)}`);
+      const provinces = await response.json();
+
+      if (!response.ok) {
+        throw new Error(provinces.error || 'Failed to load provinces');
+      }
+
+      provinceSelect.innerHTML = '<option value="">Select Province</option>';
+      provinces.forEach(province => {
+        provinceSelect.innerHTML += `<option value="${province}">${province}</option>`;
+      });
+
+      provinceSelect.disabled = false;
+
+      // Clear previous results
+      document.getElementById('analyticsResults').style.display = 'none';
+      document.getElementById('analyticsNoResults').style.display = 'none';
+      document.getElementById('analyticsSearchContainer').style.display = 'none';
+      document.getElementById('analyticsTableSearch').value = '';
+
+    } catch (error) {
+      console.error('Error loading provinces:', error);
+      provinceSelect.innerHTML = '<option value="">Error loading provinces</option>';
+      provinceSelect.disabled = true;
+    }
+  }
+
+  // Global variables for pagination
+  let currentPage = 1;
+  let totalPages = 1;
+  let currentSearch = '';
+  // Global variable to store institution analytics data for exports
+  let institutionAnalyticsData = [];
+
+  // Debounce function for search
+  let searchTimeout;
+  function debounceSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      currentSearch = document.getElementById('analyticsSearchInput').value.trim();
+      loadInstitutionAnalytics(1); // Reset to page 1 on search
+    }, 300);
+  }
+
+  // Change page function
+  function changePage(direction) {
+    const newPage = currentPage + direction;
+    if (newPage >= 1 && newPage <= totalPages) {
+      loadInstitutionAnalytics(newPage);
+    }
+  }
+
+  async function loadInstitutionAnalytics(page = 1) {
+    const country = document.getElementById('analyticsCountrySelect').value;
+    const province = document.getElementById('analyticsProvinceSelect').value;
+    const search = document.getElementById('analyticsSearchInput').value.trim();
+    const loadingDiv = document.getElementById('analyticsLoading');
+    const errorDiv = document.getElementById('analyticsError');
+    const resultsDiv = document.getElementById('analyticsResults');
+    const noResultsDiv = document.getElementById('analyticsNoResults');
+    const tbody = document.getElementById('analyticsTableBody');
+    const paginationDiv = document.getElementById('analyticsPagination');
+    const paginationInfo = document.getElementById('analyticsPaginationInfo');
+    const exportExcelBtn = document.getElementById('exportExcelBtn');
+    const exportPDFBtn = document.getElementById('exportPDFBtn');
+
+    // Validation
+    if (!country || !province) {
+      errorDiv.textContent = 'Please select both country and province';
+      errorDiv.style.display = 'block';
+      return;
+    }
+
+    // Hide previous messages
+    errorDiv.style.display = 'none';
+    resultsDiv.style.display = 'none';
+    noResultsDiv.style.display = 'none';
+    paginationDiv.style.display = 'none';
+    exportExcelBtn.style.display = 'none';
+    exportPDFBtn.style.display = 'none';
+    document.getElementById('analyticsSearchContainer').style.display = 'none';
+    document.getElementById('analyticsTableSearch').value = '';
+    loadingDiv.style.display = 'block';
+    tbody.innerHTML = '';
+    currentPage = page;
+
+    try {
+      // Build query parameters
+      const params = new URLSearchParams({
+        country: country,
+        province: province,
+        page: page,
+        per_page: 50
+      });
+      if (search) {
+        params.append('search', search);
+      }
+
+      const response = await fetch(`/api/institution-analytics?${params.toString()}`);
+      const data = await response.json();
+
+      loadingDiv.style.display = 'none';
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load institution analytics');
+      }
+
+      // Handle new response format with pagination
+      const results = data.results || [];
+      const pagination = data.pagination || {};
+
+      if (!results || results.length === 0) {
+        noResultsDiv.style.display = 'block';
+        institutionAnalyticsData = []; // Clear data if no results
+        return;
+      }
+
+      // Store results globally for export functions
+      institutionAnalyticsData = results;
+
+      // Update pagination info
+      totalPages = pagination.total_pages || 1;
+      currentPage = pagination.current_page || 1;
+
+      paginationInfo.textContent = `Showing ${((currentPage - 1) * pagination.per_page) + 1} to ${Math.min(currentPage * pagination.per_page, pagination.total_count)} of ${pagination.total_count} institutions`;
+
+      // Build table rows
+      tbody.innerHTML = results.map((inst, index) => {
+        const rowId = `inst-row-${index}`;
+
+        // Handle both old format (array of strings) and new format (array of objects)
+        const normalizeSG = (sg) => {
+          if (typeof sg === 'string') {
+            return { name: sg, user_count: 0 };
+          }
+          return { name: sg.name || sg, user_count: sg.user_count || 0 };
+        };
+
+        const allSGs = (inst.all_subject_groups || []).map(normalizeSG);
+        const sgsWithBooks = (inst.subject_groups_with_books || []).map(normalizeSG);
+
+        // Create a map for quick lookup
+        const sgsWithBooksMap = new Map(sgsWithBooks.map(sg => [sg.name, sg]));
+
+        // Find subject groups without books
+        const sgsWithoutBooks = allSGs.filter(sg => !sgsWithBooksMap.has(sg.name));
+
+        return `
         <tr>
           <td><b>${inst.institution_name || 'N/A'}</b></td>
           <td>${inst.institution_level || 'N/A'}</td>
@@ -1231,18 +1592,18 @@ async function loadInstitutionAnalytics(page = 1) {
             <div style="margin:12px 0;">
               <h6 style="margin:8px 0 4px 0; color:#065f46;"><b>All Subject Groups (${allSGs.length})</b></h6>
               <div style="margin-bottom:12px;">
-                ${allSGs.length > 0 
-                  ? allSGs.map(sg => `<span class="w3-tag w3-small" style="margin:2px; background:#86efac; color:#065f46;">${sg.name} (${sg.user_count || 0} users)</span>`).join('')
-                  : '<span class="w3-text-gray">No subject groups</span>'
-                }
+                ${allSGs.length > 0
+            ? allSGs.map(sg => `<span class="w3-tag w3-small" style="margin:2px; background:#86efac; color:#065f46;">${sg.name} (${sg.user_count || 0} users)</span>`).join('')
+            : '<span class="w3-text-gray">No subject groups</span>'
+          }
               </div>
               
               <h6 style="margin:8px 0 4px 0; color:#065f46;"><b>Subject Groups with Books (${sgsWithBooks.length})</b></h6>
               <div style="margin-bottom:12px;">
-                ${sgsWithBooks.length > 0 
-                  ? sgsWithBooks.map(sg => `<span class="w3-tag w3-small" style="margin:2px; background:#10b981; color:white;">${sg.name} (${sg.user_count || 0} users)</span>`).join('')
-                  : '<span class="w3-text-gray">No subject groups with books</span>'
-                }
+                ${sgsWithBooks.length > 0
+            ? sgsWithBooks.map(sg => `<span class="w3-tag w3-small" style="margin:2px; background:#10b981; color:white;">${sg.name} (${sg.user_count || 0} users)</span>`).join('')
+            : '<span class="w3-text-gray">No subject groups with books</span>'
+          }
               </div>
               
               ${sgsWithoutBooks.length > 0 ? `
@@ -1255,391 +1616,391 @@ async function loadInstitutionAnalytics(page = 1) {
           </td>
         </tr>
       `;
-    }).join('');
-    
-    resultsDiv.style.display = 'block';
-    exportExcelBtn.style.display = 'inline-block';
-    exportPDFBtn.style.display = 'inline-block';
-    
-    // Show pagination if more than one page
-    if (totalPages > 1) {
-      paginationDiv.style.display = 'block';
-      updatePaginationControls();
-    }
-    
-  } catch (error) {
-    loadingDiv.style.display = 'none';
-    errorDiv.textContent = error.message;
-    errorDiv.style.display = 'block';
-    console.error('Error loading institution analytics:', error);
-  }
-}
+      }).join('');
 
-function updatePaginationControls() {
-  const prevBtn = document.getElementById('prevPageBtn');
-  const nextBtn = document.getElementById('nextPageBtn');
-  const pageNumbers = document.getElementById('pageNumbers');
-  
-  // Enable/disable buttons
-  prevBtn.disabled = currentPage === 1;
-  nextBtn.disabled = currentPage === totalPages;
-  
-  // Show page numbers (show current and adjacent pages)
-  let pageNumbersHtml = '';
-  const maxPagesToShow = 5;
-  let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
-  let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
-  
-  if (endPage - startPage < maxPagesToShow - 1) {
-    startPage = Math.max(1, endPage - maxPagesToShow + 1);
-  }
-  
-  if (startPage > 1) {
-    pageNumbersHtml += `<span onclick="loadInstitutionAnalytics(1)" style="cursor:pointer; padding:4px 8px; margin:0 2px; border-radius:4px;">1</span>`;
-    if (startPage > 2) {
-      pageNumbersHtml += `<span style="padding:4px;">...</span>`;
+      resultsDiv.style.display = 'block';
+      exportExcelBtn.style.display = 'inline-block';
+      exportPDFBtn.style.display = 'inline-block';
+
+      // Show pagination if more than one page
+      if (totalPages > 1) {
+        paginationDiv.style.display = 'block';
+        updatePaginationControls();
+      }
+
+    } catch (error) {
+      loadingDiv.style.display = 'none';
+      errorDiv.textContent = error.message;
+      errorDiv.style.display = 'block';
+      console.error('Error loading institution analytics:', error);
     }
   }
-  
-  for (let i = startPage; i <= endPage; i++) {
-    if (i === currentPage) {
-      pageNumbersHtml += `<span style="background:#10b981; color:white; padding:4px 8px; margin:0 2px; border-radius:4px; font-weight:bold;">${i}</span>`;
+
+  function updatePaginationControls() {
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+    const pageNumbers = document.getElementById('pageNumbers');
+
+    // Enable/disable buttons
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = currentPage === totalPages;
+
+    // Show page numbers (show current and adjacent pages)
+    let pageNumbersHtml = '';
+    const maxPagesToShow = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+    if (endPage - startPage < maxPagesToShow - 1) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    if (startPage > 1) {
+      pageNumbersHtml += `<span onclick="loadInstitutionAnalytics(1)" style="cursor:pointer; padding:4px 8px; margin:0 2px; border-radius:4px;">1</span>`;
+      if (startPage > 2) {
+        pageNumbersHtml += `<span style="padding:4px;">...</span>`;
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      if (i === currentPage) {
+        pageNumbersHtml += `<span style="background:#10b981; color:white; padding:4px 8px; margin:0 2px; border-radius:4px; font-weight:bold;">${i}</span>`;
+      } else {
+        pageNumbersHtml += `<span onclick="loadInstitutionAnalytics(${i})" style="cursor:pointer; padding:4px 8px; margin:0 2px; border-radius:4px; background:#f0fdf4; color:#047857;">${i}</span>`;
+      }
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbersHtml += `<span style="padding:4px;">...</span>`;
+      }
+      pageNumbersHtml += `<span onclick="loadInstitutionAnalytics(${totalPages})" style="cursor:pointer; padding:4px 8px; margin:0 2px; border-radius:4px;">${totalPages}</span>`;
+    }
+
+    pageNumbers.innerHTML = pageNumbersHtml;
+  }
+
+  function toggleInstitutionDetails(rowId) {
+    const detailRow = document.getElementById(rowId);
+    const icon = document.getElementById(`icon-${rowId}`);
+
+    if (detailRow.style.display === 'none') {
+      detailRow.style.display = '';
+      icon.className = 'fa fa-chevron-up';
     } else {
-      pageNumbersHtml += `<span onclick="loadInstitutionAnalytics(${i})" style="cursor:pointer; padding:4px 8px; margin:0 2px; border-radius:4px; background:#f0fdf4; color:#047857;">${i}</span>`;
+      detailRow.style.display = 'none';
+      icon.className = 'fa fa-chevron-down';
     }
   }
-  
-  if (endPage < totalPages) {
-    if (endPage < totalPages - 1) {
-      pageNumbersHtml += `<span style="padding:4px;">...</span>`;
-    }
-    pageNumbersHtml += `<span onclick="loadInstitutionAnalytics(${totalPages})" style="cursor:pointer; padding:4px 8px; margin:0 2px; border-radius:4px;">${totalPages}</span>`;
-  }
-  
-  pageNumbers.innerHTML = pageNumbersHtml;
-}
 
-function toggleInstitutionDetails(rowId) {
-  const detailRow = document.getElementById(rowId);
-  const icon = document.getElementById(`icon-${rowId}`);
-  
-  if (detailRow.style.display === 'none') {
-    detailRow.style.display = '';
-    icon.className = 'fa fa-chevron-up';
-  } else {
-    detailRow.style.display = 'none';
-    icon.className = 'fa fa-chevron-down';
-  }
-}
+  // Helper function to format subject groups for export
+  function formatSubjectGroupsForExport(subjectGroups) {
+    if (!subjectGroups || subjectGroups.length === 0) {
+      return '';
+    }
 
-// Helper function to format subject groups for export
-function formatSubjectGroupsForExport(subjectGroups) {
-  if (!subjectGroups || subjectGroups.length === 0) {
-    return '';
-  }
-  
-  const normalizeSG = (sg) => {
-    if (typeof sg === 'string') {
-      return { name: sg, user_count: 0 };
-    }
-    return { name: sg.name || sg, user_count: sg.user_count || 0 };
-  };
-  
-  return subjectGroups.map(normalizeSG)
-    .map(sg => `${sg.name} (${sg.user_count || 0} users)`)
-    .join(', ');
-}
+    const normalizeSG = (sg) => {
+      if (typeof sg === 'string') {
+        return { name: sg, user_count: 0 };
+      }
+      return { name: sg.name || sg, user_count: sg.user_count || 0 };
+    };
 
-// Export to Excel function
-function exportInstitutionAnalyticsToExcel() {
-  try {
-    if (typeof XLSX === 'undefined') {
-      alert('XLSX library not loaded. Please refresh the page.');
-      return;
-    }
-    
-    if (!institutionAnalyticsData || institutionAnalyticsData.length === 0) {
-      alert('No data to export. Please load institution analytics first.');
-      return;
-    }
-    
-    const wb = XLSX.utils.book_new();
-    
-    // Build headers with subject groups columns
-    const headers = [
-      'Institution Name',
-      'Level',
-      'User Count',
-      'All Subject Groups',
-      'Subject Groups with Books',
-      'Subject Groups without Books'
-    ];
-    
-    const ws_data = [headers];
-    
-    // Process each institution
-    institutionAnalyticsData.forEach(inst => {
-      // Normalize subject groups
-      const normalizeSG = (sg) => {
-        if (typeof sg === 'string') {
-          return { name: sg, user_count: 0 };
-        }
-        return { name: sg.name || sg, user_count: sg.user_count || 0 };
-      };
-      
-      const allSGs = (inst.all_subject_groups || []).map(normalizeSG);
-      const sgsWithBooks = (inst.subject_groups_with_books || []).map(normalizeSG);
-      
-      // Create a map for quick lookup
-      const sgsWithBooksMap = new Map(sgsWithBooks.map(sg => [sg.name, sg]));
-      
-      // Find subject groups without books
-      const sgsWithoutBooks = allSGs.filter(sg => !sgsWithBooksMap.has(sg.name));
-      
-      // Format subject groups
-      const allSGsFormatted = formatSubjectGroupsForExport(allSGs);
-      const sgsWithBooksFormatted = formatSubjectGroupsForExport(sgsWithBooks);
-      const sgsWithoutBooksFormatted = formatSubjectGroupsForExport(sgsWithoutBooks);
-      
-      // Build row data
-      const rowData = [
-        inst.institution_name || 'N/A',
-        inst.institution_level || 'N/A',
-        inst.user_count || 0,
-        allSGsFormatted,
-        sgsWithBooksFormatted,
-        sgsWithoutBooksFormatted
+    return subjectGroups.map(normalizeSG)
+      .map(sg => `${sg.name} (${sg.user_count || 0} users)`)
+      .join(', ');
+  }
+
+  // Export to Excel function
+  function exportInstitutionAnalyticsToExcel() {
+    try {
+      if (typeof XLSX === 'undefined') {
+        alert('XLSX library not loaded. Please refresh the page.');
+        return;
+      }
+
+      if (!institutionAnalyticsData || institutionAnalyticsData.length === 0) {
+        alert('No data to export. Please load institution analytics first.');
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+
+      // Build headers with subject groups columns
+      const headers = [
+        'Institution Name',
+        'Level',
+        'User Count',
+        'All Subject Groups',
+        'Subject Groups with Books',
+        'Subject Groups without Books'
       ];
-      
-      ws_data.push(rowData);
-    });
-    
-    const ws = XLSX.utils.aoa_to_sheet(ws_data);
-    
-    // Set column widths
-    const colWidths = [
-      { wch: 40 }, // Institution Name
-      { wch: 15 }, // Level
-      { wch: 12 }, // User Count
-      { wch: 50 }, // All Subject Groups
-      { wch: 50 }, // Subject Groups with Books
-      { wch: 50 }  // Subject Groups without Books
-    ];
-    ws['!cols'] = colWidths;
-    
-    // Enable text wrapping for subject groups columns (columns D, E, F)
-    const range = XLSX.utils.decode_range(ws['!ref']);
-    for (let row = 1; row <= range.e.r; row++) {
-      for (let col = 3; col <= 5; col++) { // Columns D, E, F (0-indexed: 3, 4, 5)
-        const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-        if (!ws[cellAddress]) continue;
-        ws[cellAddress].s = {
-          alignment: { wrapText: true, vertical: 'top' }
+
+      const ws_data = [headers];
+
+      // Process each institution
+      institutionAnalyticsData.forEach(inst => {
+        // Normalize subject groups
+        const normalizeSG = (sg) => {
+          if (typeof sg === 'string') {
+            return { name: sg, user_count: 0 };
+          }
+          return { name: sg.name || sg, user_count: sg.user_count || 0 };
         };
-      }
-    }
-    
-    XLSX.utils.book_append_sheet(wb, ws, 'Institution Analytics');
-    
-    // Generate filename with timestamp
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const filename = `institution_analytics_${timestamp}.xlsx`;
-    
-    XLSX.writeFile(wb, filename);
-  } catch (error) {
-    console.error('Error exporting to Excel:', error);
-    alert('Failed to export to Excel. Please try again.');
-  }
-}
 
-// Export to PDF function
-function exportInstitutionAnalyticsToPDF() {
-  try {
-    if (typeof window.jspdf === 'undefined') {
-      alert('jsPDF library not loaded. Please refresh the page.');
-      return;
-    }
-    
-    if (!institutionAnalyticsData || institutionAnalyticsData.length === 0) {
-      alert('No data to export. Please load institution analytics first.');
-      return;
-    }
-    
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('landscape', 'pt', 'a4');
-    
-    // Get filter info
-    const country = document.getElementById('analyticsCountrySelect').value;
-    const province = document.getElementById('analyticsProvinceSelect').value;
-    const search = document.getElementById('analyticsSearchInput').value.trim();
-    
-    // Add title
-    doc.setFontSize(16);
-    doc.setTextColor(6, 95, 70); // #065f46
-    doc.text('Institution Analytics Report', 40, 30);
-    
-    // Add filter info
-    doc.setFontSize(10);
-    doc.setTextColor(4, 120, 87); // #047857
-    let yPos = 50;
-    doc.text(`Country: ${country || 'All'}`, 40, yPos);
-    doc.text(`Province: ${province || 'All'}`, 200, yPos);
-    if (search) {
-      doc.text(`Search: ${search}`, 360, yPos);
-    }
-    
-    // Build headers
-    const headers = [
-      'Institution Name',
-      'Level',
-      'User Count',
-      'All Subject Groups',
-      'Subject Groups with Books',
-      'Subject Groups without Books'
-    ];
-    
-    // Build rows from institutionAnalyticsData
-    const rows = [];
-    
-    institutionAnalyticsData.forEach(inst => {
-      // Normalize subject groups
-      const normalizeSG = (sg) => {
-        if (typeof sg === 'string') {
-          return { name: sg, user_count: 0 };
-        }
-        return { name: sg.name || sg, user_count: sg.user_count || 0 };
-      };
-      
-      const allSGs = (inst.all_subject_groups || []).map(normalizeSG);
-      const sgsWithBooks = (inst.subject_groups_with_books || []).map(normalizeSG);
-      
-      // Create a map for quick lookup
-      const sgsWithBooksMap = new Map(sgsWithBooks.map(sg => [sg.name, sg]));
-      
-      // Find subject groups without books
-      const sgsWithoutBooks = allSGs.filter(sg => !sgsWithBooksMap.has(sg.name));
-      
-      // Format subject groups
-      const allSGsFormatted = formatSubjectGroupsForExport(allSGs);
-      const sgsWithBooksFormatted = formatSubjectGroupsForExport(sgsWithBooks);
-      const sgsWithoutBooksFormatted = formatSubjectGroupsForExport(sgsWithoutBooks);
-      
-      // Build row data
-      const rowData = [
-        inst.institution_name || 'N/A',
-        inst.institution_level || 'N/A',
-        inst.user_count || 0,
-        allSGsFormatted || 'None',
-        sgsWithBooksFormatted || 'None',
-        sgsWithoutBooksFormatted || 'None'
+        const allSGs = (inst.all_subject_groups || []).map(normalizeSG);
+        const sgsWithBooks = (inst.subject_groups_with_books || []).map(normalizeSG);
+
+        // Create a map for quick lookup
+        const sgsWithBooksMap = new Map(sgsWithBooks.map(sg => [sg.name, sg]));
+
+        // Find subject groups without books
+        const sgsWithoutBooks = allSGs.filter(sg => !sgsWithBooksMap.has(sg.name));
+
+        // Format subject groups
+        const allSGsFormatted = formatSubjectGroupsForExport(allSGs);
+        const sgsWithBooksFormatted = formatSubjectGroupsForExport(sgsWithBooks);
+        const sgsWithoutBooksFormatted = formatSubjectGroupsForExport(sgsWithoutBooks);
+
+        // Build row data
+        const rowData = [
+          inst.institution_name || 'N/A',
+          inst.institution_level || 'N/A',
+          inst.user_count || 0,
+          allSGsFormatted,
+          sgsWithBooksFormatted,
+          sgsWithoutBooksFormatted
+        ];
+
+        ws_data.push(rowData);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(ws_data);
+
+      // Set column widths
+      const colWidths = [
+        { wch: 40 }, // Institution Name
+        { wch: 15 }, // Level
+        { wch: 12 }, // User Count
+        { wch: 50 }, // All Subject Groups
+        { wch: 50 }, // Subject Groups with Books
+        { wch: 50 }  // Subject Groups without Books
       ];
-      
-      rows.push(rowData);
-    });
-    
-    // Add table using autoTable
-    doc.autoTable({
-      head: [headers],
-      body: rows,
-      startY: yPos + 20,
-      styles: {
-        fontSize: 7,
-        cellPadding: 2,
-        overflow: 'linebreak',
-        cellWidth: 'wrap'
-      },
-      headStyles: {
-        fillColor: [16, 185, 129], // #10b981
-        textColor: 255,
-        fontStyle: 'bold',
-        fontSize: 8
-      },
-      alternateRowStyles: {
-        fillColor: [240, 253, 244] // #f0fdf4
-      },
-      columnStyles: {
-        0: { cellWidth: 100 }, // Institution Name
-        1: { cellWidth: 50 },  // Level
-        2: { cellWidth: 50 },  // User Count
-        3: { cellWidth: 120, cellPadding: 2 }, // All Subject Groups
-        4: { cellWidth: 120, cellPadding: 2 }, // Subject Groups with Books
-        5: { cellWidth: 120, cellPadding: 2 }  // Subject Groups without Books
-      },
-      margin: { top: yPos + 20, left: 40, right: 40 },
-      tableWidth: 'auto'
-    });
-    
-    // Generate filename with timestamp
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const filename = `institution_analytics_${timestamp}.pdf`;
-    
-    doc.save(filename);
-  } catch (error) {
-    console.error('Error exporting to PDF:', error);
-    alert('Failed to export to PDF. Please try again.');
-  }
-}
+      ws['!cols'] = colWidths;
 
-function filterAnalyticsTable() {
-  const input = document.getElementById('analyticsTableSearch');
-  const filter = input.value.toLowerCase();
-  const table = document.getElementById('analyticsTableBody');
-  const rows = table.getElementsByTagName('tr');
-  
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    // Skip detail rows (they will be shown/hidden with their parent)
-    if (row.id && row.id.startsWith('inst-row-')) {
-      continue;
-    }
-    
-    const cells = row.getElementsByTagName('td');
-    let found = false;
-    
-    // Search in institution name, level, and user count
-    for (let j = 0; j < Math.min(3, cells.length); j++) {
-      const cellText = cells[j].textContent || cells[j].innerText;
-      if (cellText.toLowerCase().indexOf(filter) > -1) {
-        found = true;
-        break;
-      }
-    }
-    
-    // Show/hide the row and its associated detail row
-    if (found) {
-      row.style.display = '';
-      // Also show the detail row if it exists and was previously visible
-      const detailRowId = row.querySelector('button')?.getAttribute('onclick')?.match(/inst-row-\d+/)?.[0];
-      if (detailRowId) {
-        const detailRow = document.getElementById(detailRowId);
-        if (detailRow && detailRow.style.display !== 'none') {
-          detailRow.style.display = '';
+      // Enable text wrapping for subject groups columns (columns D, E, F)
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let row = 1; row <= range.e.r; row++) {
+        for (let col = 3; col <= 5; col++) { // Columns D, E, F (0-indexed: 3, 4, 5)
+          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+          if (!ws[cellAddress]) continue;
+          ws[cellAddress].s = {
+            alignment: { wrapText: true, vertical: 'top' }
+          };
         }
       }
-    } else {
-      row.style.display = 'none';
-      // Hide associated detail row
-      const button = row.querySelector('button[onclick*="toggleInstitutionDetails"]');
-      if (button) {
-        const onclickAttr = button.getAttribute('onclick');
-        const match = onclickAttr.match(/inst-row-\d+/);
-        if (match) {
-          const detailRow = document.getElementById(match[0]);
-          if (detailRow) {
-            detailRow.style.display = 'none';
-            // Reset icon
-            const icon = document.getElementById(`icon-${match[0]}`);
-            if (icon) {
-              icon.className = 'fa fa-chevron-down';
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Institution Analytics');
+
+      // Generate filename with timestamp
+      const now = new Date();
+      const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `institution_analytics_${timestamp}.xlsx`;
+
+      XLSX.writeFile(wb, filename);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      alert('Failed to export to Excel. Please try again.');
+    }
+  }
+
+  // Export to PDF function
+  function exportInstitutionAnalyticsToPDF() {
+    try {
+      if (typeof window.jspdf === 'undefined') {
+        alert('jsPDF library not loaded. Please refresh the page.');
+        return;
+      }
+
+      if (!institutionAnalyticsData || institutionAnalyticsData.length === 0) {
+        alert('No data to export. Please load institution analytics first.');
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('landscape', 'pt', 'a4');
+
+      // Get filter info
+      const country = document.getElementById('analyticsCountrySelect').value;
+      const province = document.getElementById('analyticsProvinceSelect').value;
+      const search = document.getElementById('analyticsSearchInput').value.trim();
+
+      // Add title
+      doc.setFontSize(16);
+      doc.setTextColor(6, 95, 70); // #065f46
+      doc.text('Institution Analytics Report', 40, 30);
+
+      // Add filter info
+      doc.setFontSize(10);
+      doc.setTextColor(4, 120, 87); // #047857
+      let yPos = 50;
+      doc.text(`Country: ${country || 'All'}`, 40, yPos);
+      doc.text(`Province: ${province || 'All'}`, 200, yPos);
+      if (search) {
+        doc.text(`Search: ${search}`, 360, yPos);
+      }
+
+      // Build headers
+      const headers = [
+        'Institution Name',
+        'Level',
+        'User Count',
+        'All Subject Groups',
+        'Subject Groups with Books',
+        'Subject Groups without Books'
+      ];
+
+      // Build rows from institutionAnalyticsData
+      const rows = [];
+
+      institutionAnalyticsData.forEach(inst => {
+        // Normalize subject groups
+        const normalizeSG = (sg) => {
+          if (typeof sg === 'string') {
+            return { name: sg, user_count: 0 };
+          }
+          return { name: sg.name || sg, user_count: sg.user_count || 0 };
+        };
+
+        const allSGs = (inst.all_subject_groups || []).map(normalizeSG);
+        const sgsWithBooks = (inst.subject_groups_with_books || []).map(normalizeSG);
+
+        // Create a map for quick lookup
+        const sgsWithBooksMap = new Map(sgsWithBooks.map(sg => [sg.name, sg]));
+
+        // Find subject groups without books
+        const sgsWithoutBooks = allSGs.filter(sg => !sgsWithBooksMap.has(sg.name));
+
+        // Format subject groups
+        const allSGsFormatted = formatSubjectGroupsForExport(allSGs);
+        const sgsWithBooksFormatted = formatSubjectGroupsForExport(sgsWithBooks);
+        const sgsWithoutBooksFormatted = formatSubjectGroupsForExport(sgsWithoutBooks);
+
+        // Build row data
+        const rowData = [
+          inst.institution_name || 'N/A',
+          inst.institution_level || 'N/A',
+          inst.user_count || 0,
+          allSGsFormatted || 'None',
+          sgsWithBooksFormatted || 'None',
+          sgsWithoutBooksFormatted || 'None'
+        ];
+
+        rows.push(rowData);
+      });
+
+      // Add table using autoTable
+      doc.autoTable({
+        head: [headers],
+        body: rows,
+        startY: yPos + 20,
+        styles: {
+          fontSize: 7,
+          cellPadding: 2,
+          overflow: 'linebreak',
+          cellWidth: 'wrap'
+        },
+        headStyles: {
+          fillColor: [16, 185, 129], // #10b981
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 8
+        },
+        alternateRowStyles: {
+          fillColor: [240, 253, 244] // #f0fdf4
+        },
+        columnStyles: {
+          0: { cellWidth: 100 }, // Institution Name
+          1: { cellWidth: 50 },  // Level
+          2: { cellWidth: 50 },  // User Count
+          3: { cellWidth: 120, cellPadding: 2 }, // All Subject Groups
+          4: { cellWidth: 120, cellPadding: 2 }, // Subject Groups with Books
+          5: { cellWidth: 120, cellPadding: 2 }  // Subject Groups without Books
+        },
+        margin: { top: yPos + 20, left: 40, right: 40 },
+        tableWidth: 'auto'
+      });
+
+      // Generate filename with timestamp
+      const now = new Date();
+      const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `institution_analytics_${timestamp}.pdf`;
+
+      doc.save(filename);
+    } catch (error) {
+      console.error('Error exporting to PDF:', error);
+      alert('Failed to export to PDF. Please try again.');
+    }
+  }
+
+  function filterAnalyticsTable() {
+    const input = document.getElementById('analyticsTableSearch');
+    const filter = input.value.toLowerCase();
+    const table = document.getElementById('analyticsTableBody');
+    const rows = table.getElementsByTagName('tr');
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      // Skip detail rows (they will be shown/hidden with their parent)
+      if (row.id && row.id.startsWith('inst-row-')) {
+        continue;
+      }
+
+      const cells = row.getElementsByTagName('td');
+      let found = false;
+
+      // Search in institution name, level, and user count
+      for (let j = 0; j < Math.min(3, cells.length); j++) {
+        const cellText = cells[j].textContent || cells[j].innerText;
+        if (cellText.toLowerCase().indexOf(filter) > -1) {
+          found = true;
+          break;
+        }
+      }
+
+      // Show/hide the row and its associated detail row
+      if (found) {
+        row.style.display = '';
+        // Also show the detail row if it exists and was previously visible
+        const detailRowId = row.querySelector('button')?.getAttribute('onclick')?.match(/inst-row-\d+/)?.[0];
+        if (detailRowId) {
+          const detailRow = document.getElementById(detailRowId);
+          if (detailRow && detailRow.style.display !== 'none') {
+            detailRow.style.display = '';
+          }
+        }
+      } else {
+        row.style.display = 'none';
+        // Hide associated detail row
+        const button = row.querySelector('button[onclick*="toggleInstitutionDetails"]');
+        if (button) {
+          const onclickAttr = button.getAttribute('onclick');
+          const match = onclickAttr.match(/inst-row-\d+/);
+          if (match) {
+            const detailRow = document.getElementById(match[0]);
+            if (detailRow) {
+              detailRow.style.display = 'none';
+              // Reset icon
+              const icon = document.getElementById(`icon-${match[0]}`);
+              if (icon) {
+                icon.className = 'fa fa-chevron-down';
+              }
             }
           }
         }
       }
     }
   }
-}
 </script>
 
 {% endblock %}

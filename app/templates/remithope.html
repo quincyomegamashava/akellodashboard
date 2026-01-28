@@ -1,0 +1,653 @@
+{% extends "base.html" %}
+
+{% block head_extra %}
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+
+  <style>
+    /* Universal box-sizing to prevent overflow */
+    * {
+      box-sizing: border-box;
+    }
+    
+    :root {
+      --ak-primary: #00407d;
+      --ak-accent: #0ea5e9;
+      --ak-muted: #6b7280;
+      --ak-bg: #f8fafc;
+    }
+    
+    .page-header {
+      background: linear-gradient(135deg, var(--ak-primary), #2563eb);
+      color: #fff;
+      border-radius: 14px;
+      box-shadow: 0 10px 24px rgba(0,0,0,.08);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .page-header h1 {
+      font-weight: 800;
+      letter-spacing: .3px;
+      margin: 0;
+    }
+    
+    .refresh-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s ease;
+    }
+    
+    .refresh-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      color: #fff;
+    }
+    
+    .search-section {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.06);
+      border: 1px solid #e5e7eb;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-sizing: border-box;
+    }
+    
+    .search-section label {
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+      display: block;
+    }
+    
+    .search-section .search-input-wrapper {
+      position: relative;
+    }
+    
+    .search-section .search-input-wrapper i {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--ak-muted);
+      font-size: 14px;
+    }
+    
+    .search-section input {
+      width: 100%;
+      padding: 10px 14px 10px 40px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+      color: #111827;
+      transition: border-color 0.2s ease;
+    }
+    
+    .search-section input:focus {
+      outline: none;
+      border-color: var(--ak-primary);
+      box-shadow: 0 0 0 3px rgba(0, 64, 125, 0.1);
+    }
+    
+    .organizations-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+    
+    .org-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.06);
+      border: 1px solid #e5e7eb;
+      padding: 20px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-sizing: border-box;
+    }
+    
+    .org-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,.1);
+    }
+    
+    .org-card h3 {
+      color: var(--ak-primary);
+      font-weight: 700;
+      font-size: 1.25rem;
+      margin: 0 0 12px 0;
+    }
+    
+    .org-card h3 span {
+      color: var(--ak-primary);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    
+    .org-card h3 span:hover {
+      color: var(--ak-accent);
+      text-decoration: underline;
+    }
+    
+    .org-card h3 a {
+      color: var(--ak-primary);
+      text-decoration: none;
+    }
+    
+    .org-card h3 a:hover {
+      color: var(--ak-accent);
+      text-decoration: underline;
+    }
+    
+    .org-description {
+      color: #4b5563;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 16px;
+      max-height: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+    }
+    
+    .org-description.expanded {
+      max-height: none;
+    }
+    
+    .expand-link {
+      color: var(--ak-primary);
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    
+    .expand-link:hover {
+      text-decoration: underline;
+    }
+    
+    .org-categories {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    
+    .category-badge {
+      display: inline-block;
+      background: rgba(13, 148, 136, 0.1);
+      color: #0f766e;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    
+    .org-funding {
+      background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 15px;
+      border-left: 4px solid var(--ak-primary);
+      font-weight: 500;
+    }
+    
+    .org-funding strong {
+      color: var(--ak-primary);
+      font-weight: 600;
+    }
+    
+    .org-status {
+      font-size: 13px;
+      color: var(--ak-muted);
+      font-style: italic;
+      margin-bottom: 12px;
+    }
+    
+    .org-link {
+      display: inline-block;
+      color: var(--ak-primary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    
+    .org-link:hover {
+      color: var(--ak-accent);
+      text-decoration: underline;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--ak-muted);
+    }
+    
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+    
+    .empty-state-message {
+      font-size: 16px;
+      font-weight: 500;
+    }
+    
+    .error-message {
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+    
+    .stats-bar {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.06);
+      border: 1px solid #e5e7eb;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      box-sizing: border-box;
+    }
+    
+    .stats-bar span {
+      color: var(--ak-primary);
+      font-weight: 600;
+    }
+    
+    @media (max-width: 768px) {
+      .organizations-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      
+      .search-section {
+        padding: 16px;
+      }
+    }
+    
+    /* Modal Styles */
+    .campaign-modal-content {
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .modal-section {
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .modal-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    
+    .modal-section-title {
+      font-weight: 600;
+      color: var(--ak-primary);
+      margin-bottom: 12px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .modal-section-content {
+      color: #4b5563;
+      line-height: 1.6;
+    }
+    
+    .modal-funding {
+      background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+      padding: 16px;
+      border-radius: 8px;
+      border-left: 4px solid var(--ak-primary);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--ak-primary);
+    }
+    
+    .modal-categories {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    
+    .modal-external-link {
+      display: inline-block;
+      background: var(--ak-primary);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: background 0.2s ease;
+      margin-top: 8px;
+    }
+    
+    .modal-external-link:hover {
+      background: var(--ak-accent);
+      color: #fff;
+      text-decoration: none;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+
+<div class="w3-container w3-small" style="width: 100vw; max-width: 90vw; margin: 0 auto; box-sizing: border-box;">
+  
+  <!-- Page Header -->
+  <div class="page-header" style="width:70vw;">
+    <h1><i class="fas fa-building w3-margin-right"></i>Remithope Organizations</h1>
+    <a href="{{ url_for('remithope', refresh='true') }}" class="refresh-btn">
+      <i class="fas fa-sync-alt w3-margin-right"></i>Refresh Data
+    </a>
+  </div>
+
+  <!-- Error Message -->
+  {% if error_message %}
+  <div class="error-message" style="width:70vw;">
+    <strong><i class="fas fa-exclamation-triangle w3-margin-right"></i>Error:</strong> {{ error_message }}
+  </div>
+  {% endif %}
+
+  <!-- Stats Bar -->
+  {% if organizations %}
+  <div class="stats-bar" style="width:70vw;">
+    <i class="fas fa-info-circle w3-margin-right"></i>
+    Displaying <span>{{ organizations|length }}</span> organization{{ 's' if organizations|length != 1 else '' }}
+  </div>
+  {% endif %}
+
+  <!-- Search Section -->
+  {% if organizations %}
+  <div class="search-section" style="width:70vw;">
+    <label for="orgSearch">
+      <i class="fas fa-search w3-margin-right"></i>Search Organizations
+    </label>
+    <div class="search-input-wrapper">
+      <i class="fas fa-search"></i>
+      <input type="text" id="orgSearch" placeholder="Search by organization name, description, or category...">
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Organizations Display -->
+  {% if organizations %}
+    <div class="organizations-grid" style="width:70vw;">
+      {% for org in organizations %}
+      <div class="org-card" data-org-name="{{ org.name|lower }}" data-org-desc="{{ org.description|lower if org.description else '' }}" data-org-cats="{{ org.categories|join(' ')|lower if org.categories else '' }}">
+        <h3>
+          <span onclick="viewCampaign({{ org|tojson|safe }})" style="cursor: pointer; color: var(--ak-primary); text-decoration: none; display: inline-block;">
+            {{ org.name }}
+          </span>
+        </h3>
+        
+        {% if org.funding_info %}
+        <div class="org-funding">
+          <strong>Funding:</strong> {{ org.funding_info }}
+        </div>
+        {% endif %}
+        
+        {% if org.status %}
+        <div class="org-status">
+          <i class="fas fa-clock w3-margin-right"></i>{{ org.status }}
+        </div>
+        {% endif %}
+        
+        {% if org.description %}
+        <div class="org-description" id="desc-{{ loop.index }}">
+          {{ org.description }}
+        </div>
+        {% if org.description|length > 150 %}
+        <a href="#" class="expand-link" onclick="toggleDescription({{ loop.index }}); return false;">
+          <span id="expand-text-{{ loop.index }}">Read more</span>
+        </a>
+        {% endif %}
+        {% endif %}
+        
+        {% if org.categories %}
+        <div class="org-categories">
+          {% for category in org.categories %}
+          <span class="category-badge">{{ category }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        
+        {% if org.url %}
+        <button onclick="viewCampaign({{ org|tojson|safe }})" class="org-link" style="background: none; border: none; cursor: pointer; padding: 0;">
+          <i class="fas fa-external-link-alt w3-margin-right"></i>View Campaign
+        </button>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state" style="width:70vw;">
+      <div class="empty-state-icon">
+        <i class="fas fa-inbox"></i>
+      </div>
+      <div class="empty-state-message">
+        {% if error_message %}
+          Unable to load organizations. Please try refreshing.
+        {% else %}
+          No organizations found.
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+
+<!-- Campaign Details Modal -->
+<div id="campaignModal" class="w3-modal">
+  <div class="w3-modal-content w3-animate-top w3-card-4 campaign-modal-content" style="width: 90vw; max-width: 800px;">
+    <header class="w3-container w3-padding" style="background: linear-gradient(135deg, var(--ak-primary), #2563eb); color: #fff;">
+      <span onclick="closeCampaignModal()" class="w3-button w3-display-topright" style="font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+      <h3 id="modalCampaignName" style="margin: 0; padding-right: 40px;"></h3>
+    </header>
+    <div class="w3-container w3-padding" style="padding-top: 24px;">
+      
+      <!-- Description Section -->
+      <div class="modal-section" id="modalDescriptionSection" style="display: none;">
+        <div class="modal-section-title">
+          <i class="fas fa-align-left"></i>
+          <span>Description</span>
+        </div>
+        <div class="modal-section-content" id="modalDescription"></div>
+      </div>
+      
+      <!-- Funding Information Section -->
+      <div class="modal-section" id="modalFundingSection" style="display: none;">
+        <div class="modal-section-title">
+          <i class="fas fa-dollar-sign"></i>
+          <span>Funding Information</span>
+        </div>
+        <div class="modal-funding" id="modalFunding"></div>
+      </div>
+      
+      <!-- Status Section -->
+      <div class="modal-section" id="modalStatusSection" style="display: none;">
+        <div class="modal-section-title">
+          <i class="fas fa-clock"></i>
+          <span>Status</span>
+        </div>
+        <div class="modal-section-content" id="modalStatus"></div>
+      </div>
+      
+      <!-- Categories Section -->
+      <div class="modal-section" id="modalCategoriesSection" style="display: none;">
+        <div class="modal-section-title">
+          <i class="fas fa-tags"></i>
+          <span>Categories</span>
+        </div>
+        <div class="modal-categories" id="modalCategories"></div>
+      </div>
+      
+      <!-- External Link -->
+      <div class="modal-section" id="modalLinkSection" style="display: none;">
+        <a id="modalExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="modal-external-link">
+          <i class="fas fa-external-link-alt w3-margin-right"></i>Visit Campaign Page
+        </a>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Toggle description expansion
+  function toggleDescription(index) {
+    const desc = document.getElementById('desc-' + index);
+    const expandText = document.getElementById('expand-text-' + index);
+    
+    if (desc.classList.contains('expanded')) {
+      desc.classList.remove('expanded');
+      expandText.textContent = 'Read more';
+    } else {
+      desc.classList.add('expanded');
+      expandText.textContent = 'Read less';
+    }
+  }
+  
+  // Search filter functionality
+  document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('orgSearch');
+    if (searchInput) {
+      searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.trim().toLowerCase();
+        const orgCards = document.querySelectorAll('.org-card');
+        
+        orgCards.forEach(function(card) {
+          const orgName = card.getAttribute('data-org-name') || '';
+          const orgDesc = card.getAttribute('data-org-desc') || '';
+          const orgCats = card.getAttribute('data-org-cats') || '';
+          
+          const searchableText = orgName + ' ' + orgDesc + ' ' + orgCats;
+          
+          if (searchableText.includes(searchTerm) || searchTerm === '') {
+            card.style.display = '';
+          } else {
+            card.style.display = 'none';
+          }
+        });
+      });
+    }
+  });
+  
+  // View Campaign Modal Functions
+  function viewCampaign(orgData) {
+    // Populate modal with campaign data
+    const modal = document.getElementById('campaignModal');
+    const nameEl = document.getElementById('modalCampaignName');
+    const descEl = document.getElementById('modalDescription');
+    const descSection = document.getElementById('modalDescriptionSection');
+    const fundingEl = document.getElementById('modalFunding');
+    const fundingSection = document.getElementById('modalFundingSection');
+    const statusEl = document.getElementById('modalStatus');
+    const statusSection = document.getElementById('modalStatusSection');
+    const categoriesEl = document.getElementById('modalCategories');
+    const categoriesSection = document.getElementById('modalCategoriesSection');
+    const linkEl = document.getElementById('modalExternalLink');
+    const linkSection = document.getElementById('modalLinkSection');
+    
+    // Set campaign name
+    if (orgData.name) {
+      nameEl.textContent = orgData.name;
+    } else {
+      nameEl.textContent = 'Campaign Details';
+    }
+    
+    // Set description
+    if (orgData.description) {
+      descEl.textContent = orgData.description;
+      descSection.style.display = 'block';
+    } else {
+      descSection.style.display = 'none';
+    }
+    
+    // Set funding information
+    if (orgData.funding_info) {
+      fundingEl.textContent = orgData.funding_info;
+      fundingSection.style.display = 'block';
+    } else {
+      fundingSection.style.display = 'none';
+    }
+    
+    // Set status
+    if (orgData.status) {
+      statusEl.textContent = orgData.status;
+      statusSection.style.display = 'block';
+    } else {
+      statusSection.style.display = 'none';
+    }
+    
+    // Set categories
+    if (orgData.categories && orgData.categories.length > 0) {
+      categoriesEl.innerHTML = '';
+      orgData.categories.forEach(function(category) {
+        const badge = document.createElement('span');
+        badge.className = 'category-badge';
+        badge.textContent = category;
+        categoriesEl.appendChild(badge);
+      });
+      categoriesSection.style.display = 'block';
+    } else {
+      categoriesSection.style.display = 'none';
+    }
+    
+    // Set external link
+    if (orgData.url) {
+      linkEl.href = orgData.url;
+      linkSection.style.display = 'block';
+    } else {
+      linkSection.style.display = 'none';
+    }
+    
+    // Display modal
+    modal.style.display = 'block';
+  }
+  
+  function closeCampaignModal() {
+    const modal = document.getElementById('campaignModal');
+    modal.style.display = 'none';
+  }
+  
+  // Close modal when clicking outside of it
+  window.onclick = function(event) {
+    const modal = document.getElementById('campaignModal');
+    if (event.target === modal) {
+      closeCampaignModal();
+    }
+  }
+</script>
+{% endblock %}

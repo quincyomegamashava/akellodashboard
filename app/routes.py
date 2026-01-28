@@ -35,6 +35,7 @@ import secrets
 import string
 from dotenv import load_dotenv
 import requests
+from bs4 import BeautifulSoup
 import mysql.connector
 from mysql.connector import Error
 import seaborn as sns
@@ -240,6 +241,24 @@ def safe_db_execute(conn, query, params=None, fetch_one=False, fetch_all=True):
             cursor.close()
         if conn:
             conn.close()
+
+def write_debug_log(log_entry):
+    """Write debug log entry to logs/debug.log"""
+    try:
+        # Get project root (akellodashboard directory)
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        logs_dir = os.path.join(project_root, 'logs')
+        
+        # Create logs directory if it doesn't exist
+        os.makedirs(logs_dir, exist_ok=True)
+        
+        # Write to debug.log
+        debug_log_path = os.path.join(logs_dir, 'debug.log')
+        with open(debug_log_path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(log_entry) + '\n')
+    except Exception:
+        # Silently fail - app.logger is already called separately
+        pass
 
 
 
@@ -2763,7 +2782,7 @@ def ask_akello_chosen_school(school_id):
         return jsonify(response)
 
     except Exception as e:
-        print("Error fetching Ask Akello data:", e)
+        # Error logging disabled - silently return error response
         return jsonify({"error": str(e)}), 500
 
     finally:
@@ -6264,9 +6283,10 @@ def smartlearning_school():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-    # finally:
-    #     if conn:
-    #         conn.close()
+    finally:
+        # Always return the connection to the pool
+        if conn:
+            conn.close()
 
 
 
@@ -9197,6 +9217,7 @@ def schooltracker():
             
             # Load all ChampionSchool records and create mapping
             champions = ChampionSchool.query.all()
+            asl_id_to_school_id_map = {}  # Map asl_school_id to school_id for reverse lookup
             for champ in champions:
                 champ_schools = champ.get_schools() or []
                 for school in champ_schools:
@@ -9206,11 +9227,25 @@ def schooltracker():
                         asl_id_str = str(asl_id).strip()
                         if asl_id_str:
                             champion_map[asl_id_str] = f"{champ.firstname} {champ.lastname}"
+                            # Also create reverse mapping: if school_name matches, map asl_id to school_id
+                            school_name = school.get('school_name', '').strip()
+                            if school_name:
+                                asl_id_to_school_id_map[school_name.lower()] = asl_id_str
             
-            # Add champion name to each school
+            # Add champion name and asl_school_id to each school
             for school in schools:
                 school_id_str = str(school['school_id']).strip()
                 school['champion_name'] = champion_map.get(school_id_str, '')
+                # Try to find asl_school_id by matching school_name
+                school_name_lower = (school.get('school_name') or '').strip().lower()
+                if school_name_lower in asl_id_to_school_id_map:
+                    school['asl_school_id'] = asl_id_to_school_id_map[school_name_lower]
+                elif school_id_str in champion_map:
+                    # If school_id matches an asl_school_id in champion_map, use it
+                    school['asl_school_id'] = school_id_str
+                else:
+                    # If no match found, assume school_id is the same as asl_school_id
+                    school['asl_school_id'] = school_id_str
         
     except Exception as e:
         app.logger.error(f"Error in schooltracker route: {e}")
@@ -9232,6 +9267,622 @@ def schooltracker():
                         countries=countries,
                         schools=schools,
                         selected_country=selected_country)
+
+
+@app.route('/remithope', methods=['GET', 'POST'])
+@login_required
+def remithope():
+    """
+    Scrape organizations from remithope.org/campaigns/ and display them
+    """
+    organizations = []
+    error_message = None
+    refresh = request.args.get('refresh', 'false').lower() == 'true'
+    
+    # Check if data is cached in session (unless refresh is requested)
+    if not refresh and 'remithope_organizations' in session:
+        organizations = session.get('remithope_organizations', [])
+        if organizations:
+            return render_template('remithope.html', 
+                                title='Remithope Organizations',
+                                organizations=organizations,
+                                error_message=None)
+    
+    try:
+        base_url = "https://remithope.org/campaigns/"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        # Helper functions to identify and filter text
+        def is_status_text(text):
+            """Check if text is likely a status indicator"""
+            if not text:
+                return False
+            text_lower = text.lower().strip()
+            status_words = ['ended', 'active', 'closed', 'ongoing', 'completed', 'cancelled', 'pending']
+            return any(word in text_lower for word in status_words) and len(text_lower) < 50
+        
+        def is_funding_text(text):
+            """Check if text is likely funding information"""
+            if not text:
+                return False
+            import re
+            # Check for currency symbols or funding patterns
+            return bool(re.search(r'[\$£€¥]|(?:raised|goal|target|funded|donated)', text, re.IGNORECASE))
+        
+        def is_date_text(text):
+            """Check if text is likely a date"""
+            if not text:
+                return False
+            import re
+            # Check for date patterns like "2 weeks ago", "3 days ago", etc.
+            return bool(re.search(r'\d+\s*(?:day|week|month|year|hour|minute)s?\s*ago', text, re.IGNORECASE))
+        
+        def is_likely_name(text):
+            """Check if text is likely an organization name"""
+            if not text:
+                return False
+            text = text.strip()
+            # Names are usually 3-200 chars
+            if len(text) < 3 or len(text) > 200:
+                return False
+            # Only filter out if it's clearly just status/funding (short text)
+            if (is_status_text(text) and len(text) < 15) or (is_funding_text(text) and '$' in text and len(text) < 25) or is_date_text(text):
+                return False
+            # Be more permissive - if it's not clearly status/funding/date, it could be a name
+            # Check if it starts with a capital letter (common for names) or is multi-word
+            if text and (text[0].isupper() or (' ' in text and len(text.split()) <= 6)):
+                return True
+            return False
+        
+        page_num = 1
+        max_pages = 20  # Limit to prevent infinite loops
+        all_organizations = []
+        
+        while page_num <= max_pages:
+            # Construct URL for current page
+            if page_num == 1:
+                url = base_url
+            else:
+                url = f"{base_url}page/{page_num}/"
+            
+            try:
+                # Make request with timeout
+                response = requests.get(url, headers=headers, timeout=15, proxies={'http': None, 'https': None})
+                response.raise_for_status()
+                
+                # Parse HTML
+                soup = BeautifulSoup(response.content, 'html.parser')
+                
+                # Strategy 1: WordPress-specific patterns (post, entry, wp-block)
+                campaign_cards = soup.find_all(['article', 'div'], class_=lambda x: x and any(keyword in x.lower() 
+                                                                                              for keyword in ['post', 'entry', 'wp-block', 'type-post', 'post-type']))
+                
+                # Strategy 2: Find all campaign cards by class patterns
+                if not campaign_cards:
+                    campaign_cards = soup.find_all(['article', 'div'], class_=lambda x: x and ('campaign' in x.lower() or 'card' in x.lower()))
+                
+                # Strategy 3: Try finding by other common patterns
+                if not campaign_cards:
+                    campaign_cards = soup.find_all('div', class_=lambda x: x and any(keyword in x.lower() for keyword in ['campaign', 'organization', 'charity', 'fund', 'cause', 'project']))
+                
+                # Strategy 4: Find elements with links to campaign pages
+                if not campaign_cards:
+                    campaign_links = soup.find_all('a', href=lambda x: x and '/campaigns/' in str(x) and x != '/campaigns/' and not x.endswith('/campaigns/'))
+                    if campaign_links:
+                        # Get parent containers of these links
+                        campaign_cards = []
+                        for link in campaign_links:
+                            # Try to find a parent container (article, div, li, etc.)
+                            parent = link.find_parent(['article', 'div', 'li', 'section'])
+                            if parent and parent not in campaign_cards:
+                                campaign_cards.append(parent)
+                
+                # Strategy 5: Find list items that might contain campaigns (WordPress often uses lists)
+                if not campaign_cards:
+                    campaign_cards = soup.find_all('li', class_=lambda x: x and any(keyword in x.lower() for keyword in ['campaign', 'item', 'card', 'post', 'entry', 'type-post']))
+                
+                # Strategy 6: Find all articles or divs with specific structure (has heading and link)
+                if not campaign_cards:
+                    all_elements = soup.find_all(['article', 'div', 'section'])
+                    campaign_cards = []
+                    for elem in all_elements:
+                        # Check if it has a heading and a link (likely a campaign card)
+                        has_heading = elem.find(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+                        has_link = elem.find('a', href=True)
+                        has_text = len(elem.get_text(strip=True)) > 30
+                        if has_heading and has_link and has_text:
+                            # Avoid duplicates and very large containers
+                            if len(elem.get_text(strip=True)) < 5000:  # Reasonable size limit
+                                campaign_cards.append(elem)
+                
+                # Strategy 7: Last resort - find any div/article with heading and substantial text
+                if not campaign_cards:
+                    all_elements = soup.find_all(['article', 'div'])
+                    campaign_cards = [card for card in all_elements 
+                                    if card.find(['h2', 'h3', 'h4']) 
+                                    and len(card.get_text(strip=True)) > 50 
+                                    and len(card.get_text(strip=True)) < 2000]
+                
+                # Log for debugging
+                if page_num == 1:
+                    app.logger.info(f"Found {len(campaign_cards)} potential campaign cards on page {page_num}")
+                    if not campaign_cards:
+                        # Log a sample of the HTML structure for debugging
+                        app.logger.debug(f"Page HTML sample: {str(soup)[:500]}")
+                
+                if not campaign_cards:
+                    # If no cards found on this page, break
+                    if page_num == 1:
+                        error_message = "No organizations found. The website structure may have changed. Please check the website or contact support."
+                    break
+                
+                # Extract data from each card
+                page_organizations = []
+                for card in campaign_cards:
+                    org_data = {}
+                    
+                    # Debug: Log card HTML structure (first card only)
+                    if page_num == 1 and len(page_organizations) == 0:
+                        app.logger.info(f"Card HTML sample: {str(card)[:500]}")
+                        app.logger.info(f"Card text sample: {card.get_text(separator=' | ', strip=True)[:300]}")
+                    
+                    # Extract organization name/title - try multiple strategies
+                    # IMPORTANT: Extract name BEFORE status/funding to avoid confusion
+                    # WordPress-specific patterns first
+                    name = None
+                    
+                    # Strategy 1: WordPress-specific classes (entry-title, post-title, etc.)
+                    wordpress_title_classes = ['entry-title', 'post-title', 'wp-block-post-title', 'entry-header', 
+                                              'post-header', 'title', 'campaign-title', 'organization-title']
+                    for class_name in wordpress_title_classes:
+                        title_elem = card.find(class_=lambda x: x and class_name in x.lower())
+                        if title_elem:
+                            candidate = title_elem.get_text(strip=True)
+                            if candidate and len(candidate) > 0:
+                                if not (is_status_text(candidate) and len(candidate) < 20) and not (is_funding_text(candidate) and '$' in candidate):
+                                    name = candidate
+                                    break
+                    
+                    # Strategy 2: Find heading tags (h1-h6) - prioritize h2, h3, h4
+                    if not name:
+                        for tag in ['h2', 'h3', 'h4', 'h1', 'h5', 'h6']:
+                            title_elem = card.find(tag)
+                            if title_elem:
+                                candidate = title_elem.get_text(strip=True)
+                                # Filter out status and funding text, but be less strict
+                                if candidate and len(candidate) > 0:
+                                    # Only filter if it's clearly status/funding (not if it just contains those words)
+                                    if not (is_status_text(candidate) and len(candidate) < 20) and not (is_funding_text(candidate) and '$' in candidate):
+                                        name = candidate
+                                        break
+                    
+                    # Strategy 3: WordPress entry-content or post-content title (often first heading inside)
+                    if not name:
+                        entry_content = card.find(class_=lambda x: x and any(keyword in x.lower() 
+                                                                          for keyword in ['entry-content', 'post-content', 'wp-block-post-content', 'content']))
+                        if entry_content:
+                            # Find first heading in entry content
+                            for tag in ['h1', 'h2', 'h3', 'h4']:
+                                title_elem = entry_content.find(tag)
+                                if title_elem:
+                                    candidate = title_elem.get_text(strip=True)
+                                    if candidate and len(candidate) > 0:
+                                        if not (is_status_text(candidate) and len(candidate) < 20) and not (is_funding_text(candidate) and '$' in candidate):
+                                            name = candidate
+                                            break
+                            if name:
+                                break
+                    
+                    # Strategy 4: Find by class containing 'title' or 'name'
+                    if not name:
+                        title_elem = card.find(class_=lambda x: x and any(keyword in x.lower() 
+                                                                          for keyword in ['title', 'name', 'heading', 'headline', 'campaign-title']))
+                        if title_elem:
+                            candidate = title_elem.get_text(strip=True)
+                            if candidate and not (is_status_text(candidate) and len(candidate) < 20) and not (is_funding_text(candidate) and '$' in candidate):
+                                name = candidate
+                    
+                    # Strategy 5: Find title in a link (common pattern for campaign cards, especially WordPress)
+                    if not name:
+                        links = card.find_all('a', href=True)
+                        for link_elem in links:
+                            link_text = link_elem.get_text(strip=True)
+                            # Filter out common link texts and status/funding
+                            if link_text and len(link_text) > 3 and len(link_text) < 200:
+                                skip_texts = ['read more', 'view', 'click', 'learn more', 'donate', 'share', 'visit', 
+                                            'see more', 'view campaign', 'donate now', 'share this', 'home', 'about']
+                                if (not any(skip in link_text.lower() for skip in skip_texts) and
+                                    not (is_status_text(link_text) and len(link_text) < 20) and 
+                                    not (is_funding_text(link_text) and '$' in link_text)):
+                                    # Check if link goes to a campaign page - more likely to be the title
+                                    href = link_elem.get('href', '')
+                                    if '/campaigns/' in str(href) or href.startswith('/'):
+                                        name = link_text
+                                        break
+                    
+                    # Strategy 6: Get first substantial text line (excluding navigation/common text, status, funding)
+                    if not name:
+                        all_text = card.get_text(separator='\n', strip=True)
+                        lines = [line.strip() for line in all_text.split('\n') if line.strip()]
+                        skip_patterns = ['http', 'www', 'read more', 'view', 'click', 'learn more', 'donate', 'share', 
+                                       'campaigns', 'home', 'about', 'contact', 'login', 'sign up', 'menu', 'navigation',
+                                       'remithope']
+                        for line in lines:
+                            # Be less strict - just check it's not clearly status/funding/date
+                            if (len(line) > 3 and len(line) < 200 and
+                                not any(pattern in line.lower() for pattern in skip_patterns) and
+                                not line.lower().startswith(('http', 'www', 'mailto:')) and
+                                not (is_status_text(line) and len(line) < 20) and  # Only filter short status text
+                                not (is_funding_text(line) and '$' in line and len(line) < 30) and  # Only filter short funding text
+                                not is_date_text(line)):  # Filter date text
+                                # Check if it looks like a name (starts with capital or is multi-word)
+                                if line[0].isupper() or (' ' in line and len(line.split()) <= 5):
+                                    name = line
+                                    break
+                    
+                    # Strategy 7: Get text from first strong/bold element
+                    if not name:
+                        strong_elem = card.find(['strong', 'b'])
+                        if strong_elem:
+                            strong_text = strong_elem.get_text(strip=True)
+                            if strong_text and is_likely_name(strong_text):
+                                name = strong_text
+                    
+                    # Strategy 8: Get all text elements in order, find first that looks like a name
+                    if not name:
+                        # Get all text nodes in order
+                        for elem in card.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'span', 'a', 'strong', 'b']):
+                            text = elem.get_text(strip=True)
+                            if text and len(text) > 3 and len(text) < 200:
+                                # Less strict filtering
+                                if not (is_status_text(text) and len(text) < 20) and not (is_funding_text(text) and '$' in text):
+                                    if text[0].isupper() or (' ' in text and len(text.split()) <= 5):
+                                        name = text
+                                        break
+                    
+                    # Strategy 9: Last resort - get first non-empty line that's not status/funding
+                    if not name:
+                        all_text = card.get_text(separator='\n', strip=True)
+                        lines = [line.strip() for line in all_text.split('\n') if line.strip()]
+                        for line in lines:
+                            if (len(line) > 3 and len(line) < 200 and
+                                not line.lower().startswith(('http', 'www', 'mailto:')) and
+                                not (is_status_text(line) and len(line) < 15) and
+                                not (is_funding_text(line) and '$' in line and len(line) < 25) and
+                                not is_date_text(line)):
+                                name = line
+                                break
+                    
+                    # Strategy 10: Ultra fallback - get first word/phrase from card text
+                    if not name:
+                        all_text = card.get_text(separator=' ', strip=True)
+                        # Split into words and try to find a name-like phrase
+                        words = all_text.split()
+                        # Try first 2-5 words as potential name
+                        for word_count in [5, 4, 3, 2]:
+                            if len(words) >= word_count:
+                                candidate = ' '.join(words[:word_count])
+                                if (len(candidate) > 3 and len(candidate) < 200 and
+                                    not candidate.lower().startswith(('http', 'www', '$')) and
+                                    not (is_status_text(candidate) and len(candidate) < 15) and
+                                    not (is_funding_text(candidate) and '$' in candidate and len(candidate) < 25) and
+                                    not is_date_text(candidate)):
+                                    name = candidate
+                                    break
+                        if not name and words:
+                            # Last resort: just use first word if it's capitalized
+                            if words[0] and words[0][0].isupper() and len(words[0]) > 2:
+                                name = words[0]
+                    
+                    # Only proceed if we found a name
+                    if name and len(name.strip()) > 0:
+                        org_data['name'] = name.strip()
+                        # Debug log
+                        if page_num == 1 and len(page_organizations) == 0:
+                            app.logger.info(f"Extracted name: {name}")
+                    else:
+                        # Debug: Log why name wasn't found
+                        if page_num == 1 and len(page_organizations) == 0:
+                            app.logger.warning(f"No name found for card. Card text: {card.get_text(separator=' | ', strip=True)[:200]}")
+                        # Don't skip - try to use a default or continue with empty name
+                        # But for now, skip if no name
+                        continue
+                    
+                    # Extract description - try multiple strategies
+                    # IMPORTANT: Extract description AFTER name but BEFORE status/funding
+                    # WordPress-specific patterns first
+                    description = None
+                    
+                    # Strategy 1: WordPress entry-content or post-content (main content area)
+                    wordpress_content_classes = ['entry-content', 'post-content', 'wp-block-post-content', 
+                                                'entry-summary', 'post-excerpt', 'excerpt', 'content']
+                    for class_name in wordpress_content_classes:
+                        content_elem = card.find(class_=lambda x: x and class_name in x.lower())
+                        if content_elem:
+                            # Get first paragraph or substantial text from content area
+                            para = content_elem.find('p')
+                            if para:
+                                desc_text = para.get_text(strip=True)
+                            else:
+                                desc_text = content_elem.get_text(separator=' ', strip=True)
+                            
+                            if desc_text and len(desc_text) > 10:
+                                # Remove name if it appears
+                                if name and name.lower() in desc_text.lower():
+                                    desc_text = desc_text.replace(name, '', 1).strip()
+                                # Filter but be lenient
+                                if (len(desc_text) > 10 and
+                                    not (is_status_text(desc_text) and len(desc_text) < 20) and 
+                                    not (is_funding_text(desc_text) and '$' in desc_text and len(desc_text) < 30) and
+                                    not is_date_text(desc_text)):
+                                    description = desc_text
+                                    break
+                    
+                    # Strategy 2: Find by class containing description keywords
+                    if not description:
+                        desc_elem = card.find(['p', 'div', 'span'], class_=lambda x: x and any(keyword in x.lower() 
+                                                                                          for keyword in ['description', 'desc', 'summary', 'excerpt', 'content', 'text', 'body', 'detail']))
+                        if desc_elem:
+                            desc_text = desc_elem.get_text(strip=True)
+                            # Filter out status, funding, and name - be less strict
+                            if (desc_text and len(desc_text) > 10 and 
+                                desc_text != name and 
+                                not (is_status_text(desc_text) and len(desc_text) < 20) and 
+                                not (is_funding_text(desc_text) and '$' in desc_text and len(desc_text) < 30) and
+                                not is_date_text(desc_text)):
+                                description = desc_text
+                    
+                    # Strategy 2: Find first paragraph with substantial text (but not the title, status, or funding)
+                    if not description:
+                        paragraphs = card.find_all(['p', 'div', 'span'])
+                        for para in paragraphs:
+                            para_text = para.get_text(strip=True)
+                            # Skip if it's the same as the name, status, funding, or too short - be less strict
+                            if (para_text and len(para_text) > 15 and 
+                                para_text != name and 
+                                not (is_status_text(para_text) and len(para_text) < 20) and
+                                not (is_funding_text(para_text) and '$' in para_text and len(para_text) < 30) and
+                                not is_date_text(para_text) and
+                                not para_text.lower().startswith(('read more', 'view', 'click', 'donate', 'share', 'learn more')) and
+                                not para_text.lower() in ['home', 'about', 'contact', 'campaigns']):
+                                # Check if it's not a navigation or button text
+                                if len(para_text) < 1000:  # Reasonable description length
+                                    # Make sure it's not just the name repeated (but allow if description is longer)
+                                    if name.lower() not in para_text.lower() or len(para_text) > len(name) * 1.3:
+                                        description = para_text
+                                        break
+                    
+                    # Strategy 3: Extract text after the name - get all text and find content after name
+                    if not description:
+                        # Get all text, find the name position, get text after it
+                        all_text = card.get_text(separator='\n', strip=True)
+                        lines = [line.strip() for line in all_text.split('\n') if line.strip()]
+                        found_name = False
+                        for i, line in enumerate(lines):
+                            # Check if this line contains the name
+                            if name.lower() in line.lower() or line.lower() in name.lower():
+                                found_name = True
+                                # Look at next few lines for description (before status/funding)
+                                for j in range(i + 1, min(i + 10, len(lines))):
+                                    next_line = lines[j]
+                                    # Skip status, funding, dates, and action buttons
+                                    if (len(next_line) > 20 and 
+                                        not is_status_text(next_line) and
+                                        not is_funding_text(next_line) and
+                                        not is_date_text(next_line) and
+                                        not any(skip in next_line.lower() for skip in ['read more', 'view', 'click', 'donate', 'share', 'learn more', 'home', 'about']) and
+                                        not next_line.lower().startswith(('http', 'www', '$'))):
+                                        # Make sure it's not the name again
+                                        if name.lower() not in next_line.lower() or len(next_line) > len(name) * 1.5:
+                                            description = next_line
+                                            break
+                                if description:
+                                    break
+                    
+                    # Strategy 4: Get all text content, remove name, status, funding, and action buttons
+                    if not description:
+                        all_text = card.get_text(separator=' ', strip=True)
+                        # Remove the name from the text
+                        text_without_name = all_text.replace(name, '', 1).strip()
+                        
+                        # Remove status text (but be less aggressive)
+                        import re
+                        text_without_name = re.sub(r'\b(?:ended|active|closed|ongoing|completed|cancelled|pending)\b', '', text_without_name, flags=re.IGNORECASE)
+                        
+                        # Remove funding patterns (but keep text that mentions funding in context)
+                        text_without_name = re.sub(r'\$[\d,]+\.?\d*\s*(?:of|raised|goal)\s*\$?[\d,]+\.?\d*', '', text_without_name, flags=re.IGNORECASE)
+                        text_without_name = re.sub(r'(?:raised|goal|target|funded|donated):?\s*\$?[\d,]+\.?\d*', '', text_without_name, flags=re.IGNORECASE)
+                        
+                        # Remove date patterns
+                        text_without_name = re.sub(r'\d+\s*(?:day|week|month|year|hour|minute)s?\s*ago', '', text_without_name, flags=re.IGNORECASE)
+                        
+                        # Remove common action phrases
+                        for phrase in ['read more', 'view campaign', 'donate now', 'share this', 'learn more']:
+                            text_without_name = text_without_name.replace(phrase, '')
+                        
+                        text_without_name = ' '.join(text_without_name.split())
+                        
+                        # Take first reasonable chunk that looks like a description
+                        if len(text_without_name) > 15:
+                            # Get first sentence or first 200 chars
+                            sentences = text_without_name.split('.')
+                            for sentence in sentences:
+                                sentence = sentence.strip()
+                                if (len(sentence) > 15 and 
+                                    not (is_status_text(sentence) and len(sentence) < 20) and
+                                    not (is_funding_text(sentence) and '$' in sentence and len(sentence) < 30) and
+                                    not is_date_text(sentence)):
+                                    description = sentence
+                                    break
+                            if not description:
+                                # Fallback to first 200 chars (even if it contains some funding info)
+                                candidate = text_without_name[:200].strip()
+                                if len(candidate) > 15:
+                                    description = candidate
+                    
+                    # Strategy 5: Ultra fallback - get text after name in the card
+                    if not description:
+                        all_text = card.get_text(separator='\n', strip=True)
+                        lines = [line.strip() for line in all_text.split('\n') if line.strip()]
+                        # Find line with name, get next substantial line
+                        for i, line in enumerate(lines):
+                            if name.lower() in line.lower():
+                                # Look at next few lines
+                                for j in range(i + 1, min(i + 5, len(lines))):
+                                    next_line = lines[j]
+                                    if (len(next_line) > 15 and
+                                        not (is_status_text(next_line) and len(next_line) < 20) and
+                                        not (is_funding_text(next_line) and '$' in next_line and len(next_line) < 30) and
+                                        not is_date_text(next_line) and
+                                        name.lower() not in next_line.lower()):
+                                        description = next_line
+                                        break
+                                if description:
+                                    break
+                    
+                    if description:
+                        # Clean up description - limit length and remove extra whitespace
+                        description = ' '.join(description.split())
+                        # Only filter if description is clearly just status/funding (short text)
+                        if (is_status_text(description) and len(description) < 20) or (is_funding_text(description) and '$' in description and len(description) < 30):
+                            description = None
+                        elif len(description) > 500:
+                            description = description[:500] + '...'
+                        
+                    if description:
+                        org_data['description'] = description
+                        # Debug log
+                        if page_num == 1 and len(page_organizations) == 0:
+                            app.logger.info(f"Extracted description: {description[:100]}")
+                    else:
+                        org_data['description'] = None
+                        # Debug log
+                        if page_num == 1 and len(page_organizations) == 0:
+                            app.logger.warning(f"No description found. Card text: {card.get_text(separator=' | ', strip=True)[:300]}")
+                    
+                    # Extract categories/tags
+                    tags = []
+                    tag_elems = card.find_all(['span', 'a', 'div'], class_=lambda x: x and ('tag' in x.lower() or 'category' in x.lower() or 'label' in x.lower()))
+                    for tag_elem in tag_elems:
+                        tag_text = tag_elem.get_text(strip=True)
+                        if tag_text and len(tag_text) < 50:  # Reasonable tag length
+                            tags.append(tag_text)
+                    org_data['categories'] = tags if tags else []
+                    
+                    # Extract funding information
+                    funding_text = card.get_text()
+                    # Look for patterns like "$X of $Y" or "raised $X" or "goal $Y"
+                    import re
+                    funding_match = re.search(r'\$[\d,]+\.?\d*\s*(?:of|raised|goal)\s*\$[\d,]+\.?\d*', funding_text, re.IGNORECASE)
+                    if funding_match:
+                        org_data['funding_info'] = funding_match.group(0)
+                    else:
+                        # Try separate patterns
+                        raised_match = re.search(r'(?:raised|raised:?)\s*\$?[\d,]+\.?\d*', funding_text, re.IGNORECASE)
+                        goal_match = re.search(r'(?:goal|target):?\s*\$?[\d,]+\.?\d*', funding_text, re.IGNORECASE)
+                        if raised_match or goal_match:
+                            org_data['funding_info'] = f"{raised_match.group(0) if raised_match else ''} {goal_match.group(0) if goal_match else ''}".strip()
+                        else:
+                            org_data['funding_info'] = None
+                    
+                    # Extract status
+                    status_elem = card.find(class_=lambda x: x and ('status' in x.lower() or 'ended' in x.lower() or 'active' in x.lower()))
+                    if status_elem:
+                        org_data['status'] = status_elem.get_text(strip=True)
+                    else:
+                        # Look for status in text
+                        status_match = re.search(r'(?:ended|active|closed|ongoing).*?(?:\d+\s*(?:day|week|month|year)s?\s*ago)?', funding_text, re.IGNORECASE)
+                        if status_match:
+                            org_data['status'] = status_match.group(0)
+                        else:
+                            org_data['status'] = None
+                    
+                    # Extract URL/link - prioritize links to campaign pages
+                    link_elem = None
+                    # First try to find a link that goes to a campaign page
+                    campaign_links = card.find_all('a', href=lambda x: x and '/campaigns/' in str(x))
+                    if campaign_links:
+                        link_elem = campaign_links[0]
+                    else:
+                        # Fallback to any link in the card
+                        link_elem = card.find('a', href=True)
+                    
+                    if link_elem:
+                        href = link_elem.get('href', '')
+                        if href.startswith('http'):
+                            org_data['url'] = href
+                        elif href.startswith('/'):
+                            org_data['url'] = f"https://remithope.org{href}"
+                        else:
+                            org_data['url'] = f"https://remithope.org/campaigns/{href}"
+                    else:
+                        org_data['url'] = None
+                    
+                    # Only add if we have at least a name
+                    if org_data.get('name'):
+                        page_organizations.append(org_data)
+                
+                if not page_organizations:
+                    # No organizations found on this page, stop pagination
+                    break
+                
+                all_organizations.extend(page_organizations)
+                
+                # Check for next page
+                next_link = soup.find('a', class_=lambda x: x and ('next' in x.lower() if x else False))
+                if not next_link:
+                    # Try finding pagination with "Next" text
+                    next_link = soup.find('a', string=lambda x: x and 'next' in x.lower() if x else False)
+                
+                if not next_link:
+                    # Check if there's a page number indicator showing more pages
+                    pagination = soup.find(class_=lambda x: x and ('pagination' in x.lower() if x else False))
+                    if pagination:
+                        page_text = pagination.get_text()
+                        # Look for "Page X of Y" pattern
+                        page_match = re.search(r'page\s+(\d+)\s+of\s+(\d+)', page_text, re.IGNORECASE)
+                        if page_match:
+                            current_page = int(page_match.group(1))
+                            total_pages = int(page_match.group(2))
+                            if current_page < total_pages:
+                                page_num += 1
+                                continue
+                
+                # If no next link found, break
+                if not next_link:
+                    break
+                
+                page_num += 1
+                time.sleep(1)  # Be respectful, add delay between requests
+                
+            except requests.exceptions.RequestException as e:
+                app.logger.error(f"Error fetching page {page_num}: {e}")
+                if page_num == 1:
+                    error_message = f"Error fetching data: {str(e)}"
+                break
+            except Exception as e:
+                app.logger.error(f"Error parsing page {page_num}: {e}")
+                if page_num == 1:
+                    error_message = f"Error parsing data: {str(e)}"
+                break
+        
+        organizations = all_organizations
+        
+        # Cache in session
+        if organizations:
+            session['remithope_organizations'] = organizations
+        
+    except Exception as e:
+        app.logger.error(f"Error in remithope route: {e}")
+        error_message = f"An error occurred while scraping: {str(e)}"
+        organizations = []
+    
+    return render_template('remithope.html', 
+                        title='Remithope Organizations',
+                        organizations=organizations,
+                        error_message=error_message)
 
 
 @app.route('/bookallocations', methods=['GET', 'POST'])
@@ -9509,6 +10160,33 @@ def api_institution_analytics():
 
 
 # ===== Book Allocation Request API Endpoints =====
+
+@app.route('/api/book-genres', methods=['GET'])
+@login_required
+def get_book_genres():
+    """Get books and their associated genres from the library database"""
+    try:
+        conn = get_direct_library_conn()
+        
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            query = """
+                SELECT b.title, g.name 
+                FROM books b
+                JOIN book_genre bg ON b.id = bg.book_id
+                JOIN genres g ON bg.genre_id = g.id
+                WHERE g.name IN ('HBC PlusOne Primary Teacher`s Guides', 'HBC PlusOne Primary')
+            """
+            cursor.execute(query)
+            results = cursor.fetchall()
+            
+        return jsonify({'data': results}), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        app.logger.error(f"Error fetching book genres: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/api/champion-schools-by-user/<username>', methods=['GET'])
 @login_required
@@ -14731,8 +15409,7 @@ def ensure_json_response(data, status_code=200):
         'timestamp': int(time.time() * 1000)
     }
     try:
-        with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps(log_entry) + '\n')
+        write_debug_log(log_entry)
         app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
     except Exception as e:
         app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -14754,8 +15431,7 @@ def ensure_json_response(data, status_code=200):
             'timestamp': int(time.time() * 1000)
         }
         try:
-            with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps(log_entry) + '\n')
+            write_debug_log(log_entry)
             app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
         except Exception as e:
             app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -14777,8 +15453,7 @@ def ensure_json_response(data, status_code=200):
             'timestamp': int(time.time() * 1000)
         }
         try:
-            with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps(log_entry) + '\n')
+            write_debug_log(log_entry)
             app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
         except Exception as e:
             app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -14827,8 +15502,7 @@ def get_email_queries():
         'timestamp': int(time.time() * 1000)
     }
     try:
-        with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps(log_entry) + '\n')
+        write_debug_log(log_entry)
         app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
     except Exception as e:
         app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -14851,8 +15525,7 @@ def get_email_queries():
                 'timestamp': int(time.time() * 1000)
             }
             try:
-                with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps(log_entry) + '\n')
+                write_debug_log(log_entry)
                 app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
             except Exception as e:
                 app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -14875,8 +15548,7 @@ def get_email_queries():
                 'timestamp': int(time.time() * 1000)
             }
             try:
-                with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps(log_entry) + '\n')
+                write_debug_log(log_entry)
                 app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
             except Exception as e:
                 app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -14896,8 +15568,7 @@ def get_email_queries():
                 'timestamp': int(time.time() * 1000)
             }
             try:
-                with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps(log_entry) + '\n')
+                write_debug_log(log_entry)
                 app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
             except Exception as e:
                 app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -14921,8 +15592,7 @@ def get_email_queries():
                     'timestamp': int(time.time() * 1000)
                 }
                 try:
-                    with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                        f.write(json.dumps(log_entry) + '\n')
+                    write_debug_log(log_entry)
                     app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
                 except Exception as e:
                     app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -14947,8 +15617,7 @@ def get_email_queries():
                     'timestamp': int(time.time() * 1000)
                 }
                 try:
-                    with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                        f.write(json.dumps(log_entry) + '\n')
+                    write_debug_log(log_entry)
                     app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
                 except Exception as e:
                     app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -15109,8 +15778,7 @@ def fetch_gmail_emails():
         'timestamp': int(time.time() * 1000)
     }
     try:
-        with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps(log_entry) + '\n')
+        write_debug_log(log_entry)
         app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
     except Exception as e:
         app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -15159,8 +15827,7 @@ def fetch_gmail_emails():
                 'timestamp': int(time.time() * 1000)
             }
             try:
-                with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps(log_entry) + '\n')
+                write_debug_log(log_entry)
                 app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
             except Exception as e:
                 app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -15187,8 +15854,7 @@ def fetch_gmail_emails():
                 'timestamp': int(time.time() * 1000)
             }
             try:
-                with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                    f.write(json.dumps(log_entry) + '\n')
+                write_debug_log(log_entry)
                 app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
             except Exception as e:
                 app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -15371,8 +16037,7 @@ def fetch_gmail_emails():
             'timestamp': int(time.time() * 1000)
         }
         try:
-            with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps(log_entry) + '\n')
+            write_debug_log(log_entry)
             app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
         except Exception as e:
             app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -15393,8 +16058,7 @@ def fetch_gmail_emails():
                     'timestamp': int(time.time() * 1000)
                 }
                 try:
-                    with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                        f.write(json.dumps(log_entry) + '\n')
+                    write_debug_log(log_entry)
                     app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
                 except Exception as e:
                     app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -15411,8 +16075,7 @@ def fetch_gmail_emails():
                     'timestamp': int(time.time() * 1000)
                 }
                 try:
-                    with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                        f.write(json.dumps(log_entry) + '\n')
+                    write_debug_log(log_entry)
                     app.logger.error(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
                 except Exception as e:
                     app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -15436,8 +16099,7 @@ def fetch_gmail_emails():
             'timestamp': int(time.time() * 1000)
         }
         try:
-            with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps(log_entry) + '\n')
+            write_debug_log(log_entry)
             app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
         except Exception as e:
             app.logger.error(f"[DEBUG] Failed to write log: {e}")
@@ -15458,8 +16120,7 @@ def fetch_gmail_emails():
             'timestamp': int(time.time() * 1000)
         }
         try:
-            with open('/home/quincyomegamashava/Desktop/AI Dashboard/.cursor/debug.log', 'a') as f:
-                f.write(json.dumps(log_entry) + '\n')
+            write_debug_log(log_entry)
             app.logger.info(f"[DEBUG] {log_entry['location']}: {log_entry['message']} - {json.dumps(log_entry['data'])}")
         except Exception as e:
             app.logger.error(f"[DEBUG] Failed to write log: {e}")

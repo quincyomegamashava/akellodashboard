@@ -274,7 +274,7 @@
         </label>
         <div class="search-input-wrapper">
           <i class="fas fa-search"></i>
-          <input type="text" id="schoolSearch" placeholder="Search by school name, city, province, contact, or champion...">
+          <input type="text" id="schoolSearch" placeholder="Search by school name, province, contact, or champion...">
         </div>
       </div>
       
@@ -283,7 +283,8 @@
           <thead>
             <tr>
               <th>School Name</th>
-              <th>City</th>
+              <th>ASL MTD</th>
+              <th>AL MTD</th>
               <th>Province</th>
               <th>Contact</th>
               <th>Champion</th>
@@ -291,13 +292,14 @@
           </thead>
           <tbody>
             {% for school in schools %}
-            <tr>
+            <tr data-school-id="{{ school.school_id }}" data-school-name="{{ school.school_name or '' }}" data-asl-school-id="{{ school.asl_school_id or school.school_id }}">
               <td>
                 <a href="{{ url_for('school_profile_usage', school_id=school.school_id) }}" class="school-name-link">
                   {{ school.school_name or 'N/A' }}
                 </a>
               </td>
-              <td>{{ school.school_city or 'N/A' }}</td>
+              <td id="asl-mtd-{{ school.school_id }}" style="text-align: center;">—</td>
+              <td id="al-mtd-{{ school.school_id }}" style="text-align: center;">—</td>
               <td>{{ school.school_province or 'N/A' }}</td>
               <td>{{ school.contact or 'N/A' }}</td>
               <td>
@@ -345,6 +347,108 @@
 
 {% block scripts %}
 <script>
+  // Get current year date range (January 1st to today)
+  function getYearToDateRange() {
+    const today = new Date();
+    const startOfYear = new Date(today.getFullYear(), 0, 1); // January 1st
+    
+    // Format dates as YYYY-MM-DD
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    return {
+      startDate: formatDate(startOfYear),
+      endDate: formatDate(today)
+    };
+  }
+  
+  // Load ASL MTD stats for a school (Year to Date)
+  async function loadASLMTDStats(schoolId, schoolName, startDate, endDate) {
+    const elementId = `asl-mtd-${schoolId}`;
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    try {
+      const payload = {
+        school_id: schoolId,
+        school_name: schoolName || ''
+      };
+      
+      // Add date range if provided - API expects YYYY-MM-DD format only (no time)
+      if (startDate && endDate) {
+        payload.start_date = startDate;  // Just YYYY-MM-DD
+        payload.end_date = endDate;      // Just YYYY-MM-DD
+      }
+      
+      const response = await fetch('/api/smartlearning-school', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.total_count !== undefined) {
+        element.textContent = data.total_count;
+      } else {
+        console.error(`ASL MTD API error for school ${schoolId}:`, data.error || 'Unknown error', data);
+        element.textContent = data.error ? 'Error' : 'N/A';
+      }
+    } catch (err) {
+      console.error(`Error loading ASL MTD stats for school ${schoolId}:`, err);
+      element.textContent = 'Error';
+    }
+  }
+  
+  // Load AL MTD stats for a school (Year to Date)
+  async function loadALMTDStats(schoolId, aslSchoolId, startDate, endDate) {
+    const elementId = `al-mtd-${schoolId}`;
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    try {
+      // Use asl_school_id for the API call
+      const aslId = aslSchoolId || schoolId;
+      let url = `/api/library/school_profile?asl_school_id=${encodeURIComponent(aslId)}`;
+      if (startDate && endDate) {
+        url += `&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
+      }
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (response.ok && data.total_active_users !== undefined) {
+        element.textContent = data.total_active_users;
+      } else {
+        console.error(`AL MTD API error for school ${schoolId} (asl_id: ${aslId}):`, data.error || data.message || 'Unknown error', data);
+        element.textContent = (data.error || data.message) ? 'Error' : 'N/A';
+      }
+    } catch (err) {
+      console.error(`Error loading AL MTD stats for school ${schoolId}:`, err);
+      element.textContent = 'Error';
+    }
+  }
+  
+  // Load all stats for a school row
+  async function loadSchoolStats(row, startDate, endDate) {
+    const schoolId = row.getAttribute('data-school-id');
+    const schoolName = row.getAttribute('data-school-name');
+    const aslSchoolId = row.getAttribute('data-asl-school-id');
+    
+    if (!schoolId) return;
+    
+    // Load stats in parallel with date range
+    await Promise.all([
+      loadASLMTDStats(schoolId, schoolName, startDate, endDate),
+      loadALMTDStats(schoolId, aslSchoolId, startDate, endDate)
+    ]);
+  }
+  
   // Auto-submit form on country change (already handled by onchange, but keeping for clarity)
   document.addEventListener('DOMContentLoaded', function() {
     const countrySelect = document.getElementById('countrySelect');
@@ -354,6 +458,15 @@
         // This ensures it works even if JavaScript is disabled
       });
     }
+    
+    // Get year-to-date date range
+    const { startDate, endDate } = getYearToDateRange();
+    
+    // Load stats for all school rows with year-to-date range
+    const schoolRows = document.querySelectorAll('tbody tr[data-school-id]');
+    schoolRows.forEach(function(row) {
+      loadSchoolStats(row, startDate, endDate);
+    });
     
     // Table search filter functionality
     const searchInput = document.getElementById('schoolSearch');
