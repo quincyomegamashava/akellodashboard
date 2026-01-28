@@ -1,615 +1,610 @@
 {% extends "base.html" %}
 
 {% block head_extra %}
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
 
-  <style>
-    .asl-color{
-      background-color: yellow !important;
+<style>
+  .asl-color {
+    background-color: yellow !important;
+  }
+
+  /* Glass Morphism Help Desk Styling */
+  /* Override base body background for help desk page */
+  body {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 50%, #f0f4f8 100%) !important;
+    min-height: 100vh;
+    overflow-x: hidden;
+    /* Prevent horizontal scrolling */
+    box-sizing: border-box;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  /* Sidebar font overrides removed to match base template */
+
+  .help-desk-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px;
+    position: relative;
+    width: 80%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  .modern-card {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .modern-card:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.85);
+  }
+
+  /* Glass Morphism Stat Cards */
+  .stat-card {
+    background: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    color: #1f2937 !important;
+    border-radius: 16px !important;
+    padding: 18px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3));
+  }
+
+  .stat-card.green::before {
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.3));
+  }
+
+  .stat-card.orange::before {
+    background: linear-gradient(90deg, rgba(251, 146, 60, 0.3), rgba(249, 115, 22, 0.3));
+  }
+
+  .stat-card.indigo::before {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3));
+  }
+
+  .stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  .stat-card h4,
+  .stat-card h2 {
+    margin: 0;
+    font-size: 2.2em;
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .stat-card p {
+    margin: 8px 0 0 0;
+    color: #6b7280;
+    font-size: 0.9em;
+    font-weight: 500;
+  }
+
+  /* Glass Morphism Action Card */
+  .action-card {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  .action-card:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.9);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  }
+
+  .action-card i {
+    font-size: 2.5em;
+    color: #6366f1;
+    margin-bottom: 12px;
+    filter: drop-shadow(0 2px 4px rgba(99, 102, 241, 0.2));
+  }
+
+  .action-card h4 {
+    color: #1f2937;
+    margin: 12px 0 8px 0;
+    font-weight: 600;
+  }
+
+  /* Glass Morphism Feature Card */
+  .feature-card {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  .feature-card:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    transform: translateY(-4px);
+    background: rgba(255, 255, 255, 0.85);
+  }
+
+  .feature-card-header {
+    padding: 12px 16px;
+    font-weight: 600;
+    color: white;
+    background: rgba(99, 102, 241, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .feature-card-body {
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  .feature-card-body h2 {
+    margin: 8px 0;
+    font-size: 1.75em;
+    color: #1f2937;
+  }
+
+  /* Glass Morphism Table */
+  .modern-table {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    table-layout: auto;
+  }
+
+  /* Responsive table wrapper */
+  .w3-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+
+  .w3-responsive table {
+    min-width: 100%;
+    width: auto;
+  }
+
+  .modern-table thead {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    color: #1f2937;
+    border-bottom: 2px solid rgba(99, 102, 241, 0.2);
+  }
+
+  .modern-table thead th {
+    font-weight: 600;
+    padding: 12px;
+  }
+
+  .modern-table tbody tr {
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  .modern-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.9);
+    transform: scale(1.01);
+  }
+
+  .modern-table tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  /* Glass Morphism Buttons */
+  .btn-modern {
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .btn-modern-primary {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    color: #6366f1;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2);
+  }
+
+  .btn-modern-primary:hover {
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.95);
+  }
+
+  .btn-modern-secondary {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    color: #374151;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  .btn-modern-secondary:hover {
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+
+  .status-badge-modern {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 500;
+    display: inline-block;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .status-grey-modern {
+    background: rgba(243, 244, 246, 0.8);
+    color: #6b7280;
+    border: 1px solid rgba(107, 114, 128, 0.2);
+  }
+
+  .status-orange-modern {
+    background: rgba(254, 243, 199, 0.8);
+    color: #d97706;
+    border: 1px solid rgba(217, 119, 6, 0.2);
+  }
+
+  .status-green-modern {
+    background: rgba(209, 250, 229, 0.8);
+    color: #059669;
+    border: 1px solid rgba(5, 150, 105, 0.2);
+  }
+
+  /* Glass Morphism Modal */
+  .modal-modern {
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .modal-header-modern {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 20px;
+    color: #1f2937;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .input-modern {
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 10px 14px;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .input-modern:focus {
+    outline: none;
+    border-color: rgba(99, 102, 241, 0.5);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    background: rgba(255, 255, 255, 0.95);
+  }
+
+  .tag-modern {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    margin: 4px;
+    background: rgba(224, 231, 255, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #4338ca;
+    font-weight: 500;
+    border: 1px solid rgba(67, 56, 202, 0.2);
+  }
+
+  /* Glass Morphism Header */
+  .glass-header {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    text-align: center;
+  }
+
+  .glass-header h2 {
+    margin: 0;
+    font-size: 2.2em;
+    font-weight: 700;
+    color: #1f2937;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .glass-header div {
+    font-size: 1.1em;
+    margin-top: 8px;
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  /* Chart containers */
+  #helpDeskDashboard .modern-card {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  /* Ensure stat cards stack properly on all screen sizes */
+  #helpDeskDashboard .w3-col {
+    width: 100%;
+    float: left;
+    box-sizing: border-box;
+  }
+
+  @media screen and (min-width: 601px) {
+    #helpDeskDashboard .w3-col.m3 {
+      width: 50%;
     }
-    
-    /* Glass Morphism Help Desk Styling */
-    /* Override base body background for help desk page */
-    body {
-      background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 50%, #f0f4f8 100%) !important;
-      min-height: 100vh;
-      overflow-x: hidden; /* Prevent horizontal scrolling */
-      box-sizing: border-box;
+  }
+
+  @media screen and (min-width: 993px) {
+    #helpDeskDashboard .w3-col.m3 {
+      width: 25%;
     }
-    
-    * {
-      box-sizing: border-box;
-    }
-    
-    /* Slightly increase sidebar nav font size */
-    aside nav {
-      font-size: 0.9375rem !important; /* 15px - slightly larger than default text-sm (14px) */
-    }
-    
-    aside .nav-link {
-      font-size: 0.9375rem !important; /* 15px */
-    }
-    
-    aside a {
-      font-size: 0.9375rem !important; /* 15px */
-    }
-    
+  }
+
+  /* Responsive Media Queries */
+  /* Tablets and smaller laptops (768px - 1024px) */
+  @media screen and (max-width: 1024px) {
     .help-desk-container {
-      max-width: 1200px;
-      margin: 0 auto;
       padding: 16px;
-      position: relative;
-      width: 80%;
-      overflow-x: hidden;
-      box-sizing: border-box;
     }
-    
-    .modern-card {
-      background: rgba(255, 255, 255, 0.75);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-radius: 16px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-      transition: all 0.3s ease;
-      border: 1px solid rgba(255, 255, 255, 0.3);
+
+    .stat-card h4,
+    .stat-card h2 {
+      font-size: 1.8em;
     }
-    
-    .modern-card:hover {
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-      transform: translateY(-2px);
-      background: rgba(255, 255, 255, 0.85);
-    }
-    
-    /* Glass Morphism Stat Cards */
-    .stat-card {
-      background: rgba(255, 255, 255, 0.8) !important;
-      backdrop-filter: blur(20px) !important;
-      -webkit-backdrop-filter: blur(20px) !important;
-      color: #1f2937 !important;
-      border-radius: 16px !important;
-      padding: 18px;
-      text-align: center;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
-      border: 1px solid rgba(255, 255, 255, 0.3) !important;
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .stat-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3));
-    }
-    
-    .stat-card.green::before {
-      background: linear-gradient(90deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.3));
-    }
-    
-    .stat-card.orange::before {
-      background: linear-gradient(90deg, rgba(251, 146, 60, 0.3), rgba(249, 115, 22, 0.3));
-    }
-    
-    .stat-card.indigo::before {
-      background: linear-gradient(90deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3));
-    }
-    
-    .stat-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-      background: rgba(255, 255, 255, 0.9);
-    }
-    
-    .stat-card h4, .stat-card h2 {
-      margin: 0;
-      font-size: 2.2em;
-      font-weight: 700;
-      color: #1f2937;
-    }
-    
-    .stat-card p {
-      margin: 8px 0 0 0;
-      color: #6b7280;
-      font-size: 0.9em;
-      font-weight: 500;
-    }
-    
-    /* Glass Morphism Action Card */
+
     .action-card {
-      background: rgba(255, 255, 255, 0.75);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-radius: 16px;
-      padding: 24px;
-      text-align: center;
-      cursor: pointer;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      transition: all 0.3s ease;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      padding: 20px;
     }
-    
-    .action-card:hover {
-      border-color: rgba(255, 255, 255, 0.5);
-      background: rgba(255, 255, 255, 0.9);
-      transform: translateY(-4px);
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-    }
-    
+
     .action-card i {
-      font-size: 2.5em;
-      color: #6366f1;
-      margin-bottom: 12px;
-      filter: drop-shadow(0 2px 4px rgba(99, 102, 241, 0.2));
+      font-size: 2.2em;
     }
-    
-    .action-card h4 {
-      color: #1f2937;
-      margin: 12px 0 8px 0;
-      font-weight: 600;
-    }
-    
-    /* Glass Morphism Feature Card */
-    .feature-card {
-      background: rgba(255, 255, 255, 0.75);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      transition: all 0.3s ease;
-      cursor: pointer;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    }
-    
-    .feature-card:hover {
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-      transform: translateY(-4px);
-      background: rgba(255, 255, 255, 0.85);
-    }
-    
-    .feature-card-header {
-      padding: 12px 16px;
-      font-weight: 600;
-      color: white;
-      background: rgba(99, 102, 241, 0.8);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    
-    .feature-card-body {
-      padding: 16px;
-      background: rgba(255, 255, 255, 0.5);
-    }
-    
+
     .feature-card-body h2 {
-      margin: 8px 0;
-      font-size: 1.75em;
-      color: #1f2937;
+      font-size: 1.5em;
     }
-    
-    /* Glass Morphism Table */
-    .modern-table {
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      background: rgba(255, 255, 255, 0.75);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-      width: 100%;
-      table-layout: auto;
+
+    .modal-header-modern {
+      padding: 16px;
     }
-    
-    /* Responsive table wrapper */
-    .w3-responsive {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      width: 100%;
-    }
-    
-    .w3-responsive table {
-      min-width: 100%;
-      width: auto;
-    }
-    
-    .modern-table thead {
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      color: #1f2937;
-      border-bottom: 2px solid rgba(99, 102, 241, 0.2);
-    }
-    
-    .modern-table thead th {
-      font-weight: 600;
+  }
+
+  /* Small laptops and tablets in landscape (768px - 991px) */
+  @media screen and (max-width: 991px) {
+    .help-desk-container {
       padding: 12px;
     }
-    
-    .modern-table tbody tr {
-      transition: all 0.2s ease;
-      background: rgba(255, 255, 255, 0.5);
-    }
-    
-    .modern-table tbody tr:hover {
-      background: rgba(255, 255, 255, 0.9);
-      transform: scale(1.01);
-    }
-    
-    .modern-table tbody td {
-      padding: 10px 12px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    }
-    
-    /* Glass Morphism Buttons */
-    .btn-modern {
-      border-radius: 10px;
-      padding: 8px 16px;
-      font-weight: 500;
-      transition: all 0.2s ease;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      cursor: pointer;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    
-    .btn-modern-primary {
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      color: #6366f1;
-      border: 1px solid rgba(99, 102, 241, 0.3);
-      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2);
-    }
-    
-    .btn-modern-primary:hover {
-      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
-      transform: translateY(-2px);
-      background: rgba(255, 255, 255, 0.95);
-    }
-    
-    .btn-modern-secondary {
-      background: rgba(255, 255, 255, 0.7);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      color: #374151;
-      border: 1px solid rgba(0, 0, 0, 0.1);
-    }
-    
-    .btn-modern-secondary:hover {
-      background: rgba(255, 255, 255, 0.9);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-    }
-    
-    .status-badge-modern {
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.85em;
-      font-weight: 500;
-      display: inline-block;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    
-    .status-grey-modern {
-      background: rgba(243, 244, 246, 0.8);
-      color: #6b7280;
-      border: 1px solid rgba(107, 114, 128, 0.2);
-    }
-    
-    .status-orange-modern {
-      background: rgba(254, 243, 199, 0.8);
-      color: #d97706;
-      border: 1px solid rgba(217, 119, 6, 0.2);
-    }
-    
-    .status-green-modern {
-      background: rgba(209, 250, 229, 0.8);
-      color: #059669;
-      border: 1px solid rgba(5, 150, 105, 0.2);
-    }
-    
-    /* Glass Morphism Modal */
-    .modal-modern {
-      border-radius: 20px;
-      overflow: hidden;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(30px);
-      -webkit-backdrop-filter: blur(30px);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-    }
-    
-    .modal-header-modern {
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+
+    .stat-card {
       padding: 20px;
-      color: #1f2937;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     }
-    
-    .input-modern {
-      border-radius: 10px;
-      border: 1px solid rgba(0, 0, 0, 0.1);
-      padding: 10px 14px;
-      transition: all 0.2s ease;
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+
+    .stat-card h4,
+    .stat-card h2 {
+      font-size: 1.75em;
     }
-    
-    .input-modern:focus {
-      outline: none;
-      border-color: rgba(99, 102, 241, 0.5);
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-      background: rgba(255, 255, 255, 0.95);
+
+    .action-card {
+      padding: 20px;
     }
-    
-    .tag-modern {
-      display: inline-block;
-      padding: 6px 12px;
-      border-radius: 20px;
+
+    .feature-card-body {
+      padding: 16px;
+    }
+
+    .feature-card-body h2 {
+      font-size: 1.5em;
+    }
+
+    .modern-card {
+      padding: 20px;
+    }
+  }
+
+  /* Tablets in portrait and small devices (max-width: 767px) */
+  @media screen and (max-width: 767px) {
+    .help-desk-container {
+      padding: 10px;
+    }
+
+    .stat-card {
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card h4,
+    .stat-card h2 {
+      font-size: 1.5em;
+    }
+
+    .stat-card p {
       font-size: 0.85em;
-      margin: 4px;
-      background: rgba(224, 231, 255, 0.8);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      color: #4338ca;
-      font-weight: 500;
-      border: 1px solid rgba(67, 56, 202, 0.2);
     }
-    
-    /* Glass Morphism Header */
+
+    .action-card {
+      padding: 20px;
+    }
+
+    .action-card i {
+      font-size: 2em;
+    }
+
+    .action-card h4 {
+      font-size: 1.25em;
+    }
+
+    .feature-card-header {
+      padding: 12px 16px;
+      font-size: 0.9em;
+    }
+
+    .feature-card-body {
+      padding: 12px;
+    }
+
+    .feature-card-body h2 {
+      font-size: 1.5em;
+    }
+
+    .modern-card {
+      padding: 16px;
+    }
+
+    .modal-header-modern {
+      padding: 16px;
+    }
+
     .glass-header {
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(30px);
-      -webkit-backdrop-filter: blur(30px);
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 24px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      text-align: center;
+      padding: 20px;
     }
-    
+
     .glass-header h2 {
-      margin: 0;
-      font-size: 2.2em;
-      font-weight: 700;
-      color: #1f2937;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      font-size: 2em;
     }
-    
-    .glass-header div {
+
+    .modern-table thead th {
+      padding: 12px 8px;
+      font-size: 0.85em;
+    }
+
+    .modern-table tbody td {
+      padding: 8px;
+      font-size: 0.85em;
+    }
+  }
+
+  /* Small mobile devices (max-width: 480px) */
+  @media screen and (max-width: 480px) {
+    .help-desk-container {
+      padding: 8px;
+    }
+
+    .stat-card {
+      padding: 12px;
+    }
+
+    .stat-card h4,
+    .stat-card h2 {
+      font-size: 1.25em;
+    }
+
+    .action-card {
+      padding: 16px;
+    }
+
+    .action-card i {
+      font-size: 1.75em;
+    }
+
+    .action-card h4 {
       font-size: 1.1em;
-      margin-top: 8px;
-      color: #6b7280;
-      font-weight: 500;
     }
-    
-    /* Chart containers */
-    #helpDeskDashboard .modern-card {
-      background: rgba(255, 255, 255, 0.75);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+
+    .feature-card-header {
+      padding: 10px 12px;
+      font-size: 0.85em;
     }
-    
-    /* Ensure stat cards stack properly on all screen sizes */
-    #helpDeskDashboard .w3-col {
-      width: 100%;
-      float: left;
-      box-sizing: border-box;
+
+    .feature-card-body {
+      padding: 10px;
     }
-    
-    @media screen and (min-width: 601px) {
-      #helpDeskDashboard .w3-col.m3 {
-        width: 50%;
-      }
+
+    .feature-card-body h2 {
+      font-size: 1.25em;
     }
-    
-    @media screen and (min-width: 993px) {
-      #helpDeskDashboard .w3-col.m3 {
-        width: 25%;
-      }
+
+    .modern-card {
+      padding: 12px;
     }
-    
-    /* Responsive Media Queries */
-    /* Tablets and smaller laptops (768px - 1024px) */
-    @media screen and (max-width: 1024px) {
-      .help-desk-container {
-        padding: 16px;
-      }
-      
-      .stat-card h4, .stat-card h2 {
-        font-size: 1.8em;
-      }
-      
-      .action-card {
-        padding: 20px;
-      }
-      
-      .action-card i {
-        font-size: 2.2em;
-      }
-      
-      .feature-card-body h2 {
-        font-size: 1.5em;
-      }
-      
-      .modal-header-modern {
-        padding: 16px;
-      }
+
+    .modal-header-modern {
+      padding: 12px;
     }
-    
-    /* Small laptops and tablets in landscape (768px - 991px) */
-    @media screen and (max-width: 991px) {
-      .help-desk-container {
-        padding: 12px;
-      }
-      
-      .stat-card {
-        padding: 20px;
-      }
-      
-      .stat-card h4, .stat-card h2 {
-        font-size: 1.75em;
-      }
-      
-      .action-card {
-        padding: 20px;
-      }
-      
-      .feature-card-body {
-        padding: 16px;
-      }
-      
-      .feature-card-body h2 {
-        font-size: 1.5em;
-      }
-      
-      .modern-card {
-        padding: 20px;
-      }
+
+    .glass-header {
+      padding: 16px;
     }
-    
-    /* Tablets in portrait and small devices (max-width: 767px) */
-    @media screen and (max-width: 767px) {
-      .help-desk-container {
-        padding: 10px;
-      }
-      
-      .stat-card {
-        padding: 16px;
-        margin-bottom: 16px;
-      }
-      
-      .stat-card h4, .stat-card h2 {
-        font-size: 1.5em;
-      }
-      
-      .stat-card p {
-        font-size: 0.85em;
-      }
-      
-      .action-card {
-        padding: 20px;
-      }
-      
-      .action-card i {
-        font-size: 2em;
-      }
-      
-      .action-card h4 {
-        font-size: 1.25em;
-      }
-      
-      .feature-card-header {
-        padding: 12px 16px;
-        font-size: 0.9em;
-      }
-      
-      .feature-card-body {
-        padding: 12px;
-      }
-      
-      .feature-card-body h2 {
-        font-size: 1.5em;
-      }
-      
-      .modern-card {
-        padding: 16px;
-      }
-      
-      .modal-header-modern {
-        padding: 16px;
-      }
-      
-      .glass-header {
-        padding: 20px;
-      }
-      
-      .glass-header h2 {
-        font-size: 2em;
-      }
-      
-      .modern-table thead th {
-        padding: 12px 8px;
-        font-size: 0.85em;
-      }
-      
-      .modern-table tbody td {
-        padding: 8px;
-        font-size: 0.85em;
-      }
+
+    .glass-header h2 {
+      font-size: 1.5em;
     }
-    
-    /* Small mobile devices (max-width: 480px) */
-    @media screen and (max-width: 480px) {
-      .help-desk-container {
-        padding: 8px;
-      }
-      
-      .stat-card {
-        padding: 12px;
-      }
-      
-      .stat-card h4, .stat-card h2 {
-        font-size: 1.25em;
-      }
-      
-      .action-card {
-        padding: 16px;
-      }
-      
-      .action-card i {
-        font-size: 1.75em;
-      }
-      
-      .action-card h4 {
-        font-size: 1.1em;
-      }
-      
-      .feature-card-header {
-        padding: 10px 12px;
-        font-size: 0.85em;
-      }
-      
-      .feature-card-body {
-        padding: 10px;
-      }
-      
-      .feature-card-body h2 {
-        font-size: 1.25em;
-      }
-      
-      .modern-card {
-        padding: 12px;
-      }
-      
-      .modal-header-modern {
-        padding: 12px;
-      }
-      
-      .glass-header {
-        padding: 16px;
-      }
-      
-      .glass-header h2 {
-        font-size: 1.5em;
-      }
-    }
-  </style>
+  }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -637,7 +632,7 @@
         </div>
       </div>
     </div>
-    
+
     <div class="w3-col s12 m6 l3" style="margin-bottom: 16px;">
       <div class="feature-card" onclick="document.getElementById('myQueriesModal').style.display='block'">
         <div class="feature-card-header">
@@ -649,7 +644,7 @@
         </div>
       </div>
     </div>
-    
+
     <div class="w3-col s12 m6 l3" style="margin-bottom: 16px;">
       <div class="feature-card" onclick="openEmailQueriesModal()">
         <div class="feature-card-header">
@@ -661,7 +656,7 @@
         </div>
       </div>
     </div>
-    
+
     <div class="w3-col s12 m6 l3" style="margin-bottom: 16px;">
       <div class="feature-card" onclick="document.getElementById('searchLibraryUsersModal').style.display='block'">
         <div class="feature-card-header">
@@ -673,9 +668,10 @@
         </div>
       </div>
     </div>
-    
+
     <div class="w3-col s12 m6 l3" style="margin-bottom: 16px;">
-      <div class="feature-card" onclick="document.getElementById('helpDeskNotificationsModal').style.display='block'; loadHelpDeskNotifications();">
+      <div class="feature-card"
+        onclick="document.getElementById('helpDeskNotificationsModal').style.display='block'; loadHelpDeskNotifications();">
         <div class="feature-card-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
           <b><i class="fa fa-bell"></i> Notifications</b>
         </div>
@@ -716,7 +712,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Charts Row -->
     <div class="w3-row-padding" style="margin-top: 24px;">
       <div class="w3-col s12 m6" style="margin-bottom: 20px;">
@@ -737,9 +733,11 @@
 
 <!-- Recent Queries Modal -->
 <div id="recentQueriesModal" class="w3-modal" style="z-index:2950;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
+  <div class="w3-modal-content w3-animate-top modal-modern"
+    style="width: 95vw; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
     <header class="modal-header-modern">
-      <span onclick="document.getElementById('recentQueriesModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
+      <span onclick="document.getElementById('recentQueriesModal').style.display='none'"
+        class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-list"></i> Recent Queries</h5>
     </header>
     <div class="w3-container" style="padding:16px;">
@@ -747,7 +745,8 @@
         <h4 class="w3-text-indigo">Recent Queries</h4>
         <div class="w3-margin-bottom w3-row-padding">
           <div class="w3-col s12 m7">
-            <input class="w3-input w3-border w3-round" id="querySearch" type="text" placeholder="Search queries..." oninput="filterQueries()">
+            <input class="w3-input w3-border w3-round" id="querySearch" type="text" placeholder="Search queries..."
+              oninput="filterQueries()">
           </div>
           <div class="w3-col s8 m3 w3-margin-top-small">
             <select id="statusFilter" class="w3-input w3-border w3-round" onchange="filterQueries()">
@@ -782,54 +781,62 @@
             <tbody>
               {% for q in queries %}
               {% set st = q.status if q.status else 'Not started' %}
-              {% set row_class = 'status-grey' if st == 'Not started' else ('status-orange' if st == 'Looking into it' else ('status-green' if st == 'Resolved' else '')) %}
+              {% set row_class = 'status-grey' if st == 'Not started' else ('status-orange' if st == 'Looking into it'
+              else ('status-green' if st == 'Resolved' else '')) %}
               {% set assignees = q._assignees_list|default([]) %}
               <tr data-status="{{ st }}" class="{{ row_class }}">
                 <td><strong>{{ q.query_title }}</strong></td>
                 <td>
                   {% if current_user.userRole == 'Admin' or current_user.has_privilege('Admin Queries Access') %}
-                    <select class="w3-input w3-border w3-round w3-small status-select" data-id="{{ q.id }}" onchange="onStatusChange(this);">
-                      <option value="Not started" {% if st=='Not started' %}selected{% endif %}>Not started</option>
-                      <option value="Looking into it" {% if st=='Looking into it' %}selected{% endif %}>Looking into it</option>
-                      <option value="Resolved" {% if st=='Resolved' %}selected{% endif %}>Resolved</option>
-                    </select>
+                  <select class="w3-input w3-border w3-round w3-small status-select" data-id="{{ q.id }}"
+                    onchange="onStatusChange(this);">
+                    <option value="Not started" {% if st=='Not started' %}selected{% endif %}>Not started</option>
+                    <option value="Looking into it" {% if st=='Looking into it' %}selected{% endif %}>Looking into it
+                    </option>
+                    <option value="Resolved" {% if st=='Resolved' %}selected{% endif %}>Resolved</option>
+                  </select>
                   {% else %}
-                    <span class="status-badge {{ row_class }}">{{ st }}</span>
+                  <span class="status-badge {{ row_class }}">{{ st }}</span>
                   {% endif %}
                 </td>
                 <td>{{ q.query_type }}</td>
                 <td>{{ q.created_by }}</td>
                 <td>
                   {% if assignees %}
-                    {% for assignee in assignees %}
-                      {% set role = assignee.userRole if assignee.userRole else 'N/A' %}
-                      <span class="w3-tag w3-blue w3-tiny w3-round" title="{{ assignee.email }} - {{ role }}">{{ assignee.firstname }} {{ assignee.lastname }} ({{ role }})</span>
-                    {% endfor %}
+                  {% for assignee in assignees %}
+                  {% set role = assignee.userRole if assignee.userRole else 'N/A' %}
+                  <span class="w3-tag w3-blue w3-tiny w3-round" title="{{ assignee.email }} - {{ role }}">{{
+                    assignee.firstname }} {{ assignee.lastname }} ({{ role }})</span>
+                  {% endfor %}
                   {% else %}
-                    <span class="w3-text-gray w3-tiny">Unassigned</span>
+                  <span class="w3-text-gray w3-tiny">Unassigned</span>
                   {% endif %}
                 </td>
                 <td>{{ q.timestamp.strftime('%Y-%m-%d %H:%M') if q.timestamp else '' }}</td>
                 <td>
                   {% if q.image_path %}
-                    <a class="w3-button w3-tiny w3-border w3-round" href="{{ q.image_path }}" target="_blank">View</a>
+                  <a class="w3-button w3-tiny w3-border w3-round" href="{{ q.image_path }}" target="_blank">View</a>
                   {% else %}
-                    <span class="w3-text-gray">None</span>
+                  <span class="w3-text-gray">None</span>
                   {% endif %}
                 </td>
                 <td>
-                  <button class="w3-button w3-tiny w3-indigo w3-round" onclick="viewQueryDetails({{ q.id }})" title="View full details">
+                  <button class="w3-button w3-tiny w3-indigo w3-round" onclick="viewQueryDetails({{ q.id }})"
+                    title="View full details">
                     <i class="fa fa-eye"></i> View
                   </button>
                   {% if current_user.userRole == 'Admin' %}
-                  <button class="w3-button w3-tiny w3-red w3-round" onclick="deleteQuery({{ q.id }})" title="Delete query">
+                  <button class="w3-button w3-tiny w3-red w3-round" onclick="deleteQuery({{ q.id }})"
+                    title="Delete query">
                     <i class="fa fa-trash"></i> Delete
                   </button>
                   {% endif %}
                 </td>
               </tr>
               {% else %}
-              <tr><td colspan="8" class="w3-center w3-text-gray">No queries yet</td></tr>
+              <tr>
+                <td colspan="8" class="w3-center w3-text-gray">No queries yet</td>
+              </tr>
               {% endfor %}
             </tbody>
           </table>
@@ -841,9 +848,11 @@
 
 <!-- Query Details Modal -->
 <div id="queryDetailsModal" class="w3-modal" style="z-index:3000;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 900px; max-height: 90vh; overflow-y: auto;">
+  <div class="w3-modal-content w3-animate-top modal-modern"
+    style="width: 95vw; max-width: 900px; max-height: 90vh; overflow-y: auto;">
     <header class="modal-header-modern">
-      <span onclick="document.getElementById('queryDetailsModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
+      <span onclick="document.getElementById('queryDetailsModal').style.display='none'"
+        class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-info-circle"></i> Query Details</h5>
     </header>
     <div class="w3-container" style="padding:16px;">
@@ -859,9 +868,11 @@
 
 <!-- My Queries Modal -->
 <div id="myQueriesModal" class="w3-modal" style="z-index:2950;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
+  <div class="w3-modal-content w3-animate-top modal-modern"
+    style="width: 95vw; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
     <header class="modal-header-modern">
-      <span onclick="document.getElementById('myQueriesModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
+      <span onclick="document.getElementById('myQueriesModal').style.display='none'"
+        class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-user"></i> My Queries</h5>
     </header>
     <div class="w3-container" style="padding:16px;">
@@ -869,7 +880,8 @@
         <h4 class="w3-text-indigo">My Queries</h4>
         <div class="w3-margin-bottom w3-row-padding">
           <div class="w3-col s12 m8">
-            <input class="w3-input w3-border w3-round" id="myQuerySearch" type="text" placeholder="Search my queries..." oninput="filterQueries()">
+            <input class="w3-input w3-border w3-round" id="myQuerySearch" type="text" placeholder="Search my queries..."
+              oninput="filterQueries()">
           </div>
           <div class="w3-col s12 m4 w3-margin-top-small">
             <select id="myStatusFilter" class="w3-input w3-border w3-round" onchange="filterQueries()">
@@ -893,21 +905,24 @@
             <tbody>
               {% for q in my_queries %}
               {% set st = q.status if q.status else 'Not started' %}
-              {% set row_class = 'status-grey' if st == 'Not started' else ('status-orange' if st == 'Looking into it' else ('status-green' if st == 'Resolved' else '')) %}
+              {% set row_class = 'status-grey' if st == 'Not started' else ('status-orange' if st == 'Looking into it'
+              else ('status-green' if st == 'Resolved' else '')) %}
               <tr data-status="{{ st }}" class="{{ row_class }}">
                 <td>{{ q.query_title }}</td>
                 <td><span class="status-badge {{ row_class }}">{{ st }}</span></td>
                 <td>{{ q.timestamp.strftime('%Y-%m-%d %H:%M') if q.timestamp else '' }}</td>
                 <td>
                   {% if q.image_path %}
-                    <a class="w3-button w3-tiny w3-border w3-round" href="{{ q.image_path }}" target="_blank">View</a>
+                  <a class="w3-button w3-tiny w3-border w3-round" href="{{ q.image_path }}" target="_blank">View</a>
                   {% else %}
-                    <span class="w3-text-gray">None</span>
+                  <span class="w3-text-gray">None</span>
                   {% endif %}
                 </td>
               </tr>
               {% else %}
-              <tr><td colspan="4" class="w3-center w3-text-gray">You have not logged any queries yet</td></tr>
+              <tr>
+                <td colspan="4" class="w3-center w3-text-gray">You have not logged any queries yet</td>
+              </tr>
               {% endfor %}
             </tbody>
           </table>
@@ -919,18 +934,22 @@
 
 <!-- Help Desk Notifications Modal -->
 <div id="helpDeskNotificationsModal" class="w3-modal" style="z-index:2950;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 600px; max-height: 85vh; overflow-y: auto;">
+  <div class="w3-modal-content w3-animate-top modal-modern"
+    style="width: 95vw; max-width: 600px; max-height: 85vh; overflow-y: auto;">
     <header class="modal-header-modern">
-      <span onclick="document.getElementById('helpDeskNotificationsModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
+      <span onclick="document.getElementById('helpDeskNotificationsModal').style.display='none'"
+        class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-bell"></i> Query Notifications</h5>
     </header>
     <div class="w3-container" style="padding:16px;">
       <div class="w3-card w3-white w3-round w3-padding">
         <div class="w3-margin-bottom">
-          <button class="w3-button w3-small w3-indigo w3-round" onclick="loadHelpDeskNotifications()" title="Refresh notifications">
+          <button class="w3-button w3-small w3-indigo w3-round" onclick="loadHelpDeskNotifications()"
+            title="Refresh notifications">
             <i class="fa fa-refresh"></i> Refresh
           </button>
-          <button class="w3-button w3-small w3-green w3-round" onclick="markAllNotificationsRead()" title="Mark all as read">
+          <button class="w3-button w3-small w3-green w3-round" onclick="markAllNotificationsRead()"
+            title="Mark all as read">
             <i class="fa fa-check"></i> Mark All Read
           </button>
         </div>
@@ -946,46 +965,54 @@
 
 <!-- Search Library Users Modal -->
 <div id="searchLibraryUsersModal" class="w3-modal" style="z-index:2950;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
+  <div class="w3-modal-content w3-animate-top modal-modern"
+    style="width: 95vw; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
     <header class="modal-header-modern">
-      <span onclick="document.getElementById('searchLibraryUsersModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
+      <span onclick="document.getElementById('searchLibraryUsersModal').style.display='none'"
+        class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-search"></i> Search Library Users</h5>
     </header>
     <div class="w3-container" style="padding:16px;">
       <div class="w3-card w3-white w3-round w3-padding">
         <h4 class="w3-text-orange">Search Library Users</h4>
-        
+
         <!-- Basic Search: Email -->
         <div class="w3-margin-bottom">
           <label class="w3-small w3-text-gray"><i class="fa fa-envelope"></i> Email Address</label>
-          <input class="w3-input w3-border w3-round" id="libraryUserEmailSearch" type="email" placeholder="Enter email address..." onkeypress="if(event.key==='Enter') searchLibraryUsers()">
+          <input class="w3-input w3-border w3-round" id="libraryUserEmailSearch" type="email"
+            placeholder="Enter email address..." onkeypress="if(event.key==='Enter') searchLibraryUsers()">
         </div>
-        
+
         <!-- Advanced Search Toggle -->
         <div class="w3-margin-bottom">
-          <button class="w3-button w3-small w3-light-gray w3-round" onclick="toggleAdvancedSearch()" id="toggleAdvancedSearchBtn">
+          <button class="w3-button w3-small w3-light-gray w3-round" onclick="toggleAdvancedSearch()"
+            id="toggleAdvancedSearchBtn">
             <i class="fa fa-chevron-down" id="advancedSearchIcon"></i> Advanced Search (First Name / Last Name)
           </button>
         </div>
-        
+
         <!-- Advanced Search Fields -->
         <div id="advancedSearchSection" style="display:none;" class="w3-margin-bottom">
           <div class="w3-panel w3-light-gray w3-round w3-padding-small">
             <label class="w3-small w3-text-gray"><i class="fa fa-user"></i> First Name</label>
-            <input class="w3-input w3-border w3-round w3-margin-bottom" id="libraryUserFirstNameSearch" type="text" placeholder="Enter first name..." onkeypress="if(event.key==='Enter') searchLibraryUsers()">
-            
+            <input class="w3-input w3-border w3-round w3-margin-bottom" id="libraryUserFirstNameSearch" type="text"
+              placeholder="Enter first name..." onkeypress="if(event.key==='Enter') searchLibraryUsers()">
+
             <label class="w3-small w3-text-gray"><i class="fa fa-user"></i> Last Name</label>
-            <input class="w3-input w3-border w3-round" id="libraryUserLastNameSearch" type="text" placeholder="Enter last name..." onkeypress="if(event.key==='Enter') searchLibraryUsers()">
-            
+            <input class="w3-input w3-border w3-round" id="libraryUserLastNameSearch" type="text"
+              placeholder="Enter last name..." onkeypress="if(event.key==='Enter') searchLibraryUsers()">
+
             <p class="w3-tiny w3-text-gray w3-margin-top">
-              <i class="fa fa-info-circle"></i> You can search by email only, or use first name and/or last name. All fields use AND logic when multiple are provided.
+              <i class="fa fa-info-circle"></i> You can search by email only, or use first name and/or last name. All
+              fields use AND logic when multiple are provided.
             </p>
           </div>
         </div>
-        
+
         <!-- Search Button -->
         <div class="w3-margin-bottom">
-          <button class="w3-button w3-orange w3-round w3-block" onclick="searchLibraryUsers()" id="searchLibraryUsersBtn">
+          <button class="w3-button w3-orange w3-round w3-block" onclick="searchLibraryUsers()"
+            id="searchLibraryUsersBtn">
             <i class="fa fa-search"></i> Search
           </button>
         </div>
@@ -1029,7 +1056,8 @@
 <div id="createQueryModal" class="w3-modal" style="z-index:2950;">
   <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 700px;">
     <header class="modal-header-modern">
-      <span onclick="document.getElementById('createQueryModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
+      <span onclick="document.getElementById('createQueryModal').style.display='none'"
+        class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-plus-circle"></i> Create a Query</h5>
     </header>
     <div class="w3-container" style="padding:16px;">
@@ -1049,7 +1077,8 @@
           <p class="w3-small w3-text-gray">How would you like to log this query?</p>
           <div class="w3-row-padding">
             <div class="w3-col s6">
-              <button type="button" class="w3-button w3-block w3-round w3-light-gray w3-border choice" data-value="anonymous">
+              <button type="button" class="w3-button w3-block w3-round w3-light-gray w3-border choice"
+                data-value="anonymous">
                 <i class="fas fa-user-secret"></i> Anonymous
               </button>
             </div>
@@ -1067,7 +1096,8 @@
           <p>{{ form.query_title.label(class="w3-small") }}</p>
           {{ form.query_title(class="w3-input w3-border w3-round", placeholder="Brief title") }}
           <p class="w3-margin-top">{{ form.query_description.label(class="w3-small") }}</p>
-          {{ form.query_description(class="w3-input w3-border w3-round", rows="5", placeholder="Describe your issue...") }}
+          {{ form.query_description(class="w3-input w3-border w3-round", rows="5", placeholder="Describe your issue...")
+          }}
         </div>
 
         <!-- Step 3: Attachment -->
@@ -1091,7 +1121,8 @@
 
         <!-- Nav buttons -->
         <div class="w3-margin-top">
-          <button type="button" class="w3-button w3-round w3-light-gray" id="prevBtn" onclick="prevStep()" disabled>Back</button>
+          <button type="button" class="w3-button w3-round w3-light-gray" id="prevBtn" onclick="prevStep()"
+            disabled>Back</button>
           <button type="button" class="w3-button w3-round w3-indigo" id="nextBtn" onclick="nextStep()">Next</button>
         </div>
       </form>
@@ -1103,21 +1134,26 @@
 <div id="userAssignmentModal" class="w3-modal" style="z-index:3000;">
   <div class="w3-modal-content w3-animate-top w3-card-4 modal-modern" style="width: 95vw; max-width: 600px;">
     <header class="modal-header-modern">
-      <span onclick="closeUserAssignmentModal()" class="w3-button w3-display-topright" style="color: white; font-size: 24px;">&times;</span>
+      <span onclick="closeUserAssignmentModal()" class="w3-button w3-display-topright"
+        style="color: white; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" id="assignmentModalTitle"><i class="fa fa-users"></i> Assign Query to Users</h5>
     </header>
     <div class="w3-container" style="padding:16px;">
       <div class="w3-card w3-white w3-round w3-padding">
         <p class="w3-small w3-text-gray">Search and select users to assign this query to:</p>
         <div class="w3-margin-bottom">
-          <input class="w3-input w3-border w3-round" id="userSearchInput" type="text" placeholder="Search users by name, username, or email..." onkeyup="searchUsersForAssignment()" oninput="searchUsersForAssignment()">
+          <input class="w3-input w3-border w3-round" id="userSearchInput" type="text"
+            placeholder="Search users by name, username, or email..." onkeyup="searchUsersForAssignment()"
+            oninput="searchUsersForAssignment()">
         </div>
-        <div id="userSearchResults" class="w3-margin-bottom" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
+        <div id="userSearchResults" class="w3-margin-bottom"
+          style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
           <p class="w3-text-gray w3-small w3-center">Start typing to search for users...</p>
         </div>
         <div id="selectedUsers" class="w3-margin-bottom">
           <p class="w3-small w3-text-gray"><strong>Selected Users:</strong></p>
-          <div id="selectedUsersList" class="w3-padding-small" style="min-height: 40px; border: 1px solid #ddd; border-radius: 4px;">
+          <div id="selectedUsersList" class="w3-padding-small"
+            style="min-height: 40px; border: 1px solid #ddd; border-radius: 4px;">
             <p class="w3-text-gray w3-tiny w3-center">No users selected</p>
           </div>
         </div>
@@ -1136,49 +1172,57 @@
 
 <!-- Email Queries Modal -->
 <div id="emailQueriesModal" class="w3-modal" style="z-index:2950;">
-  <div class="w3-modal-content w3-animate-top modal-modern" style="width: 95vw; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
+  <div class="w3-modal-content w3-animate-top modal-modern"
+    style="width: 95vw; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
     <header class="modal-header-modern">
-      <span onclick="document.getElementById('emailQueriesModal').style.display='none'" class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
+      <span onclick="document.getElementById('emailQueriesModal').style.display='none'"
+        class="w3-button w3-display-topright" style="color: #1f2937; font-size: 24px;">&times;</span>
       <h5 class="w3-margin-0" style="color: #1f2937;"><i class="fa fa-envelope"></i> Email Queries</h5>
     </header>
     <div class="w3-container" style="padding:16px;">
       <div class="w3-card w3-white w3-round w3-padding">
         <h4 class="w3-text-deep-purple">Queries from Email</h4>
-        
+
         <!-- Email Source Toggle -->
         <div class="w3-margin-bottom">
           <label class="w3-small w3-text-gray"><i class="fa fa-envelope"></i> Email Source:</label>
           <div class="w3-bar w3-border w3-round" style="display:inline-flex; width:100%;">
-            <button class="w3-bar-item w3-button email-source-btn active" data-source="outlook" onclick="switchEmailSource('outlook')" style="flex:1;">
+            <button class="w3-bar-item w3-button email-source-btn active" data-source="outlook"
+              onclick="switchEmailSource('outlook')" style="flex:1;">
               <i class="fa fa-windows"></i> Outlook
             </button>
-            <button class="w3-bar-item w3-button email-source-btn" data-source="gmail" onclick="switchEmailSource('gmail')" style="flex:1;">
+            <button class="w3-bar-item w3-button email-source-btn" data-source="gmail"
+              onclick="switchEmailSource('gmail')" style="flex:1;">
               <i class="fa fa-google"></i> Gmail
             </button>
           </div>
         </div>
-        
+
         <div id="microsoftAuthStatus" class="w3-margin-bottom" style="display:none;">
           <div class="w3-panel w3-yellow w3-round">
-            <p class="w3-small"><i class="fa fa-exclamation-triangle"></i> <span id="authStatusMessage">Not connected to Outlook</span></p>
+            <p class="w3-small"><i class="fa fa-exclamation-triangle"></i> <span id="authStatusMessage">Not connected to
+                Outlook</span></p>
             <button class="w3-button w3-small w3-blue w3-round" onclick="connectToMicrosoft()" id="connectBtn">
               <i class="fa fa-plug"></i> Connect to Outlook
             </button>
-            <button class="w3-button w3-small w3-red w3-round" onclick="disconnectMicrosoft()" id="disconnectBtn" style="display:none;">
+            <button class="w3-button w3-small w3-red w3-round" onclick="disconnectMicrosoft()" id="disconnectBtn"
+              style="display:none;">
               <i class="fa fa-unlink"></i> Disconnect
             </button>
           </div>
         </div>
-        
+
         <div id="gmailConfigStatus" class="w3-margin-bottom" style="display:none;">
           <div class="w3-panel w3-yellow w3-round">
-            <p class="w3-small"><i class="fa fa-exclamation-triangle"></i> <span id="gmailConfigMessage">Gmail configuration may be missing</span></p>
+            <p class="w3-small"><i class="fa fa-exclamation-triangle"></i> <span id="gmailConfigMessage">Gmail
+                configuration may be missing</span></p>
           </div>
         </div>
-        
+
         <div class="w3-margin-bottom w3-row-padding">
           <div class="w3-col s12 m8">
-            <input class="w3-input w3-border w3-round" id="emailQuerySearch" type="text" placeholder="Search email queries..." oninput="filterEmailQueries()">
+            <input class="w3-input w3-border w3-round" id="emailQuerySearch" type="text"
+              placeholder="Search email queries..." oninput="filterEmailQueries()">
           </div>
           <div class="w3-col s12 m4 w3-margin-top-small">
             <button class="w3-button w3-indigo w3-round w3-block" onclick="fetchEmailQueries()" id="refreshEmailsBtn">
@@ -1203,7 +1247,9 @@
               </tr>
             </thead>
             <tbody id="emailQueriesBody">
-              <tr><td colspan="6" class="w3-center w3-text-gray">Click "Refresh Emails" to load email queries</td></tr>
+              <tr>
+                <td colspan="6" class="w3-center w3-text-gray">Click "Refresh Emails" to load email queries</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -1213,14 +1259,61 @@
 </div>
 
 <style>
-  .modal-gradient-header{background:linear-gradient(135deg,#4f46e5,#06b6d4)}
-  .step{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#eef2ff;color:#3730a3;font-weight:600;margin-right:6px;border:1px solid #c7d2fe}
-  .step.active{background:#3730a3;color:#fff;border-color:#3730a3}
-  .choice{border:1px solid #dbeafe}
-  .status-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-weight:600}
-  .status-grey .status-badge, .status-grey select{background:#f3f4f6;color:#374151;border-color:#e5e7eb}
-  .status-orange .status-badge, .status-orange select{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
-  .status-green .status-badge, .status-green select{background:#ecfdf5;color:#065f46;border-color:#a7f3d0}
+  .modal-gradient-header {
+    background: linear-gradient(135deg, #4f46e5, #06b6d4)
+  }
+
+  .step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #eef2ff;
+    color: #3730a3;
+    font-weight: 600;
+    margin-right: 6px;
+    border: 1px solid #c7d2fe
+  }
+
+  .step.active {
+    background: #3730a3;
+    color: #fff;
+    border-color: #3730a3
+  }
+
+  .choice {
+    border: 1px solid #dbeafe
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-weight: 600
+  }
+
+  .status-grey .status-badge,
+  .status-grey select {
+    background: #f3f4f6;
+    color: #374151;
+    border-color: #e5e7eb
+  }
+
+  .status-orange .status-badge,
+  .status-orange select {
+    background: #fff7ed;
+    color: #9a3412;
+    border-color: #fed7aa
+  }
+
+  .status-green .status-badge,
+  .status-green select {
+    background: #ecfdf5;
+    color: #065f46;
+    border-color: #a7f3d0
+  }
 </style>
 
 <script>
@@ -1230,7 +1323,7 @@
   // Open create query modal and reset form
   function openCreateQueryModal() {
     currentStep = 1;
-    document.getElementById('createQueryModal').style.display='block';
+    document.getElementById('createQueryModal').style.display = 'block';
     showStep(1);
     // Reset form
     const form = document.getElementById('helpDeskForm');
@@ -1243,29 +1336,29 @@
     }
   }
 
-  function showStep(n){
-    document.querySelectorAll('.step-pane').forEach(p=>p.style.display='none');
+  function showStep(n) {
+    document.querySelectorAll('.step-pane').forEach(p => p.style.display = 'none');
     const pane = document.querySelector(`.step-pane[data-step="${n}"]`);
     if (pane) pane.style.display = '';
-    document.querySelectorAll('.step').forEach((s,i)=>{
-      s.classList.toggle('active', (i+1)===n);
+    document.querySelectorAll('.step').forEach((s, i) => {
+      s.classList.toggle('active', (i + 1) === n);
     });
-    document.getElementById('prevBtn').disabled = n===1;
-    document.getElementById('nextBtn').textContent = n===totalSteps ? 'Review' : 'Next';
+    document.getElementById('prevBtn').disabled = n === 1;
+    document.getElementById('nextBtn').textContent = n === totalSteps ? 'Review' : 'Next';
   }
 
-  function nextStep(){
-    if (currentStep===1){
+  function nextStep() {
+    if (currentStep === 1) {
       const v = document.getElementById('queryTypeHidden').value;
-      if (!v){ alert('Please choose Anonymous or As myself'); return; }
+      if (!v) { alert('Please choose Anonymous or As myself'); return; }
     }
-    if (currentStep===2){
+    if (currentStep === 2) {
       const t = document.getElementById('{{ form.query_title.id }}').value.trim();
       const d = document.getElementById('{{ form.query_description.id }}').value.trim();
-      if (!t || !d){ alert('Please provide a title and description'); return; }
+      if (!t || !d) { alert('Please provide a title and description'); return; }
     }
-    if (currentStep<totalSteps){ currentStep++; }
-    if (currentStep===4){
+    if (currentStep < totalSteps) { currentStep++; }
+    if (currentStep === 4) {
       document.getElementById('reviewIdentity').textContent = document.getElementById('queryTypeHidden').value || '-';
       document.getElementById('reviewTitle').textContent = document.getElementById('{{ form.query_title.id }}').value || '-';
       document.getElementById('reviewDesc').textContent = document.getElementById('{{ form.query_description.id }}').value || '-';
@@ -1277,71 +1370,71 @@
     }
     showStep(currentStep);
   }
-  function prevStep(){
-    if (currentStep>1){ currentStep--; }
+  function prevStep() {
+    if (currentStep > 1) { currentStep--; }
     document.getElementById('nextBtn').style.display = '';
     showStep(currentStep);
   }
 
   // Identity choices
-  document.addEventListener('click', function(e){
-    if (e.target.closest('.choice')){
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('.choice')) {
       const v = e.target.closest('.choice').dataset.value;
       document.getElementById('queryTypeHidden').value = v;
       nextStep();
     }
   });
 
-  function filterTable(tableId, searchId, statusId){
-    const f = (document.getElementById(searchId).value||'').toLowerCase();
-    const st = (document.getElementById(statusId).value||'');
-    document.querySelectorAll(`#${tableId} tbody tr`).forEach(tr=>{
+  function filterTable(tableId, searchId, statusId) {
+    const f = (document.getElementById(searchId).value || '').toLowerCase();
+    const st = (document.getElementById(statusId).value || '');
+    document.querySelectorAll(`#${tableId} tbody tr`).forEach(tr => {
       const matchesText = tr.textContent.toLowerCase().includes(f);
       const matchesStatus = !st || (tr.getAttribute('data-status') === st);
       tr.style.display = (matchesText && matchesStatus) ? '' : 'none';
     });
   }
-  function filterQueries(){
-    if (document.getElementById('queriesTable')){
-      filterTable('queriesTable','querySearch','statusFilter');
+  function filterQueries() {
+    if (document.getElementById('queriesTable')) {
+      filterTable('queriesTable', 'querySearch', 'statusFilter');
     }
-    if (document.getElementById('myQueriesTable')){
-      filterTable('myQueriesTable','myQuerySearch','myStatusFilter');
+    if (document.getElementById('myQueriesTable')) {
+      filterTable('myQueriesTable', 'myQuerySearch', 'myStatusFilter');
     }
   }
 
-  async function onStatusChange(sel){
+  async function onStatusChange(sel) {
     const id = sel.dataset.id;
     const status = sel.value;
-    try{
-      const res = await fetch(`/help-desk/${id}/status`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status})});
-      if(!res.ok){ const e = await res.json(); alert('Failed to update status: ' + (e.error||res.status)); return; }
+    try {
+      const res = await fetch(`/help-desk/${id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+      if (!res.ok) { const e = await res.json(); alert('Failed to update status: ' + (e.error || res.status)); return; }
       const tr = sel.closest('tr');
       tr.setAttribute('data-status', status);
-      tr.classList.remove('status-grey','status-orange','status-green');
-      if(status==='Not started') tr.classList.add('status-grey');
-      else if(status==='Looking into it') tr.classList.add('status-orange');
-      else if(status==='Resolved') tr.classList.add('status-green');
-      
+      tr.classList.remove('status-grey', 'status-orange', 'status-green');
+      if (status === 'Not started') tr.classList.add('status-grey');
+      else if (status === 'Looking into it') tr.classList.add('status-orange');
+      else if (status === 'Resolved') tr.classList.add('status-green');
+
       // Refresh notifications after status change
       refreshHelpDeskNotifications();
-    }catch(err){ alert('Network error: ' + err.message); }
+    } catch (err) { alert('Network error: ' + err.message); }
   }
 
-  async function deleteQuery(id){
-    if(!confirm('Delete this query?')) return;
-    try{
-      const res = await fetch(`/help-desk/${id}`, {method:'DELETE'});
-      if(!res.ok){ const e = await res.json(); alert('Failed to delete: ' + (e.error||res.status)); return; }
+  async function deleteQuery(id) {
+    if (!confirm('Delete this query?')) return;
+    try {
+      const res = await fetch(`/help-desk/${id}`, { method: 'DELETE' });
+      if (!res.ok) { const e = await res.json(); alert('Failed to delete: ' + (e.error || res.status)); return; }
       const row = document.querySelector(`#queriesTable tbody tr td button[onclick="deleteQuery(${id})"]`).closest('tr');
-      if(row) row.remove();
-    }catch(err){ alert('Network error: ' + err.message); }
+      if (row) row.remove();
+    } catch (err) { alert('Network error: ' + err.message); }
   }
 
-  async function viewQueryDetails(queryId){
+  async function viewQueryDetails(queryId) {
     const modal = document.getElementById('queryDetailsModal');
     const content = document.getElementById('queryDetailsContent');
-    
+
     // Show modal and loading state
     modal.style.display = 'block';
     content.innerHTML = `
@@ -1350,24 +1443,24 @@
         <p>Loading query details...</p>
       </div>
     `;
-    
+
     try {
       const response = await fetch(`/api/help-desk/query/${queryId}`);
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch query details');
       }
-      
+
       // Format timestamp
       const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleString() : 'N/A';
       const resolvedAt = data.resolved_at ? new Date(data.resolved_at).toLocaleString() : null;
-      
+
       // Determine status badge class
       let statusClass = 'w3-gray';
       if (data.status === 'Looking into it') statusClass = 'w3-orange';
       else if (data.status === 'Resolved') statusClass = 'w3-green';
-      
+
       // Build assignees HTML
       let assigneesHtml = '';
       if (data.assignees && data.assignees.length > 0) {
@@ -1385,7 +1478,7 @@
       } else {
         assigneesHtml = '<span class="w3-text-gray w3-small">No assignees</span>';
       }
-      
+
       // Build image HTML
       let imageHtml = '';
       if (data.image_path) {
@@ -1400,7 +1493,7 @@
           </div>
         `;
       }
-      
+
       // Build the full content HTML
       content.innerHTML = `
         <div class="w3-card w3-white w3-round w3-padding">
@@ -1473,10 +1566,10 @@
           ${imageHtml}
         </div>
       `;
-      
+
       // Store current query ID for assignment editing
       window.currentQueryId = queryId;
-      
+
     } catch (error) {
       content.innerHTML = `
         <div class="w3-panel w3-red w3-round">
@@ -1487,7 +1580,7 @@
       `;
     }
   }
-  
+
   // Helper function to escape HTML
   function escapeHtml(text) {
     if (text === null || text === undefined) return '';
@@ -1498,26 +1591,26 @@
 
   // Initialize
   showStep(currentStep);
-  
+
   // Handle form submission - close modal on success
   const helpDeskForm = document.getElementById('helpDeskForm');
   if (helpDeskForm) {
-    helpDeskForm.addEventListener('submit', function(e) {
+    helpDeskForm.addEventListener('submit', function (e) {
       // Form will submit normally, but we can add a handler here if needed
       // The page will reload on successful submission, so modal will close automatically
     });
   }
 
   // ===== Email Queries Functions =====
-  
+
   // Store current email source (default: 'outlook')
   let currentEmailSource = localStorage.getItem('emailSource') || 'outlook';
-  
+
   // Switch email source
   function switchEmailSource(source) {
     currentEmailSource = source;
     localStorage.setItem('emailSource', source);
-    
+
     // Update button styles
     document.querySelectorAll('.email-source-btn').forEach(btn => {
       if (btn.dataset.source === source) {
@@ -1530,11 +1623,11 @@
         btn.classList.add('w3-light-gray');
       }
     });
-    
+
     // Show/hide auth status based on source
     const microsoftAuthDiv = document.getElementById('microsoftAuthStatus');
     const gmailConfigDiv = document.getElementById('gmailConfigStatus');
-    
+
     if (source === 'outlook') {
       microsoftAuthDiv.style.display = 'block';
       gmailConfigDiv.style.display = 'none';
@@ -1545,31 +1638,31 @@
       // Check Gmail config status
       checkGmailConfig();
     }
-    
+
     // Clear current email list
     document.getElementById('emailQueriesBody').innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">Click "Refresh Emails" to load email queries</td></tr>';
   }
-  
+
   // Check Gmail configuration status
   async function checkGmailConfig() {
     const gmailConfigDiv = document.getElementById('gmailConfigStatus');
     const gmailConfigMsg = document.getElementById('gmailConfigMessage');
-    
+
     // Don't check config on modal open, just show status
     // The actual fetch will show the real status
     gmailConfigDiv.className = 'w3-margin-bottom w3-panel w3-blue w3-round';
     gmailConfigMsg.innerHTML = '<i class="fa fa-info-circle"></i> Click "Refresh Emails" to load Gmail emails';
   }
-  
+
   // Open email queries modal and check auth status
   function openEmailQueriesModal() {
-    document.getElementById('emailQueriesModal').style.display='block';
-    
+    document.getElementById('emailQueriesModal').style.display = 'block';
+
     // Initialize email source toggle
     const savedSource = localStorage.getItem('emailSource') || 'outlook';
     switchEmailSource(savedSource);
   }
-  
+
   // Check Microsoft authentication status
   async function checkMicrosoftAuth() {
     try {
@@ -1579,7 +1672,7 @@
       const authStatusMsg = document.getElementById('authStatusMessage');
       const connectBtn = document.getElementById('connectBtn');
       const disconnectBtn = document.getElementById('disconnectBtn');
-      
+
       if (data.authenticated) {
         authStatusDiv.style.display = 'block';
         authStatusDiv.className = 'w3-margin-bottom w3-panel w3-green w3-round';
@@ -1597,12 +1690,12 @@
       console.error('Error checking auth status:', error);
     }
   }
-  
+
   // Connect to Microsoft
   function connectToMicrosoft() {
     window.location.href = '/microsoft-login';
   }
-  
+
   // Disconnect from Microsoft
   async function disconnectMicrosoft() {
     if (!confirm('Disconnect from Outlook? You will need to reconnect to fetch emails.')) return;
@@ -1616,54 +1709,54 @@
       alert('Error disconnecting: ' + error.message);
     }
   }
-  
+
   async function fetchEmailQueries() {
     const loadingIndicator = document.getElementById('emailLoadingIndicator');
     const tbody = document.getElementById('emailQueriesBody');
     const countElement = document.getElementById('emailQueryCount');
-    
+
     // Get current email source
     const source = currentEmailSource || localStorage.getItem('emailSource') || 'outlook';
-    
-      loadingIndicator.style.display = 'block';
-      tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">Loading...</td></tr>';
-      
-      // Store response details for debugging
-      let responseDetails = {
-        status: null,
-        statusText: null,
-        headers: {},
-        contentType: null,
-        responseText: null,
-        responseLength: null
-      };
-      
-      try {
-        const startTime = performance.now();
-        console.log(`Fetching emails from ${source}...`);
-        const response = await fetch(`/api/email-queries?source=${source}`);
-      
+
+    loadingIndicator.style.display = 'block';
+    tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">Loading...</td></tr>';
+
+    // Store response details for debugging
+    let responseDetails = {
+      status: null,
+      statusText: null,
+      headers: {},
+      contentType: null,
+      responseText: null,
+      responseLength: null
+    };
+
+    try {
+      const startTime = performance.now();
+      console.log(`Fetching emails from ${source}...`);
+      const response = await fetch(`/api/email-queries?source=${source}`);
+
       // Capture response details
       responseDetails.status = response.status;
       responseDetails.statusText = response.statusText;
       responseDetails.contentType = response.headers.get('content-type') || '';
-      
+
       // Capture all headers
       response.headers.forEach((value, key) => {
         responseDetails.headers[key] = value;
       });
-      
+
       // Check Content-Type header
       const contentType = responseDetails.contentType;
       const isJson = contentType.includes('application/json');
-      
+
       // Get response text first to handle both JSON and text errors
       const responseText = await response.text();
       responseDetails.responseText = responseText;
       responseDetails.responseLength = responseText.length;
-      
+
       let data;
-      
+
       // Handle empty response
       if (!responseText || responseText.trim() === '') {
         console.error('Empty response received from server', responseDetails);
@@ -1674,7 +1767,7 @@
         };
         throw window.lastEmailError.error;
       }
-      
+
       // Try to parse as JSON
       try {
         data = JSON.parse(responseText);
@@ -1691,16 +1784,16 @@
           source: source,
           headers: responseDetails.headers
         };
-        
+
         console.error('Failed to parse response as JSON:', errorDetails);
-        
+
         // Store error details globally for display
         window.lastEmailError = {
           error: parseError,
           responseDetails: responseDetails,
           errorDetails: errorDetails
         };
-        
+
         // Provide more helpful error message
         let errorMessage = 'Invalid response format from server. ';
         if (!isJson) {
@@ -1715,14 +1808,14 @@
         } else {
           errorMessage += `Response preview: ${responseText.substring(0, 100)}...`;
         }
-        
+
         // Log full response for debugging
         console.error('Full response:', responseText);
         console.error('Response details:', responseDetails);
-        
+
         throw new Error(errorMessage);
       }
-      
+
       if (!response.ok) {
         // Check if authentication is required (for Outlook)
         if ((data.requires_auth || response.status === 401) && source === 'outlook') {
@@ -1752,14 +1845,14 @@
         }
         throw new Error(data.error || 'Failed to fetch emails');
       }
-      
+
       console.log('Response received:', { emailCount: data.emails?.length || 0, hasError: !!data.error, status: response.status });
-      
+
       const emails = data.emails || [];
       const fetchTime = performance.now() - startTime;
       console.log(`Fetched ${emails.length} emails from ${source} in ${fetchTime.toFixed(2)}ms`);
       countElement.textContent = emails.length;
-      
+
       if (emails.length === 0) {
         loadingIndicator.style.display = 'none';
         tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">No email queries found</td></tr>';
@@ -1773,13 +1866,13 @@
             escapeDiv.textContent = String(text);
             return escapeDiv.innerHTML;
           };
-          
+
           // Escape for use in JavaScript strings (for onclick attributes)
           const escapeJs = (text) => {
             if (!text) return '';
             return String(text).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
           };
-          
+
           // Build HTML string more efficiently
           const rows = emails.map(email => {
             const status = email.status || 'Not started';
@@ -1789,7 +1882,7 @@
             const emailSubject = escapeHtml(email.subject || '(No Subject)');
             const emailDate = escapeHtml(email.date || 'N/A');
             const emailPreview = escapeHtml((email.preview || '').substring(0, 100)) + (email.preview && email.preview.length > 100 ? '...' : '');
-            
+
             return `
           <tr data-email-id="${escapeHtml(email.id || '')}" class="${statusClass}">
             <td><strong>${emailSubject}</strong></td>
@@ -1814,7 +1907,7 @@
           </tr>
         `;
           });
-          
+
           tbody.innerHTML = rows.join('');
           const renderTime = performance.now() - renderStart;
           console.log(`Rendered ${emails.length} emails in ${renderTime.toFixed(2)}ms`);
@@ -1828,7 +1921,7 @@
           </td></tr>`;
         }
       }
-      
+
       // Update auth/config status after successful fetch
       if (source === 'outlook') {
         checkMicrosoftAuth();
@@ -1849,7 +1942,7 @@
       const storedError = window.lastEmailError || {};
       const errorResponseDetails = storedError.responseDetails || responseDetails || {};
       const errorDetails = storedError.errorDetails || {};
-      
+
       console.error('Error fetching emails:', {
         error: error,
         message: error.message,
@@ -1859,7 +1952,7 @@
         responseDetails: errorResponseDetails,
         errorDetails: errorDetails
       });
-      
+
       // Create user-friendly error message
       let userMessage = error.message || 'An unknown error occurred';
       if (userMessage.includes('Invalid response format')) {
@@ -1867,7 +1960,7 @@
       } else if (userMessage.includes('Failed to fetch') || userMessage.includes('NetworkError')) {
         userMessage = 'Network error. Please check your internet connection and try again.';
       }
-      
+
       // Simple HTML escape for error messages
       const escapeHtmlSimple = (text) => {
         if (!text) return '';
@@ -1875,12 +1968,12 @@
         div.textContent = String(text);
         return div.innerHTML;
       };
-      
+
       // Build debug information HTML
       const responseText = errorResponseDetails.responseText || '';
       const responsePreview = responseText.length > 0 ? responseText.substring(0, 1000) : 'No response text available';
       const debugInfoId = 'emailErrorDebug_' + Date.now();
-      
+
       const debugInfoHtml = `
         <div class="w3-margin-top w3-panel w3-light-gray w3-round" style="text-align: left; max-height: 400px; overflow-y: auto;">
           <h6 class="w3-text-gray"><i class="fa fa-bug"></i> Debug Information</h6>
@@ -1905,7 +1998,7 @@
           </div>
         </div>
       `;
-      
+
       tbody.innerHTML = `<tr><td colspan="6" class="w3-center w3-text-red">
         <p><i class="fa fa-exclamation-circle"></i> <strong>Error:</strong> ${escapeHtmlSimple(userMessage)}</p>
         <p class="w3-small w3-text-gray">Source: ${escapeHtmlSimple(source)} | Check browser console (F12) for technical details</p>
@@ -1914,7 +2007,7 @@
           <i class="fa fa-refresh"></i> Retry
         </button>
       </td></tr>`;
-      
+
       // Update Gmail config status on error
       if (source === 'gmail') {
         const gmailConfigDiv = document.getElementById('gmailConfigStatus');
@@ -1928,7 +2021,7 @@
       loadingIndicator.style.display = 'none';
     }
   }
-  
+
   // Helper function to copy response to clipboard
   function copyResponseToClipboard(debugInfoId) {
     const fullResponseDiv = document.getElementById(debugInfoId + '_full');
@@ -1944,7 +2037,7 @@
       alert('No response text available to copy.');
     }
   }
-  
+
   // Helper function to toggle full response display
   function toggleFullResponse(debugInfoId) {
     const fullResponseDiv = document.getElementById(debugInfoId + '_full');
@@ -1952,7 +2045,7 @@
       fullResponseDiv.style.display = fullResponseDiv.style.display === 'none' ? 'block' : 'none';
     }
   }
-  
+
   function filterEmailQueries() {
     const filter = (document.getElementById('emailQuerySearch').value || '').toLowerCase();
     document.querySelectorAll('#emailQueriesTable tbody tr').forEach(tr => {
@@ -1960,7 +2053,7 @@
       tr.style.display = matchesText ? '' : 'none';
     });
   }
-  
+
   function viewEmailDetails(emailId, source) {
     // Use current source if not provided
     source = source || currentEmailSource || localStorage.getItem('emailSource') || 'outlook';
@@ -1985,62 +2078,62 @@
       })
       .catch(err => alert('Error viewing email: ' + err.message));
   }
-  
+
   // Store email conversion data
   let pendingEmailConversion = null;
-  
+
   async function convertEmailToQuery(emailId, source) {
     // Use current source if not provided
     source = source || currentEmailSource || localStorage.getItem('emailSource') || 'outlook';
-    
+
     // Store conversion data
     pendingEmailConversion = { emailId, source };
     currentEditingQueryId = null; // Clear query editing
-    
+
     // Update modal title
     document.getElementById('assignmentModalTitle').innerHTML = '<i class="fa fa-users"></i> Assign Query to Users';
-    
+
     // Clear previous selections
     selectedUserIds = [];
     updateSelectedUsersDisplay();
     document.getElementById('userSearchInput').value = '';
     document.getElementById('userSearchResults').innerHTML = '<p class="w3-text-gray w3-small w3-center">Start typing to search for users...</p>';
-    
+
     // Open assignment modal
     document.getElementById('userAssignmentModal').style.display = 'block';
   }
-  
+
   // User assignment variables
   let selectedUserIds = [];
   let userSearchTimeout = null;
   let currentEditingQueryId = null; // Track which query is being edited
-  
+
   async function searchUsersForAssignment() {
     const searchInput = document.getElementById('userSearchInput');
     const searchTerm = searchInput.value.trim();
     const resultsDiv = document.getElementById('userSearchResults');
-    
+
     // Clear previous timeout
     if (userSearchTimeout) {
       clearTimeout(userSearchTimeout);
     }
-    
+
     if (searchTerm.length < 2) {
       resultsDiv.innerHTML = '<p class="w3-text-gray w3-small w3-center">Start typing to search for users...</p>';
       return;
     }
-    
+
     // Debounce search
     userSearchTimeout = setTimeout(async () => {
       try {
         const response = await fetch(`/api/search-users?q=${encodeURIComponent(searchTerm)}`);
         const data = await response.json();
-        
+
         if (!response.ok) {
           resultsDiv.innerHTML = `<p class="w3-text-red w3-small">Error: ${data.error || 'Search failed'}</p>`;
           return;
         }
-        
+
         const users = data.users || [];
         if (users.length === 0) {
           resultsDiv.innerHTML = '<p class="w3-text-gray w3-small w3-center">No users found</p>';
@@ -2061,7 +2154,7 @@
       }
     }, 300);
   }
-  
+
   function addUserToSelection(userId, username, email, firstname, lastname) {
     if (!selectedUserIds.includes(userId)) {
       selectedUserIds.push(userId);
@@ -2069,20 +2162,20 @@
       searchUsersForAssignment(); // Refresh to show selected status
     }
   }
-  
+
   function removeUserFromSelection(userId, username, email, firstname, lastname) {
     selectedUserIds = selectedUserIds.filter(id => id !== userId);
     updateSelectedUsersDisplay();
     searchUsersForAssignment(); // Refresh to show unselected status
   }
-  
+
   function updateSelectedUsersDisplay() {
     const selectedDiv = document.getElementById('selectedUsersList');
     if (selectedUserIds.length === 0) {
       selectedDiv.innerHTML = '<p class="w3-text-gray w3-tiny w3-center">No users selected</p>';
     } else {
       // Fetch user details for selected users
-      Promise.all(selectedUserIds.map(id => 
+      Promise.all(selectedUserIds.map(id =>
         fetch(`/api/search-users?q=${id}`)
           .then(res => res.json())
           .then(data => data.users && data.users.find(u => u.id === id))
@@ -2107,7 +2200,7 @@
       });
     }
   }
-  
+
   function closeUserAssignmentModal() {
     document.getElementById('userAssignmentModal').style.display = 'none';
     pendingEmailConversion = null;
@@ -2118,26 +2211,26 @@
     document.getElementById('assignmentModalTitle').innerHTML = '<i class="fa fa-users"></i> Assign Query to Users';
     updateSelectedUsersDisplay();
   }
-  
+
   // Open edit assignments modal for existing query
   async function openEditAssignmentsModal(queryId) {
     currentEditingQueryId = queryId;
     pendingEmailConversion = null; // Clear email conversion if any
-    
+
     // Update modal title
     document.getElementById('assignmentModalTitle').innerHTML = '<i class="fa fa-edit"></i> Edit Query Assignments';
-    
+
     // Clear previous selections
     selectedUserIds = [];
     updateSelectedUsersDisplay();
     document.getElementById('userSearchInput').value = '';
     document.getElementById('userSearchResults').innerHTML = '<p class="w3-text-gray w3-small w3-center">Start typing to search for users...</p>';
-    
+
     // Fetch current assignees
     try {
       const response = await fetch(`/api/help-desk/query/${queryId}`);
       const data = await response.json();
-      
+
       if (response.ok && data.assignees) {
         // Pre-select current assignees
         selectedUserIds = data.assignees.map(a => a.id);
@@ -2146,11 +2239,11 @@
     } catch (error) {
       console.error('Error fetching current assignees:', error);
     }
-    
+
     // Open modal
     document.getElementById('userAssignmentModal').style.display = 'block';
   }
-  
+
   async function confirmUserAssignment() {
     // Check if editing existing query
     if (currentEditingQueryId) {
@@ -2158,25 +2251,25 @@
         const response = await fetch(`/api/help-desk/query/${currentEditingQueryId}/assignments`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             user_ids: selectedUserIds
           })
         });
         const data = await response.json();
-        
+
         if (!response.ok) {
           alert('Error: ' + (data.error || 'Failed to update assignments'));
           return;
         }
-        
+
         closeUserAssignmentModal();
         alert('Assignments updated successfully!' + (selectedUserIds.length > 0 ? ` Assigned to ${selectedUserIds.length} user(s).` : ''));
-        
+
         // Refresh query details if modal is open
         if (window.currentQueryId === currentEditingQueryId) {
           viewQueryDetails(currentEditingQueryId);
         }
-        
+
         // Refresh the page to update the table
         location.reload();
       } catch (error) {
@@ -2184,26 +2277,26 @@
       }
       return;
     }
-    
+
     // Handle email conversion
     if (!pendingEmailConversion) {
       alert('No email conversion pending');
       return;
     }
-    
+
     const { emailId, source } = pendingEmailConversion;
-    
+
     try {
       const response = await fetch(`/api/email-queries/${emailId}/convert`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           source: source,
           assigned_user_ids: selectedUserIds
         })
       });
       const data = await response.json();
-      
+
       if (!response.ok) {
         if (data.requires_auth || response.status === 401) {
           if (confirm('Authentication required. Connect to Outlook?')) {
@@ -2214,7 +2307,7 @@
         }
         return;
       }
-      
+
       closeUserAssignmentModal();
       alert('Email converted to query successfully!' + (selectedUserIds.length > 0 ? ` Assigned to ${selectedUserIds.length} user(s).` : ''));
       location.reload();
@@ -2222,34 +2315,34 @@
       alert('Error converting email: ' + error.message);
     }
   }
-  
+
   // Handle email query status change
   async function onEmailStatusChange(select) {
     const emailId = select.dataset.emailId;
     const status = select.value;
     const fromEmail = select.dataset.from;
-    
+
     try {
       // Update status
       const response = await fetch(`/api/email-queries/${emailId}/status`, {
         method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
-      
+
       const data = await response.json();
       if (!response.ok) {
         alert('Error updating status: ' + (data.error || 'Unknown error'));
         return;
       }
-      
+
       // Update row styling
       const tr = select.closest('tr');
       tr.classList.remove('status-grey', 'status-orange', 'status-green');
       if (status === 'Not started') tr.classList.add('status-grey');
       else if (status === 'Looking into it') tr.classList.add('status-orange');
       else if (status === 'Resolved') tr.classList.add('status-green');
-      
+
       // If status is Resolved, show email notification dialog
       if (status === 'Resolved') {
         showEmailNotificationDialog(emailId, fromEmail);
@@ -2258,56 +2351,56 @@
       alert('Error updating status: ' + error.message);
     }
   }
-  
+
   // Show email notification dialog when query is resolved
   function showEmailNotificationDialog(emailId, recipientEmail) {
     const message = prompt(
       `Send resolution notification to ${recipientEmail}?\n\nEnter your message:`,
       'Your query has been resolved. Thank you for contacting us!\n\nBest regards,\nAkello Support Team'
     );
-    
+
     if (message === null) return; // User cancelled
-    
+
     if (message.trim() === '') {
       alert('Message cannot be empty');
       return;
     }
-    
+
     // Send the email
     sendResolutionEmail(emailId, recipientEmail, message);
   }
-  
+
   async function sendResolutionEmail(emailId, recipientEmail, message) {
     try {
       const response = await fetch(`/api/email-queries/${emailId}/send-resolution`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipient: recipientEmail,
           message: message
         })
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         alert('Error sending email: ' + (data.error || 'Unknown error'));
         return;
       }
-      
+
       alert('Resolution email sent successfully!');
     } catch (error) {
       alert('Error sending email: ' + error.message);
     }
   }
-  
+
   // ===== Search Library Users Functions =====
-  
+
   function toggleAdvancedSearch() {
     const advancedSection = document.getElementById('advancedSearchSection');
     const icon = document.getElementById('advancedSearchIcon');
     const isVisible = advancedSection.style.display !== 'none';
-    
+
     if (isVisible) {
       advancedSection.style.display = 'none';
       icon.className = 'fa fa-chevron-down';
@@ -2316,33 +2409,33 @@
       icon.className = 'fa fa-chevron-up';
     }
   }
-  
+
   async function searchLibraryUsers() {
     const emailInput = document.getElementById('libraryUserEmailSearch');
     const firstNameInput = document.getElementById('libraryUserFirstNameSearch');
     const lastNameInput = document.getElementById('libraryUserLastNameSearch');
-    
+
     const email = emailInput.value.trim();
     const firstName = firstNameInput ? firstNameInput.value.trim() : '';
     const lastName = lastNameInput ? lastNameInput.value.trim() : '';
-    
+
     const loadingIndicator = document.getElementById('libraryUsersLoadingIndicator');
     const resultsDiv = document.getElementById('libraryUsersResults');
     const errorDiv = document.getElementById('libraryUsersError');
     const tbody = document.getElementById('libraryUsersTableBody');
     const countElement = document.getElementById('libraryUsersCount');
-    
+
     // Hide previous results and errors
     resultsDiv.style.display = 'none';
     errorDiv.style.display = 'none';
-    
+
     // At least one search parameter is required
     if (!email && !firstName && !lastName) {
       errorDiv.style.display = 'block';
       document.getElementById('libraryUsersErrorMessage').textContent = 'Please enter at least one search parameter (email, first name, or last name)';
       return;
     }
-    
+
     // Validate email format if provided
     if (email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -2352,31 +2445,31 @@
         return;
       }
     }
-    
+
     loadingIndicator.style.display = 'block';
-        tbody.innerHTML = '<tr><td colspan="9" class="w3-center w3-text-gray">Searching...</td></tr>';
-    
+    tbody.innerHTML = '<tr><td colspan="9" class="w3-center w3-text-gray">Searching...</td></tr>';
+
     try {
       // Build query parameters
       const params = new URLSearchParams();
       if (email) params.append('email', email);
       if (firstName) params.append('first_name', firstName);
       if (lastName) params.append('last_name', lastName);
-      
+
       const response = await fetch(`/api/search-library-users?${params.toString()}`);
       const data = await response.json();
-      
+
       loadingIndicator.style.display = 'none';
-      
+
       if (!response.ok) {
         errorDiv.style.display = 'block';
         document.getElementById('libraryUsersErrorMessage').textContent = data.error || 'Error searching for users';
         return;
       }
-      
+
       const users = data.users || [];
       countElement.textContent = users.length;
-      
+
       // Debug: Log users data to console
       console.log('Users data received:', users);
       users.forEach((user, idx) => {
@@ -2386,7 +2479,7 @@
           books: user.books
         });
       });
-      
+
       if (users.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="w3-center w3-text-gray">No users found matching your search criteria</td></tr>';
         resultsDiv.style.display = 'block';
@@ -2398,7 +2491,7 @@
           div.textContent = String(text);
           return div.innerHTML;
         };
-        
+
         tbody.innerHTML = users.map((user, index) => {
           const booksCount = user.books ? user.books.length : 0;
           return `
@@ -2452,18 +2545,18 @@
                         </thead>
                         <tbody>
                           ${user.books.map((book, bookIndex) => {
-                            const status = (book.status || '').toLowerCase();
-                            let statusClass = 'w3-gray';
-                            if (status === 'completed') {
-                              statusClass = 'w3-green';
-                            } else if (status === 'failed') {
-                              statusClass = 'w3-red';
-                            } else if (status === 'pending') {
-                              statusClass = 'w3-yellow';
-                            } else if (status === 'paid') {
-                              statusClass = 'w3-green';
-                            }
-                            return `
+            const status = (book.status || '').toLowerCase();
+            let statusClass = 'w3-gray';
+            if (status === 'completed') {
+              statusClass = 'w3-green';
+            } else if (status === 'failed') {
+              statusClass = 'w3-red';
+            } else if (status === 'pending') {
+              statusClass = 'w3-yellow';
+            } else if (status === 'paid') {
+              statusClass = 'w3-green';
+            }
+            return `
                             <tr data-status="${escapeHtml(status)}" class="book-row">
                               <td>${escapeHtml(book.title || '')}</td>
                               <td>${escapeHtml(book.author || '')}</td>
@@ -2481,7 +2574,7 @@
                               <td>${escapeHtml(book.order_created_at || '')}</td>
                             </tr>
                           `;
-                          }).join('')}
+          }).join('')}
                         </tbody>
                       </table>
                     </div>
@@ -2491,7 +2584,7 @@
             ` : ''}
           `;
         }).join('');
-        
+
         resultsDiv.style.display = 'block';
       }
     } catch (error) {
@@ -2501,12 +2594,12 @@
       console.error('Error searching library users:', error);
     }
   }
-  
+
   // Toggle books table for a specific user
   function toggleUserBooks(userIndex) {
     const booksRow = document.getElementById(`booksRow_${userIndex}`);
     const toggleIcon = document.getElementById(`toggleBooksIcon_${userIndex}`);
-    
+
     if (booksRow && toggleIcon) {
       const isVisible = booksRow.style.display !== 'none';
       if (isVisible) {
@@ -2518,13 +2611,13 @@
       }
     }
   }
-  
+
   // Filter books table by status
   function filterBooksByStatus(userIndex) {
     const filterSelect = document.getElementById(`statusFilter_${userIndex}`);
     const selectedStatus = filterSelect ? filterSelect.value.toLowerCase() : '';
     const booksTable = document.getElementById(`booksTable_${userIndex}`);
-    
+
     if (booksTable) {
       const rows = booksTable.querySelectorAll('tbody tr.book-row');
       rows.forEach(row => {
@@ -2537,26 +2630,26 @@
       });
     }
   }
-  
+
   // Load dashboard stats on page load
   async function loadDashboardStats() {
     try {
       const response = await fetch('/api/help-desk/stats');
       const data = await response.json();
-      
+
       if (!response.ok || !data.success) {
         console.error('Failed to load dashboard stats');
         return;
       }
-      
+
       const stats = data.stats;
-      
+
       // Update stat cards
       document.getElementById('totalQueriesStat').textContent = stats.total_queries;
       document.getElementById('resolvedQueriesStat').textContent = stats.resolved_queries;
       document.getElementById('unresolvedQueriesStat').textContent = stats.unresolved_queries;
       document.getElementById('successRateStat').textContent = stats.success_rate + '%';
-      
+
       // Status breakdown pie chart
       const statusCtx = document.getElementById('statusChart');
       if (statusCtx) {
@@ -2584,7 +2677,7 @@
           }
         });
       }
-      
+
       // Time series line chart
       const timeCtx = document.getElementById('timeChart');
       if (timeCtx) {
@@ -2627,47 +2720,47 @@
       console.error('Error loading dashboard stats:', error);
     }
   }
-  
+
   // Load stats when page loads
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function () {
     loadDashboardStats();
     // Refresh stats every 60 seconds
     setInterval(loadDashboardStats, 60000);
-    
+
     // Load notification count on page load
     updateHelpDeskNotificationCount();
     // Refresh notifications every 30 seconds
     setInterval(updateHelpDeskNotificationCount, 30000);
   });
-  
+
   // Help Desk Notifications Functions
   async function loadHelpDeskNotifications() {
     const listDiv = document.getElementById('helpDeskNotificationsList');
     if (!listDiv) return;
-    
+
     listDiv.innerHTML = '<div class="w3-center w3-padding"><i class="fa fa-spinner fa-spin"></i> Loading notifications...</div>';
-    
+
     try {
       const response = await fetch('/api/help-desk/notifications');
       const data = await response.json();
-      
+
       if (!response.ok || !data.success) {
         listDiv.innerHTML = '<div class="w3-center w3-padding w3-text-red">Error loading notifications</div>';
         return;
       }
-      
+
       const notifications = data.notifications || [];
       if (notifications.length === 0) {
         listDiv.innerHTML = '<div class="w3-center w3-padding w3-text-gray">No notifications</div>';
       } else {
         listDiv.innerHTML = notifications.map(notif => {
-          const icon = notif.notification_type === 'assignment' ? 'user-plus' : 
-                      notif.notification_type === 'resolution' ? 'check-circle' : 
-                      notif.notification_type === 'status_change' ? 'info-circle' : 'bell';
+          const icon = notif.notification_type === 'assignment' ? 'user-plus' :
+            notif.notification_type === 'resolution' ? 'check-circle' :
+              notif.notification_type === 'status_change' ? 'info-circle' : 'bell';
           const date = new Date(notif.created_at).toLocaleString();
           const unreadClass = notif.read ? '' : 'w3-light-blue';
           const unreadDot = notif.read ? '' : '<span class="w3-badge w3-blue w3-tiny" style="margin-left: 8px;">New</span>';
-          
+
           return `
             <div class="w3-padding w3-border-bottom ${unreadClass}" style="cursor: pointer; transition: background 0.2s;" 
                  onclick="handleNotificationClick(${notif.id}, ${notif.query_id})"
@@ -2686,7 +2779,7 @@
           `;
         }).join('');
       }
-      
+
       // Update count
       updateHelpDeskNotificationCount();
     } catch (error) {
@@ -2694,12 +2787,12 @@
       listDiv.innerHTML = '<div class="w3-center w3-padding w3-text-red">Error loading notifications</div>';
     }
   }
-  
+
   async function updateHelpDeskNotificationCount() {
     try {
       const response = await fetch('/api/help-desk/notifications');
       const data = await response.json();
-      
+
       if (response.ok && data.success) {
         const unreadCount = (data.notifications || []).filter(n => !n.read).length;
         const countElement = document.getElementById('helpDeskNotificationCount');
@@ -2718,7 +2811,7 @@
       console.error('Error updating notification count:', error);
     }
   }
-  
+
   function refreshHelpDeskNotifications() {
     // Refresh notification count
     updateHelpDeskNotificationCount();
@@ -2728,7 +2821,7 @@
       loadHelpDeskNotifications();
     }
   }
-  
+
   async function handleNotificationClick(notificationId, queryId) {
     // Mark notification as read
     try {
@@ -2738,54 +2831,54 @@
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
-    
+
     // Close notifications modal
     document.getElementById('helpDeskNotificationsModal').style.display = 'none';
-    
+
     // Open query details modal
     if (queryId) {
       viewQueryDetails(queryId);
     }
-    
+
     // Refresh notifications
     refreshHelpDeskNotifications();
   }
-  
+
   async function markAllNotificationsRead() {
     try {
       const response = await fetch('/api/help-desk/notifications');
       const data = await response.json();
-      
+
       if (!response.ok || !data.success) {
         alert('Error loading notifications');
         return;
       }
-      
+
       const unreadNotifications = (data.notifications || []).filter(n => !n.read);
-      
+
       if (unreadNotifications.length === 0) {
         alert('No unread notifications');
         return;
       }
-      
+
       // Mark all unread notifications as read
-      const promises = unreadNotifications.map(notif => 
+      const promises = unreadNotifications.map(notif =>
         fetch(`/api/notifications/${notif.id}/read`, { method: 'PATCH' })
       );
-      
+
       await Promise.all(promises);
-      
+
       // Refresh notifications
       loadHelpDeskNotifications();
       updateHelpDeskNotificationCount();
-      
+
       alert(`Marked ${unreadNotifications.length} notification(s) as read`);
     } catch (error) {
       console.error('Error marking all as read:', error);
       alert('Error marking notifications as read');
     }
   }
-  
+
   function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;

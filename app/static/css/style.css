@@ -1,0 +1,275 @@
+/* Font loaded in HTML */
+
+:root {
+    --primary-color: #4f46e5;
+    /* Indigo 600 */
+    --primary-hover: #4338ca;
+    /* Indigo 700 */
+    --bg-color: #f8fafc;
+    /* Slate 50 */
+    --sidebar-width: 280px;
+    --sidebar-width-collapsed: 80px;
+    --header-height: 70px;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-color);
+    color: #0f172a;
+    /* Slate 900 */
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Glassmorphism & Cards */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    border: 1px solid #e2e8f0;
+    /* Slate 200 */
+    transition: all 0.2s ease-in-out;
+}
+
+.card:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Navigation Links */
+.nav-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    color: #64748b;
+    /* Slate 500 */
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    text-decoration: none !important;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.nav-item:hover {
+    background-color: #f1f5f9;
+    /* Slate 100 */
+    color: #334155;
+    /* Slate 700 */
+}
+
+.nav-item.active {
+    background-color: #e0e7ff;
+    /* Indigo 100 */
+    color: #4338ca;
+    /* Indigo 700 */
+}
+
+.nav-item i,
+.nav-item svg {
+    margin-right: 0.75rem;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+    font-size: 1.1em;
+}
+
+/* Layout Utilities - Sidebar */
+.sidebar-container {
+    width: var(--sidebar-width);
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 40;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: white;
+    border-right: 1px solid #e2e8f0;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Collapsed Sidebar State */
+.sidebar-container.collapsed {
+    width: var(--sidebar-width-collapsed);
+}
+
+/* Main Content Adjustment */
+.main-content {
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-container.collapsed+.main-content,
+body.sidebar-collapsed .main-content {
+    margin-left: var(--sidebar-width-collapsed);
+}
+
+/* Hiding Elements in Collapsed State */
+.sidebar-container.collapsed .nav-text,
+.sidebar-container.collapsed .sidebar-text,
+.sidebar-container.collapsed .fa-chevron-down {
+    opacity: 0;
+    display: none;
+}
+
+.sidebar-container.collapsed .nav-item {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.sidebar-container.collapsed .nav-item i {
+    margin-right: 0;
+}
+
+/* Center checkbox logo when collapsed */
+.sidebar-container.collapsed .gap-3 {
+    justify-content: center;
+    width: 100%;
+}
+
+.top-bar {
+    height: var(--header-height);
+    background: white;
+    /* Make it solid or glass */
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    padding: 0 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 1024px) {
+    /* Sidebar transform is handled by Tailwind classes in base.html (-translate-x-full) */
+
+    .main-content {
+        margin-left: 0;
+    }
+
+    body.sidebar-collapsed .main-content {
+        margin-left: 0;
+    }
+}
+
+/* --- Micro-interactions & Animations --- */
+
+/* 1. Button Press & Lift */
+.btn-interaction {
+    transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
+}
+
+.btn-interaction:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2), 0 2px 4px -1px rgba(79, 70, 229, 0.1);
+    /* Indigo shadow */
+}
+
+.btn-interaction:active {
+    transform: scale(0.97) translateY(0);
+}
+
+/* 2. Smooth Input Focus */
+.input-interaction {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.input-interaction:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+    /* Soft indigo ring */
+    border-color: #6366f1;
+    /* Indigo 500 */
+}
+
+/* 3. Card Hover Lift */
+.hover-lift {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* 4. Staggered Entry Animation */
+@keyframes slideUpFade {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-enter {
+    opacity: 0;
+    /* Start invisible */
+    animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Delays for Staggering */
+.delay-100 {
+    animation-delay: 100ms;
+}
+
+.delay-200 {
+    animation-delay: 200ms;
+}
+
+.delay-300 {
+    animation-delay: 300ms;
+}
+
+.delay-400 {
+    animation-delay: 400ms;
+}
+
+.delay-500 {
+    animation-delay: 500ms;
+}
+
+/* Details/Summary dropdown animation */
+details>summary {
+    list-style: none;
+}
+
+details>summary::-webkit-details-marker {
+    display: none;
+}

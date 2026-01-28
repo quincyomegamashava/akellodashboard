@@ -18818,7 +18818,7 @@ def global_search():
         try:
             projects = ProjectA.query.filter(
                 db.or_(
-                    ProjectA.project_name.ilike(search_term),
+                    ProjectA.name.ilike(search_term),
                     ProjectA.description.ilike(search_term)
                 )
             ).limit(10).all()
@@ -18831,7 +18831,7 @@ def global_search():
                     search_results.append({
                         'type': 'project',
                         'id': project.id,
-                        'title': project.project_name,
+                        'title': project.name,
                         'subtitle': 'Project',
                         'description': project.description or 'No description',
                         'url': url_for('aplanforprojects'),  # Redirect to project planning page
@@ -18869,7 +18869,9 @@ def global_search():
         try:
             champions = ChampionSchool.query.filter(
                 db.or_(
-                    ChampionSchool.school_name.ilike(search_term),
+                    ChampionSchool.firstname.ilike(search_term),
+                    ChampionSchool.lastname.ilike(search_term),
+                    ChampionSchool.schools.ilike(search_term),
                     ChampionSchool.province.ilike(search_term)
                 )
             ).limit(10).all()
@@ -18882,8 +18884,8 @@ def global_search():
                         search_results.append({
                             'type': 'champion',
                             'id': champion.id,
-                            'title': champion.school_name,
-                            'subtitle': f"Champion School - {champion.province}",
+                            'title': f"{champion.firstname} {champion.lastname}",
+                            'subtitle': f"Champion - {champion.province}",
                             'description': f"Province: {champion.province}",
                             'url': url_for('all_champion_details'),
                             'icon': 'award'
@@ -18893,8 +18895,8 @@ def global_search():
                     search_results.append({
                         'type': 'champion',
                         'id': champion.id,
-                        'title': champion.school_name,
-                        'subtitle': f"Champion School - {champion.province}",
+                        'title': f"{champion.firstname} {champion.lastname}",
+                        'subtitle': f"Champion - {champion.province}",
                         'description': f"Province: {champion.province}",
                         'url': url_for('all_champion_details'),
                         'icon': 'award'
