@@ -17,6 +17,18 @@
     --border-radius: 18px;
   }
 
+  .text-success-light {
+    color: #4ade80 !important;
+  }
+
+  .text-warning-light {
+    color: #fbbf24 !important;
+  }
+
+  .text-danger-light {
+    color: #f87171 !important;
+  }
+
   /* Long-term scholarship highlighting */
   .chip.long-term {
     border: 2px solid #f59e0b !important;
@@ -586,22 +598,22 @@
           <article class="hero-stat">
             <span class="hero-stat__label">Champion schools</span>
             <span class="hero-stat__value">{{ count_user_schools }}</span>
-            <span class="hero-stat__hint">Total assigned</span>
+            <span class="hero-stat__hint">Total Assigned Pool</span>
           </article>
           <article class="hero-stat">
-            <span class="hero-stat__label">Total schools with active scholarship</span>
-            <span class="hero-stat__value">{{ count_active_scholarship_schools }}</span>
-            <span class="hero-stat__hint">SmartLearning</span>
+            <span class="hero-stat__label">Valid Scholarship</span>
+            <span class="hero-stat__value text-success-light">{{ count_valid_scholarship }}</span>
+            <span class="hero-stat__hint">Active < 12mo</span>
           </article>
           <article class="hero-stat">
-            <span class="hero-stat__label">Total schools with inactive scholarship</span>
-            <span class="hero-stat__value">{{ count_inactive_scholarship_schools }}</span>
-            <span class="hero-stat__hint">Linked</span>
+            <span class="hero-stat__label">Scholarship Elapsed</span>
+            <span class="hero-stat__value text-warning-light">{{ count_elapsed_scholarship }}</span>
+            <span class="hero-stat__hint">Expired or 12+ mo</span>
           </article>
           <article class="hero-stat">
-            <span class="hero-stat__label">Schools without scholarship</span>
+            <span class="hero-stat__label">Never Assigned</span>
             <span class="hero-stat__value">{{ count_no_scholarship_schools }}</span>
-            <span class="hero-stat__hint">N/A</span>
+            <span class="hero-stat__hint">No active record</span>
           </article>
         </div>
       </div>

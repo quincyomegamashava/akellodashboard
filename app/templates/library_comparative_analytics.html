@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .comp-wrapper {
+        width: 90%;
+        max-width: 1200px;
+        margin: 40px auto;
+        padding: 0 16px;
+    }
+
+    .comp-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        padding: 24px;
+        border-radius: 12px;
+        color: white;
+        box-shadow: 0 8px 16px rgba(99, 102, 241, 0.2);
+    }
+
+    .comp-card {
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 12px 32px rgba(10, 31, 68, 0.08);
+        padding: 24px;
+        border: 1px solid #eef2f7;
+    }
+
+    .comp-table {
+        width: 100% !important;
+        border-collapse: separate !important;
+        border-spacing: 0 8px !important;
+    }
+
+    .comp-table thead th {
+        background: #f8fafc;
+        padding: 16px;
+        font-weight: 600;
+        color: #475569;
+        text-transform: uppercase;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+    }
+
+    .ratio-badge {
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: 14px;
+    }
+
+    .ratio-high {
+        background: #dcfce7;
+        color: #15803d;
+    }
+
+    .ratio-med {
+        background: #fef9c3;
+        color: #854d0e;
+    }
+
+    .ratio-low {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+</style>
+
+<div class="comp-wrapper">
+    <div class="comp-header">
+        <div>
+            <h2><i class="fa fa-chart-line mr-3"></i> Conversion Analytics</h2>
+            <p class="mb-0 opacity-75">Ratio of Subscriptions vs. Paid Purchases</p>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="comp-card mb-4">
+        <form method="GET" action="{{ url_for('library_comparative_analytics') }}" class="row align-items-end">
+            <div class="col-md-3">
+                <label class="form-label font-weight-bold text-muted small text-uppercase">Genre</label>
+                <select name="genre" class="form-control rounded-pill border-2">
+                    <option value="">All Genres</option>
+                    {% for genre in genres %}
+                    <option value="{{ genre.id }}" {% if selected_genre==genre.id|string %}selected{% endif %}>
+                        {{ genre.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label font-weight-bold text-muted small text-uppercase">Start Date</label>
+                <input type="date" name="start_date" class="form-control rounded-pill border-2"
+                    value="{{ start_date or '' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label font-weight-bold text-muted small text-uppercase">End Date</label>
+                <input type="date" name="end_date" class="form-control rounded-pill border-2"
+                    value="{{ end_date or '' }}">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary btn-block rounded-pill">
+                    <i class="fa fa-sync mr-2"></i> Update Report
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="comp-card">
+        <table id="compTable" class="comp-table display">
+            <thead>
+                <tr>
+                    <th>Book Details</th>
+                    <th class="text-center">Subscriptions</th>
+                    <th class="text-center">Purchases</th>
+                    <th class="text-center">Conversion Ratio</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in data %}
+                <tr>
+                    <td>
+                        <div class="font-weight-bold text-dark">{{ item.title }}</div>
+                        <div class="small text-muted">{{ item.author }}</div>
+                    </td>
+                    <td class="text-center">{{ item.sub_count or 0 }}</td>
+                    <td class="text-center">{{ item.pur_count or 0 }}</td>
+                    <td class="text-center">
+                        {% set ratio = item.conversion_ratio or 0 %}
+                        <span
+                            class="ratio-badge {% if ratio > 0.5 %}ratio-high{% elif ratio > 0.1 %}ratio-med{% else %}ratio-low{% endif %}">
+                            {{ "{:.1%}".format(ratio) }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+<script>
+    $(document).ready(function () {
+        $('#compTable').DataTable({
+            pageLength: 25,
+            order: [[3, 'desc']],
+            dom: '<"d-flex justify-content-between align-items-center mb-4"lf>rt<"d-flex justify-content-between align-items-center mt-4"ip>'
+        });
+    });
+</script>
+{% endblock %}

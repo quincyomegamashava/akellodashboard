@@ -9272,6 +9272,289 @@ def get_book_genres():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/book-subscriptions', methods=['GET'])
+@login_required
+def book_subscriptions():
+    """Display most subscribed books from the library database with advanced filtering"""
+    try:
+        from datetime import date, timedelta
+        
+        # --- Filters ---
+        genre_id = request.args.get('genre')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        conn = get_direct_library_conn()
+        
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # 1. Fetch available genres
+            cursor.execute("SELECT DISTINCT g.id, g.name FROM genres g JOIN book_genre bg ON g.id = bg.genre_id ORDER BY g.name")
+            all_genres = cursor.fetchall()
+
+            # 2. Main Query for Top Books
+            query = """
+                SELECT 
+                    b.id,
+                    b.title, 
+                    b.author,
+                    b.isbn,
+                    COUNT(bu.book_id) as subscription_count
+                FROM books b
+                JOIN book_user bu ON b.id = bu.book_id
+                LEFT JOIN book_genre bg ON b.id = bg.book_id
+                WHERE 1=1
+            """
+            
+            params = []
+            if genre_id:
+                query += " AND bg.genre_id = %s"
+                params.append(genre_id)
+            
+            # Use 'bu.created_at' if it exists, otherwise omit date filter for now
+            # We'll try to use it and catch errors if the column is missing
+            if start_date:
+                query += " AND bu.created_at >= %s"
+                params.append(start_date)
+            if end_date:
+                query += " AND bu.created_at <= %s"
+                params.append(f"{end_date} 23:59:59")
+                
+            query += """
+                GROUP BY b.id, b.title, b.author, b.isbn
+                ORDER BY subscription_count DESC
+            """
+            
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+            
+            # 3. Summary Stats
+            total_subs = sum(r['subscription_count'] for r in results)
+            top_book = results[0]['title'] if results else 'N/A'
+            
+        return render_template('book_subscriptions.html', 
+                             title='Book Subscriptions', 
+                             subscriptions=results,
+                             genres=all_genres,
+                             selected_genre=genre_id,
+                             start_date=start_date,
+                             end_date=end_date,
+                             stats={
+                                 'total': total_subs,
+                                 'top_book': top_book,
+                                 'count': len(results)
+                             })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        app.logger.error(f"Error fetching book subscriptions: {e}")
+        # Fallback to empty list or flash message if template expects it
+        return render_template('book_subscriptions.html', 
+                             title='Book Subscriptions', 
+                             subscriptions=[],
+                             error=str(e))
+
+
+@app.route('/book-purchases', methods=['GET'])
+@login_required
+def book_purchases():
+    """Display most purchased books from the library database (non-voucher) with advanced analytics"""
+    try:
+        from datetime import date, timedelta
+        
+        # --- Filters ---
+        genre_id = request.args.get('genre')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        conn = get_direct_library_conn()
+        
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # 1. Fetch available genres
+            cursor.execute("SELECT DISTINCT g.id, g.name FROM genres g JOIN book_genre bg ON g.id = bg.genre_id ORDER BY g.name")
+            all_genres = cursor.fetchall()
+
+            # 2. Query to find most purchased books and their revenue
+            query = """
+                SELECT 
+                    b.id,
+                    b.title, 
+                    b.author,
+                    b.isbn,
+                    SUM(bo.quantity) as purchase_count,
+                    SUM(bo.quantity * b.price) as total_revenue
+                FROM books b
+                JOIN book_order bo ON b.id = bo.book_id
+                JOIN orders o ON bo.order_id = o.id
+                LEFT JOIN book_genre bg ON b.id = bg.book_id
+                WHERE o.payment_method != 'Voucher'
+                  AND o.status = 'Completed'
+            """
+            
+            params = []
+            if genre_id:
+                query += " AND bg.genre_id = %s"
+                params.append(genre_id)
+            if start_date:
+                query += " AND o.created_at >= %s"
+                params.append(start_date)
+            if end_date:
+                query += " AND o.created_at <= %s"
+                params.append(f"{end_date} 23:59:59")
+                
+            query += """
+                GROUP BY b.id, b.title, b.author, b.isbn
+                ORDER BY purchase_count DESC
+            """
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+            
+            # 3. Global Stats for header
+            total_revenue = sum(r['total_revenue'] or 0 for r in results)
+            total_qty = sum(r['purchase_count'] or 0 for r in results)
+            
+            # 4. Fetch Top Province Overall (for summary card)
+            prov_query = """
+                SELECT i.province, SUM(bo.quantity) as qty
+                FROM orders o
+                JOIN book_order bo ON o.id = bo.order_id
+                JOIN users u ON o.user_id = u.id
+                JOIN institution_user iu ON u.id = iu.user_id
+                JOIN institutions i ON iu.institution_id = i.id
+                WHERE o.payment_method != 'Voucher' AND o.status = 'Completed'
+            """
+            prov_params = []
+            if start_date:
+                prov_query += " AND o.created_at >= %s"
+                prov_params.append(start_date)
+            if end_date:
+                prov_query += " AND o.created_at <= %s"
+                prov_params.append(f"{end_date} 23:59:59")
+                
+            prov_query += " GROUP BY i.province ORDER BY qty DESC LIMIT 1"
+            cursor.execute(prov_query, prov_params)
+            top_prov_res = cursor.fetchone()
+            top_province = top_prov_res['province'] if top_prov_res else 'N/A'
+            
+        return render_template('book_purchases.html', 
+                             title='Book Purchases', 
+                             purchases=results,
+                             genres=all_genres,
+                             selected_genre=genre_id,
+                             start_date=start_date,
+                             end_date=end_date,
+                             stats={
+                                 'revenue': total_revenue,
+                                 'quantity': total_qty,
+                                 'top_province': top_province,
+                                 'count': len(results)
+                             })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        app.logger.error(f"Error fetching book purchases: {e}")
+        return render_template('book_purchases.html', 
+                             title='Book Purchases', 
+                             purchases=[],
+                             error=str(e))
+
+
+@app.route('/library-comparative-analytics', methods=['GET'])
+@login_required
+def library_comparative_analytics():
+    """Comparative analysis between Subscriptions and Purchases (Conversion)"""
+    try:
+        from datetime import date
+        
+        genre_id = request.args.get('genre')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        conn = get_direct_library_conn()
+        
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # 1. Fetch available genres
+            cursor.execute("SELECT DISTINCT g.id, g.name FROM genres g JOIN book_genre bg ON g.id = bg.genre_id ORDER BY g.name")
+            all_genres = cursor.fetchall()
+
+            # 2. Main query for conversion metrics
+            query = """
+                SELECT 
+                    b.id, b.title, b.author,
+                    sub_q.sub_count,
+                    pur_q.pur_count,
+                    COALESCE(pur_q.pur_count, 0) / NULLIF(COALESCE(sub_q.sub_count, 0), 0) as conversion_ratio
+                FROM books b
+                LEFT JOIN (
+                    SELECT book_id, COUNT(*) as sub_count 
+                    FROM book_user 
+                    WHERE 1=1
+                    {sub_date_filter}
+                    GROUP BY book_id
+                ) sub_q ON b.id = sub_q.book_id
+                LEFT JOIN (
+                    SELECT bo.book_id, SUM(bo.quantity) as pur_count
+                    FROM book_order bo
+                    JOIN orders o ON bo.order_id = o.id
+                    WHERE o.status = 'Completed' AND o.payment_method != 'Voucher'
+                    {pur_date_filter}
+                    GROUP BY bo.book_id
+                ) pur_q ON b.id = pur_q.book_id
+                LEFT JOIN book_genre bg ON b.id = bg.book_id
+                WHERE (sub_q.sub_count > 0 OR pur_q.pur_count > 0)
+            """
+            
+            sub_date_filter = ""
+            pur_date_filter = ""
+            params = []
+            
+            if start_date:
+                sub_date_filter += " AND created_at >= %s"
+                pur_date_filter += " AND o.created_at >= %s"
+                params.append(start_date)
+            if end_date:
+                sub_date_filter += " AND created_at <= %s"
+                pur_date_filter += " AND o.created_at <= %s"
+                params.append(f"{end_date} 23:59:59")
+            
+            # Since we have parameters in subqueries, we must handle them carefully
+            # But here we can inject the filter strings and double the params if needed
+            # Actually, the params list needs to contain copies for both subqueries
+            final_params = []
+            if start_date: final_params.append(start_date)
+            if end_date: final_params.append(f"{end_date} 23:59:59")
+            if start_date: final_params.append(start_date)
+            if end_date: final_params.append(f"{end_date} 23:59:59")
+            
+            if genre_id:
+                query += " AND bg.genre_id = %s"
+                final_params.append(genre_id)
+                
+            query = query.format(sub_date_filter=sub_date_filter, pur_date_filter=pur_date_filter)
+            query += " GROUP BY b.id, b.title, b.author ORDER BY conversion_ratio DESC"
+            
+            cursor.execute(query, final_params)
+            results = cursor.fetchall()
+            
+        return render_template('library_comparative_analytics.html', 
+                             title='Library Conversion Analytics', 
+                             data=results,
+                             genres=all_genres,
+                             selected_genre=genre_id,
+                             start_date=start_date,
+                             end_date=end_date)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        app.logger.error(f"Error fetching comparative analytics: {e}")
+        return render_template('library_comparative_analytics.html', 
+                             title='Library Conversion Analytics', 
+                             data=[],
+                             error=str(e))
+
+
 @app.route('/api/champion-schools-by-user/<username>', methods=['GET'])
 @login_required
 def get_champion_schools_by_user(username):
@@ -10695,27 +10978,32 @@ def profile(username):
     # Final total after loop
     # print(f"\nTotal SmartLearning Champs MTD: {smartlearning_champ_mtd}")
 
-    # Calculate active (not expired) vs inactive (expired or disabled) scholarship counts
-    count_truly_active = 0
-    count_inactive_total = 0
-
-    # Count truly active schools from active_scholarship_schools (filtering out expired ones)
-    for s in active_scholarship_schools:
-        is_expired = s.get("expiry_date") and s.get("expiry_date") < today
-        if is_expired:
-            count_inactive_total += 1
-        else:
-            count_truly_active += 1
-
-    # Add disabled schools to inactive count
-    count_inactive_total += len(inactive_scholarship_schools)
+    # Synchronize categorization logic with dashboard (Valid vs Elapsed)
+    count_valid_scholarship = 0
+    count_elapsed_scholarship = 0
     
+    all_processed_schools = active_scholarship_schools + inactive_scholarship_schools
+    for s in all_processed_schools:
+        sid = s.get("id")
+        is_expired = s.get("expiry_date") and s.get("expiry_date") < today
+        is_active = s.get("active", False)
+        
+        # Tenure check (12+ months)
+        duration_info = school_duration_map.get(sid, {})
+        is_over_12 = duration_info.get("is_over_12_months", False)
+        total_m = duration_info.get("total_months", 0)
+        
+        if not is_active or is_expired or is_over_12 or (total_m >= 12):
+            count_elapsed_scholarship += 1
+        elif is_active:
+            count_valid_scholarship += 1
+
     # Schools without any scholarship record
     count_no_scholarship = len(schools_without_scholarship)
 
     return render_template('userProfile.html',
-                           count_active_scholarship_schools=count_truly_active,
-                           count_inactive_scholarship_schools=count_inactive_total,
+                           count_valid_scholarship=count_valid_scholarship,
+                           count_elapsed_scholarship=count_elapsed_scholarship,
                            count_no_scholarship_schools=count_no_scholarship,
                            user=user,
                             form=form,
@@ -11556,6 +11844,70 @@ def contracting():
         role = current_user.userRole
         scorecards = Scorecard.query.filter_by(employee_name=username).all()
     return render_template('contracting.html', username=username, role=role, title='Contracting', scorecards=scorecards)
+
+
+@app.route('/save_scorecard_row', methods=['POST'])
+@login_required
+def save_scorecard_row():
+    """Create or update a scorecard row"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+        
+    try:
+        row_id = data.get('id')
+        weight = float(data.get('weight', 0))
+        
+        if row_id:
+            # Update existing row
+            row = Scorecard.query.get(row_id)
+            if not row:
+                return jsonify({'error': 'Row not found'}), 404
+            
+            # Authorization check: only the owner or an admin can update
+            if row.employee_name != current_user.username and current_user.userRole != 'Admin':
+                return jsonify({'error': 'Unauthorized'}), 403
+        else:
+            # Create new row
+            row = Scorecard(employee_name=current_user.username)
+            db.session.add(row)
+            
+        # Update fields
+        row.key_focus_area = data.get('keyFocusArea')
+        row.strategic_objective = data.get('strategicObjective')
+        row.performance_measure = data.get('performanceMeasure')
+        row.unit_of_measure = data.get('unitOfMeasure')
+        row.target = data.get('target')
+        row.weight = weight
+        
+        db.session.commit()
+        return jsonify({'message': 'Row saved successfully', 'new_id': row.id})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/delete_scorecard_row/<int:id>', methods=['POST'])
+@login_required
+def delete_scorecard_row(id):
+    """Delete a scorecard row"""
+    try:
+        row = Scorecard.query.get(id)
+        if not row:
+            return jsonify({'error': 'Row not found'}), 404
+            
+        # Authorization check
+        if row.employee_name != current_user.username and current_user.userRole != 'Admin':
+            return jsonify({'error': 'Unauthorized'}), 403
+            
+        db.session.delete(row)
+        db.session.commit()
+        return jsonify({'message': 'Row deleted successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
 from psycopg2.extras import DictCursor
@@ -13961,65 +14313,7 @@ def save_scorecard():
     return redirect(url_for('contracting'))
 
 
-@app.route('/save_scorecard_row', methods=['POST'])
-def save_scorecard_row():
-    try:
-        # Parse JSON data from the request
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
 
-        # Extract data from the request
-        scorecard_id = data.get('id')  # ID of the scorecard row
-        key_focus_area = data.get('keyFocusArea')
-        strategic_objective = data.get('strategicObjective')
-        performance_measure = data.get('performanceMeasure')
-        unit_of_measure = data.get('unitOfMeasure')
-        target = data.get('target')
-        weight = data.get('weight')
-
-        # Validate required fields
-        if not key_focus_area or not strategic_objective or not performance_measure or not unit_of_measure or not target or not weight:
-            return jsonify({'error': 'All fields are required'}), 400
-
-        # If ID is provided, update the existing scorecard
-        if scorecard_id:
-            scorecard = Scorecard.query.get(scorecard_id)
-            if not scorecard:
-                return jsonify({'error': 'Scorecard not found'}), 404
-
-            # Update the scorecard fields
-            scorecard.key_focus_area = key_focus_area
-            scorecard.strategic_objective = strategic_objective
-            scorecard.performance_measure = performance_measure
-            scorecard.unit_of_measure = unit_of_measure
-            scorecard.target = target
-            scorecard.weight = float(weight)
-
-        # If no ID is provided, create a new scorecard
-        else:
-            scorecard = Scorecard(
-                key_focus_area=key_focus_area,
-                strategic_objective=strategic_objective,
-                performance_measure=performance_measure,
-                unit_of_measure=unit_of_measure,
-                target=target,
-                weight=float(weight),
-                employee_name=current_user.username  # Assign to the current user
-            )
-            db.session.add(scorecard)
-
-        # Commit changes to the database
-        db.session.commit()
-
-        return jsonify({
-            'message': 'Scorecard saved successfully',
-            'new_id': scorecard.id if not scorecard_id else None  # Return new ID if created
-        }), 200
-
-    except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({'error': 'An error occurred while saving the scorecard'}), 500
 
 
 # ---------- Password reset helpers ----------
@@ -19573,56 +19867,76 @@ def all_champions_school_tracker():
             cursor.close()
             conn.close()
             
-            # Process Rows
+            # Create map for scholarship rows
+            scholarship_map = {}
             for row in scholarship_rows:
-                # Handle dict/tuple (routes.py handles both usually)
                 if isinstance(row, dict):
                     sid = row['school_id']
-                    sname = row['school_name']
-                    stype = row['scholarship_type']
-                    sexpiry = row['expiry_date']
-                    sactive = row['active']
-                    sduration = row.get('duration')
+                    scholarship_map[sid] = row
                 else:
                     sid = row[0]
-                    sname = row[1]
-                    stype = row[2]
-                    sexpiry = row[3]
-                    sactive = row[4]
-                    sduration = row[5]
+                    scholarship_map[sid] = {
+                        'school_name': row[1],
+                        'scholarship_type': row[2],
+                        'expiry_date': row[3],
+                        'active': row[4],
+                        'duration': row[5]
+                    }
 
-                # Normalize Expiry
-                if sexpiry:
-                    if isinstance(sexpiry, str):
-                        try:
-                           sexpiry = datetime.strptime(sexpiry, "%Y-%m-%d").date()
-                        except:
-                            try:
-                                sexpiry = datetime.strptime(sexpiry, "%Y-%m-%d %H:%M:%S").date()
-                            except:
-                                pass
-                    elif hasattr(sexpiry, 'date'):
-                        sexpiry = sexpiry.date()
-                
-                is_expired = False
-                if sexpiry and isinstance(sexpiry, date):
-                     if sexpiry < today:
-                         is_expired = True
-                
-                normalized_active = normalize_active_flag(sactive)
-                
-                # Determine Status
-                status = "Inactive"
-                if normalized_active:
-                    if is_expired:
-                         status = "Expired"
-                    else:
-                         status = "Active"
-                
-                active_subs = sub_map.get(sid, 0)
-                
-                # Get Champion Info
+            # Process all unique school IDs from ChampionSchool
+            for sid in chunk:
                 champ_infos = school_id_map.get(sid, [])
+                s_data = scholarship_map.get(sid)
+                
+                if s_data:
+                    sname = s_data['school_name']
+                    stype = s_data['scholarship_type']
+                    sexpiry = s_data['expiry_date']
+                    sactive = s_data['active']
+                    
+                    # Normalize Expiry
+                    if sexpiry:
+                        if isinstance(sexpiry, str):
+                            try:
+                                sexpiry = datetime.strptime(sexpiry, "%Y-%m-%d").date()
+                            except:
+                                try:
+                                    sexpiry = datetime.strptime(sexpiry, "%Y-%m-%d %H:%M:%S").date()
+                                except:
+                                    pass
+                        elif hasattr(sexpiry, 'date'):
+                            sexpiry = sexpiry.date()
+                    
+                    is_expired = False
+                    if sexpiry and isinstance(sexpiry, date):
+                         if sexpiry < today:
+                             is_expired = True
+                    
+                    normalized_active = normalize_active_flag(sactive)
+                    
+                    # Determine Status
+                    status = "Inactive"
+                    if normalized_active:
+                        if is_expired:
+                             status = "Expired"
+                        else:
+                             status = "Active"
+                    
+                    active_subs = sub_map.get(sid, 0)
+                    over_12 = since_2025_map.get(sid, {}).get("is_over_12_months", False)
+                    first_awarded = since_2025_map.get(sid, {}).get("first_awarded_at", "N/A")
+                    total_m = since_2025_map.get(sid, {}).get("total_months", 0)
+                else:
+                    # Not in scholarship table
+                    sname = "Unknown School"
+                    stype = "N/A"
+                    sexpiry = None
+                    status = "Never Assigned"
+                    active_subs = 0
+                    over_12 = False
+                    first_awarded = "N/A"
+                    total_m = 0
+
                 for info in champ_infos:
                     results.append({
                         "champion": info['champion'],
@@ -19630,11 +19944,11 @@ def all_champions_school_tracker():
                         "school_name": sname,
                         "status": status,
                         "expiry_date": sexpiry.isoformat() if sexpiry else None,
-                        "first_awarded_at": since_2025_map.get(sid, {}).get("first_awarded_at", "N/A"),
-                        "is_over_12_months": since_2025_map.get(sid, {}).get("is_over_12_months", False),
+                        "first_awarded_at": first_awarded,
+                        "is_over_12_months": over_12,
                         "scholarship_type": stype,
                         "active_subscriptions": active_subs,
-                        "duration": since_2025_map.get(sid, {}).get("total_months", 0)
+                        "duration": total_m
                     })
 
         return jsonify(results), 200

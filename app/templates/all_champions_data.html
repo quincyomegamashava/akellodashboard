@@ -327,289 +327,309 @@
         <div class="tab-pane fade" id="content-schooltracker" role="tabpanel">
 
           <div class="row g-3 mb-3">
-            <div class="col-md-4">
+            <div class="col-md-3">
+              <div class="d-flex align-items-center p-3 bg-white border rounded shadow-sm h-100">
+                <div class="rounded-circle bg-soft-primary p-3 me-3">
+                  <i class="fa fa-school text-primary"></i>
+                </div>
+                <div>
+                  <div class="text-muted small">Total Schools</div>
+                  <div class="h5 mb-0 fw-bold" id="st-total-count">-</div>
+                  <div class="text-mini text-muted">(Scholarship Pool)</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="d-flex align-items-center p-3 bg-white border rounded shadow-sm h-100">
+                <div class="rounded-circle bg-soft-danger p-3 me-3">
+                  <i class="fa fa-hourglass-end text-danger"></i>
+                </div>
+                <div>
+                  <div class="text-muted small">Scholarship Elapsed</div>
+                  <div class="h5 mb-0 fw-bold" id="st-elapsed-count">-</div>
+                  <div class="text-mini text-muted">(12+ months)</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
               <div class="d-flex align-items-center p-3 bg-white border rounded shadow-sm h-100">
                 <div class="rounded-circle bg-soft-success p-3 me-3">
-                  <i class="fa fa-check text-success"></i>
+                  <i class="fa fa-check-circle text-success"></i>
                 </div>
                 <div>
-                  <div class="text-muted small">Active Schools</div>
-                  <div class="h4 mb-0 fw-bold" id="st-active-count">-</div>
+                  <div class="text-muted small">Valid Scholarship</div>
+                  <div class="h5 mb-0 fw-bold" id="st-valid-count">-</div>
+                  <div class="text-mini text-muted">(Active < 12mo)</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="d-flex align-items-center p-3 bg-white border rounded shadow-sm h-100">
+                  <div class="rounded-circle bg-soft-warning p-3 me-3">
+                    <i class="fa fa-exclamation-triangle text-warning"></i>
+                  </div>
+                  <div>
+                    <div class="text-muted small">Never Assigned</div>
+                    <div class="h5 mb-0 fw-bold" id="st-never-count">-</div>
+                    <div class="text-mini text-muted">(No active record)</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12 mt-2">
+                <div class="alert alert-soft-light border-0 py-2 mb-0 small text-muted">
+                  <i class="fa fa-info-circle me-2"></i> Inclusive of schools with multiple database entries
                 </div>
               </div>
             </div>
-            <div class="col-md-4">
-              <div class="d-flex align-items-center p-3 bg-white border rounded shadow-sm h-100">
-                <div class="rounded-circle bg-soft-secondary p-3 me-3">
-                  <i class="fa fa-times text-secondary"></i>
-                </div>
+
+            <div class="card border-0 shadow-sm">
+              <div class="card-header d-flex justify-content-between align-items-center bg-white py-3">
                 <div>
-                  <div class="text-muted small">Inactive Schools</div>
-                  <div class="h4 mb-0 fw-bold" id="st-inactive-count">-</div>
+                  <span class="fw-bold text-dark">School Tracker</span>
+                  <div id="schooltracker-status" class="text-muted small fw-normal mt-1">Load tab to fetch data</div>
                 </div>
               </div>
-            </div>
-            <div class="col-md-4">
-              <div class="d-flex align-items-center p-3 bg-white border rounded shadow-sm h-100">
-                <div class="rounded-circle bg-soft-warning p-3 me-3">
-                  <i class="fa fa-users text-warning"></i>
-                </div>
-                <div>
-                  <div class="text-muted small">Sub. (Inactive Schools)</div>
-                  <div class="h4 mb-0 fw-bold" id="st-inactive-subs">-</div>
-                </div>
+              <div class="p-3 border-bottom bg-light">
+                <input type="text" id="searchSchools" placeholder="Search school, champion or province..."
+                  class="form-control search-input bg-white w-100">
+              </div>
+              <div class="table-responsive" style="max-height: 70vh;">
+                <table class="table-custom" id="schooltracker-table">
+                  <thead>
+                    <tr>
+                      <th>Champion</th>
+                      <th>School</th>
+                      <th>Province</th>
+                      <th>Status</th>
+                      <th>First Awarded</th>
+                      <th>Expiry</th>
+                      <th>Duration</th>
+                      <th>Type</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
               </div>
             </div>
           </div>
 
-          <div class="card border-0 shadow-sm">
-            <div class="card-header d-flex justify-content-between align-items-center bg-white py-3">
-              <div>
-                <span class="fw-bold text-dark">School Tracker</span>
-                <div id="schooltracker-status" class="text-muted small fw-normal mt-1">Load tab to fetch data</div>
-              </div>
-            </div>
-            <div class="p-3 border-bottom bg-light">
-              <input type="text" id="searchSchools" placeholder="Search school, champion or province..."
-                class="form-control search-input bg-white w-100">
-            </div>
-            <div class="table-responsive" style="max-height: 70vh;">
-              <table class="table-custom" id="schooltracker-table">
-                <thead>
-                  <tr>
-                    <th>Champion</th>
-                    <th>School</th>
-                    <th>Province</th>
-                    <th>Status</th>
-                    <th>First Awarded</th>
-                    <th>Expiry</th>
-                    <th>Duration</th>
-                    <th>Type</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Download Modal -->
+  <div class="modal fade" id="downloadModal" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+        <div class="modal-header border-bottom-0 pb-0">
+          <h5 class="modal-title fs-6 fw-bold">Export Data</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-4">Select format to download the current view.</p>
+          <div class="d-grid gap-2">
+            <button class="btn btn-outline-success btn-sm text-start ps-3" onclick="exportBothAsExcel()">
+              <i class="fa fa-file-excel me-2"></i> Excel Spreadsheet
+            </button>
+            <button class="btn btn-outline-danger btn-sm text-start ps-3" onclick="exportBothAsPDF()">
+              <i class="fa fa-file-pdf me-2"></i> PDF Document
+            </button>
           </div>
         </div>
-
       </div>
     </div>
   </div>
-</div>
 
-<!-- Download Modal -->
-<div class="modal fade" id="downloadModal" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
-    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
-      <div class="modal-header border-bottom-0 pb-0">
-        <h5 class="modal-title fs-6 fw-bold">Export Data</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p class="text-muted small mb-4">Select format to download the current view.</p>
-        <div class="d-grid gap-2">
-          <button class="btn btn-outline-success btn-sm text-start ps-3" onclick="exportBothAsExcel()">
-            <i class="fa fa-file-excel me-2"></i> Excel Spreadsheet
-          </button>
-          <button class="btn btn-outline-danger btn-sm text-start ps-3" onclick="exportBothAsPDF()">
-            <i class="fa fa-file-pdf me-2"></i> PDF Document
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+  {% endblock %}
 
-{% endblock %}
+  {% block scripts %}
+  <!-- Flatpickr JS -->
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+  <!-- XLSX & JSPDF (Keeping original deps if needed or assuming they are in base or verified) -->
+  <!-- Note: If base.html does not include these, we might need them. The original file implied their existence via usage. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
-{% block scripts %}
-<!-- Flatpickr JS -->
-<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
-<!-- XLSX & JSPDF (Keeping original deps if needed or assuming they are in base or verified) -->
-<!-- Note: If base.html does not include these, we might need them. The original file implied their existence via usage. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <script>
+    // ---- Small helpers ----
+    const TTL_MS = 5 * 60 * 1000; // cache TTL: 5 minutes
+    const analyticsCacheKey = 'allChampions_analytics_v1';
+    const championsCacheKey = 'allChampions_champions_v1';
+    const schoolTrackerCacheKey = 'allChampions_schooltracker_v1';
 
-<script>
-  // ---- Small helpers ----
-  const TTL_MS = 5 * 60 * 1000; // cache TTL: 5 minutes
-  const analyticsCacheKey = 'allChampions_analytics_v1';
-  const championsCacheKey = 'allChampions_champions_v1';
-  const schoolTrackerCacheKey = 'allChampions_schooltracker_v1';
+    // In-memory state for fast filtering and virtualization
+    let analyticsVT = null, analyticsAllRows = [], analyticsFilteredRows = [];
+    let championsVT = null, championsAllRows = [], championsFilteredRows = [];
+    let schoolVT = null, schoolAllRows = [], schoolFilteredRows = [];
+    let analyticsController = null, championsLoaded = false, schoolTrackerLoaded = false;
 
-  // In-memory state for fast filtering and virtualization
-  let analyticsVT = null, analyticsAllRows = [], analyticsFilteredRows = [];
-  let championsVT = null, championsAllRows = [], championsFilteredRows = [];
-  let schoolVT = null, schoolAllRows = [], schoolFilteredRows = [];
-  let analyticsController = null, championsLoaded = false, schoolTrackerLoaded = false;
+    // Initialize Date Objects
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-  // Initialize Date Objects
-  const today = new Date();
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-
-  // Initialize Flatpickr
-  const fpConfig = {
-    dateFormat: "Y-m-d",
-    allowInput: true,
-    onChange: function (selectedDates, dateStr, instance) {
-      // Optional: Could auto-trigger filter here if desired
-      // For now, rely on "Apply Filter" button
-    }
-  };
-
-  const startPicker = flatpickr("#startDate", { ...fpConfig, defaultDate: startOfMonth });
-  const endPicker = flatpickr("#endDate", { ...fpConfig, defaultDate: today });
-
-  function setStatus(id, text) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = text || '';
-  }
-
-  function getCache(key) {
-    try {
-      const s = localStorage.getItem(key);
-      if (!s) return null;
-      const obj = JSON.parse(s);
-      if (!obj || !obj.ts || !obj.data) return null;
-      if (Date.now() - obj.ts > TTL_MS) return null;
-      return obj;
-    } catch { return null; }
-  }
-
-  function setCache(key, data) {
-    try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch { }
-  }
-
-  function showSkeleton(tableId, rows = 10, cols = 7) {
-    const tbody = document.querySelector(`#${tableId} tbody`);
-    if (!tbody) return;
-    let html = '';
-    for (let i = 0; i < rows; i++) {
-      html += '<tr class="skeleton-row">';
-      for (let c = 0; c < cols; c++) {
-        html += '<td><div class="skeleton-line" style="width:100%"></div></td>';
+    // Initialize Flatpickr
+    const fpConfig = {
+      dateFormat: "Y-m-d",
+      allowInput: true,
+      onChange: function (selectedDates, dateStr, instance) {
+        // Optional: Could auto-trigger filter here if desired
+        // For now, rely on "Apply Filter" button
       }
-      html += '</tr>';
-    }
-    tbody.innerHTML = html;
-  }
+    };
 
-  // ---- Virtualized table rendering ----
-  function getScrollParent(node) {
-    let p = node.parentElement;
-    while (p) {
-      const style = getComputedStyle(p);
-      const isScrollable = /(auto|scroll)/.test(style.overflow + style.overflowY + style.overflowX);
-      if (isScrollable) return p;
-      p = p.parentElement;
-    }
-    return document.scrollingElement || document.documentElement;
-  }
+    const startPicker = flatpickr("#startDate", { ...fpConfig, defaultDate: startOfMonth });
+    const endPicker = flatpickr("#endDate", { ...fpConfig, defaultDate: today });
 
-  function mountVirtualTable(tableId, rows, renderRow, cols, options = {}) {
-    const rowHeight = options.rowHeight || 45; // slightly taller for modern look
-    const buffer = options.buffer || 10;
-
-    const table = document.getElementById(tableId);
-    if (!table) return;
-    const tbody = table.querySelector('tbody');
-    const container = getScrollParent(table);
-
-    function getTopOffset(el, ancestor) {
-      let y = 0, n = el;
-      while (n && n !== ancestor) { y += n.offsetTop || 0; n = n.offsetParent; }
-      return y;
+    function setStatus(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text || '';
     }
 
-    const tableTop = getTopOffset(table, container);
+    function getCache(key) {
+      try {
+        const s = localStorage.getItem(key);
+        if (!s) return null;
+        const obj = JSON.parse(s);
+        if (!obj || !obj.ts || !obj.data) return null;
+        if (Date.now() - obj.ts > TTL_MS) return null;
+        return obj;
+      } catch { return null; }
+    }
 
-    function render() {
-      const viewportH = container.clientHeight || window.innerHeight;
-      const scrollY = container.scrollTop;
+    function setCache(key, data) {
+      try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch { }
+    }
 
-      const visibleCount = Math.ceil(viewportH / rowHeight) + buffer * 2;
-      let start = Math.floor((scrollY - tableTop) / rowHeight) - buffer;
-      if (start < 0) start = 0;
-      let end = start + visibleCount;
-      if (end > rows.length) end = rows.length;
-
-      const topPad = start * rowHeight;
-      const bottomPad = (rows.length - end) * rowHeight;
-
+    function showSkeleton(tableId, rows = 10, cols = 7) {
+      const tbody = document.querySelector(`#${tableId} tbody`);
+      if (!tbody) return;
       let html = '';
-      if (topPad > 0) {
-        html += `<tr><td colspan="${cols}" style="padding:0; height:${topPad}px; border:none;"></td></tr>`;
-      }
-      for (let i = start; i < end; i++) html += renderRow(rows[i], i);
-      if (bottomPad > 0) {
-        html += `<tr><td colspan="${cols}" style="padding:0; height:${bottomPad}px; border:none;"></td></tr>`;
+      for (let i = 0; i < rows; i++) {
+        html += '<tr class="skeleton-row">';
+        for (let c = 0; c < cols; c++) {
+          html += '<td><div class="skeleton-line" style="width:100%"></div></td>';
+        }
+        html += '</tr>';
       }
       tbody.innerHTML = html;
     }
 
-    // Initial render, then on scroll/resize
-    render();
-    container.addEventListener('scroll', render, { passive: true });
-    window.addEventListener('resize', render);
-
-    return {
-      update(newRows) { rows = newRows || []; render(); },
-      destroy() {
-        container.removeEventListener('scroll', render);
-        window.removeEventListener('resize', render);
+    // ---- Virtualized table rendering ----
+    function getScrollParent(node) {
+      let p = node.parentElement;
+      while (p) {
+        const style = getComputedStyle(p);
+        const isScrollable = /(auto|scroll)/.test(style.overflow + style.overflowY + style.overflowX);
+        if (isScrollable) return p;
+        p = p.parentElement;
       }
-    };
-  }
-
-  // ---- Date Range Logic ----
-  function ymd(d) {
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${d.getFullYear()}-${mm}-${dd}`;
-  }
-
-  function setRange(rangeType) {
-    const n = new Date();
-    let s, e;
-
-    if (rangeType === 'this_month') {
-      s = new Date(n.getFullYear(), n.getMonth(), 1);
-      e = new Date(n.getFullYear(), n.getMonth() + 1, 0); // End of month
-    } else if (rangeType === 'last_30') {
-      s = new Date(n);
-      s.setDate(n.getDate() - 30);
-      e = new Date(n);
-    } else if (rangeType === 'ytd') {
-      s = new Date(n.getFullYear(), 0, 1);
-      e = new Date(n);
+      return document.scrollingElement || document.documentElement;
     }
 
-    if (s && e) {
-      startPicker.setDate(s);
-      endPicker.setDate(e);
+    function mountVirtualTable(tableId, rows, renderRow, cols, options = {}) {
+      const rowHeight = options.rowHeight || 45; // slightly taller for modern look
+      const buffer = options.buffer || 10;
+
+      const table = document.getElementById(tableId);
+      if (!table) return;
+      const tbody = table.querySelector('tbody');
+      const container = getScrollParent(table);
+
+      function getTopOffset(el, ancestor) {
+        let y = 0, n = el;
+        while (n && n !== ancestor) { y += n.offsetTop || 0; n = n.offsetParent; }
+        return y;
+      }
+
+      const tableTop = getTopOffset(table, container);
+
+      function render() {
+        const viewportH = container.clientHeight || window.innerHeight;
+        const scrollY = container.scrollTop;
+
+        const visibleCount = Math.ceil(viewportH / rowHeight) + buffer * 2;
+        let start = Math.floor((scrollY - tableTop) / rowHeight) - buffer;
+        if (start < 0) start = 0;
+        let end = start + visibleCount;
+        if (end > rows.length) end = rows.length;
+
+        const topPad = start * rowHeight;
+        const bottomPad = (rows.length - end) * rowHeight;
+
+        let html = '';
+        if (topPad > 0) {
+          html += `<tr><td colspan="${cols}" style="padding:0; height:${topPad}px; border:none;"></td></tr>`;
+        }
+        for (let i = start; i < end; i++) html += renderRow(rows[i], i);
+        if (bottomPad > 0) {
+          html += `<tr><td colspan="${cols}" style="padding:0; height:${bottomPad}px; border:none;"></td></tr>`;
+        }
+        tbody.innerHTML = html;
+      }
+
+      // Initial render, then on scroll/resize
+      render();
+      container.addEventListener('scroll', render, { passive: true });
+      window.addEventListener('resize', render);
+
+      return {
+        update(newRows) { rows = newRows || []; render(); },
+        destroy() {
+          container.removeEventListener('scroll', render);
+          window.removeEventListener('resize', render);
+        }
+      };
     }
 
-    // Update active chips
-    document.querySelectorAll('.date-chip').forEach(c => c.classList.remove('active'));
-    document.querySelector(`.date-chip[data-range="${rangeType}"]`)?.classList.add('active');
-  }
-
-
-  async function fetchAnalytics(startDate, endDate, opts = {}) {
-    let url = "/api/champion-schools-smartlearning-usage-analytics";
-    if (startDate && endDate) {
-      url += `?start_date=${startDate}&end_date=${endDate}`;
+    // ---- Date Range Logic ----
+    function ymd(d) {
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${d.getFullYear()}-${mm}-${dd}`;
     }
-    const response = await fetch(url, { signal: opts.signal });
-    if (!response.ok) throw new Error(`API error ${response.status}`);
-    return await response.json();
-  }
 
-  function renderAnalytics(data) {
-    const rows = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
-    const renderRow = (row) => `
+    function setRange(rangeType) {
+      const n = new Date();
+      let s, e;
+
+      if (rangeType === 'this_month') {
+        s = new Date(n.getFullYear(), n.getMonth(), 1);
+        e = new Date(n.getFullYear(), n.getMonth() + 1, 0); // End of month
+      } else if (rangeType === 'last_30') {
+        s = new Date(n);
+        s.setDate(n.getDate() - 30);
+        e = new Date(n);
+      } else if (rangeType === 'ytd') {
+        s = new Date(n.getFullYear(), 0, 1);
+        e = new Date(n);
+      }
+
+      if (s && e) {
+        startPicker.setDate(s);
+        endPicker.setDate(e);
+      }
+
+      // Update active chips
+      document.querySelectorAll('.date-chip').forEach(c => c.classList.remove('active'));
+      document.querySelector(`.date-chip[data-range="${rangeType}"]`)?.classList.add('active');
+    }
+
+
+    async function fetchAnalytics(startDate, endDate, opts = {}) {
+      let url = "/api/champion-schools-smartlearning-usage-analytics";
+      if (startDate && endDate) {
+        url += `?start_date=${startDate}&end_date=${endDate}`;
+      }
+      const response = await fetch(url, { signal: opts.signal });
+      if (!response.ok) throw new Error(`API error ${response.status}`);
+      return await response.json();
+    }
+
+    function renderAnalytics(data) {
+      const rows = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+      const renderRow = (row) => `
     <tr>
       <td>
         <div class="d-flex align-items-center">
@@ -627,22 +647,22 @@
       <td class="text-center fw-bold text-primary">${row.overall_student_count}</td>
     </tr>`;
 
-    analyticsAllRows = rows;
-    analyticsFilteredRows = rows;
-    if (!analyticsVT) {
-      analyticsVT = mountVirtualTable('analytics-table', rows, renderRow, 6, { rowHeight: 60, buffer: 12 });
-    } else {
-      analyticsVT.update(rows);
+      analyticsAllRows = rows;
+      analyticsFilteredRows = rows;
+      if (!analyticsVT) {
+        analyticsVT = mountVirtualTable('analytics-table', rows, renderRow, 6, { rowHeight: 60, buffer: 12 });
+      } else {
+        analyticsVT.update(rows);
+      }
     }
-  }
 
-  // Lazy-load Champions table on first open or with date range
-  async function loadChampions(forceReload = false) {
-    if (championsLoaded && !forceReload) return;
-    championsLoaded = true;
-    setStatus('champions-status', 'Loading...');
+    // Lazy-load Champions table on first open or with date range
+    async function loadChampions(forceReload = false) {
+      if (championsLoaded && !forceReload) return;
+      championsLoaded = true;
+      setStatus('champions-status', 'Loading...');
 
-    const champsRenderRow = (c) => `
+      const champsRenderRow = (c) => `
     <tr>
       <td>
         <div class="d-flex align-items-center">
@@ -655,68 +675,68 @@
       <td class="text-center fw-bold text-success">${c.chatlog_count}</td>
     </tr>`;
 
-    // Only use cache if not forcing reload
-    if (!forceReload) {
-      const cachedChampions = getCache(championsCacheKey);
-      if (cachedChampions && Array.isArray(cachedChampions.data)) {
-        championsAllRows = cachedChampions.data;
-        championsFilteredRows = championsAllRows;
-        championsVT = mountVirtualTable('champions-table', championsAllRows, champsRenderRow, 4, { rowHeight: 52, buffer: 12 });
-        setStatus('champions-status', `Loaded from cache`);
-      }
-    }
-
-    try {
-      // Get date range from inputs
-      const startDate = document.querySelector("#startDate").value;
-      const endDate = document.querySelector("#endDate").value;
-
-      // Build URL with date parameters if present
-      let url = "/api/all-champions-ask-data";
-      if (startDate && endDate) {
-        url += `?start_date=${startDate}&end_date=${endDate}`;
-      }
-
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error(`API error ${resp.status}`);
-      const champions = await resp.json(); // Backend now returns list directly or object? Checked routes.py, it returns list of dicts.
-      // Wait, checked routes.py... it returns list of dicts: `return jsonify(results)`
-
-      championsAllRows = Array.isArray(champions) ? champions : (champions.data || []);
-      championsFilteredRows = championsAllRows;
-      if (!championsVT) {
-        championsVT = mountVirtualTable('champions-table', championsAllRows, champsRenderRow, 4, { rowHeight: 52, buffer: 12 });
-      } else {
-        championsVT.update(championsAllRows);
-      }
-      setCache(championsCacheKey, championsAllRows);
-      setStatus('champions-status', `Updated just now (${championsAllRows.length} rows)`);
-    } catch (e) {
-      console.error(e);
-      setStatus('champions-status', 'Failed to load champions data.');
-    }
-  }
-
-  // Lazy-load School Tracker
-  async function loadSchoolTracker(forceReload = false) {
-    if (schoolTrackerLoaded && !forceReload) return;
-    schoolTrackerLoaded = true;
-    setStatus('schooltracker-status', 'Loading...');
-
-    const schoolRenderRow = (s) => {
-      let statusBadge = '';
-      if (s.status === 'Active') {
-        statusBadge = '<span class="badge bg-success">Active</span>';
-      } else if (s.status === 'Expired') {
-        statusBadge = '<span class="badge bg-warning text-dark">Expired</span>';
-        if (s.active_subscriptions > 0) {
-          statusBadge += ` <span class="badge bg-soft-warning text-warning border border-warning ms-1">${s.active_subscriptions} sub</span>`;
+      // Only use cache if not forcing reload
+      if (!forceReload) {
+        const cachedChampions = getCache(championsCacheKey);
+        if (cachedChampions && Array.isArray(cachedChampions.data)) {
+          championsAllRows = cachedChampions.data;
+          championsFilteredRows = championsAllRows;
+          championsVT = mountVirtualTable('champions-table', championsAllRows, champsRenderRow, 4, { rowHeight: 52, buffer: 12 });
+          setStatus('champions-status', `Loaded from cache`);
         }
-      } else {
-        statusBadge = '<span class="badge bg-secondary">Inactive</span>';
       }
 
-      return `
+      try {
+        // Get date range from inputs
+        const startDate = document.querySelector("#startDate").value;
+        const endDate = document.querySelector("#endDate").value;
+
+        // Build URL with date parameters if present
+        let url = "/api/all-champions-ask-data";
+        if (startDate && endDate) {
+          url += `?start_date=${startDate}&end_date=${endDate}`;
+        }
+
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`API error ${resp.status}`);
+        const champions = await resp.json(); // Backend now returns list directly or object? Checked routes.py, it returns list of dicts.
+        // Wait, checked routes.py... it returns list of dicts: `return jsonify(results)`
+
+        championsAllRows = Array.isArray(champions) ? champions : (champions.data || []);
+        championsFilteredRows = championsAllRows;
+        if (!championsVT) {
+          championsVT = mountVirtualTable('champions-table', championsAllRows, champsRenderRow, 4, { rowHeight: 52, buffer: 12 });
+        } else {
+          championsVT.update(championsAllRows);
+        }
+        setCache(championsCacheKey, championsAllRows);
+        setStatus('champions-status', `Updated just now (${championsAllRows.length} rows)`);
+      } catch (e) {
+        console.error(e);
+        setStatus('champions-status', 'Failed to load champions data.');
+      }
+    }
+
+    // Lazy-load School Tracker
+    async function loadSchoolTracker(forceReload = false) {
+      if (schoolTrackerLoaded && !forceReload) return;
+      schoolTrackerLoaded = true;
+      setStatus('schooltracker-status', 'Loading...');
+
+      const schoolRenderRow = (s) => {
+        let statusBadge = '';
+        if (s.status === 'Active') {
+          statusBadge = '<span class="badge bg-success">Active</span>';
+        } else if (s.status === 'Expired') {
+          statusBadge = '<span class="badge bg-warning text-dark">Expired</span>';
+          if (s.active_subscriptions > 0) {
+            statusBadge += ` <span class="badge bg-soft-warning text-warning border border-warning ms-1">${s.active_subscriptions} sub</span>`;
+          }
+        } else {
+          statusBadge = '<span class="badge bg-secondary">Inactive</span>';
+        }
+
+        return `
         <tr class="${s.is_over_12_months ? 'long-term-row' : ''}">
           <td><div class="fw-medium text-dark">${s.champion || 'U'}</div></td>
           <td>
@@ -732,267 +752,267 @@
           <td class="small text-muted">${s.duration || '0'} mo</td>
           <td class="small text-muted">${s.scholarship_type || '-'}</td>
         </tr>`;
-    };
+      };
 
-    if (!forceReload) {
-      const cached = getCache(schoolTrackerCacheKey);
-      if (cached && Array.isArray(cached.data)) {
-        schoolAllRows = cached.data;
-        schoolFilteredRows = schoolAllRows;
-        schoolVT = mountVirtualTable('schooltracker-table', schoolAllRows, schoolRenderRow, 6, { rowHeight: 52, buffer: 12 });
-        setStatus('schooltracker-status', 'Loaded from cache');
-      }
-    }
-
-    try {
-      const resp = await fetch('/api/all-champions-school-tracker');
-      if (!resp.ok) throw new Error(`API error ${resp.status}`);
-      const schools = await resp.json();
-
-      let activeCount = 0;
-      let inactiveCount = 0;
-      let inactiveSubs = 0;
-
-      schools.forEach(s => {
-        if (s.status === 'Active') {
-          activeCount++;
-        } else {
-          inactiveCount++;
-          if (s.active_subscriptions) {
-            inactiveSubs += s.active_subscriptions;
-          }
+      if (!forceReload) {
+        const cached = getCache(schoolTrackerCacheKey);
+        if (cached && Array.isArray(cached.data)) {
+          schoolAllRows = cached.data;
+          schoolFilteredRows = schoolAllRows;
+          schoolVT = mountVirtualTable('schooltracker-table', schoolAllRows, schoolRenderRow, 6, { rowHeight: 52, buffer: 12 });
+          setStatus('schooltracker-status', 'Loaded from cache');
         }
-      });
-      document.getElementById('st-active-count').textContent = activeCount;
-      document.getElementById('st-inactive-count').textContent = inactiveCount;
-      document.getElementById('st-inactive-subs').textContent = inactiveSubs;
-
-      schoolAllRows = schools;
-      schoolFilteredRows = schools;
-
-      if (!schoolVT) {
-        schoolVT = mountVirtualTable('schooltracker-table', schoolAllRows, schoolRenderRow, 6, { rowHeight: 52, buffer: 12 });
-      } else {
-        schoolVT.update(schoolAllRows);
       }
-      setCache(schoolTrackerCacheKey, schoolAllRows);
-      setStatus('schooltracker-status', `Updated just now (${schoolAllRows.length} rows)`);
-
-    } catch (e) {
-      console.error(e);
-      setStatus('schooltracker-status', 'Failed to load school tracker data.');
-    }
-  }
-
-  // Export helpers
-  function buildRangeLabel() {
-    const s = (document.getElementById('startDate') || {}).value || '';
-    const e = (document.getElementById('endDate') || {}).value || '';
-    if (s && e) return `${s} to ${e}`;
-    return 'All Time';
-  }
-
-  function sanitizeSheetName(name) {
-    return name.replace(/[\\\/*?:\[\]]/g, '_').slice(0, 28);
-  }
-
-  function exportBothAsExcel() {
-    try {
-      const wb = XLSX.utils.book_new();
-      // Tables are virtualized, so DOM table only has visible rows.
-      // We must export from *data* sources (analyticsAllRows, championsAllRows, schoolAllRows)
-
-      const s1 = XLSX.utils.json_to_sheet(analyticsAllRows);
-      const s2 = XLSX.utils.json_to_sheet(championsAllRows);
-      const s3 = XLSX.utils.json_to_sheet(schoolAllRows);
-
-      XLSX.utils.book_append_sheet(wb, s1, "Analytics Overview");
-      XLSX.utils.book_append_sheet(wb, s2, "Ask Akello Engagement");
-      XLSX.utils.book_append_sheet(wb, s3, "School Tracker");
-
-      XLSX.writeFile(wb, `akello_champions_report_${buildRangeLabel()}.xlsx`);
-    } catch (e) {
-      console.error(e);
-      alert('Failed to export Excel - Ensure data is loaded');
-    }
-  }
-
-  function exportBothAsPDF() {
-    // PDF export logic usually relies on autoTable parsing the DOM. 
-    // Since we are virtualized, this will fail to print all rows.
-    // We would need to generate the PDF from JSON data. 
-    // For simplicity given instructions, providing alert if using virtual DOM or implementing basic data-based method.
-    // Let's implement a basic JSON based export for PDF.
-    try {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF('l', 'mm', 'a4'); // Use landscape for wider tables
-      const range = buildRangeLabel();
-
-      doc.setFontSize(18);
-      doc.text(`Akello Champions Report`, 14, 20);
-      doc.setFontSize(11);
-      doc.text(`Period: ${range}`, 14, 28);
-
-      // Table 1: Analytics Overview
-      doc.setFontSize(14);
-      doc.text("1. Analytics Overview", 14, 40);
-      const cols1 = ["Champion", "Username", "Province", "Schools", "ASL Students", "Lib Students", "Total"];
-      const rows1 = analyticsAllRows.map(r => [r.champion, r.username, r.province, r.school_count, r.asl_student_count, r.library_student_count, r.overall_student_count]);
-
-      doc.autoTable({
-        head: [cols1],
-        body: rows1,
-        startY: 45,
-        theme: 'grid',
-        styles: { fontSize: 8 },
-        headStyles: { fillStyle: [37, 99, 235] }
-      });
-
-      // Table 2: Ask Akello Engagement
-      let nextY = doc.lastAutoTable.finalY + 15;
-      if (nextY > 150) { doc.addPage(); nextY = 20; }
-
-      doc.setFontSize(14);
-      doc.text("2. Ask Akello Engagement", 14, nextY);
-      const cols2 = ["Champion", "Province", "School Count", "Chat Logs"];
-      const rows2 = championsAllRows.map(r => [r.champion, r.province, r.school_count, r.chatlog_count]);
-
-      doc.autoTable({
-        head: [cols2],
-        body: rows2,
-        startY: nextY + 5,
-        theme: 'grid',
-        styles: { fontSize: 8 },
-        headStyles: { fillStyle: [111, 66, 193] }
-      });
-
-      // Table 3: School Tracker
-      nextY = doc.lastAutoTable.finalY + 15;
-      if (nextY > 150) { doc.addPage(); nextY = 20; }
-
-      doc.setFontSize(14);
-      doc.text("3. School Tracker", 14, nextY);
-      const cols3 = ["Champion", "School", "Province", "Status", "First Awarded", "Expiry", "Duration", "Type"];
-      const rows3 = schoolAllRows.map(s => [
-        s.champion,
-        s.school_name,
-        s.province,
-        s.status,
-        s.first_awarded_at || '-',
-        s.expiry_date || '-',
-        s.duration || '0',
-        s.scholarship_type || '-'
-      ]);
-
-      doc.autoTable({
-        head: [cols3],
-        body: rows3,
-        startY: nextY + 5,
-        theme: 'grid',
-        styles: { fontSize: 7 }, // Smaller font to fit many columns
-        headStyles: { fillStyle: [20, 161, 153] }
-      });
-
-      doc.save(`akello_champions_report_${range.replace(/\s+/g, '_')}.pdf`);
-    } catch (e) {
-      console.error("PDF Export Error:", e);
-      alert("PDF Generation Error - Please ensure all data is loaded.");
-    }
-  }
-
-  document.addEventListener("DOMContentLoaded", async () => {
-    // Init state
-    showSkeleton('analytics-table', 8, 6);
-    setStatus('analytics-status', 'Loading...');
-
-    // Setup Tab Listeners
-    const triggerTabList = [].slice.call(document.querySelectorAll('#v-pills-tab button'))
-    triggerTabList.forEach(function (triggerEl) {
-      const tabTrigger = new bootstrap.Tab(triggerEl)
-      triggerEl.addEventListener('shown.bs.tab', function (event) {
-        if (event.target.id === 'tab-askakello') {
-          loadChampions();
-        } else if (event.target.id === 'tab-schooltracker') {
-          loadSchoolTracker();
-        }
-      })
-    });
-
-    // Load Initial Analytics
-    try {
-      const cached = getCache(analyticsCacheKey);
-      if (cached) renderAnalytics(cached.data);
-
-      const startDate = document.querySelector("#startDate").value;
-      const endDate = document.querySelector("#endDate").value;
-      const live = await fetchAnalytics(startDate, endDate);
-      const payload = Array.isArray(live) ? { data: live } : live;
-      renderAnalytics(payload);
-      setCache(analyticsCacheKey, payload);
-      setStatus('analytics-status', `Loaded ${payload.data.length} records`);
-    } catch (e) {
-      console.error(e);
-      setStatus('analytics-status', 'Failed to load data');
-    }
-
-    // Search Listeners
-    document.getElementById('search').addEventListener('input', (e) => {
-      const term = e.target.value.toLowerCase();
-      if (!term) { renderAnalytics({ data: analyticsAllRows }); return; }
-      const filtered = analyticsAllRows.filter(r =>
-        (r.champion || '').toLowerCase().includes(term) || (r.province || '').toLowerCase().includes(term)
-      );
-      renderAnalytics({ data: filtered });
-    });
-
-    document.getElementById('searchChampions').addEventListener('input', (e) => {
-      const term = e.target.value.toLowerCase();
-      if (!term) { if (championsLoaded) loadChampions(); return; } // naive reload or re-render
-      // better to filter in memory
-      const filtered = championsAllRows.filter(r =>
-        (r.champion || '').toLowerCase().includes(term) || (r.province || '').toLowerCase().includes(term)
-      );
-      championsFilteredRows = filtered;
-      if (championsVT) championsVT.update(filtered);
-    });
-
-    document.getElementById('searchSchools').addEventListener('input', (e) => {
-      const term = e.target.value.toLowerCase();
-      if (!term) { if (schoolTrackerLoaded) { schoolFilteredRows = schoolAllRows; schoolVT.update(schoolAllRows); } return; }
-
-      const filtered = schoolAllRows.filter(r =>
-        (r.champion || '').toLowerCase().includes(term) ||
-        (r.school_name || '').toLowerCase().includes(term) ||
-        (r.province || '').toLowerCase().includes(term)
-      );
-      schoolFilteredRows = filtered;
-      if (schoolVT) schoolVT.update(filtered);
-    });
-
-    // Filter Button
-    document.getElementById('loadData').addEventListener('click', async () => {
-      showSkeleton('analytics-table', 8, 6);
-      setStatus('analytics-status', 'Reloading...');
-
-      const s = document.getElementById('startDate').value;
-      const e = document.getElementById('endDate').value;
 
       try {
-        const live = await fetchAnalytics(s, e);
+        const resp = await fetch('/api/all-champions-school-tracker');
+        if (!resp.ok) throw new Error(`API error ${resp.status}`);
+        const schools = await resp.json();
+
+        let elapsedCount = 0;
+        let validCount = 0;
+        let neverCount = 0;
+
+        schools.forEach(s => {
+          if (s.status === 'Never Assigned') {
+            neverCount++;
+          } else if (s.is_over_12_months || s.status === 'Expired' || (s.duration && s.duration >= 12)) {
+            elapsedCount++;
+          } else if (s.status === 'Active') {
+            validCount++;
+          }
+        });
+        document.getElementById('st-total-count').textContent = schools.length;
+        document.getElementById('st-elapsed-count').textContent = elapsedCount;
+        document.getElementById('st-valid-count').textContent = validCount;
+        document.getElementById('st-never-count').textContent = neverCount;
+
+        schoolAllRows = schools;
+        schoolFilteredRows = schools;
+
+        if (!schoolVT) {
+          schoolVT = mountVirtualTable('schooltracker-table', schoolAllRows, schoolRenderRow, 6, { rowHeight: 52, buffer: 12 });
+        } else {
+          schoolVT.update(schoolAllRows);
+        }
+        setCache(schoolTrackerCacheKey, schoolAllRows);
+        setStatus('schooltracker-status', `Updated just now (${schoolAllRows.length} rows)`);
+
+      } catch (e) {
+        console.error(e);
+        setStatus('schooltracker-status', 'Failed to load school tracker data.');
+      }
+    }
+
+    // Export helpers
+    function buildRangeLabel() {
+      const s = (document.getElementById('startDate') || {}).value || '';
+      const e = (document.getElementById('endDate') || {}).value || '';
+      if (s && e) return `${s} to ${e}`;
+      return 'All Time';
+    }
+
+    function sanitizeSheetName(name) {
+      return name.replace(/[\\\/*?:\[\]]/g, '_').slice(0, 28);
+    }
+
+    function exportBothAsExcel() {
+      try {
+        const wb = XLSX.utils.book_new();
+        // Tables are virtualized, so DOM table only has visible rows.
+        // We must export from *data* sources (analyticsAllRows, championsAllRows, schoolAllRows)
+
+        const s1 = XLSX.utils.json_to_sheet(analyticsAllRows);
+        const s2 = XLSX.utils.json_to_sheet(championsAllRows);
+        const s3 = XLSX.utils.json_to_sheet(schoolAllRows);
+
+        XLSX.utils.book_append_sheet(wb, s1, "Analytics Overview");
+        XLSX.utils.book_append_sheet(wb, s2, "Ask Akello Engagement");
+        XLSX.utils.book_append_sheet(wb, s3, "School Tracker");
+
+        XLSX.writeFile(wb, `akello_champions_report_${buildRangeLabel()}.xlsx`);
+      } catch (e) {
+        console.error(e);
+        alert('Failed to export Excel - Ensure data is loaded');
+      }
+    }
+
+    function exportBothAsPDF() {
+      // PDF export logic usually relies on autoTable parsing the DOM. 
+      // Since we are virtualized, this will fail to print all rows.
+      // We would need to generate the PDF from JSON data. 
+      // For simplicity given instructions, providing alert if using virtual DOM or implementing basic data-based method.
+      // Let's implement a basic JSON based export for PDF.
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4'); // Use landscape for wider tables
+        const range = buildRangeLabel();
+
+        doc.setFontSize(18);
+        doc.text(`Akello Champions Report`, 14, 20);
+        doc.setFontSize(11);
+        doc.text(`Period: ${range}`, 14, 28);
+
+        // Table 1: Analytics Overview
+        doc.setFontSize(14);
+        doc.text("1. Analytics Overview", 14, 40);
+        const cols1 = ["Champion", "Username", "Province", "Schools", "ASL Students", "Lib Students", "Total"];
+        const rows1 = analyticsAllRows.map(r => [r.champion, r.username, r.province, r.school_count, r.asl_student_count, r.library_student_count, r.overall_student_count]);
+
+        doc.autoTable({
+          head: [cols1],
+          body: rows1,
+          startY: 45,
+          theme: 'grid',
+          styles: { fontSize: 8 },
+          headStyles: { fillStyle: [37, 99, 235] }
+        });
+
+        // Table 2: Ask Akello Engagement
+        let nextY = doc.lastAutoTable.finalY + 15;
+        if (nextY > 150) { doc.addPage(); nextY = 20; }
+
+        doc.setFontSize(14);
+        doc.text("2. Ask Akello Engagement", 14, nextY);
+        const cols2 = ["Champion", "Province", "School Count", "Chat Logs"];
+        const rows2 = championsAllRows.map(r => [r.champion, r.province, r.school_count, r.chatlog_count]);
+
+        doc.autoTable({
+          head: [cols2],
+          body: rows2,
+          startY: nextY + 5,
+          theme: 'grid',
+          styles: { fontSize: 8 },
+          headStyles: { fillStyle: [111, 66, 193] }
+        });
+
+        // Table 3: School Tracker
+        nextY = doc.lastAutoTable.finalY + 15;
+        if (nextY > 150) { doc.addPage(); nextY = 20; }
+
+        doc.setFontSize(14);
+        doc.text("3. School Tracker", 14, nextY);
+        const cols3 = ["Champion", "School", "Province", "Status", "First Awarded", "Expiry", "Duration", "Type"];
+        const rows3 = schoolAllRows.map(s => [
+          s.champion,
+          s.school_name,
+          s.province,
+          s.status,
+          s.first_awarded_at || '-',
+          s.expiry_date || '-',
+          s.duration || '0',
+          s.scholarship_type || '-'
+        ]);
+
+        doc.autoTable({
+          head: [cols3],
+          body: rows3,
+          startY: nextY + 5,
+          theme: 'grid',
+          styles: { fontSize: 7 }, // Smaller font to fit many columns
+          headStyles: { fillStyle: [20, 161, 153] }
+        });
+
+        doc.save(`akello_champions_report_${range.replace(/\s+/g, '_')}.pdf`);
+      } catch (e) {
+        console.error("PDF Export Error:", e);
+        alert("PDF Generation Error - Please ensure all data is loaded.");
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      // Init state
+      showSkeleton('analytics-table', 8, 6);
+      setStatus('analytics-status', 'Loading...');
+
+      // Setup Tab Listeners
+      const triggerTabList = [].slice.call(document.querySelectorAll('#v-pills-tab button'))
+      triggerTabList.forEach(function (triggerEl) {
+        const tabTrigger = new bootstrap.Tab(triggerEl)
+        triggerEl.addEventListener('shown.bs.tab', function (event) {
+          if (event.target.id === 'tab-askakello') {
+            loadChampions();
+          } else if (event.target.id === 'tab-schooltracker') {
+            loadSchoolTracker();
+          }
+        })
+      });
+
+      // Load Initial Analytics
+      try {
+        const cached = getCache(analyticsCacheKey);
+        if (cached) renderAnalytics(cached.data);
+
+        const startDate = document.querySelector("#startDate").value;
+        const endDate = document.querySelector("#endDate").value;
+        const live = await fetchAnalytics(startDate, endDate);
         const payload = Array.isArray(live) ? { data: live } : live;
         renderAnalytics(payload);
         setCache(analyticsCacheKey, payload);
         setStatus('analytics-status', `Loaded ${payload.data.length} records`);
-      } catch (err) {
-        console.error(err);
-        setStatus('analytics-status', 'Error loading data');
+      } catch (e) {
+        console.error(e);
+        setStatus('analytics-status', 'Failed to load data');
       }
 
-      if (championsLoaded) {
-        loadChampions(true);
-      }
+      // Search Listeners
+      document.getElementById('search').addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        if (!term) { renderAnalytics({ data: analyticsAllRows }); return; }
+        const filtered = analyticsAllRows.filter(r =>
+          (r.champion || '').toLowerCase().includes(term) || (r.province || '').toLowerCase().includes(term)
+        );
+        renderAnalytics({ data: filtered });
+      });
+
+      document.getElementById('searchChampions').addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        if (!term) { if (championsLoaded) loadChampions(); return; } // naive reload or re-render
+        // better to filter in memory
+        const filtered = championsAllRows.filter(r =>
+          (r.champion || '').toLowerCase().includes(term) || (r.province || '').toLowerCase().includes(term)
+        );
+        championsFilteredRows = filtered;
+        if (championsVT) championsVT.update(filtered);
+      });
+
+      document.getElementById('searchSchools').addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        if (!term) { if (schoolTrackerLoaded) { schoolFilteredRows = schoolAllRows; schoolVT.update(schoolAllRows); } return; }
+
+        const filtered = schoolAllRows.filter(r =>
+          (r.champion || '').toLowerCase().includes(term) ||
+          (r.school_name || '').toLowerCase().includes(term) ||
+          (r.province || '').toLowerCase().includes(term)
+        );
+        schoolFilteredRows = filtered;
+        if (schoolVT) schoolVT.update(filtered);
+      });
+
+      // Filter Button
+      document.getElementById('loadData').addEventListener('click', async () => {
+        showSkeleton('analytics-table', 8, 6);
+        setStatus('analytics-status', 'Reloading...');
+
+        const s = document.getElementById('startDate').value;
+        const e = document.getElementById('endDate').value;
+
+        try {
+          const live = await fetchAnalytics(s, e);
+          const payload = Array.isArray(live) ? { data: live } : live;
+          renderAnalytics(payload);
+          setCache(analyticsCacheKey, payload);
+          setStatus('analytics-status', `Loaded ${payload.data.length} records`);
+        } catch (err) {
+          console.error(err);
+          setStatus('analytics-status', 'Error loading data');
+        }
+
+        if (championsLoaded) {
+          loadChampions(true);
+        }
+      });
+
     });
-
-  });
-</script>
-{% endblock %}
+  </script>
+  {% endblock %}

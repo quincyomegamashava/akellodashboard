@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .subs-wrapper {
+        width: 90%;
+        max-width: 1200px;
+        margin: 40px auto;
+        padding: 0 16px;
+    }
+
+    .subs-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+        background: linear-gradient(135deg, #00407d 0%, #002d58 100%);
+        padding: 24px;
+        border-radius: 12px;
+        color: white;
+        box-shadow: 0 8px 16px rgba(0, 64, 125, 0.2);
+    }
+
+    .subs-header h2 {
+        margin: 0;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+    }
+
+    .subs-card {
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 12px 32px rgba(10, 31, 68, 0.08);
+        padding: 24px;
+        border: 1px solid #eef2f7;
+    }
+
+    .subscription-table {
+        width: 100% !important;
+        border-collapse: separate !important;
+        border-spacing: 0 8px !important;
+    }
+
+    .subscription-table thead th {
+        background: #f8fafc;
+        padding: 16px;
+        font-weight: 600;
+        color: #475569;
+        text-transform: uppercase;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+        border: none;
+    }
+
+    .subscription-table tbody tr {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .subscription-table tbody tr:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        background-color: #f1f5f9 !important;
+    }
+
+    .subscription-table td {
+        padding: 16px;
+        background: #fff;
+        border-top: 1px solid #f1f5f9;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .subscription-table td:first-child {
+        border-left: 1px solid #f1f5f9;
+        border-top-left-radius: 8px;
+        border-bottom-left-radius: 8px;
+    }
+
+    .subscription-table td:last-child {
+        border-right: 1px solid #f1f5f9;
+        border-top-right-radius: 8px;
+        border-bottom-right-radius: 8px;
+    }
+
+    .count-badge {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: 14px;
+        box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+    }
+
+    .book-title {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 15px;
+    }
+
+    .book-meta {
+        color: #64748b;
+        font-size: 13px;
+    }
+
+    /* DataTables Overrides */
+    .dataTables_wrapper .dataTables_filter input {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 12px;
+        outline: none;
+    }
+
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+        background: #00407d !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 6px;
+    }
+</style>
+
+<div class="subs-wrapper">
+    <div class="subs-header">
+        <div>
+            <h2><i class="fa fa-book-reader mr-3"></i> Book Subscriptions</h2>
+            <p class="mb-0 opacity-75">Analytics for most subscribed books in Akello Library</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-light rounded-pill px-4" onclick="window.location.reload()">
+                <i class="fa fa-sync-alt"></i> Refresh Data
+            </button>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger rounded-4 shadow-sm mb-4">
+        <i class="fa fa-exclamation-triangle mr-2"></i> {{ error }}
+    </div>
+    {% endif %}
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="subs-card text-center p-4" style="border-left: 5px solid #00407d;">
+                <div class="text-muted small text-uppercase font-weight-bold mb-1">Total Subscriptions</div>
+                <div class="h2 font-weight-bold mb-0" style="color: #00407d;">{{ stats.total }}</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="subs-card text-center p-4" style="border-left: 5px solid #10b981;">
+                <div class="text-muted small text-uppercase font-weight-bold mb-1">Top Performing Book</div>
+                <div class="h5 font-weight-bold mb-0 text-truncate" title="{{ stats.top_book }}">{{ stats.top_book }}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="subs-card text-center p-4" style="border-left: 5px solid #3b82f6;">
+                <div class="text-muted small text-uppercase font-weight-bold mb-1">Analyzed Records</div>
+                <div class="h2 font-weight-bold mb-0" style="color: #3b82f6;">{{ stats.count }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="subs-card mb-4">
+        <form method="GET" action="{{ url_for('book_subscriptions') }}" class="row align-items-end">
+            <div class="col-md-3">
+                <label class="form-label font-weight-bold text-muted small text-uppercase">Genre</label>
+                <select name="genre" class="form-control rounded-pill border-2">
+                    <option value="">All Genres</option>
+                    {% for genre in genres %}
+                    <option value="{{ genre.id }}" {% if selected_genre==genre.id|string %}selected{% endif %}>
+                        {{ genre.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label font-weight-bold text-muted small text-uppercase">Start Date</label>
+                <input type="date" name="start_date" class="form-control rounded-pill border-2"
+                    value="{{ start_date or '' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label font-weight-bold text-muted small text-uppercase">End Date</label>
+                <input type="date" name="end_date" class="form-control rounded-pill border-2"
+                    value="{{ end_date or '' }}">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary btn-block rounded-pill">
+                    <i class="fa fa-filter mr-2"></i> Update Report
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="subs-card">
+        <table id="subsTable" class="subscription-table display">
+            <thead>
+                <tr>
+                    <th>Book Details</th>
+                    <th>ISBN</th>
+                    <th class="text-center">Subscriptions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sub in subscriptions %}
+                <tr>
+                    <td>
+                        <div class="book-title">{{ sub.title }}</div>
+                        <div class="book-meta">{{ sub.author }}</div>
+                    </td>
+                    <td><code class="text-primary">{{ sub.isbn or 'N/A' }}</code></td>
+                    <td class="text-center">
+                        <span class="count-badge">{{ sub.subscription_count }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+<script>
+    $(document).ready(function () {
+        $('#subsTable').DataTable({
+            pageLength: 25,
+            order: [[2, 'desc']],
+            dom: '<"d-flex justify-content-between align-items-center mb-4"lf>rt<"d-flex justify-content-between align-items-center mt-4"ip>',
+            language: {
+                search: "_INPUT_",
+                searchPlaceholder: "Search books..."
+            }
+        });
+    });
+</script>
+{% endblock %}
