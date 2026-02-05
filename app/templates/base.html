@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% block title %}Akello Internal <br> Dashboard{% endblock %}</title>
+  <title>{% block title %}Akello Dashboard{% endblock %}</title>
 
   <!-- Fonts -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
@@ -172,7 +172,7 @@
       {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}
       <div class="px-3 mt-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider sidebar-text">Content
       </div>
-      <a href="{{ url_for('content_development') }}"
+      <a href="{{ url_for('content_dev.content_development') }}"
         class="nav-item {{ 'active' if title == 'Content Development' else '' }}">
         <i class="fas fa-paragraph"></i> <span class="nav-text">Content Dev</span>
       </a>

@@ -152,37 +152,36 @@ def get_library_pool():
 # ---------- Helper functions ----------
 # ---------- Improved Helper functions with error handling ----------
 def get_direct_library_conn():
-    """Get a library database connection with error handling and timeout"""
+    """Get a library database connection - direct connection for help desk"""
     try:
-        pool = get_library_pool()
-        if pool is None:
-            raise Exception("Library connection pool not available")
+        import pymysql
         
-        conn = pool.connection()
-        if conn is None:
-            raise Exception("Failed to get library database connection from pool")
-        return conn
+        # Use credentials that have access from this IP
+        # Note: User qmashava doesn't have access from your current IP (77.246.50.217)
+        host = '40.88.149.15'
+        port = 33000
+        user = 'kmudzimuirema'
+        password = 'Ak3110$2022'
+        database = 'akello_library'
+        
+        app.logger.info(f"Connecting to library database at {host}:{port}/{database} as {user}")
+        
+        return pymysql.connect(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database=database,
+            cursorclass=pymysql.cursors.DictCursor,
+            autocommit=True,
+            connect_timeout=30,
+            read_timeout=60,
+            write_timeout=60,
+            charset='utf8mb4'
+        )
     except Exception as e:
-        app.logger.error(f"Error getting library database connection: {e}")
-        # Try to create a direct connection as fallback
-        try:
-            import pymysql
-            return pymysql.connect(
-                host='40.88.149.15',
-                port=33000,
-                user='kmudzimuirema',
-                password='Ak3110$2022',
-                database='akello_library',
-                cursorclass=pymysql.cursors.DictCursor,
-                autocommit=True,
-                connect_timeout=30,
-                read_timeout=60,
-                write_timeout=60,
-                charset='utf8mb4'
-            )
-        except Exception as fallback_error:
-            app.logger.error(f"Fallback connection also failed: {fallback_error}")
-            raise Exception("Unable to establish library database connection")
+        app.logger.error(f"Failed to get library connection: {e}")
+        raise
 
 def get_ruzivo_conn():
     """Get a ruzivo database connection with error handling and timeout"""
@@ -718,922 +717,7 @@ def index():
     )
 
 
-@app.route('/content-development', methods=['GET'])
-@login_required
-def content_development():
-    # Check if user is admin or has Content Development privilege
-    if current_user.userRole != 'Admin' and not current_user.has_privilege('Content Development'):
-        return "Unauthorized", 403
-    return render_template('content_development.html', title='Content Development')
 
-
-# -------- Content Development API --------
-@app.route('/api/ollama/models', methods=['GET'])
-@login_required
-def list_ollama_models():
-    base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')
-    headers = {}
-    # Optional auth
-    authz = os.getenv('OLLAMA_AUTHORIZATION')
-    api_key = os.getenv('OLLAMA_API_KEY')
-    if authz:
-        headers['Authorization'] = authz
-    elif api_key:
-        headers['Authorization'] = f'Bearer {api_key}'
-
-    # Try HTTP API first
-    try:
-        r = requests.get(f"{base_url}/api/tags", timeout=10, headers=headers)
-        r.raise_for_status()
-        data = r.json() or {}
-        models = [m.get('name') for m in data.get('models', []) if m.get('name')]
-        if models:
-            return jsonify({'models': models})
-    except Exception:
-        pass
-    # Try Python library fallback (with explicit host)
-    try:
-        from ollama import Client
-        client = Client(host=base_url)
-        res = client.list()
-        models = [m.get('name') for m in (res.get('models') or []) if m.get('name')]
-        if models:
-            return jsonify({'models': models})
-    except Exception as e:
-        return jsonify({'models': ['llama3.1', 'llama3', 'mistral', 'phi3', 'qwen2', 'gemma'], 'error': str(e)}), 200
-    # Final fallback
-    return jsonify({'models': ['llama3.1', 'llama3', 'mistral', 'phi3', 'qwen2', 'gemma']}), 200
-
-# -------- End Content Development API --------
-
-@app.route('/api/lessons/<int:lesson_id>', methods=['GET'])
-@login_required
-def get_lesson(lesson_id):
-    lesson = Lesson.query.get_or_404(lesson_id)
-    # Ensure user has access via membership
-    ws = Workspace.query.get(lesson.workspace_id)
-    if current_user not in ws.members:
-        return jsonify({'error': 'Not authorized'}), 403
-    return jsonify({
-        'id': lesson.id,
-        'workspace_id': lesson.workspace_id,
-        'topic': lesson.topic,
-        'subject': lesson.subject,
-        'age': lesson.age,
-        'content': lesson.content,
-        'created_at': lesson.created_at.isoformat() if lesson.created_at else None
-    })
-
-@app.route('/api/workspaces/<int:ws_id>', methods=['DELETE', 'PATCH'])
-@login_required
-def modify_workspace(ws_id):
-    ws = Workspace.query.get_or_404(ws_id)
-    # Only creator can modify/delete for now
-    if ws.created_by != current_user.id:
-        return jsonify({'error': 'Only the creator can modify or delete this workspace'}), 403
-
-    if request.method == 'DELETE':
-        db.session.delete(ws)
-        db.session.commit()
-        return jsonify({'status': 'deleted'})
-
-    # PATCH
-    data = request.get_json(silent=True) or {}
-    name = (data.get('name') or '').strip()
-    description = (data.get('description') or '').strip()
-    if name:
-        ws.name = name
-    # allow empty description to clear
-    if 'description' in data:
-        ws.description = description
-    db.session.commit()
-    return jsonify({'status': 'updated', 'workspace': {'id': ws.id, 'name': ws.name, 'description': ws.description or ''}})
-
-@app.route('/api/workspaces/mine', methods=['GET'])
-@login_required
-def workspaces_mine():
-    # Workspaces where current user is a member
-    wss = Workspace.query.join(Workspace.members).filter(User.id == current_user.id).order_by(Workspace.created_at.desc()).all()
-
-    def file_to_dict(f):
-        # make a URL-ish path for front-end anchors
-        url_path = '/' + f.stored_path.replace('\\\\', '/').lstrip('/')
-        return {
-            'id': f.id,
-            'name': f.original_name,
-            'url': url_path,
-            'uploaded_at': f.uploaded_at.isoformat() if f.uploaded_at else None
-        }
-
-    def lesson_to_dict(l):
-        return {
-            'id': l.id,
-            'topic': l.topic,
-            'age': l.age,
-            'subject': l.subject,
-            'created_at': l.created_at.isoformat() if l.created_at else None
-        }
-    
-    def activity_question_to_dict(aq):
-        return {
-            'id': aq.id,
-            'lesson_id': aq.lesson_id,
-            'topic': aq.topic,
-            'subject': aq.subject,
-            'age_range': aq.age_range,
-            'grade_range': aq.grade_range,
-            'ability_levels': aq.ability_levels,
-            'question_type': aq.question_type,
-            'num_questions': aq.num_questions,
-            'created_at': aq.created_at.isoformat() if aq.created_at else None
-        }
-
-    def tasks_for_workspace(ws_id):
-        # Collect all tasks in all projects under this workspace
-        projects = Project.query.filter_by(workspace_id=ws_id).all()
-        project_ids = [p.id for p in projects]
-        if not project_ids:
-            return []
-        all_tasks = Task.query.filter(Task.project_id.in_(project_ids)).all()
-        by_parent = {}
-        parents = []
-        for t in all_tasks:
-            if t.parent_id is None:
-                parents.append(t)
-            else:
-                by_parent.setdefault(t.parent_id, []).append(t)
-        result = []
-        for p in parents:
-            result.append({
-                'id': p.id,
-                'title': p.title,
-                'status': p.status,
-                'subtasks': [
-                    {'id': c.id, 'title': c.title, 'status': c.status}
-                    for c in by_parent.get(p.id, [])
-                ]
-            })
-        return result
-
-    data = []
-    for ws in wss:
-        files = [file_to_dict(f) for f in ws.files]
-        lessons = [lesson_to_dict(l) for l in ws.lessons]
-        activity_questions = [activity_question_to_dict(aq) for aq in ws.activity_questions]
-        tasks = tasks_for_workspace(ws.id)
-        data.append({
-            'id': ws.id,
-            'name': ws.name,
-            'description': ws.description or '',
-            'created_at': ws.created_at.isoformat() if ws.created_at else None,
-            'files': files,
-            'lessons': lessons,
-            'activity_questions': activity_questions,
-            'tasks': tasks
-        })
-    return jsonify({'workspaces': data})
-@app.route('/api/content-dev/bootstrap', methods=['GET'])
-@login_required
-def content_dev_bootstrap():
-    # Allowed collaborators: all users where userRole != 'Brand Ambassador'
-    allowed_users = User.query.filter(User.userRole != 'Brand Ambassador').order_by(User.firstname.asc()).all()
-
-    # Workspaces where current user is a member
-    member_ws = Workspace.query.join(Workspace.members).filter(User.id == current_user.id).order_by(Workspace.created_at.desc()).all()
-
-    def ws_summary(ws):
-        return { 'id': ws.id, 'name': ws.name }
-
-    return jsonify({
-        'collaborators': [
-            {
-                'id': u.id,
-                'username': u.username,
-                'name': f"{(u.firstname or '').strip()} {(u.lastname or '').strip()}".strip() or u.username
-            } for u in allowed_users
-        ],
-        'workspaces': [ws_summary(w) for w in member_ws]
-    })
-
-
-@app.route('/api/workspaces', methods=['POST'])
-@login_required
-def create_workspace_api():
-    # Expect multipart/form-data
-    subject = request.form.get('subject', '').strip()
-    grade = request.form.get('grade', '').strip()
-    term = request.form.get('term', '').strip()
-    description = request.form.get('description', '').strip()
-    collab_field = request.form.getlist('collaborators')
-    if not collab_field:
-        raw = request.form.get('collaborators', '')
-        collab_field = [x for x in raw.split(',') if x] if raw else []
-
-    tasks_json = request.form.get('tasks')
-    try:
-        tasks = json.loads(tasks_json) if tasks_json else []
-    except Exception:
-        tasks = []
-
-    if not subject or not grade:
-        return jsonify({'error': 'Subject and Grade are required'}), 400
-
-    name = f"{subject} Grade {grade}"
-    ws = Workspace(name=name, description=(term + ('\n' + description if description else '')) if term else description, created_by=current_user.id)
-    db.session.add(ws)
-
-    # Add members: current user + selected collaborators
-    try:
-        member_ids = {int(mid) for mid in collab_field if str(mid).isdigit()}
-    except Exception:
-        member_ids = set()
-    # ensure current user is included
-    member_ids.add(current_user.id)
-    if member_ids:
-        users = User.query.filter(User.id.in_(member_ids)).all()
-        ws.members = list(set(users))
-
-    # Create a default project to hold tasks
-    project = Project(title='Content Plan', description='Auto-created for workspace tasks', workspace=ws, status='Not Started')
-    db.session.add(project)
-    db.session.flush()
-
-    # Insert tasks + subtasks
-    for t in tasks:
-        title = (t.get('title') or '').strip()
-        if not title:
-            continue
-        parent_task = Task(title=title, project=project, status='To Do')
-        db.session.add(parent_task)
-        for st in t.get('subtasks', []) or []:
-            st_title = (st or '').strip()
-            if not st_title:
-                continue
-            db.session.add(Task(title=st_title, project=project, parent_id=parent_task.id, status='To Do'))
-
-    db.session.flush()
-
-    # Handle file uploads
-    upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join(app.root_path, 'static', 'uploads', 'workspaces'))
-    os.makedirs(upload_folder, exist_ok=True)
-    saved_files = []
-    for file in request.files.getlist('files'):
-        if not file or not getattr(file, 'filename', None):
-            continue
-        fname = secure_filename(file.filename)
-        # Store within a subfolder per workspace
-        ws_dir = os.path.join(upload_folder, str(ws.id))
-        os.makedirs(ws_dir, exist_ok=True)
-        stored_path = os.path.join(ws_dir, fname)
-        file.save(stored_path)
-        rel_path = os.path.relpath(stored_path, app.root_path)
-        wf = WorkspaceFile(workspace=ws, original_name=fname, stored_path=rel_path, uploaded_by=current_user.id)
-        db.session.add(wf)
-        saved_files.append({'original_name': fname, 'path': rel_path.replace('\\', '/')})
-
-    db.session.commit()
-
-    return jsonify({
-        'workspace': {'id': ws.id, 'name': ws.name},
-        'files': saved_files
-    }), 201
-
-
-def build_lesson_prompt(age:int, topic:str, objectives:list, aspects:list, activities:list, images:list, subject: str = None):
-    """Build an optimized, concise prompt for faster generation"""
-    # Format: SUBJECT (all caps) then Topic
-    subject_title = (subject or "GENERAL").upper()
-    
-    # Limit items for faster generation
-    obj_lines = "\n".join([f"• {o}" for o in objectives[:5]]) if objectives else "• Understand key concepts\n• Apply knowledge"
-    aspects_lines = "\n".join([f"• {a}" for a in aspects[:4]]) if aspects else "• Core concepts\n• Examples"
-    activities_lines = "\n".join([f"• {a}" for a in activities[:3]]) if activities else "• Practical exercises"
-
-    # More concise prompt for faster generation
-    prompt = f"""Create a lesson for {age}-year-olds:
-
-{subject_title}
-{topic}
-
-Objectives
-By the end of this lesson, you should be able to:
-{obj_lines}
-
-[For each concept, include:]
-[Concept Name]
-[Brief description]
-Uses of [Concept Name]
-[Key uses]
-
-{aspects_lines}
-
-Activity 1
-{activities_lines}
-
-Format: ALL CAPS subject, topic, Objectives, concepts with Uses, Activity. British English. Write to students directly."""
-    
-    return prompt
-
-
-@app.route('/api/lessons/generate-stream', methods=['POST'])
-@login_required
-def generate_lesson_api_stream():
-    """Streaming endpoint for lesson generation with progress updates"""
-    
-    def send_error(error_msg):
-        return f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
-    
-    try:
-        data = request.get_json(silent=True) or {}
-        workspace_id = data.get('workspace_id')
-        topic = (data.get('topic') or '').strip()
-        age = data.get('age')
-        subject_field = (data.get('subject') or '').strip() or None
-        objectives = data.get('objectives') or []
-        aspects = data.get('aspects') or []
-        activities = data.get('activities') or []
-        images = data.get('images') or []
-        custom_prompt = (data.get('custom_prompt') or '').strip()
-
-        if not workspace_id:
-            return Response(send_error('workspace_id is required'), mimetype='text/event-stream'), 400
-
-        workspace_id_int = int(workspace_id)
-        ws = Workspace.query.get_or_404(workspace_id_int)
-        if current_user not in ws.members:
-            return Response(send_error('Not a member of this workspace'), mimetype='text/event-stream'), 403
-        
-        # Store values we need in the generator (avoid detached instance errors)
-        user_id = current_user.id
-    except Exception as e:
-        return Response(send_error(f'Error: {str(e)}'), mimetype='text/event-stream'), 500
-
-    # Ollama config - optimized for speed
-    base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')
-    model = (data.get('model') or os.getenv('OLLAMA_MODEL') or 'phi3:mini')  # Default to faster model
-    # Reduced tokens for faster generation (1500 tokens ≈ 1000-1200 words, enough for a lesson)
-    num_predict = int(os.getenv('OLLAMA_MAX_TOKENS', '1500'))
-    # Lower temperature for faster, more focused responses
-    temperature = float(os.getenv('OLLAMA_TEMPERATURE', '0.6'))
-
-    headers = {}
-    authz = os.getenv('OLLAMA_AUTHORIZATION')
-    api_key = os.getenv('OLLAMA_API_KEY')
-    if authz:
-        headers['Authorization'] = authz
-    elif api_key:
-        headers['Authorization'] = f'Bearer {api_key}'
-
-    def generate():
-        content = ''
-        total_chars = 0
-        estimated_total = num_predict * 4  # Rough estimate: 4 chars per token
-        
-        try:
-            # Build prompt
-            if custom_prompt:
-                if not topic or not age:
-                    yield send_error('topic and age are required even when using custom prompt (for reference)')
-                    return
-                subject_title = (subject_field or "GENERAL").upper() if subject_field else "GENERAL"
-                prompt = f"""Create a lesson following this EXACT format:
-
-{subject_title}
-{topic}
-
-Objectives
-By the end of this lesson, you should be able to:
-[List objectives based on: {custom_prompt}]
-
-[For each main concept, include:]
-[Concept Name]
-[Description]
-Uses of [Concept Name]
-[Uses list]
-
-Activity 1
-[Activity description]
-
-CRITICAL: Follow the format exactly - ALL CAPS subject title, then topic, then Objectives section, then concepts with Uses subsections, then Activities. Use British English. Write directly to students."""
-            else:
-                if not topic or not age:
-                    yield send_error('workspace_id, topic and age are required')
-                    return
-                prompt = build_lesson_prompt(int(age), topic, objectives, aspects, activities, images, subject_field)
-            
-            yield f"data: {json.dumps({'type': 'progress', 'percentage': 5, 'message': 'Starting generation...'})}\n\n"
-            
-            # For streaming, use (connect_timeout, read_timeout) where read_timeout=None allows unlimited streaming
-            resp = requests.post(f"{base_url}/api/chat", json={
-                'model': model,
-                'messages': [
-                    {'role': 'system', 'content': 'You are an expert educator. Write clear, engaging student lessons in British English following the exact format specified.'},
-                    {'role': 'user', 'content': prompt}
-                ],
-                'stream': True,
-                'options': {
-                    'num_predict': num_predict,
-                    'temperature': temperature
-                }
-            }, timeout=(30, None), headers=headers, stream=True)  # 30s connect, None for read (allows streaming)
-            resp.raise_for_status()
-            
-            yield f"data: {json.dumps({'type': 'progress', 'percentage': 10, 'message': 'Model processing...'})}\n\n"
-            
-            for line in resp.iter_lines():
-                if line:
-                    try:
-                        chunk = json.loads(line)
-                        if 'message' in chunk and 'content' in chunk['message']:
-                            new_content = chunk['message']['content']
-                            content += new_content
-                            total_chars += len(new_content)
-                            # Update progress based on content length
-                            progress = min(95, 10 + int((total_chars / estimated_total) * 85))
-                            yield f"data: {json.dumps({'type': 'progress', 'percentage': progress, 'message': f'Generating... {progress}%', 'content': new_content})}\n\n"
-                        elif 'response' in chunk:
-                            new_content = chunk['response']
-                            content += new_content
-                            total_chars += len(new_content)
-                            progress = min(95, 10 + int((total_chars / estimated_total) * 85))
-                            yield f"data: {json.dumps({'type': 'progress', 'percentage': progress, 'message': f'Generating... {progress}%', 'content': new_content})}\n\n"
-                    except json.JSONDecodeError:
-                        continue
-            
-            # Save lesson - use stored workspace_id and user_id to avoid detached instance errors
-            lesson = Lesson(
-                workspace_id=workspace_id_int,
-                topic=topic,
-                subject=subject_field,
-                age=int(age),
-                objectives=objectives,
-                aspects=aspects,
-                activities=activities,
-                images=images,
-                prompt=prompt,
-                content=content,
-                created_by=user_id
-            )
-            db.session.add(lesson)
-            db.session.commit()
-            
-            yield f"data: {json.dumps({'type': 'complete', 'percentage': 100, 'message': 'Lesson generation complete!', 'lesson_id': lesson.id, 'content': content})}\n\n"
-            
-        except requests.exceptions.ReadTimeout as e:
-            # Handle timeout - try to save partial content if we have some
-            error_msg = 'Generation timed out. The model is taking longer than expected. Try using a faster model (phi3:mini) or reducing the content length.'
-            app.logger.error(f"Lesson generation timeout: {str(e)}")
-            if content:
-                # Save partial content
-                try:
-                    lesson = Lesson(
-                        workspace_id=workspace_id_int,
-                        topic=topic,
-                        subject=subject_field,
-                        age=int(age),
-                        objectives=objectives,
-                        aspects=aspects,
-                        activities=activities,
-                        images=images,
-                        prompt=prompt,
-                        content=content + "\n\n[Note: Generation was interrupted - partial content]",
-                        created_by=user_id
-                    )
-                    db.session.add(lesson)
-                    db.session.commit()
-                    yield f"data: {json.dumps({'type': 'error', 'message': error_msg + ' Partial content saved.', 'partial_content': content, 'lesson_id': lesson.id})}\n\n"
-                except Exception as save_err:
-                    app.logger.error(f"Error saving partial content: {save_err}")
-                    yield send_error(error_msg)
-            else:
-                yield send_error(error_msg)
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, requests.exceptions.RequestException) as e:
-            # Handle network disconnections and connection errors
-            import traceback
-            error_msg = f'Network error: {str(e)}. Please check your connection and try again. If Ollama is remote, ensure it\'s accessible.'
-            app.logger.error(f"Lesson generation connection error: {traceback.format_exc()}")
-            if content:
-                # Try to save partial content on network error
-                try:
-                    lesson = Lesson(
-                        workspace_id=workspace_id_int,
-                        topic=topic,
-                        subject=subject_field,
-                        age=int(age),
-                        objectives=objectives,
-                        aspects=aspects,
-                        activities=activities,
-                        images=images,
-                        prompt=prompt,
-                        content=content + "\n\n[Note: Generation was interrupted due to network error - partial content]",
-                        created_by=user_id
-                    )
-                    db.session.add(lesson)
-                    db.session.commit()
-                    yield f"data: {json.dumps({'type': 'error', 'message': error_msg + ' Partial content saved.', 'partial_content': content, 'lesson_id': lesson.id})}\n\n"
-                except Exception as save_err:
-                    app.logger.error(f"Error saving partial content on network error: {save_err}")
-                    yield send_error(error_msg)
-            else:
-                yield send_error(error_msg)
-        except Exception as e:
-            import traceback
-            error_msg = f'Error generating lesson: {str(e)}'
-            app.logger.error(f"Lesson generation error: {traceback.format_exc()}")
-            yield send_error(error_msg)
-
-    return Response(stream_with_context(generate()), mimetype='text/event-stream')
-
-
-@app.route('/api/lessons/generate', methods=['POST'])
-@login_required
-def generate_lesson_api():
-    data = request.get_json(silent=True) or {}
-    workspace_id = data.get('workspace_id')
-    topic = (data.get('topic') or '').strip()
-    age = data.get('age')
-    subject_field = (data.get('subject') or '').strip() or None
-    objectives = data.get('objectives') or []
-    aspects = data.get('aspects') or []
-    activities = data.get('activities') or []
-    images = data.get('images') or []
-    custom_prompt = (data.get('custom_prompt') or '').strip()  # For single prompt mode
-
-    if not workspace_id:
-        return jsonify({'error': 'workspace_id is required'}), 400
-
-    ws = Workspace.query.get_or_404(int(workspace_id))
-    # ensure requester is a member
-    if current_user not in ws.members:
-        return jsonify({'error': 'Not a member of this workspace'}), 403
-
-    # If custom prompt is provided, use it directly; otherwise build from structured inputs
-    if custom_prompt:
-        if not topic or not age:
-            return jsonify({'error': 'topic and age are required even when using custom prompt (for reference)'}), 400
-        subject_title = (subject_field or "GENERAL").upper() if subject_field else "GENERAL"
-        prompt = f"""Create a lesson following this EXACT format:
-
-{subject_title}
-{topic}
-
-Objectives
-By the end of this lesson, you should be able to:
-[List objectives based on: {custom_prompt}]
-
-[For each main concept, include:]
-[Concept Name]
-[Description]
-Uses of [Concept Name]
-[Uses list]
-
-Activity 1
-[Activity description]
-
-CRITICAL: Follow the format exactly - ALL CAPS subject title, then topic, then Objectives section, then concepts with Uses subsections, then Activities. Use British English. Write directly to students."""
-    else:
-        if not topic or not age:
-            return jsonify({'error': 'workspace_id, topic and age are required'}), 400
-    prompt = build_lesson_prompt(int(age), topic, objectives, aspects, activities, images, subject_field)
-
-    # Ollama config
-    base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')
-    model = (data.get('model') or os.getenv('OLLAMA_MODEL') or 'llama3.1')
-    
-    # Optimization: Use faster parameters for quicker generation
-    # num_predict limits output length (2000 tokens ≈ 1500 words, enough for a complete lesson)
-    num_predict = int(os.getenv('OLLAMA_MAX_TOKENS', '2000'))
-    # Lower temperature = faster, more focused responses (0.7 is a good balance)
-    temperature = float(os.getenv('OLLAMA_TEMPERATURE', '0.7'))
-
-    # Try HTTP chat endpoint first (usually more efficient)
-    content = ''
-    headers = {}
-    authz = os.getenv('OLLAMA_AUTHORIZATION')
-    api_key = os.getenv('OLLAMA_API_KEY')
-    if authz:
-        headers['Authorization'] = authz
-    elif api_key:
-        headers['Authorization'] = f'Bearer {api_key}'
-
-    # Use streaming for progress tracking
-    content = ''
-    try:
-        # Try streaming first for progress updates
-        resp = requests.post(f"{base_url}/api/chat", json={
-            'model': model,
-            'messages': [
-                {'role': 'system', 'content': 'You are an expert educator. Write clear, engaging student lessons in British English following the exact format specified.'},
-                {'role': 'user', 'content': prompt}
-            ],
-            'stream': True,
-            'options': {
-                'num_predict': num_predict,
-                'temperature': temperature
-            }
-        }, timeout=90, headers=headers, stream=True)
-        resp.raise_for_status()
-        
-        # Collect streamed content
-        for line in resp.iter_lines():
-            if line:
-                try:
-                    chunk = json.loads(line)
-                    if 'message' in chunk and 'content' in chunk['message']:
-                        content += chunk['message']['content']
-                    elif 'response' in chunk:
-                        content += chunk['response']
-                except json.JSONDecodeError:
-                    continue
-    except Exception as e:
-        # Fallback to non-streaming
-        try:
-            resp2 = requests.post(f"{base_url}/api/chat", json={
-                'model': model,
-                'messages': [
-                    {'role': 'system', 'content': 'You are an expert educator. Write clear, engaging student lessons in British English following the exact format specified.'},
-                    {'role': 'user', 'content': prompt}
-                ],
-                'stream': False,
-                'options': {
-                    'num_predict': num_predict,
-                    'temperature': temperature
-                }
-            }, timeout=60, headers=headers)
-            resp2.raise_for_status()
-            payload = resp2.json()
-            content = payload.get('message', {}).get('content') or ''
-        except Exception as e2:
-            # Final fallback: Python library
-            try:
-                from ollama import Client
-                client = Client(host=base_url)
-                res = client.chat(model=model, messages=[
-                    {'role': 'system', 'content': 'You are an expert educator. Write clear, engaging student lessons in British English following the exact format specified.'},
-                    {'role': 'user', 'content': prompt}
-                ], options={'num_predict': num_predict, 'temperature': temperature})
-                content = res.get('message', {}).get('content') or ''
-            except Exception as e3:
-                return jsonify({'error': f'Failed to generate from Ollama: {str(e3)}'}), 502
-
-    # Save lesson
-    lesson = Lesson(
-        workspace_id=ws.id,
-        topic=topic,
-        subject=subject_field,
-        age=int(age),
-        objectives=objectives,
-        aspects=aspects,
-        activities=activities,
-        images=images,
-        prompt=prompt,
-        content=content,
-        created_by=current_user.id
-    )
-    db.session.add(lesson)
-    db.session.commit()
-
-    return jsonify({
-        'lesson': {
-            'id': lesson.id,
-            'workspace_id': ws.id,
-            'topic': lesson.topic,
-            'subject': lesson.subject,
-            'age': lesson.age,
-            'content': lesson.content
-        },
-        'model': model
-    }), 201
-
-
-def build_activity_question_prompt(topic: str, subject: str, age_range: dict, grade_range: dict, ability_levels: list, question_type: str, num_questions: int):
-    """Build prompt for generating activity questions using Ollama"""
-    parts = []
-    
-    # Header
-    header = f"Create {num_questions} activity questions for students on the topic: \"{topic}\""
-    if subject:
-        header += f" in the subject of {subject}"
-    parts.append(header)
-    
-    # Student range specifications
-    range_specs = []
-    if age_range and age_range.get('min_age') and age_range.get('max_age'):
-        range_specs.append(f"Age range: {age_range['min_age']}-{age_range['max_age']} years old")
-    if grade_range and grade_range.get('min_grade') and grade_range.get('max_grade'):
-        range_specs.append(f"Grade range: Grade {grade_range['min_grade']}-{grade_range['max_grade']}")
-    if ability_levels:
-        levels_str = ", ".join(ability_levels)
-        range_specs.append(f"Ability levels: {levels_str}")
-    
-    if range_specs:
-        parts.append("\n\nStudent specifications:\n" + "\n".join([f"• {s}" for s in range_specs]))
-    
-    # Question type
-    question_type_map = {
-        'multiple_choice': 'multiple choice questions with 4 options each',
-        'short_answer': 'short answer questions (1-2 sentences)',
-        'essay': 'essay questions requiring detailed responses',
-        'mixed': 'a mix of question types (multiple choice, short answer, and essay)'
-    }
-    qtype_desc = question_type_map.get(question_type, 'mixed questions')
-    parts.append(f"\n\nQuestion type: {qtype_desc}")
-    
-    # Format requirements
-    parts.append("\n\nFormat the output clearly with:")
-    parts.append("• Question number and question text")
-    if question_type in ['multiple_choice', 'mixed']:
-        parts.append("• For multiple choice: List options A, B, C, D and indicate the correct answer")
-    if question_type in ['essay', 'mixed']:
-        parts.append("• For essay questions: Include suggested marking criteria or key points")
-    parts.append("\nUse British English spelling and terminology.")
-    
-    return "\n".join(parts)
-
-
-@app.route('/api/activity-questions/generate', methods=['POST'])
-@login_required
-def generate_activity_questions_api():
-    data = request.get_json(silent=True) or {}
-    workspace_id = data.get('workspace_id')
-    topic = (data.get('topic') or '').strip()
-    subject_field = (data.get('subject') or '').strip() or None
-    age_range = data.get('age_range')  # {min_age: int, max_age: int}
-    grade_range = data.get('grade_range')  # {min_grade: int, max_grade: int}
-    ability_levels = data.get('ability_levels') or []
-    question_type = data.get('question_type', 'mixed')
-    num_questions = data.get('num_questions', 5)
-    lesson_id = data.get('lesson_id')  # Optional link to a lesson
-    
-    if not workspace_id or not topic:
-        return jsonify({'error': 'workspace_id and topic are required'}), 400
-    
-    if not isinstance(num_questions, int) or num_questions < 1:
-        num_questions = 5
-    
-    # Validate age range if provided
-    if age_range:
-        min_age = age_range.get('min_age')
-        max_age = age_range.get('max_age')
-        if min_age and max_age and min_age > max_age:
-            return jsonify({'error': 'min_age must be less than or equal to max_age'}), 400
-    
-    # Validate grade range if provided
-    if grade_range:
-        min_grade = grade_range.get('min_grade')
-        max_grade = grade_range.get('max_grade')
-        if min_grade and max_grade and min_grade > max_grade:
-            return jsonify({'error': 'min_grade must be less than or equal to max_grade'}), 400
-    
-    ws = Workspace.query.get_or_404(int(workspace_id))
-    # ensure requester is a member
-    if current_user not in ws.members:
-        return jsonify({'error': 'Not a member of this workspace'}), 403
-    
-    # Validate lesson_id if provided
-    if lesson_id:
-        lesson = Lesson.query.get(lesson_id)
-        if not lesson or lesson.workspace_id != ws.id:
-            return jsonify({'error': 'Invalid lesson_id or lesson does not belong to workspace'}), 400
-    
-    prompt = build_activity_question_prompt(topic, subject_field, age_range, grade_range, ability_levels, question_type, num_questions)
-    
-    # Ollama config
-    base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')
-    model = (data.get('model') or os.getenv('OLLAMA_MODEL') or 'llama3.1')
-    
-    # Try HTTP API first
-    content = ''
-    http_error = None
-    headers = {}
-    authz = os.getenv('OLLAMA_AUTHORIZATION')
-    api_key = os.getenv('OLLAMA_API_KEY')
-    if authz:
-        headers['Authorization'] = authz
-    elif api_key:
-        headers['Authorization'] = f'Bearer {api_key}'
-    
-    try:
-        resp = requests.post(f"{base_url}/api/generate", json={
-            'model': model,
-            'prompt': prompt,
-            'stream': False
-        }, timeout=120, headers=headers)
-        resp.raise_for_status()
-        payload = resp.json()
-        content = payload.get('response') or payload.get('message') or ''
-        if not content:
-            content = payload.get('data') or ''
-    except Exception as e:
-        http_error = e
-    # If HTTP failed or returned empty, try HTTP chat endpoint
-    if not content:
-        try:
-            resp2 = requests.post(f"{base_url}/api/chat", json={
-                'model': model,
-                'messages': [{ 'role': 'user', 'content': prompt }],
-                'stream': False
-            }, timeout=120, headers=headers)
-            resp2.raise_for_status()
-            payload2 = resp2.json()
-            content = payload2.get('message', {}).get('content') or ''
-        except Exception:
-            pass
-    # If HTTP failed or returned empty, try Python library fallback
-    if not content:
-        try:
-            from ollama import Client
-            client = Client(host=base_url)
-            res = client.generate(model=model, prompt=prompt, stream=False)
-            content = res.get('response') or res.get('message', {}).get('content') or ''
-            if not content:
-                res2 = client.chat(model=model, messages=[{ 'role': 'user', 'content': prompt }])
-                content = res2.get('message', {}).get('content') or ''
-        except Exception as e:
-            if http_error:
-                return jsonify({'error': f'Failed to generate from Ollama HTTP ({http_error}); and Python client also failed: {e}'}), 502
-            return jsonify({'error': f'Failed to generate from Ollama Python client: {e}'}), 502
-    
-    # Save activity question
-    activity_question = ActivityQuestion(
-        workspace_id=ws.id,
-        lesson_id=lesson_id if lesson_id else None,
-        topic=topic,
-        subject=subject_field,
-        age_range=age_range,
-        grade_range=grade_range,
-        ability_levels=ability_levels,
-        question_type=question_type,
-        num_questions=num_questions,
-        prompt=prompt,
-        content=content,
-        created_by=current_user.id
-    )
-    db.session.add(activity_question)
-    db.session.commit()
-    
-    return jsonify({
-        'activity_question': {
-            'id': activity_question.id,
-            'workspace_id': ws.id,
-            'topic': activity_question.topic,
-            'subject': activity_question.subject,
-            'content': activity_question.content
-        },
-        'model': model
-    }), 201
-
-
-@app.route('/api/activity-questions/<int:question_id>', methods=['GET'])
-@login_required
-def get_activity_question(question_id):
-    activity_question = ActivityQuestion.query.get_or_404(question_id)
-    # Ensure user has access via membership
-    ws = Workspace.query.get(activity_question.workspace_id)
-    if current_user not in ws.members:
-        return jsonify({'error': 'Not authorized'}), 403
-    return jsonify({
-        'id': activity_question.id,
-        'workspace_id': activity_question.workspace_id,
-        'lesson_id': activity_question.lesson_id,
-        'topic': activity_question.topic,
-        'subject': activity_question.subject,
-        'age_range': activity_question.age_range,
-        'grade_range': activity_question.grade_range,
-        'ability_levels': activity_question.ability_levels,
-        'question_type': activity_question.question_type,
-        'num_questions': activity_question.num_questions,
-        'content': activity_question.content,
-        'created_at': activity_question.created_at.isoformat() if activity_question.created_at else None
-    })
-
-
-@app.route('/api/workspaces/<int:ws_id>/activity-questions', methods=['GET'])
-@login_required
-def get_workspace_activity_questions(ws_id):
-    ws = Workspace.query.get_or_404(ws_id)
-    if current_user not in ws.members:
-        return jsonify({'error': 'Not authorized'}), 403
-    
-    questions = ActivityQuestion.query.filter_by(workspace_id=ws_id).order_by(ActivityQuestion.created_at.desc()).all()
-    
-    def question_to_dict(aq):
-        return {
-            'id': aq.id,
-            'lesson_id': aq.lesson_id,
-            'topic': aq.topic,
-            'subject': aq.subject,
-            'age_range': aq.age_range,
-            'grade_range': aq.grade_range,
-            'ability_levels': aq.ability_levels,
-            'question_type': aq.question_type,
-            'num_questions': aq.num_questions,
-            'created_at': aq.created_at.isoformat() if aq.created_at else None
-        }
-    
-    return jsonify({
-        'activity_questions': [question_to_dict(aq) for aq in questions]
-    })
 
 
 
@@ -2634,10 +1718,9 @@ def all_champions_ask_data():
     # Query once: chatlog counts per school_id within date range
     counts_by_school = {}
     try:
-        pool = get_ruzivo_pool()
-        if pool is None:
+        conn = get_ruzivo_conn()
+        if conn is None:
             return jsonify({"error": "Database connection not available"}), 500
-        conn = pool.connection()
         import pymysql.cursors
         cursor = conn.cursor(pymysql.cursors.DictCursor)
 
@@ -3726,6 +2809,7 @@ def platforms_quick_custom_date():
 @cache.cached(timeout=60 * 60 * 6, key_prefix='platforms_overall_yearly')  # Reduced to 6 hours
 def platforms_overall_yearly():
     import time
+    import pymysql
     import threading
     import concurrent.futures
     
@@ -6235,7 +5319,7 @@ def smartlearning_school():
             return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
 
         # Get the connection from the PyMySQL connection pool
-        conn = ruzivo_pool.connection()
+        conn = get_ruzivo_conn()
 
         with conn.cursor() as cursor:
             # Main data query with grade filter
@@ -11284,6 +10368,17 @@ def profile(username):
     today = datetime.today().date()
     start_date = today.replace(day=1)
 
+    # helper to normalize active flag
+    def normalize_active_flag(value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value != 0
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            return normalized in {"1", "true", "t", "yes", "y"}
+        return False
+
     # ✅ Batch query instead of loop - much faster
     if preselected_asl_ids:
         conn = get_ruzivo_conn()
@@ -11323,10 +10418,305 @@ def profile(username):
                 "name": s["school_name"]
             })
 
+    # ✅ Categorize schools for better display
+    active_scholarship_schools = []
+    inactive_scholarship_schools = []
+    schools_without_scholarship = []
+    school_duration_map = {}
+    
+    # Track schools found in scholarship table
+    schools_with_scholarship_ids = set()
+    
+    if preselected_asl_ids:
+        duration_map = {}
+        try:
+            conn = get_ruzivo_conn()
+            cursor = conn.cursor()
+            
+            # Create placeholders for IN clause
+            placeholders = ','.join(['%s'] * len(preselected_asl_ids))
+            scholarship_query = f"""
+                SELECT ts.school_id, sc.school_name, sc.school_province, sc.school_city,
+                       ts.awarded_at, ts.awarded_by, ts.school_type, ts.scholarship_type,
+                       ts.scholarship_grades, ts.expiry_date, ts.duration, ts.active,
+                       ts.date_modified
+                FROM tblscholarships_schools ts
+                LEFT JOIN tblschools sc ON sc.school_id = ts.school_id
+                WHERE ts.school_id IN ({placeholders})
+            """
+            
+            cursor.execute(scholarship_query, preselected_asl_ids)
+            scholarship_results = cursor.fetchall()
+
+            duration_query = f"""
+                SELECT SUM(x.duration) AS total_months, x.school_id, MIN(x.awarded_at) AS first_awarded_at
+                FROM tblscholarships_schools x
+                WHERE x.school_id IN ({placeholders})
+                AND x.awarded_at >= %s
+                GROUP BY x.school_id
+            """
+            cursor.execute(duration_query, (*preselected_asl_ids, '2025-01-01'))
+            duration_rows = cursor.fetchall()
+
+            cursor.close()
+            conn.close()
+            
+            for duration_row in duration_rows:
+                if isinstance(duration_row, dict):
+                    school_key = duration_row.get("school_id")
+                    total_months = duration_row.get("total_months") or 0
+                    first_awarded = duration_row.get("first_awarded_at")
+                else:
+                    school_key = duration_row[1]
+                    total_months = duration_row[0] or 0
+                    first_awarded = duration_row[2]
+                if school_key:
+                    today = date.today()
+                    is_over_12 = False
+                    if first_awarded:
+                        # Normalize first_awarded to date if it's datetime
+                        fa_date = first_awarded.date() if hasattr(first_awarded, 'date') else first_awarded
+                        if isinstance(fa_date, date) and fa_date <= today - timedelta(days=365):
+                            is_over_12 = True
+                            
+                    duration_map[school_key] = {
+                        "total_months": total_months,
+                        "first_awarded_at": first_awarded,
+                        "is_over_12_months": is_over_12
+                    }
+
+            for row in scholarship_results:
+                if isinstance(row, dict):
+                    school_data = {
+                        "id": row.get("school_id"),
+                        "name": row.get("school_name"),
+                        "province": row.get("school_province"),
+                        "city": row.get("school_city"),
+                        "awarded_at": row.get("awarded_at"),
+                        "awarded_by": row.get("awarded_by"),
+                        "school_type": row.get("school_type"),
+                        "scholarship_type": row.get("scholarship_type"),
+                        "scholarship_grades": row.get("scholarship_grades"),
+                        "expiry_date": row.get("expiry_date"),
+                        "duration": row.get("duration"),
+                        "active": normalize_active_flag(row.get("active")),
+                        "date_modified": row.get("date_modified"),
+                        "total_months": duration_map.get(row.get("school_id"), {}).get("total_months", 0),
+                        "first_awarded_at": duration_map.get(row.get("school_id"), {}).get("first_awarded_at", "N/A")
+                    }
+                    
+                    # Convert expiry_date to date object if it's a datetime or string
+                    if school_data["expiry_date"]:
+                        if isinstance(school_data["expiry_date"], str):
+                            try:
+                                # Try parsing string date
+                                school_data["expiry_date"] = datetime.strptime(school_data["expiry_date"], "%Y-%m-%d").date()
+                            except:
+                                try:
+                                    school_data["expiry_date"] = datetime.strptime(school_data["expiry_date"], "%Y-%m-%d %H:%M:%S").date()
+                                except:
+                                    pass  # Keep original if parsing fails
+                        elif hasattr(school_data["expiry_date"], 'date'):
+                            # If it's a datetime object, convert to date
+                            school_data["expiry_date"] = school_data["expiry_date"].date()
+                else:
+                    # Handle tuple result
+                    school_active_value = row[11]
+                    school_data = {
+                        "id": row[0],
+                        "name": row[1],
+                        "province": row[2],
+                        "city": row[3],
+                        "awarded_at": row[4],
+                        "awarded_by": row[5],
+                        "school_type": row[6],
+                        "scholarship_type": row[7],
+                        "scholarship_grades": row[8],
+                        "expiry_date": row[9],
+                        "duration": row[10],
+                        "active": normalize_active_flag(school_active_value),
+                        "date_modified": row[12],
+                        "total_months": duration_map.get(row[0], 0)
+                    }
+                
+                # Convert expiry_date to date object if it's a datetime or string
+                if school_data["expiry_date"]:
+                    if isinstance(school_data["expiry_date"], str):
+                        try:
+                            # Try parsing string date
+                            school_data["expiry_date"] = datetime.strptime(school_data["expiry_date"], "%Y-%m-%d").date()
+                        except:
+                            try:
+                                school_data["expiry_date"] = datetime.strptime(school_data["expiry_date"], "%Y-%m-%d %H:%M:%S").date()
+                            except:
+                                pass  # Keep original if parsing fails
+                    elif hasattr(school_data["expiry_date"], 'date'):
+                        # If it's a datetime object, convert to date
+                        school_data["expiry_date"] = school_data["expiry_date"].date()
+                
+                # Categorize by active status
+                if school_data["active"]:
+                    # Check if expired for debug
+                    is_expired = school_data["expiry_date"] and school_data["expiry_date"] < today
+                    
+                    # If scholarship is expired, count active subscriptions from tblpoints_purchase
+                    if is_expired and school_data["id"]:
+                        try:
+                            # Calculate current month range
+                            first_day_of_month = today.replace(day=1)
+                            if today.month == 12:
+                                first_day_next_month = today.replace(year=today.year + 1, month=1, day=1)
+                            else:
+                                first_day_next_month = today.replace(month=today.month + 1, day=1)
+                            
+                            # Query tblpoints_purchase for active subscriptions
+                            conn_sub = get_ruzivo_conn()
+                            cursor_sub = conn_sub.cursor()
+                            
+                            subscription_query = """
+                                SELECT COUNT(DISTINCT p.student_id) as active_count
+                                FROM tblpoints_purchase p
+                                JOIN tblstudents s ON p.student_id = s.student_id
+                                WHERE s.school_id = %s
+                                  AND p.expiry_date >= %s
+                                  AND p.expiry_date < %s
+                            """
+                            
+                            cursor_sub.execute(subscription_query, (school_data["id"], first_day_of_month, first_day_next_month))
+                            result = cursor_sub.fetchone()
+                            cursor_sub.close()
+                            conn_sub.close()
+                            
+                            if result:
+                                if isinstance(result, dict):
+                                    school_data["active_subscription_count"] = result.get("active_count", 0) or 0
+                                else:
+                                    school_data["active_subscription_count"] = result[0] or 0
+                            else:
+                                school_data["active_subscription_count"] = 0
+                                
+                        except Exception as e:
+                            print(f"Error fetching subscription count for school {school_data['id']}: {e}")
+                            school_data["active_subscription_count"] = 0
+                    else:
+                        school_data["active_subscription_count"] = 0
+                    
+                    active_scholarship_schools.append(school_data)
+                    # Debug: Log expiry date for troubleshooting
+                    print(f"DEBUG: Active scholarship - School: {school_data['name']}")
+                    print(f"  Expiry Date: {school_data['expiry_date']} (Type: {type(school_data['expiry_date'])})")
+                    print(f"  Today: {today} (Type: {type(today)})")
+                    print(f"  Is Expired: {is_expired}")
+                    print(f"  Comparison: {school_data['expiry_date']} < {today} = {is_expired}")
+                    if is_expired:
+                        print(f"  Active Subscriptions: {school_data.get('active_subscription_count', 0)}")
+                    print("---")
+                else:
+                    school_data["active_subscription_count"] = 0
+                    if school_data["id"]:
+                        try:
+                            # Calculate current month range
+                            first_day_of_month = today.replace(day=1)
+                            if today.month == 12:
+                                first_day_next_month = today.replace(year=today.year + 1, month=1, day=1)
+                            else:
+                                first_day_next_month = today.replace(month=today.month + 1, day=1)
+
+                            conn_sub = get_ruzivo_conn()
+                            cursor_sub = conn_sub.cursor()
+
+                            subscription_query = """
+                                SELECT COUNT(DISTINCT p.student_id) as active_count
+                                FROM tblpoints_purchase p
+                                JOIN tblstudents s ON p.student_id = s.student_id
+                                WHERE s.school_id = %s
+                                  AND p.expiry_date >= %s
+                                  AND p.expiry_date < %s
+                            """
+
+                            cursor_sub.execute(subscription_query, (school_data["id"], first_day_of_month, first_day_next_month))
+                            result = cursor_sub.fetchone()
+                            cursor_sub.close()
+                            conn_sub.close()
+
+                            if result:
+                                if isinstance(result, dict):
+                                    school_data["active_subscription_count"] = result.get("active_count", 0) or 0
+                                else:
+                                    school_data["active_subscription_count"] = result[0] or 0
+                            else:
+                                school_data["active_subscription_count"] = 0
+
+                        except Exception as e:
+                            print(f"Error fetching subscription count for inactive school {school_data['id']}: {e}")
+                            school_data["active_subscription_count"] = 0
+                    inactive_scholarship_schools.append(school_data)
+                
+                # Mark as found
+                schools_with_scholarship_ids.add(school_data["id"])
+
+            # ✅ Identify schools MISSING from tblscholarships_schools
+            # These are schools assigned to the champion but not in the scholarship table
+            for s_dict in existing_school_dicts:
+                asl_id = s_dict.get("asl_school_id")
+                if asl_id and int(asl_id) not in schools_with_scholarship_ids:
+                    schools_without_scholarship.append({
+                        "id": asl_id,
+                        "name": s_dict.get("school_name", "Unknown School"),
+                        "active": False,
+                        "scholarship_type": "No Scholarship",
+                        "active_subscription_count": 0 # Default for missing ones
+                    })
+                    
+        except Exception as e:
+            print(f"Error fetching scholarship data: {e}")
+            # Continue without scholarship data if there's an error
+        finally:
+            school_duration_map = duration_map
+
+    # Calculate aggregations for Paid Subscription section
+    total_active_sub_students = 0
+    schools_with_active_subs_count = 0
+    
+    # Combine lists to iterate once (active + inactive) - wait, inactive_scholarship_schools is separate.
+    # We should check all schools that we have data for.
+    # The lists are: active_scholarship_schools, inactive_scholarship_schools (which includes expired ones usually? check classification logic)
+    # The code divides schools into 'active_scholarship_schools' and 'inactive_scholarship_schools'.
+    # Expired/Inactive logic logic earlier: if normalized_active and not is_expired -> active list. Else -> inactive list.
+    
+    all_processed_schools = active_scholarship_schools + inactive_scholarship_schools
+    
+    for s in all_processed_schools:
+        subs = s.get("active_subscription_count", 0)
+        if subs > 0:
+            total_active_sub_students += subs
+            schools_with_active_subs_count += 1
+
     # Final total after loop
     # print(f"\nTotal SmartLearning Champs MTD: {smartlearning_champ_mtd}")
 
+    # Calculate active (not expired) vs inactive (expired or disabled) scholarship counts
+    count_truly_active = 0
+    count_inactive_total = 0
+
+    # Count truly active schools from active_scholarship_schools (filtering out expired ones)
+    for s in active_scholarship_schools:
+        is_expired = s.get("expiry_date") and s.get("expiry_date") < today
+        if is_expired:
+            count_inactive_total += 1
+        else:
+            count_truly_active += 1
+
+    # Add disabled schools to inactive count
+    count_inactive_total += len(inactive_scholarship_schools)
+    
+    # Schools without any scholarship record
+    count_no_scholarship = len(schools_without_scholarship)
+
     return render_template('userProfile.html',
+                           count_active_scholarship_schools=count_truly_active,
+                           count_inactive_scholarship_schools=count_inactive_total,
+                           count_no_scholarship_schools=count_no_scholarship,
                            user=user,
                             form=form,
                             champ=champ,
@@ -11334,6 +10724,13 @@ def profile(username):
                             preselected_school_ids=preselected_asl_ids,
                             count_user_schools=count_user_schools,
                             smartlearning_champ_mtd=smartlearning_champ_mtd,
+                           active_scholarship_schools=active_scholarship_schools,
+                           inactive_scholarship_schools=inactive_scholarship_schools,
+                           schools_without_scholarship=schools_without_scholarship,
+                           school_duration_map=school_duration_map,
+                           current_date=today,  # ✅ Pass current date for expiry comparison
+                           total_active_sub_students=total_active_sub_students,
+                           schools_with_active_subs_count=schools_with_active_subs_count,
                            title="Profile")
 
 
@@ -17325,6 +16722,126 @@ def search_users():
         }), 500
 
 
+@app.route('/help-desk/update-status/<int:query_id>', methods=['POST'])
+@login_required
+def update_help_desk_status(query_id):
+    """Update status of a help desk query"""
+    try:
+        from app.models import HelpDeskQuery
+        from datetime import datetime
+        from sqlalchemy import inspect
+        data = request.json
+        new_status = data.get('status')
+        
+        if not new_status:
+            return jsonify({'success': False, 'message': 'Status required'}), 400
+            
+        # Check if resolved_at column exists
+        try:
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
+            has_resolved_at = 'resolved_at' in columns
+        except Exception:
+            has_resolved_at = False
+            
+        if has_resolved_at:
+            query = HelpDeskQuery.query.get_or_404(query_id)
+            query.status = new_status
+            if new_status == 'Resolved':
+                query.resolved_at = datetime.utcnow()
+            else:
+                query.resolved_at = None
+            db.session.commit()
+        else:
+            # Raw SQL fallback
+            if new_status == 'Resolved':
+                db.session.execute(
+                    text("UPDATE helpdesk_queries SET status = :status WHERE id = :id"),
+                    {'status': new_status, 'id': query_id}
+                )
+            else:
+                db.session.execute(
+                    text("UPDATE helpdesk_queries SET status = :status WHERE id = :id"),
+                    {'status': new_status, 'id': query_id}
+                )
+            db.session.commit()
+            
+        return jsonify({'success': True, 'message': 'Status updated'})
+    except Exception as e:
+        app.logger.error(f"Error updating status: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/help-desk/assign-query', methods=['POST'])
+@login_required
+def assign_help_desk_query():
+    """Assign a query to a user"""
+    try:
+        data = request.json
+        query_id = data.get('queryId')
+        user_email = data.get('userEmail')
+        
+        if not query_id or not user_email:
+            return jsonify({'success': False, 'message': 'Missing data'}), 400
+            
+        # Get user ID
+        from app.models import User
+        user = User.query.filter_by(email=user_email).first()
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found'}), 404
+            
+        # Check if already assigned
+        exists = db.session.execute(
+            text("SELECT 1 FROM query_assignees WHERE query_id = :qid AND user_id = :uid"),
+            {'qid': query_id, 'uid': user.id}
+        ).scalar()
+        
+        if exists:
+            return jsonify({'success': True, 'message': 'Already assigned'})
+            
+        # Assign
+        db.session.execute(
+            text("INSERT INTO query_assignees (query_id, user_id) VALUES (:qid, :uid)"),
+            {'qid': query_id, 'uid': user.id}
+        )
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Assigned successfully'})
+    except Exception as e:
+        app.logger.error(f"Error assigning query: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/help-desk/query/<int:query_id>/assignments', methods=['PUT'])
+@login_required
+def update_help_desk_assignments(query_id):
+    """Update assignments for a help desk query (Multi-User)"""
+    try:
+        data = request.json
+        user_ids = data.get('user_ids', [])
+        
+        # Clear existing assignments
+        db.session.execute(
+            text("DELETE FROM query_assignees WHERE query_id = :qid"),
+            {'qid': query_id}
+        )
+        
+        # Add new assignments
+        if user_ids:
+            for uid in user_ids:
+                db.session.execute(
+                    text("INSERT INTO query_assignees (query_id, user_id) VALUES (:qid, :uid)"),
+                    {'qid': query_id, 'uid': uid}
+                )
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Assignments updated'})
+    except Exception as e:
+        app.logger.error(f"Error updating assignments: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/search-library-users', methods=['GET'])
 @login_required
 def search_library_users():
@@ -19910,5 +19427,223 @@ def list_game_scores():
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/all-champions-school-tracker', methods=['GET'])
+@login_required
+def all_champions_school_tracker():
+    """Fetch all schools for all champions with status"""
+    
+    def normalize_active_flag(value):
+        if value is None:
+            return False
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ('yes', 'true', '1', 'active')
+        if isinstance(value, int):
+            return value == 1
+        return False
+
+    try:
+        # 1. Fetch all champion schools
+        champion_schools = ChampionSchool.query.all()
+        app.logger.info(f"DEBUG: Found {len(champion_schools)} ChampionSchool records")
+        
+        # 2. Extract unique school_ids and map to champion info
+        school_id_map = {} # school_id -> list of {champion, username, province}
+        unique_school_ids = set()
+        
+        for cs in champion_schools:
+            # ChampionSchool stores schools in a JSON text field
+            schools_list = cs.get_schools() # Returns list of dicts with asl_school_id, etc.
+            # app.logger.info(f"DEBUG: Champion {cs.firstname} has schools: {schools_list}")
+            
+            champion_name = f"{cs.firstname} {cs.lastname}"
+            
+            for school in schools_list:
+                # Some entries might use 'id' or 'asl_school_id', check structure based on model
+                # Model says: "asl_school_id", "library_school_id", "school_name"
+                s_id = school.get('asl_school_id')
+                
+                if s_id:
+                    try:
+                        s_id_int = int(s_id)
+                        unique_school_ids.add(s_id_int)
+                        if s_id_int not in school_id_map:
+                            school_id_map[s_id_int] = []
+                        
+                        school_id_map[s_id_int].append({
+                            'champion': champion_name,
+                            'province': cs.province,
+                        })
+                    except ValueError:
+                         app.logger.warning(f"DEBUG: Invalid school ID found: {s_id}")
+
+        app.logger.info(f"DEBUG: Extracted {len(unique_school_ids)} unique school IDs")
+        if not unique_school_ids:
+             return jsonify([]), 200
+
+        # Convert to list for SQL IN clause
+        school_ids_list = list(unique_school_ids)
+        
+        # 3. Query Ruzivo/Scholarship DB
+        results = []
+        
+        # Process in chunks if too many schools
+        chunk_size = 1000
+        for i in range(0, len(school_ids_list), chunk_size):
+            chunk = school_ids_list[i:i + chunk_size]
+            placeholders = ','.join(['%s'] * len(chunk))
+            
+            conn = get_ruzivo_conn()
+            cursor = conn.cursor()
+            
+            # Fetch scholarship details
+            query = f"""
+                SELECT ts.school_id, sc.school_name, ts.scholarship_type, 
+                       ts.expiry_date, ts.active, ts.duration
+                FROM tblscholarships_schools ts
+                LEFT JOIN tblschools sc ON sc.school_id = ts.school_id
+                WHERE ts.school_id IN ({placeholders})
+            """
+            cursor.execute(query, chunk)
+            scholarship_rows = cursor.fetchall()
+
+            # Fetch durations and first awards since 2025
+            since_2025_query = f"""
+                SELECT x.school_id, SUM(x.duration) AS total_months, MIN(x.awarded_at) AS first_awarded_at
+                FROM tblscholarships_schools x
+                WHERE x.school_id IN ({placeholders})
+                AND x.awarded_at >= %s
+                GROUP BY x.school_id
+            """
+            cursor.execute(since_2025_query, (*chunk, '2025-01-01'))
+            since_2025_rows = cursor.fetchall()
+            since_2025_map = {}
+            for row in since_2025_rows:
+                today_date = date.today()
+                if isinstance(row, dict):
+                    sid = row['school_id']
+                    fa = row['first_awarded_at']
+                    total_m = row['total_months'] or 0
+                else:
+                    sid = row[0]
+                    total_m = row[1] or 0
+                    fa = row[2]
+                
+                is_over_12 = False
+                if fa:
+                    fa_dt = fa.date() if hasattr(fa, 'date') else fa
+                    if isinstance(fa_dt, date) and fa_dt <= today_date - timedelta(days=365):
+                        is_over_12 = True
+
+                since_2025_map[sid] = {
+                    "total_months": total_m,
+                    "first_awarded_at": fa,
+                    "is_over_12_months": is_over_12
+                }
+            
+            # Fetch active subscriptions for expired checks
+            today = datetime.now().date()
+            first_day_of_month = today.replace(day=1)
+            if today.month == 12:
+                first_day_next_month = today.replace(year=today.year + 1, month=1, day=1)
+            else:
+                first_day_next_month = today.replace(month=today.month + 1, day=1)
+
+            sub_query = f"""
+                SELECT s.school_id, COUNT(DISTINCT p.student_id) as active_count
+                FROM tblpoints_purchase p
+                JOIN tblstudents s ON p.student_id = s.student_id
+                WHERE s.school_id IN ({placeholders})
+                  AND p.expiry_date >= %s
+                  AND p.expiry_date < %s
+                GROUP BY s.school_id
+            """
+            cursor.execute(sub_query, (*chunk, first_day_of_month, first_day_next_month))
+            sub_rows = cursor.fetchall()
+            sub_map = {}
+            for row in sub_rows:
+                 if isinstance(row, dict):
+                     sub_map[row['school_id']] = row['active_count']
+                 else:
+                     sub_map[row[0]] = row[1]
+
+            cursor.close()
+            conn.close()
+            
+            # Process Rows
+            for row in scholarship_rows:
+                # Handle dict/tuple (routes.py handles both usually)
+                if isinstance(row, dict):
+                    sid = row['school_id']
+                    sname = row['school_name']
+                    stype = row['scholarship_type']
+                    sexpiry = row['expiry_date']
+                    sactive = row['active']
+                    sduration = row.get('duration')
+                else:
+                    sid = row[0]
+                    sname = row[1]
+                    stype = row[2]
+                    sexpiry = row[3]
+                    sactive = row[4]
+                    sduration = row[5]
+
+                # Normalize Expiry
+                if sexpiry:
+                    if isinstance(sexpiry, str):
+                        try:
+                           sexpiry = datetime.strptime(sexpiry, "%Y-%m-%d").date()
+                        except:
+                            try:
+                                sexpiry = datetime.strptime(sexpiry, "%Y-%m-%d %H:%M:%S").date()
+                            except:
+                                pass
+                    elif hasattr(sexpiry, 'date'):
+                        sexpiry = sexpiry.date()
+                
+                is_expired = False
+                if sexpiry and isinstance(sexpiry, date):
+                     if sexpiry < today:
+                         is_expired = True
+                
+                normalized_active = normalize_active_flag(sactive)
+                
+                # Determine Status
+                status = "Inactive"
+                if normalized_active:
+                    if is_expired:
+                         status = "Expired"
+                    else:
+                         status = "Active"
+                
+                active_subs = sub_map.get(sid, 0)
+                
+                # Get Champion Info
+                champ_infos = school_id_map.get(sid, [])
+                for info in champ_infos:
+                    results.append({
+                        "champion": info['champion'],
+                        "province": info['province'],
+                        "school_name": sname,
+                        "status": status,
+                        "expiry_date": sexpiry.isoformat() if sexpiry else None,
+                        "first_awarded_at": since_2025_map.get(sid, {}).get("first_awarded_at", "N/A"),
+                        "is_over_12_months": since_2025_map.get(sid, {}).get("is_over_12_months", False),
+                        "scholarship_type": stype,
+                        "active_subscriptions": active_subs,
+                        "duration": since_2025_map.get(sid, {}).get("total_months", 0)
+                    })
+
+        return jsonify(results), 200
+        
+    except Exception as e:
+        app.logger.error(f"Error in school tracker: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+
 
 

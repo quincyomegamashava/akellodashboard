@@ -33,3 +33,6 @@ from app import routes, models, monitoring_routes
 # Import and register database routes
 from app.database_routes import database_bp
 app.register_blueprint(database_bp)
+
+from app.blueprints.content_dev import bp as content_dev_bp
+app.register_blueprint(content_dev_bp)

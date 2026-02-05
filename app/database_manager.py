@@ -13,6 +13,10 @@ from typing import Dict, List, Any, Optional
 import pandas as pd
 from datetime import datetime
 from urllib.parse import quote_plus
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class DatabaseManager:
     """Manages multiple database connections for query interface"""
@@ -30,21 +34,21 @@ class DatabaseManager:
             'ruzivo': {
                 'name': 'Ruzivo Database',
                 'type': 'mysql',
-                'host': os.getenv('RUZIVO_DB_HOST', 'localhost'),
-                'port': int(os.getenv('RUZIVO_DB_PORT', 3306)),
-                'database': os.getenv('RUZIVO_DB_NAME', 'ruzivo_2017'),  # Updated to match existing config
-                'username': os.getenv('RUZIVO_DB_USER', 'root'),
-                'password': os.getenv('RUZIVO_DB_PASSWORD', ''),
+                'host': os.getenv('ASL_DB_HOST', 'localhost'),
+                'port': int(os.getenv('ASL_DB_PORT', 3306)),
+                'database': os.getenv('ASL_DB_NAME', 'ruzivo_2017'),
+                'username': os.getenv('ASL_DB_USER', 'root'),
+                'password': os.getenv('ASL_DB_PASS', ''),
                 'description': 'Ruzivo production database for content and user management'
             },
             'library': {
                 'name': 'Library Database', 
                 'type': 'mysql',
-                'host': os.getenv('LIBRARY_DB_HOST', 'localhost'),
-                'port': int(os.getenv('LIBRARY_DB_PORT', 3306)),
-                'database': os.getenv('LIBRARY_DB_NAME', 'akello_library'),  # Updated to match existing config
-                'username': os.getenv('LIBRARY_DB_USER', 'root'),
-                'password': os.getenv('LIBRARY_DB_PASSWORD', ''),
+                'host': os.getenv('AL_DB_HOST', 'localhost'),
+                'port': int(os.getenv('AL_DB_PORT', 3306)),
+                'database': os.getenv('AL_DB_NAME', 'akello_library'),
+                'username': os.getenv('AL_DB_USER', 'root'),
+                'password': os.getenv('AL_DB_PASS', ''),
                 'description': 'Library management system database for resources and analytics'
             }
         }

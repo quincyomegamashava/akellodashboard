@@ -1,356 +1,894 @@
 {% extends "base.html" %}
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css" />
-  <link
-    rel="stylesheet"
-    href="https://www.w3schools.com/lib/w3-theme-blue-grey.css"
-  />
-  <link
-    rel="stylesheet"
-    href="https://fonts.googleapis.com/css?family=Open+Sans"
-  />
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
-  />
+{% block head_extra %}
+<!-- Flatpickr CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
 
-  <link
-    rel="stylesheet"
-    href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
-  />
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
-
-  <style>
-    html,
-    body,
-    h1,
-    h2,
-    h3,
-    h4,
-    h5 {
-      font-family: "Open Sans", sans-serif;
-    }
-  </style>
-</head>
-{% block content %}
 <style>
-  /* Modern, responsive layout */
+  :root {
+    --page-bg: #f4f6fb;
+    --card-bg: #ffffff;
+    --card-border: rgba(15, 34, 82, 0.12);
+    --muted-color: #6a7390;
+    --heading-color: #0f1e36;
+    --accent-primary: #4b6cf7;
+    --accent-secondary: #1c9f76;
+    --accent-warm: #f29c3a;
+    --border-radius: 18px;
+  }
+
+  /* Long-term scholarship highlighting */
+  .chip.long-term {
+    border: 2px solid #f59e0b !important;
+    /* Amber border */
+    background: #fffbeb !important;
+    /* Amber-50 background */
+    position: relative;
+  }
+
+  .chip.long-term::after {
+    content: "\f091";
+    /* Trophy icon or similar */
+    font-family: FontAwesome;
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #f59e0b;
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
   .profile-wrapper {
-    max-width: 1200px;
-    margin: 60px auto 40px;
-    padding: 0 16px;
+    padding: 52px 16px 72px;
+    background: var(--page-bg);
   }
 
   .profile-grid {
+    max-width: 1200px;
+    margin: 0 auto;
     display: grid;
-    grid-template-columns: 320px 1fr 320px;
-    gap: 20px;
+    gap: 24px;
   }
 
   .card {
-    background: #fff;
-    border-radius: 14px;
-    box-shadow: 0 6px 18px rgba(10, 31, 68, 0.08);
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--card-border);
+    box-shadow: 0 15px 40px rgba(15, 34, 82, 0.08);
     overflow: hidden;
   }
 
   .card-header {
-    padding: 16px 18px;
-    border-bottom: 1px solid #eef2f7;
-    background: linear-gradient(180deg, #f7faff 0%, #ffffff 100%);
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(15, 34, 82, 0.08);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--heading-color);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
   .card-body {
-    padding: 18px;
+    padding: 24px;
   }
 
-  .soft {
-    color: #6b7a90;
-  }
-
-  .pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: #edf4ff;
-    color: #0b5ed7;
-    border-radius: 999px;
-    padding: 6px 12px;
-    font-size: 0.85rem;
-    font-weight: 600;
-  }
-
-  .stat {
-    display: grid;
-    grid-template-columns: 56px 1fr;
-    align-items: center;
-    gap: 12px;
-    padding: 14px;
-    border-radius: 12px;
-    background: #f9fbff;
-    border: 1px solid #eef2f7;
-  }
-
-  .stat .icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 12px;
-    display: grid;
-    place-items: center;
+  .profile-hero .card-body {
+    padding: 32px;
+    background: linear-gradient(135deg, #0b1739, #1b2d66);
     color: #fff;
   }
 
-  .stat .value {
-    font: 700 1.35rem/1.1 system-ui, -apple-system, Segoe UI, Roboto;
-    color: #0b213f;
-  }
-
-  .chips {
+  .hero-body {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    flex-direction: column;
+    gap: 24px;
   }
 
-  .chip {
-    display: inline-flex;
+  .hero-headline {
+    display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 12px;
-    background: #e9f7f7;
-    color: #116a6a;
-    border-radius: 999px;
-    border: 1px solid #cdeaea;
-    text-decoration: none;
-    font-size: 0.85rem;
-    transition: all 0.15s;
-  }
-
-  .chip:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+    gap: 18px;
+    flex-wrap: wrap;
   }
 
   .profile-avatar {
-    width: 110px;
-    height: 110px;
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
     object-fit: cover;
-    border: 4px solid #fff;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    border: 4px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
   }
 
-  .kv {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px 20px;
-  }
-
-  .kv .k {
-    font: 600 0.75rem/1 system-ui;
+  .hero-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #77849a;
+    margin-bottom: 6px;
+    color: rgba(255, 255, 255, 0.7);
   }
 
-  .kv .v {
-    font: 600 1rem/1.4 system-ui;
-    color: #0f2547;
-    background: #f9fbff;
-    border: 1px solid #eef2f7;
+  .hero-title {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .hero-pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 6px 0 8px;
+  }
+
+  .pill {
+    border-radius: 999px;
+    padding: 6px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+  }
+
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .hero-meta i {
+    margin-right: 6px;
+  }
+
+  .hero-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+  }
+
+  .hero-stat {
+    padding: 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .hero-stat__label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  .hero-stat__value {
+    font-size: 1.9rem;
+    font-weight: 700;
+  }
+
+  .hero-stat__hint {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  .profile-content {
+    display: grid;
+    gap: 24px;
+  }
+
+  @media (min-width: 1024px) {
+    .profile-content {
+      grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+      align-items: flex-start;
+    }
+
+    .hero-body {
+      flex-direction: row;
+      justify-content: space-between;
+    }
+
+    .hero-headline {
+      align-items: center;
+    }
+  }
+
+  .profile-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 18px;
+  }
+
+  .info-item {
+    background: rgba(15, 34, 82, 0.03);
+    border-radius: 12px;
+    padding: 12px 14px;
+    min-height: 76px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .info-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: var(--muted-color);
+  }
+
+  .info-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--heading-color);
+  }
+
+  .section-group {
+    padding: 0 24px 24px;
+  }
+
+  .section-group+.section-group {
+    border-top: 1px solid rgba(15, 34, 82, 0.08);
+  }
+
+  .section-header {
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--heading-color);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+  }
+
+  .inactive-schools .section-header {
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+  }
+
+  .section-subtle {
+    color: var(--muted-color);
+    padding: 18px 24px 24px;
+  }
+
+  .chips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+  }
+
+  .chip {
+    background: #fff;
+    color: var(--heading-color);
+    border-radius: 999px;
+    padding: 10px 16px;
+    border: 1px solid rgba(15, 34, 82, 0.12);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    text-decoration: none;
+  }
+
+  .chip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 35px rgba(15, 34, 82, 0.12);
+  }
+
+  .chip.active-schol {
+    background: linear-gradient(135deg, #0b1739, #1b2d66);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 20px 40px rgba(11, 23, 57, 0.45);
+  }
+
+  .chip.active-schol:hover {
+    background: linear-gradient(135deg, #0f1f43, #22307a);
+  }
+
+  .chip.inactive-schol {
+    background: linear-gradient(135deg, #ff8b3d, #ff5a1c);
+    color: #fff;
+    border-color: rgba(255, 138, 61, 0.6);
+    box-shadow: 0 18px 35px rgba(255, 107, 33, 0.4);
+  }
+
+  .chip.inactive-schol:hover {
+    background: linear-gradient(135deg, #ff9c54, #ff6d2d);
+  }
+
+  .chip.reminder {
+    background: #fff8f0;
+    border-color: rgba(242, 156, 58, 0.4);
+    color: #b64500;
+  }
+
+  .chip.neutral {
+    opacity: 0.75;
+  }
+
+  .status-badge {
+    margin-left: auto;
+    font-size: 0.65rem;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--accent-secondary);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .profile-aside {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .filter-form {
+    display: grid;
+    gap: 14px;
+  }
+
+  .filter-control {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: var(--muted-color);
+  }
+
+  .input-field {
+    border: 1px solid rgba(15, 34, 82, 0.12);
     border-radius: 10px;
-    padding: 8px 12px;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    background: #fff;
+    color: var(--heading-color);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
   }
 
-  @media (max-width: 1100px) {
-    .profile-grid {
-      grid-template-columns: 3200px 1fr;
-    }
-
-    .profile-right {
-      order: 3;
-      grid-column: 1 / -1;
-    }
+  .input-field:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(75, 108, 247, 0.25);
   }
 
-  @media (max-width: 780px) {
-    .profile-grid {
-      grid-template-columns: 1fr;
-    }
+  .filter-actions {
+    display: flex;
+    gap: 10px;
+  }
 
-    .profile-left,
-    .profile-main,
-    .profile-right {
-      grid-column: 1 / -1;
-    }
+  .filter-actions button {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-weight: 600;
+    border: none;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
 
-    .kv {
-      grid-template-columns: 1fr;
-    }
+  .btn-primary {
+    background: var(--accent-primary);
+    color: #fff;
+  }
 
-    .profile-avatar {
-      width: 84px;
-      height: 84px;
-    }
+  .btn-secondary {
+    background: rgba(15, 34, 82, 0.08);
+    color: var(--heading-color);
+  }
 
+  .quick-stats .stat-card {
+    display: flex;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 14px;
+    background: rgba(15, 34, 82, 0.05);
+    align-items: center;
+    border: 1px solid rgba(15, 34, 82, 0.06);
+  }
+
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    font-size: 1.2rem;
+    color: #fff;
+  }
+
+  .stat-icon.accent-primary {
+    background: var(--accent-primary);
+  }
+
+  .stat-icon.accent-secondary {
+    background: var(--accent-secondary);
+  }
+
+  .stat-icon.accent-warning {
+    background: var(--accent-warm);
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted-color);
+  }
+
+  .stat-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--heading-color);
+  }
+
+  .stat-subtle {
+    font-size: 0.75rem;
+    color: var(--muted-color);
+  }
+
+  .no-scroll {
+    overflow: hidden;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 18, 40, 0.65);
+    backdrop-filter: blur(9px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 1200;
+  }
+
+  .modal-overlay.is-visible {
+    display: flex;
+  }
+
+  .modal-panel {
+    background: var(--card-bg);
+    border-radius: 24px;
+    padding: 28px 24px 30px;
+    width: min(460px, 100%);
+    box-shadow: 0 25px 60px rgba(6, 14, 36, 0.55);
+    position: relative;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .modal-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--heading-color);
+    margin: 0;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--muted-color);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .modal-details {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .modal-details dt {
+    font-size: 0.7rem;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--muted-color);
+  }
+
+  .modal-details dd {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--heading-color);
+  }
+
+  .modal-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 12px 18px;
+    border-radius: 12px;
+    background: var(--accent-primary);
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: background 0.2s ease;
+  }
+
+  .modal-link:hover {
+    background: #3450d1;
+  }
+
+  @media (max-width: 768px) {
     .profile-wrapper {
-      max-width: 85vw;
+      padding: 36px 10px 60px;
+    }
+
+    .card-body {
+      padding: 20px;
+    }
+
+    .profile-hero .card-body {
+      padding: 24px;
     }
   }
 </style>
+{% endblock %}
 
-<div class="profile-wrapper w3-small">
-  <div class="profile-grid" style="width: 65vw">
-    <!-- Left: Profile summary -->
-    <section class="profile-left card">
-      <div class="card-body" style="text-align: center">
-        <img src="{{ user.avatar(128) }}" alt="Avatar" class="profile-avatar" />
-        <div style="margin-top: 12px">
-          <span class="pill"
-            ><i class="fa fa-user"></i>{{ user.username }}</span
-          >
+{% block content %}
+<div class="profile-wrapper">
+  <div class="profile-grid">
+    <section class="profile-hero card">
+      <div class="card-body hero-body">
+        <div class="hero-headline">
+          <img src="{{ user.avatar(128) }}" alt="Avatar" class="profile-avatar" />
+          <div>
+            <div class="hero-label">Profile overview</div>
+            <h1 class="hero-title">{{ user.firstname }} {{ user.lastname }}</h1>
+            <div class="hero-pill-row">
+              <span class="pill"><i class="fa fa-user"></i> {{ user.username }}</span>
+              <span class="pill">{{ user.userRole }}</span>
+            </div>
+            <div class="hero-meta">
+              <span><i class="fa fa-map-marker"></i> {{ user.province }}</span>
+              <span><i class="fa fa-clock-o"></i> Last seen {{ user.last_seen.strftime('%Y-%m-%d') }}</span>
+            </div>
+          </div>
         </div>
-        <div class="soft" style="margin-top: 10px">
-          <i class="fa fa-map-marker soft"></i> {{ user.province }}
-        </div>
-        <div class="soft" style="margin-top: 6px">
-          <i class="fa fa-clock-o soft"></i> Last seen: {{
-          user.last_seen.strftime('%Y-%m-%d') }}
+        <div class="hero-stats-grid">
+          <article class="hero-stat">
+            <span class="hero-stat__label">Champion schools</span>
+            <span class="hero-stat__value">{{ count_user_schools }}</span>
+            <span class="hero-stat__hint">Total assigned</span>
+          </article>
+          <article class="hero-stat">
+            <span class="hero-stat__label">Total schools with active scholarship</span>
+            <span class="hero-stat__value">{{ count_active_scholarship_schools }}</span>
+            <span class="hero-stat__hint">SmartLearning</span>
+          </article>
+          <article class="hero-stat">
+            <span class="hero-stat__label">Total schools with inactive scholarship</span>
+            <span class="hero-stat__value">{{ count_inactive_scholarship_schools }}</span>
+            <span class="hero-stat__hint">Linked</span>
+          </article>
+          <article class="hero-stat">
+            <span class="hero-stat__label">Schools without scholarship</span>
+            <span class="hero-stat__value">{{ count_no_scholarship_schools }}</span>
+            <span class="hero-stat__hint">N/A</span>
+          </article>
         </div>
       </div>
-      <div
-        id="profile"
-        class="w3-hide"
-        data-firstname="{{ user.firstname }}"
-        data-lastname="{{ user.lastname }}"
-      ></div>
     </section>
 
-    <!-- Main: General information + Schools -->
-    <main class="profile-main card">
-      <header class="card-header"><strong>General Information</strong></header>
-      <div class="card-body">
-        <div class="kv">
-          <div>
-            <div class="k">First Name</div>
-            <div class="v">{{ user.firstname }}</div>
-          </div>
-          <div>
-            <div class="k">Last Name</div>
-            <div class="v">{{ user.lastname }}</div>
-          </div>
-          <div>
-            <div class="k">Username</div>
-            <div class="v">{{ user.username }}</div>
-          </div>
-          <div>
-            <div class="k">Role</div>
-            <div class="v">{{ user.userRole }}</div>
-          </div>
-          <div>
-            <div class="k">Department</div>
-            <div class="v">{{ user.department }}</div>
-          </div>
-          <div>
-            <div class="k">Province</div>
-            <div class="v">{{ user.province }}</div>
-          </div>
-        </div>
-      </div>
+    <div id="profile" class="w3-hide" data-firstname="{{ user.firstname }}" data-lastname="{{ user.lastname }}"></div>
 
-      {% if champ and schools_for_template %}
-      <header class="card-header"><strong>Schools</strong></header>
-      <div class="card-body">
-        <div class="chips">
-          {% for school in schools_for_template %}
-          <a
-            class="chip"
-            href="{{ url_for('school_profile_usage', school_id=school.id) }}"
-          >
-            <i class="fa fa-university"></i> {{ school.name }}
-          </a>
-          {% endfor %}
-        </div>
-        {% elif champ %}
-        <span class="soft">No schools assigned</span>
-        {% else %}
-        <span class="soft">No Champion School record found.</span>
-      </div>
-      {% endif %}
-    </main>
-
-    {% if user.userRole == 'Brand Ambassador' %}
-    <!-- Right: Key stats -->
-    <aside class="profile-right">
-      <!-- Date Range Filter -->
-      <div class="card" style="margin-bottom: 20px">
-        <header class="card-header"><strong>Date Range Filter</strong></header>
+    <div class="profile-content">
+      <main class="profile-main card">
+        <header class="card-header"><strong>General Information</strong></header>
         <div class="card-body">
-          <form id="date-filter-form" style="display: grid; gap: 10px">
-            <div>
-              <label for="start-date" style="display: block; font-size: 0.85rem; color: #6b7a90; margin-bottom: 4px;">Start Date</label>
-              <input type="date" id="start-date" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #eef2f7; border-radius: 8px;" />
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">First Name</span>
+              <span class="info-value">{{ user.firstname }}</span>
             </div>
-            <div>
-              <label for="end-date" style="display: block; font-size: 0.85rem; color: #6b7a90; margin-bottom: 4px;">End Date</label>
-              <input type="date" id="end-date" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #eef2f7; border-radius: 8px;" />
+            <div class="info-item">
+              <span class="info-label">Last Name</span>
+              <span class="info-value">{{ user.lastname }}</span>
             </div>
-            <button type="submit" class="w3-button w3-blue" style="border-radius: 8px; padding: 10px;">Apply Filter</button>
-            <button type="button" id="reset-filter" class="w3-button w3-light-grey" style="border-radius: 8px; padding: 10px;">Reset to MTD</button>
-          </form>
+            <div class="info-item">
+              <span class="info-label">Username</span>
+              <span class="info-value">{{ user.username }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Department</span>
+              <span class="info-value">{{ user.department }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Role</span>
+              <span class="info-value">{{ user.userRole }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Province</span>
+              <span class="info-value">{{ user.province }}</span>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="card" style="margin-bottom: 20px">
-        <header class="card-header"><strong>Quick Stats</strong></header>
-        <div class="card-body" style="display: grid; gap: 12px">
-          <div class="stat">
-            <div class="icon" style="background: #6f42c1">
-              <i class="fa fa-school"></i>
+        {# Schools section intentionally removed in favor of dedicated scholarship sections #}
+
+        {% set truly_active_schools = [] %}
+        {% set expired_scholarship_schools = [] %}
+        {% for school in active_scholarship_schools %}
+        {% set is_expired = school.expiry_date is not none and school.expiry_date < current_date %} {% if is_expired %}
+          {% set _=expired_scholarship_schools.append(school) %} {% else %} {% set _=truly_active_schools.append(school)
+          %} {% endif %} {% endfor %} {% if truly_active_schools %} <section class="section-group">
+          <div class="section-header">Schools with Active Scholarship</div>
+          <div class="chips-grid">
+            {% for school in truly_active_schools %}
+            {% set school_url = url_for('school_profile_usage', school_id=school.id) %}
+            {% set is_long_term = school.is_over_12_months %}
+            <a class="chip chip-detail active-schol {{ 'long-term' if is_long_term }}" href="{{ school_url }}"
+              title="Type: {{ school.scholarship_type or 'N/A' }} | Grades: {{ school.scholarship_grades or 'N/A' }} | Expires: {{ school.expiry_date or 'N/A' }} | Awarded by: {{ school.awarded_by or 'N/A' }}"
+              data-school-name="{{ school.name }}" data-school-expiry="{{ school.expiry_date or 'N/A' }}"
+              data-school-grades="{{ school.scholarship_grades or 'N/A' }}"
+              data-school-type="{{ school.scholarship_type or 'N/A' }}"
+              data-school-duration="{{ school.total_months or 0 }}"
+              data-school-awarded-at="{{ school.first_awarded_at or 'N/A' }}"
+              data-school-long-term="{{ 'true' if is_long_term else 'false' }}" data-school-url="{{ school_url }}">
+              <i class="fa fa-university"></i> {{ school.name }}
+              <span class="stat-subtle">( {{ school.scholarship_type or 'N/A' }} )</span>
+            </a>
+            {% endfor %}
+          </div>
+          </section>
+          {% endif %}
+
+          {% if expired_scholarship_schools %}
+          <section class="section-group">
+            <div class="section-header">Schools with Expired Scholarship</div>
+            <div class="chips-grid">
+              {% for school in expired_scholarship_schools %}
+              {% set school_url = url_for('school_profile_usage', school_id=school.id) %}
+              {% set is_long_term = school.is_over_12_months %}
+              <a class="chip reminder chip-detail {{ 'long-term' if is_long_term }}" href="{{ school_url }}"
+                title="Type: {{ school.scholarship_type or 'N/A' }} | Grades: {{ school.scholarship_grades or 'N/A' }} | Expires: {{ school.expiry_date or 'N/A' }} | Awarded by: {{ school.awarded_by or 'N/A' }} | STATUS: EXPIRED"
+                data-school-name="{{ school.name }}" data-school-expiry="{{ school.expiry_date or 'N/A' }}"
+                data-school-grades="{{ school.scholarship_grades or 'N/A' }}"
+                data-school-type="{{ school.scholarship_type or 'N/A' }}"
+                data-school-duration="{{ school.total_months or 0 }}"
+                data-school-awarded-at="{{ school.first_awarded_at or 'N/A' }}"
+                data-school-long-term="{{ 'true' if is_long_term else 'false' }}" data-school-url="{{ school_url }}"
+                style="background: #fff3e0 !important; color: #e65100 !important; border-color: #ffcc80 !important;">
+                <i class="fa fa-university"></i> {{ school.name }}
+                <span class="stat-subtle">( {{ school.scholarship_type or 'N/A' }} ) ⚠️</span>
+                {% if school.active_subscription_count %}
+                <span class="status-badge">{{ school.active_subscription_count }} active</span>
+                {% endif %}
+              </a>
+              {% endfor %}
             </div>
-            <div>
-              <div class="soft" style="font-size: 0.8rem">
-                Number of schools
+          </section>
+          {% endif %}
+
+          {% if inactive_scholarship_schools %}
+          <section class="section-group inactive-schools">
+            <div class="section-header">Schools with Inactive Scholarship</div>
+            <div class="chips-grid">
+              {% for school in inactive_scholarship_schools %}
+              {% set school_url = url_for('school_profile_usage', school_id=school.id) %}
+              {% set is_long_term = school.is_over_12_months %}
+              <a class="chip neutral chip-detail inactive-schol {{ 'long-term' if is_long_term }}"
+                href="{{ school_url }}"
+                title="Type: {{ school.scholarship_type or 'N/A' }} | Grades: {{ school.scholarship_grades or 'N/A' }} | Expired: {{ school.expiry_date or 'N/A' }} | Awarded by: {{ school.awarded_by or 'N/A' }}"
+                data-school-name="{{ school.name }}" data-school-expiry="{{ school.expiry_date or 'N/A' }}"
+                data-school-grades="{{ school.scholarship_grades or 'N/A' }}"
+                data-school-type="{{ school.scholarship_type or 'N/A' }}"
+                data-school-duration="{{ school.total_months or 0 }}"
+                data-school-awarded-at="{{ school.first_awarded_at or 'N/A' }}"
+                data-school-long-term="{{ 'true' if is_long_term else 'false' }}" data-school-url="{{ school_url }}">
+                <i class="fa fa-university"></i> {{ school.name }}
+                <span class="stat-subtle">( {{ school.scholarship_type or 'N/A' }} )</span>
+                {% if school.active_subscription_count %}
+                <span class="status-badge">{{ school.active_subscription_count }} active</span>
+                {% endif %}
+              </a>
+              {% endfor %}
+            </div>
+          </section>
+          {% endif %}
+
+          {% if schools_without_scholarship %}
+          <section class="section-group">
+            <div class="section-header">Schools Without Scholarship</div>
+            <div class="chips-grid">
+              {% for school in schools_without_scholarship %}
+              {% set school_url = url_for('school_profile_usage', school_id=school.id) %}
+              <a class="chip neutral chip-detail" href="{{ school_url }}" title="STATUS: NO SCHOLARSHIP RECORD FOUND"
+                data-school-name="{{ school.name }}" data-school-type="No Scholarship"
+                data-school-url="{{ school_url }}">
+                <i class="fa fa-university"></i> {{ school.name }}
+                <span class="stat-subtle">( No Record )</span>
+              </a>
+              {% endfor %}
+            </div>
+          </section>
+          {% endif %}
+      </main>
+
+      {% if user.userRole == 'Brand Ambassador' %}
+      <aside class="profile-aside">
+        <div class="card">
+          <header class="card-header"><strong>Date Range Filter</strong></header>
+          <div class="card-body">
+            <form id="date-filter-form" class="filter-form">
+              <div class="filter-control">
+                <label class="field-label" for="start-date">Start Date</label>
+                <input type="text" id="start-date" class="input-field" autocomplete="off" />
               </div>
-              <div class="value">{{ count_user_schools }}</div>
-            </div>
+              <div class="filter-control">
+                <label class="field-label" for="end-date">End Date</label>
+                <input type="text" id="end-date" class="input-field" autocomplete="off" />
+              </div>
+              <div class="filter-actions">
+                <button type="submit" class="btn-primary">Apply filter</button>
+                <button type="button" id="reset-filter" class="btn-secondary">Reset to MTD</button>
+              </div>
+            </form>
           </div>
-          <div class="stat">
-            <div class="icon" style="background: #0d6efd">
-              <i class="fa fa-laptop"></i>
+        </div>
+
+        <div class="card quick-stats">
+          <header class="card-header"><strong>Quick Stats</strong></header>
+          <div class="card-body">
+            <div class="stat-card">
+              <div class="stat-icon accent-warning">
+                <i class="fa fa-school"></i>
+              </div>
+              <div>
+                <div class="stat-label">Number of schools</div>
+                <div class="stat-value">{{ count_user_schools }}</div>
+              </div>
             </div>
-            <div>
-              <div class="soft" style="font-size: 0.8rem">ASL MTD</div>
-              <div class="value" id="asl-count">{{ smartlearning_champ_mtd }}</div>
+            <div class="stat-card">
+              <div class="stat-icon accent-primary">
+                <i class="fa fa-laptop"></i>
+              </div>
+              <div>
+                <div class="stat-label">ASL MTD</div>
+                <div class="stat-value" id="asl-count">{{ smartlearning_champ_mtd }}</div>
+              </div>
             </div>
-          </div>
-          <div class="stat">
-            <div class="icon" style="background: #14a199">
-              <i class="fa fa-book"></i>
-            </div>
-            <div>
-              <div class="soft" style="font-size: 0.8rem">AL MTD</div>
-              <div class="value" id="libstudent-count">0</div>
+            <div class="stat-card">
+              <div class="stat-icon accent-secondary">
+                <i class="fa fa-book"></i>
+              </div>
+              <div>
+                <div class="stat-label">AL MTD</div>
+                <div class="stat-value" id="libstudent-count">0</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </aside>
-    {% endif %}
+
+        <div class="card">
+          <header class="card-header"><strong>Paid Subscription</strong></header>
+          <div class="card-body">
+            <div class="stat-card">
+              <div class="stat-icon accent-warning">
+                <i class="fa fa-users"></i>
+              </div>
+              <div>
+                <div class="stat-label">Total Active Subs</div>
+                <div class="stat-value">{{ total_active_sub_students }}</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon accent-primary">
+                <i class="fa fa-university"></i>
+              </div>
+              <div>
+                <div class="stat-label">Schools with Active Subs</div>
+                <div class="stat-value">{{ schools_with_active_subs_count }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+      {% endif %}
+    </div>
   </div>
 </div>
+<div id="school-detail-modal" class="modal-overlay" role="dialog" aria-modal="true"
+  aria-labelledby="school-detail-title">
+  <div class="modal-panel">
+    <div class="modal-header">
+      <h3 id="school-detail-title" class="modal-title" data-modal-name>School details</h3>
+      <button type="button" class="modal-close" aria-label="Close school details">&times;</button>
+    </div>
+    <dl class="modal-details">
+      <div>
+        <dt>Type</dt>
+        <dd data-modal-type></dd>
+      </div>
+      <div>
+        <dt>Grades</dt>
+        <dd data-modal-grades></dd>
+      </div>
+      <div>
+        <dt>Expiry</dt>
+        <dd data-modal-expiry></dd>
+      </div>
+      <div>
+        <dt>First Awarded (2025+)</dt>
+        <dd data-modal-awarded-at></dd>
+      </div>
+      <div>
+        <dt>Total months (since Jan 2025)</dt>
+        <dd data-modal-duration></dd>
+      </div>
+    </dl>
+    <p class="stat-subtle" data-modal-hint>Details preview</p>
+    <a href="#" class="modal-link" data-modal-link>View school profile</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Flatpickr JS -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 
 <script>
   // Initialize default date range (MTD)
   function getDefaultDates() {
     const today = new Date();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    let startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    // Exclusion Logic: If start date falls within Dec 4, 2025 - Jan 12, 2026, move it to Jan 13, 2026
+    const exclusionStart = new Date(2025, 11, 4); // Dec 4, 2025
+    const exclusionEnd = new Date(2026, 0, 12);   // Jan 12, 2026
+
+    if (startDate >= exclusionStart && startDate <= exclusionEnd) {
+      startDate = new Date(2026, 0, 13); // Set to Jan 13, 2026
+    }
+
+    // Helper to format date as YYYY-MM-DD in local time
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     return {
-      startDate: startOfMonth.toISOString().split('T')[0],
-      endDate: today.toISOString().split('T')[0]
+      startDate: formatDate(startDate),
+      endDate: formatDate(today)
     };
   }
 
@@ -370,9 +908,8 @@
       }
 
       // Fetch AL (Library) stats
-      const alQueryParams = `firstname=${encodeURIComponent(firstname)}&lastname=${encodeURIComponent(lastname)}${
-        dateParams ? '&' + dateParams : ''
-      }`;
+      const alQueryParams = `firstname=${encodeURIComponent(firstname)}&lastname=${encodeURIComponent(lastname)}${dateParams ? '&' + dateParams : ''
+        }`;
       const alResponse = await fetch(`/api/champ-library-usage?${alQueryParams}`);
       const alData = await alResponse.json();
       if (alResponse.ok) {
@@ -384,7 +921,7 @@
       // Get username from the URL
       const pathSegments = window.location.pathname.split('/');
       const username = pathSegments[pathSegments.length - 1];
-      
+
       const aslQueryParams = dateParams ? `?${dateParams}` : '';
       const aslResponse = await fetch(`/api/champion/${username}/asl_active${aslQueryParams}`);
       const aslData = await aslResponse.json();
@@ -401,13 +938,33 @@
   document.addEventListener("DOMContentLoaded", () => {
     // Set default dates
     const { startDate, endDate } = getDefaultDates();
-    const startInput = document.querySelector("#start-date");
-    const endInput = document.querySelector("#end-date");
-    
-    if (startInput && endInput) {
-      startInput.value = startDate;
-      endInput.value = endDate;
+
+    // Configuration for Flatpickr
+    if (typeof flatpickr === 'undefined') {
+      console.error('Flatpickr library not loaded!');
+      return;
     }
+    const flatpickrConfig = {
+      dateFormat: "Y-m-d",
+      allowInput: false,
+      disable: [
+        {
+          from: "2025-12-04",
+          to: "2026-01-12"
+        }
+      ]
+    };
+
+    // Initialize Flatpickr instances
+    const startPicker = flatpickr("#start-date", {
+      ...flatpickrConfig,
+      defaultDate: startDate
+    });
+
+    const endPicker = flatpickr("#end-date", {
+      ...flatpickrConfig,
+      defaultDate: endDate
+    });
 
     // Fetch initial stats
     fetchStats();
@@ -417,8 +974,12 @@
     if (filterForm) {
       filterForm.addEventListener("submit", (e) => {
         e.preventDefault();
+        // Get values from the Flatpickr inputs (which are regular inputs now)
+        const startInput = document.querySelector("#start-date");
+        const endInput = document.querySelector("#end-date");
         const start = startInput.value;
         const end = endInput.value;
+
         if (start && end) {
           fetchStats(start, end);
         }
@@ -430,11 +991,83 @@
     if (resetBtn) {
       resetBtn.addEventListener("click", () => {
         const { startDate, endDate } = getDefaultDates();
-        startInput.value = startDate;
-        endInput.value = endDate;
+
+        // Reset Flatpickr instances
+        if (startPicker) startPicker.setDate(startDate);
+        if (endPicker) endPicker.setDate(endDate);
+
         fetchStats();
       });
     }
+
+    const schoolModal = document.querySelector("#school-detail-modal");
+    const modalName = schoolModal?.querySelector("[data-modal-name]");
+    const modalType = schoolModal?.querySelector("[data-modal-type]");
+    const modalGrades = schoolModal?.querySelector("[data-modal-grades]");
+    const modalExpiry = schoolModal?.querySelector("[data-modal-expiry]");
+    const modalDuration = schoolModal?.querySelector("[data-modal-duration]");
+    const modalLink = schoolModal?.querySelector("[data-modal-link]");
+    const modalHint = schoolModal?.querySelector("[data-modal-hint]");
+
+    const normalizeValue = (value) => {
+      if (value === undefined || value === null) return "N/A";
+      const textValue = String(value).trim();
+      return textValue ? textValue : "N/A";
+    };
+
+    const closeSchoolModal = () => {
+      if (!schoolModal) return;
+      schoolModal.classList.remove("is-visible");
+      document.body.classList.remove("no-scroll");
+    };
+
+    const openSchoolModal = (source) => {
+      if (!schoolModal) return;
+      const name = normalizeValue(source.dataset.schoolName);
+      const type = normalizeValue(source.dataset.schoolType);
+      const grades = normalizeValue(source.dataset.schoolGrades);
+      const expiry = normalizeValue(source.dataset.schoolExpiry);
+      const duration = normalizeValue(source.dataset.schoolDuration);
+      const awardedAt = normalizeValue(source.dataset.schoolAwardedAt);
+      const url = source.dataset.schoolUrl || "#";
+
+      const modalAwardedAt = schoolModal?.querySelector("[data-modal-awarded-at]");
+
+      modalName && (modalName.textContent = name);
+      modalType && (modalType.textContent = type);
+      modalGrades && (modalGrades.textContent = grades);
+      modalExpiry && (modalExpiry.textContent = expiry);
+      modalDuration && (modalDuration.textContent = duration);
+      modalAwardedAt && (modalAwardedAt.textContent = awardedAt);
+      modalLink && (modalLink.href = url);
+      modalLink && (modalLink.textContent = `View ${name} profile`);
+      modalHint && (modalHint.textContent = "See the expiry, grades, type, and total scholarship months below.");
+
+      schoolModal.classList.add("is-visible");
+      document.body.classList.add("no-scroll");
+    };
+
+    document.querySelectorAll(".chip-detail").forEach((chip) => {
+      chip.addEventListener("click", (event) => {
+        event.preventDefault();
+        openSchoolModal(chip);
+      });
+    });
+
+    const modalCloseBtn = schoolModal?.querySelector(".modal-close");
+    modalCloseBtn?.addEventListener("click", closeSchoolModal);
+
+    schoolModal?.addEventListener("click", (event) => {
+      if (event.target === schoolModal) {
+        closeSchoolModal();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && schoolModal?.classList.contains("is-visible")) {
+        closeSchoolModal();
+      }
+    });
   });
 </script>
 {% endblock %}

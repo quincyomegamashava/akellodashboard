@@ -1,526 +1,432 @@
 {% extends 'base.html' %}
 {% block title %}Content Development{% endblock %}
 
-{% block content %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/content_dev_modern.css') }}">
+<link
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@300;400;700&display=swap"
+  rel="stylesheet">
+{% endblock %}
 
-<!-- Workspace Selector Section (Top) -->
- <div class="w3-card w3-white w3-round w3-border w3-margin-bottom">
-  <header class="w3-container w3-padding" style="background:#0ea5e9; color:#fff; border-top-left-radius:8px;border-top-right-radius:8px;">
-    <div class="w3-large"><b>Select or Create Workspace</b></div>
-    <div class="w3-small w3-opacity">Choose a subject workspace to generate lesson notes and activity questions</div>
-        </header>
-      <div class="w3-container w3-padding">
-        <div class="w3-row-padding">
-      <div class="w3-col s12 m8">
-        <label class="w3-small">Select Workspace
-          <select class="w3-input w3-border w3-round-small" id="workspaceSelector">
-            <option value="">-- Select a workspace --</option>
-          </select>
-        </label>
+{% block content %}
+<div class="cd-container">
+
+  <!-- Header & Workspace Selector -->
+  <div class="cd-card">
+    <div class="cd-card-body cd-flex cd-justify-between cd-items-center" style="padding: 16px 24px;">
+      <div>
+        <h1 style="font-size:1.25rem; font-weight:700; color:var(--text-main); margin:0;">Content Studio</h1>
+        <p class="cd-text-muted cd-text-sm" style="margin:4px 0 0;">Create lessons and activities with AI</p>
       </div>
-      <div class="w3-col s12 m4">
-        <button class="w3-button w3-blue w3-round w3-block" type="button" onclick="openWsModal()" style="margin-top:24px;">
-          <i class="fa fa-folder"></i> New Workspace
+
+      <div class="cd-flex cd-gap-2 cd-items-center">
+        <div style="min-width: 250px;">
+          <select class="cd-select" id="workspaceSelector">
+            <option value="">-- Select Workspace --</option>
+          </select>
+        </div>
+        <button class="cd-btn cd-btn-primary" onclick="openWsModal()">
+          <i class="fa fa-plus"></i> New
         </button>
       </div>
     </div>
-    
-    <!-- Selected Workspace Info -->
-    <div id="selectedWorkspaceInfo" class="w3-margin-top w3-hide">
-      <div class="w3-card w3-light-gray w3-round w3-padding">
-        <div class="w3-large" id="wsInfoName"></div>
-        <div class="w3-small w3-text-gray" id="wsInfoDescription"></div>
+
+    <!-- Selected Workspace Info (Hidden by default) -->
+    <div id="selectedWorkspaceInfo" class="cd-hidden"
+      style="border-top:1px solid var(--border-color); padding: 12px 24px; background:#f8fafc;">
+      <div class="cd-flex cd-justify-between cd-items-center">
+        <div class="cd-flex cd-items-center cd-gap-2">
+          <span class="cd-text-muted cd-text-sm">Active Workspace:</span>
+          <span id="wsInfoName" style="font-weight:600; color:var(--primary-color);"></span>
+          <span id="wsInfoDescription" class="cd-text-muted cd-text-sm" style="margin-left:8px;"></span>
+        </div>
+        <div class="cd-text-sm cd-text-muted">
+          <!-- Hidden inputs used by JS -->
+          <input type="hidden" id="lsWorkspaceDisplay">
+          <input type="hidden" id="aqWorkspaceDisplay">
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- Workspace Content Section (Hidden until workspace selected) -->
-<div id="workspaceContentSection" class="w3-hide">
-  
-  <!-- Generation Tools Tabs -->
-  <div class="w3-card w3-white w3-round w3-border w3-margin-bottom">
-    <div class="w3-bar w3-light-gray">
-      <button class="w3-bar-item w3-button w3-border-right" onclick="openTab('lessonTab')" id="lessonTabBtn">
-        <i class="fa fa-book"></i> Lesson Content
-      </button>
-      <button class="w3-bar-item w3-button w3-border-right" onclick="openTab('activityTab')" id="activityTabBtn">
-        <i class="fa fa-question-circle"></i> Activity Questions
-      </button>
-      <button class="w3-bar-item w3-button" onclick="openTab('contentTab')" id="contentTabBtn">
-        <i class="fa fa-list"></i> Generated Content
-      </button>
-    </div>
+  <!-- Main Content Areas (Hidden until workspace selected) -->
+  <div id="workspaceContentSection" class="cd-grid cd-hidden">
 
-    <!-- Lesson Generator Tab -->
-    <div id="lessonTab" class="w3-container w3-padding tab-content">
-      <header class="w3-container w3-padding" style="background:#10b981; color:#fff; border-radius:8px; margin-bottom:16px;">
-        <div class="w3-large"><b>Generate Lesson Content</b></div>
-        <div class="w3-small w3-opacity">Create student-friendly lesson content that learners can read and study independently - use structured inputs or a single prompt</div>
-      </header>
-      
-      <div class="w3-right w3-margin-bottom">
-        <button class="w3-button w3-light-gray w3-round" type="button" onclick="testOllama()"><i class="fa fa-plug"></i> Test Ollama</button>
-        <span id="ollamaStatus" class="w3-small w3-text-gray w3-margin-left"></span>
-      </div>
-
-      <!-- Mode Toggle -->
-      <div class="w3-margin-bottom">
-        <div class="w3-bar w3-light-gray w3-round">
-          <button class="w3-bar-item w3-button" id="lsModeStructuredBtn" onclick="switchLessonMode('structured')" style="background:#10b981; color:#fff;">Structured Input</button>
-          <button class="w3-bar-item w3-button" id="lsModePromptBtn" onclick="switchLessonMode('prompt')">Single Prompt</button>
-        </div>
-      </div>
-      
-      <form id="lessonForm">
-        <div class="w3-row-padding">
-          <div class="w3-col s12 m5">
-            <label class="w3-small">Ollama Model
-              <select class="w3-input w3-border w3-round-small" id="lsModelSelect"></select>
-            </label>
-            <div class="w3-tiny w3-text-gray w3-margin-top">Tip: Use phi3:mini for fastest generation (recommended)</div>
-          </div>
-          <div class="w3-col s12 m7">
-            <label class="w3-small">Workspace (read-only)
-              <input class="w3-input w3-border w3-round-small" id="lsWorkspaceDisplay" readonly style="background:#f5f5f5;">
-            </label>
+    <!-- LEFT COLUMN: Tools -->
+    <div class="cd-col-left">
+      <div class="cd-card">
+        <!-- Tabs -->
+        <div class="cd-card-header" style="padding: 12px;">
+          <div class="cd-tabs" style="margin:0;">
+            <button class="cd-tab-btn active" onclick="openTab('lessonTab')" id="lessonTabBtn">
+              <i class="fa fa-book"></i> Planner
+            </button>
+            <button class="cd-tab-btn" onclick="openTab('activityTab')" id="activityTabBtn">
+              <i class="fa fa-tasks"></i> Activities
+            </button>
+            <button class="cd-tab-btn" onclick="openTab('contentTab')" id="contentTabBtn">
+              <i class="fa fa-folder-open"></i> Files
+            </button>
           </div>
         </div>
 
-        <!-- Structured Input Mode -->
-        <div id="lsStructuredMode">
-          <div class="w3-row-padding w3-margin-top">
-            <div class="w3-col s12">
-            <label class="w3-small">Topic *
-                <input class="w3-input w3-border w3-round-small" id="lsTopic" placeholder="e.g., Purpose of the totem system" required>
-            </label>
-          </div>
-          </div>
-          <div class="w3-row-padding w3-margin-top">
-            <div class="w3-col s6">
-              <label class="w3-small">Age of learner *
-                <input class="w3-input w3-border w3-round-small" id="lsAge" type="number" min="3" max="21" placeholder="10" required>
-            </label>
-          </div>
-            <div class="w3-col s6">
-              <label class="w3-small">Subject (optional)
-                <input class="w3-input w3-border w3-round-small" id="lsSubject" placeholder="e.g., Social Studies">
-            </label>
-          </div>
-        </div>
-        
-        <div class="w3-row-padding w3-margin-top">
-          <div class="w3-col s12">
-              <label class="w3-small">Objectives (one per line)
-                <textarea class="w3-input w3-border w3-round-small" id="lsObjectives" rows="3" placeholder="e.g., define a totem
-explain the importance of the totem system"></textarea>
-            </label>
-          </div>
-        </div>
-        
-        <div class="w3-row-padding w3-margin-top">
-            <div class="w3-col s12">
-              <label class="w3-small">Content aspects (one per line)
-                <textarea class="w3-input w3-border w3-round-small" id="lsAspects" rows="3" placeholder="e.g., Totems
-identity
-regulating marriage
-social interaction
-expressing gratitude
-preservation of culture"></textarea>
-            </label>
-          </div>
+        <!-- LESSON TAB -->
+        <div id="lessonTab" class="cd-card-body tab-content">
+          <div class="cd-flex cd-justify-between cd-items-center cd-mb-4">
+            <h3 style="margin:0; font-size:1rem;">Lesson Planner</h3>
+            <button class="cd-btn cd-btn-ghost cd-text-sm" onclick="testOllama()" style="padding:4px 8px;">
+              <i class="fa fa-plug"></i> <span id="ollamaStatus">Check AI</span>
+            </button>
           </div>
 
-          <div class="w3-row-padding w3-margin-top">
-            <div class="w3-col s12">
-              <label class="w3-small">Activities (one per line)
-                <textarea class="w3-input w3-border w3-round-small" id="lsActivities" rows="3" placeholder="e.g., Explaining the term totem
-Tabulating totems and their sacred animals or objects
-Discussing the importance of totems
-Drawing and labelling their own totem symbols
-Praising classmates with their totems
-Explaining how totems help in preservation of resources"></textarea>
-            </label>
-          </div>
-        </div>
-        
-        <div class="w3-row-padding w3-margin-top">
-          <div class="w3-col s12">
-              <label class="w3-small">Suggested images/illustrations (optional; one per line)
-                <textarea class="w3-input w3-border w3-round-small" id="lsImages" rows="2" placeholder="e.g., A collage of local totem symbols
-An infographic showing how totems regulate marriage"></textarea>
-            </label>
+          <form id="lessonForm">
+            <div class="cd-form-group">
+              <label class="cd-label">AI Model</label>
+              <select class="cd-select" id="lsModelSelect"></select>
             </div>
-          </div>
-        </div>
 
-        <!-- Single Prompt Mode -->
-        <div id="lsPromptMode" class="w3-hide">
-          <div class="w3-row-padding w3-margin-top">
-          <div class="w3-col s12">
-            <label class="w3-small">Lesson Prompt *
-              <textarea class="w3-input w3-border w3-round-small" id="lsPrompt" rows="8" placeholder="Enter a detailed prompt describing the lesson content you want to generate for students. For example:
+            <!-- Mode Toggle -->
+            <div class="cd-form-group cd-flex cd-gap-2" style="background:#f1f5f9; padding:4px; border-radius:8px;">
+              <button type="button" class="cd-tab-btn active" id="lsModeStructuredBtn"
+                onclick="switchLessonMode('structured')">Structured</button>
+              <button type="button" class="cd-tab-btn" id="lsModePromptBtn" onclick="switchLessonMode('prompt')">Free
+                Prompt</button>
+            </div>
 
-Create a comprehensive lesson for 10-year-old students on 'The Water Cycle'. The lesson should:
-- Explain the stages of the water cycle (evaporation, condensation, precipitation) in simple terms
-- Include real-world examples
-- Use age-appropriate language that students can understand
-- Include practice questions and activities
-- Be written directly to the student so they can study independently"></textarea>
-            </label>
-          </div>
-          </div>
-          <div class="w3-row-padding w3-margin-top">
-            <div class="w3-col s6">
-              <label class="w3-small">Topic (for reference) *
-                <input class="w3-input w3-border w3-round-small" id="lsPromptTopic" placeholder="e.g., The Water Cycle" required>
+            <!-- Structured Mode -->
+            <div id="lsStructuredMode">
+              <div class="cd-form-group">
+                <label class="cd-label">Topic *</label>
+                <input class="cd-input" id="lsTopic" placeholder="e.g. Photosynthesis" required>
+              </div>
+
+              <div class="cd-grid" style="grid-template-columns: 1fr 1fr; gap:16px;">
+                <div class="cd-form-group">
+                  <label class="cd-label">Age *</label>
+                  <input class="cd-input" id="lsAge" type="number" min="3" max="21" placeholder="10" required>
+                </div>
+                <div class="cd-form-group">
+                  <label class="cd-label">Subject</label>
+                  <input class="cd-input" id="lsSubject" placeholder="e.g. Science">
+                </div>
+              </div>
+
+              <div class="cd-form-group">
+                <label class="cd-label">Objectives (one per line)</label>
+                <textarea class="cd-textarea" id="lsObjectives" rows="3" placeholder="• Define key terms..."></textarea>
+              </div>
+
+              <div class="cd-form-group">
+                <label class="cd-label">Key Aspects</label>
+                <textarea class="cd-textarea" id="lsAspects" rows="3" placeholder="• Process details..."></textarea>
+              </div>
+
+              <div class="cd-form-group">
+                <label class="cd-label">Activities</label>
+                <textarea class="cd-textarea" id="lsActivities" rows="3" placeholder="• Group discussion..."></textarea>
+              </div>
+
+              <div class="cd-form-group">
+                <label class="cd-label">Images (Visual descriptions)</label>
+                <textarea class="cd-textarea" id="lsImages" rows="2"></textarea>
+              </div>
+            </div>
+
+            <!-- Prompt Mode -->
+            <div id="lsPromptMode" class="cd-hidden">
+              <div class="cd-form-group">
+                <label class="cd-label">Custom Prompt *</label>
+                <textarea class="cd-textarea" id="lsPrompt" rows="10"
+                  placeholder="Describe exactly what you want the AI to create..."></textarea>
+              </div>
+              <div class="cd-grid" style="grid-template-columns: 1fr 1fr; gap:16px;">
+                <div class="cd-form-group">
+                  <label class="cd-label">Topic Ref *</label>
+                  <input class="cd-input" id="lsPromptTopic" required>
+                </div>
+                <div class="cd-form-group">
+                  <label class="cd-label">Age *</label>
+                  <input class="cd-input" id="lsPromptAge" type="number" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="cd-form-group">
+              <label class="cd-flex cd-items-center cd-gap-2" style="cursor:pointer; user-select:none;">
+                <input type="checkbox" id="lsIncludeQuestions" class="toggle-checkbox" style="width:20px; height:20px;">
+                <span class="cd-text-sm">Auto-generate review questions</span>
               </label>
             </div>
-            <div class="w3-col s6">
-              <label class="w3-small">Age of learner *
-                <input class="w3-input w3-border w3-round-small" id="lsPromptAge" type="number" min="3" max="21" placeholder="10" required>
-              </label>
-            </div>
-          </div>
-        </div>
 
-        <div class="w3-row-padding w3-margin-top">
-          <div class="w3-col s12">
-            <label class="w3-small">
-              <input type="checkbox" id="lsIncludeQuestions"> Include Activity Questions (generate questions along with lesson)
-            </label>
-          </div>
-        </div>
-        
-        <div class="w3-row-padding w3-margin-top">
-          <div class="w3-col s12 m6">
-            <button type="button" class="w3-button w3-green w3-round w3-block" onclick="generateLesson()" id="lsGenerateBtn">
+            <button type="button" class="cd-btn cd-btn-success cd-btn-block" onclick="generateLesson()"
+              id="lsGenerateBtn">
               <i class="fa fa-magic"></i> Generate Lesson
             </button>
-          </div>
-          <div class="w3-col s12 m6">
-            <button type="reset" class="w3-button w3-light-gray w3-round w3-block">Clear</button>
-          </div>
+          </form>
         </div>
-      </form>
-        
-        <!-- Loading indicator with progress -->
-      <div id="lsLoading" class="w3-center w3-margin-top w3-hide">
-        <div class="w3-text-green"><i class="fa fa-spinner w3-spin"></i> <span id="lsProgressMessage">Generating lesson...</span></div>
-        <div class="w3-margin-top">
-          <div class="w3-light-gray" style="width:100%; height:20px; border-radius:10px; overflow:hidden;">
-            <div id="lsProgressBar" class="w3-green" style="height:100%; width:0%; transition:width 0.3s; text-align:center; line-height:20px; color:#fff; font-size:12px;">
-              <span id="lsProgressPercent">0%</span>
-            </div>
-          </div>
-        </div>
-        <div class="w3-small w3-text-gray w3-margin-top" id="lsProgressText">Initializing...</div>
-      </div>
-        
-        <!-- Output area -->
-      <div id="lsOutputSection" class="w3-margin-top w3-hide">
-        <div class="w3-small w3-text-gray w3-margin-bottom">Generated Lesson Content (for students):</div>
-          <div class="w3-card w3-light-gray w3-round">
-            <div class="w3-container w3-padding">
-            <div id="lsOutput" class="w3-small" style="white-space: pre-wrap; max-height: 500px; overflow-y: auto;"></div>
-            </div>
-          </div>
-          <div class="w3-right w3-margin-top">
-          <button class="w3-button w3-indigo w3-round" type="button" onclick="copyLessonOutput()">
-              <i class="fa fa-copy"></i> Copy
-            </button>
-          <button class="w3-button w3-green w3-round" type="button" onclick="downloadLessonOutput()">
-              <i class="fa fa-download"></i> Download
-            </button>
-        </div>
-      </div>
-    </div>
 
-    <!-- Activity Questions Tab -->
-    <div id="activityTab" class="w3-container w3-padding tab-content w3-hide">
-      <header class="w3-container w3-padding" style="background:#f05dc6; color:#fff; border-radius:8px; margin-bottom:16px;">
-        <div class="w3-large"><b>Generate Activity Questions</b></div>
-        <div class="w3-small w3-opacity">Create activity questions for students using Ollama</div>
-        </header>
-      
-      <form id="activityQuestionForm">
-            <div class="w3-row-padding">
-          <div class="w3-col s12 m5">
-            <label class="w3-small">Ollama Model
-              <select class="w3-input w3-border w3-round-small" id="aqModelSelect"></select>
-                </label>
-              </div>
-          <div class="w3-col s12 m7">
-            <label class="w3-small">Workspace (read-only)
-              <input class="w3-input w3-border w3-round-small" id="aqWorkspaceDisplay" readonly style="background:#f5f5f5;">
-                </label>
-              </div>
-              </div>
-        
-            <div class="w3-row-padding w3-margin-top">
-              <div class="w3-col s12">
-            <label class="w3-small">Topic *
-              <input class="w3-input w3-border w3-round-small" id="aqTopic" placeholder="e.g., The Water Cycle" required>
-                </label>
-              </div>
+        <!-- ACTIVITY TAB -->
+        <div id="activityTab" class="cd-card-body tab-content cd-hidden">
+          <div class="cd-mb-4">
+            <h3 style="margin:0; font-size:1rem;">Activity Generator</h3>
+          </div>
+          <form id="activityQuestionForm">
+            <div class="cd-form-group">
+              <label class="cd-label">AI Model</label>
+              <select class="cd-select" id="aqModelSelect"></select>
             </div>
 
-            <div class="w3-row-padding w3-margin-top">
-          <div class="w3-col s12 m6">
-            <label class="w3-small">Subject (optional)
-              <input class="w3-input w3-border w3-round-small" id="aqSubject" placeholder="e.g., Science">
-                </label>
-          </div>
-          <div class="w3-col s12 m6">
-            <label class="w3-small">Link to Lesson (optional)
-              <select class="w3-input w3-border w3-round-small" id="aqLessonSelect">
+            <div class="cd-form-group">
+              <label class="cd-label">Topic *</label>
+              <input class="cd-input" id="aqTopic" required>
+            </div>
+
+            <div class="cd-form-group">
+              <label class="cd-label">Subject</label>
+              <input class="cd-input" id="aqSubject">
+            </div>
+
+            <div class="cd-form-group">
+              <label class="cd-label">Base on Lesson</label>
+              <select class="cd-select" id="aqLessonSelect">
                 <option value="">-- None --</option>
               </select>
-            </label>
+            </div>
+
+            <fieldset
+              style="border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-bottom:16px;">
+              <legend class="cd-text-sm cd-text-muted" style="padding:0 4px;">Demographics</legend>
+              <div class="cd-grid" style="grid-template-columns:1fr 1fr; gap:12px;">
+                <div>
+                  <label class="cd-label" style="font-size:0.75rem;">Age Range</label>
+                  <div class="cd-flex cd-gap-2">
+                    <input class="cd-input" id="aqMinAge" type="number" placeholder="Min">
+                    <input class="cd-input" id="aqMaxAge" type="number" placeholder="Max">
+                  </div>
+                </div>
+                <div>
+                  <label class="cd-label" style="font-size:0.75rem;">Grade Range</label>
+                  <div class="cd-flex cd-gap-2">
+                    <input class="cd-input" id="aqMinGrade" type="number" placeholder="Min">
+                    <input class="cd-input" id="aqMaxGrade" type="number" placeholder="Max">
+                  </div>
+                </div>
+              </div>
+              <div class="cd-mt-4">
+                <label class="cd-label" style="font-size:0.75rem;">Difficulty</label>
+                <div class="cd-flex cd-gap-2 cd-text-sm">
+                  <label><input type="checkbox" id="aqAbilityBeginner"> Easy</label>
+                  <label><input type="checkbox" id="aqAbilityIntermediate"> Med</label>
+                  <label><input type="checkbox" id="aqAbilityAdvanced"> Hard</label>
+                </div>
+              </div>
+            </fieldset>
+
+            <div class="cd-grid" style="grid-template-columns: 1fr 100px; gap:16px;">
+              <div class="cd-form-group">
+                <label class="cd-label">Type</label>
+                <select class="cd-select" id="aqQuestionType">
+                  <option value="mixed">Mixed</option>
+                  <option value="multiple_choice">Multiple Choice</option>
+                  <option value="short_answer">Short Answer</option>
+                  <option value="essay">Essay</option>
+                </select>
+              </div>
+              <div class="cd-form-group">
+                <label class="cd-label">Count</label>
+                <input class="cd-input" id="aqNumQuestions" type="number" value="5">
               </div>
             </div>
 
-        <!-- Student Range Section -->
-        <div class="w3-card w3-light-gray w3-round w3-padding w3-margin-top">
-          <div class="w3-small w3-text-gray w3-margin-bottom"><b>Student Range Specifications</b></div>
-          
-          <div class="w3-row-padding">
-            <div class="w3-col s12 m6">
-              <label class="w3-small">Age Range
-                <div class="w3-row-padding" style="margin-left:-8px;margin-right:-8px;">
-                  <div class="w3-col s6">
-                    <input class="w3-input w3-border w3-round-small" id="aqMinAge" type="number" min="3" max="21" placeholder="Min age">
-                  </div>
-                  <div class="w3-col s6">
-                    <input class="w3-input w3-border w3-round-small" id="aqMaxAge" type="number" min="3" max="21" placeholder="Max age">
-                  </div>
-                </div>
-                </label>
-            </div>
-            <div class="w3-col s12 m6">
-              <label class="w3-small">Grade Range
-                <div class="w3-row-padding" style="margin-left:-8px;margin-right:-8px;">
-                  <div class="w3-col s6">
-                    <input class="w3-input w3-border w3-round-small" id="aqMinGrade" type="number" min="1" max="13" placeholder="Min grade">
-                  </div>
-                  <div class="w3-col s6">
-                    <input class="w3-input w3-border w3-round-small" id="aqMaxGrade" type="number" min="1" max="13" placeholder="Max grade">
-                  </div>
-                </div>
-              </label>
-              </div>
-            </div>
-
-            <div class="w3-row-padding w3-margin-top">
-              <div class="w3-col s12">
-              <label class="w3-small">Ability Levels
-                <div class="w3-row-padding" style="margin-left:-8px;margin-right:-8px;">
-                  <div class="w3-col s4">
-                    <label><input type="checkbox" id="aqAbilityBeginner" value="beginner"> Beginner</label>
-                  </div>
-                  <div class="w3-col s4">
-                    <label><input type="checkbox" id="aqAbilityIntermediate" value="intermediate"> Intermediate</label>
-                  </div>
-                  <div class="w3-col s4">
-                    <label><input type="checkbox" id="aqAbilityAdvanced" value="advanced"> Advanced</label>
-                </div>
-                </div>
-              </label>
-            </div>
-              </div>
-            </div>
-
-            <div class="w3-row-padding w3-margin-top">
-              <div class="w3-col s12 m6">
-            <label class="w3-small">Question Type *
-              <select class="w3-input w3-border w3-round-small" id="aqQuestionType" required>
-                <option value="mixed">Mixed (multiple choice, short answer, essay)</option>
-                <option value="multiple_choice">Multiple Choice Only</option>
-                <option value="short_answer">Short Answer Only</option>
-                <option value="essay">Essay Questions Only</option>
-              </select>
-            </label>
-              </div>
-              <div class="w3-col s12 m6">
-            <label class="w3-small">Number of Questions *
-              <input class="w3-input w3-border w3-round-small" id="aqNumQuestions" type="number" min="1" max="50" value="5" required>
-            </label>
-          </div>
-        </div>
-
-        <div class="w3-row-padding w3-margin-top">
-          <div class="w3-col s12 m6">
-            <button type="button" class="w3-button w3-pink w3-round w3-block" onclick="generateActivityQuestions()" id="aqGenerateBtn">
-              <i class="fa fa-magic"></i> Generate Questions
+            <button type="button" class="cd-btn cd-btn-primary cd-btn-block" onclick="generateActivityQuestions()"
+              id="aqGenerateBtn">
+              <i class="fa fa-bolt"></i> Generate
             </button>
-          </div>
-          <div class="w3-col s12 m6">
-            <button type="reset" class="w3-button w3-light-gray w3-round w3-block">Clear</button>
-              </div>
-            </div>
           </form>
+        </div>
 
-      <!-- Loading indicator -->
-      <div id="aqLoading" class="w3-center w3-margin-top w3-hide">
-        <div class="w3-text-pink"><i class="fa fa-spinner w3-spin"></i> Generating activity questions...</div>
-        <div class="w3-small w3-text-gray w3-margin-top">This may take a few moments</div>
-      </div>
+        <!-- FILES TAB -->
+        <div id="contentTab" class="cd-card-body tab-content cd-hidden">
+          <div class="cd-mb-4">
+            <h3 style="margin:0; font-size:1rem;">Workspace Files</h3>
+          </div>
 
-      <!-- Output area -->
-      <div id="aqOutputSection" class="w3-margin-top w3-hide">
-        <div class="w3-small w3-text-gray w3-margin-bottom">Generated Activity Questions:</div>
-        <div class="w3-card w3-light-gray w3-round">
-          <div class="w3-container w3-padding">
-            <div id="aqOutput" class="w3-small" style="white-space: pre-wrap; max-height: 400px; overflow-y: auto;"></div>
+          <div class="cd-form-group">
+            <label class="cd-label">Saved Lessons</label>
+            <ul id="workspaceLessonsList"
+              style="list-style:none; padding:0; margin:0; max-height:200px; overflow-y:auto; border:1px solid var(--border-color); border-radius:8px;">
+            </ul>
+          </div>
+
+          <div class="cd-form-group">
+            <label class="cd-label">Saved Activities</label>
+            <ul id="workspaceActivityQuestionsList"
+              style="list-style:none; padding:0; margin:0; max-height:200px; overflow-y:auto; border:1px solid var(--border-color); border-radius:8px;">
+            </ul>
           </div>
         </div>
-        <div class="w3-right w3-margin-top">
-          <button class="w3-button w3-indigo w3-round" type="button" onclick="copyActivityQuestions()">
-            <i class="fa fa-copy"></i> Copy
-          </button>
-          <button class="w3-button w3-green w3-round" type="button" onclick="downloadActivityQuestions()">
-            <i class="fa fa-download"></i> Download
-          </button>
-        </div>
+
       </div>
     </div>
 
-    <!-- Generated Content Tab -->
-    <div id="contentTab" class="w3-container w3-padding tab-content w3-hide">
-      <header class="w3-container w3-padding" style="background:#6366f1; color:#fff; border-radius:8px; margin-bottom:16px;">
-        <div class="w3-large"><b>Generated Content</b></div>
-        <div class="w3-small w3-opacity">View all lessons and activity questions in this workspace</div>
-        </header>
-      
-      <div class="w3-row-padding">
-        <div class="w3-col s12 m6">
-          <div class="w3-card w3-white w3-round w3-border">
-        <div class="w3-container w3-padding">
-              <div class="w3-small w3-text-gray w3-margin-bottom"><b>Lessons</b></div>
-              <ul id="workspaceLessonsList" class="w3-ul w3-small" style="border:1px dashed #e5e7eb; border-radius:8px; max-height:400px; overflow:auto;"></ul>
-          </div>
-              </div>
-              </div>
-        <div class="w3-col s12 m6">
-          <div class="w3-card w3-white w3-round w3-border">
-            <div class="w3-container w3-padding">
-              <div class="w3-small w3-text-gray w3-margin-bottom"><b>Activity Questions</b></div>
-              <ul id="workspaceActivityQuestionsList" class="w3-ul w3-small" style="border:1px dashed #e5e7eb; border-radius:8px; max-height:400px; overflow:auto;"></ul>
-            </div>
-          </div>
+    <!-- RIGHT COLUMN: Preview & Output -->
+    <div class="cd-col-right">
+
+      <!-- Welcome State (Visible when nothing generated yet) -->
+      <div id="welcomeState" class="cd-card cd-flex cd-items-center cd-justify-between"
+        style="padding:40px; text-align:center; min-height:600px; border-style:dashed; border-width:2px;">
+        <div style="width:100%;">
+          <div style="font-size:3rem; color:#cbd5e1; margin-bottom:16px;"><i class="fa fa-lightbulb-o"></i></div>
+          <h2 style="color:var(--text-muted);">Ready to Create?</h2>
+          <p style="color:var(--text-muted); max-width:400px; margin:8px auto;">Select a tool from the left panel to
+            start generating high-quality educational content.</p>
         </div>
       </div>
+
+      <!-- LESSON OUTPUT -->
+      <div id="lsOutputSection" class="cd-hidden">
+        <div class="cd-flex cd-justify-between cd-items-center cd-mb-4">
+          <span class="cd-text-sm cd-text-muted">Type: <b>Lesson Plan</b></span>
+          <div class="cd-flex cd-gap-2">
+            <button class="cd-btn cd-btn-ghost cd-text-sm" onclick="copyLessonOutput()"><i class="fa fa-copy"></i>
+              Copy</button>
+            <button class="cd-btn cd-btn-ghost cd-text-sm" onclick="downloadLessonOutput()"><i
+                class="fa fa-download"></i> Save</button>
+          </div>
+        </div>
+        <div class="cd-paper cd-paper-container">
+          <div id="lsOutput"></div>
+        </div>
+      </div>
+
+      <!-- ACTIVITY OUTPUT -->
+      <div id="aqOutputSection" class="cd-hidden">
+        <div class="cd-flex cd-justify-between cd-items-center cd-mb-4">
+          <span class="cd-text-sm cd-text-muted">Type: <b>Activity Questions</b></span>
+          <div class="cd-flex cd-gap-2">
+            <button class="cd-btn cd-btn-ghost cd-text-sm" onclick="copyActivityQuestions()"><i class="fa fa-copy"></i>
+              Copy</button>
+            <button class="cd-btn cd-btn-ghost cd-text-sm" onclick="downloadActivityQuestions()"><i
+                class="fa fa-download"></i> Save</button>
+          </div>
+        </div>
+        <div class="cd-paper cd-paper-container">
+          <div id="aqOutput"></div>
+        </div>
+      </div>
+
+      <!-- LOADING STATES -->
+      <div id="lsLoading" class="cd-card cd-loader cd-hidden" style="min-height:400px;">
+        <i class="fa fa-circle-o-notch fa-spin fa-3x" style="color:var(--accent-color);"></i>
+        <h3 class="cd-mt-4" id="lsProgressMessage">Drafting content...</h3>
+        <p class="cd-text-muted cd-text-sm" id="lsProgressText">Analyzing requirements...</p>
+        <div class="cd-progress-bar">
+          <div id="lsProgressBar" class="cd-progress-fill"></div>
+        </div>
+        <div id="lsProgressPercent" class="cd-text-sm cd-mt-4 cd-text-muted">0%</div>
+      </div>
+
+      <div id="aqLoading" class="cd-card cd-loader cd-hidden" style="min-height:400px;">
+        <i class="fa fa-circle-o-notch fa-spin fa-3x" style="color:var(--primary-color);"></i>
+        <h3 class="cd-mt-4">Constructing questions...</h3>
+        <p class="cd-text-muted cd-text-sm">Please wait while we generate assessment items.</p>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Modal: New Workspace -->
+<div id="wsCreateModal" class="w3-modal" style="z-index:9999;">
+  <div class="cd-card" style="width:100%; max-width:600px; margin:40px auto; position:relative;">
+    <div class="cd-card-header cd-flex cd-justify-between cd-items-center">
+      <h2>New Subject Workspace</h2>
+      <button onclick="closeWsModal()"
+        style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+    </div>
+    <div class="cd-card-body">
+      <form id="workspaceForm">
+        <div class="cd-grid" style="grid-template-columns: 2fr 1fr; gap:16px;">
+          <div class="cd-form-group">
+            <label class="cd-label">Subject</label>
+            <input class="cd-input" id="wsSubject" placeholder="English" required>
+          </div>
+          <div class="cd-form-group">
+            <label class="cd-label">Grade</label>
+            <input class="cd-input" id="wsGrade" type="number" placeholder="7">
+          </div>
+        </div>
+
+        <div class="cd-form-group">
+          <label class="cd-label">Term / Semester</label>
+          <input class="cd-input" id="wsTerm" placeholder="Term 1 2024">
+        </div>
+
+        <div class="cd-form-group">
+          <label class="cd-label">Description</label>
+          <textarea class="cd-textarea" id="wsDescription" rows="2"></textarea>
+        </div>
+
+        <div class="cd-form-group">
+          <label class="cd-label">Collaborators</label>
+          <select multiple class="cd-select" id="wsCollaboratorsSelect" style="height:100px;"></select>
+          <small class="cd-text-muted">Hold Ctrl/Cmd to select multiple</small>
+        </div>
+
+        <div class="cd-form-group">
+          <label class="cd-label">Attachments</label>
+          <input type="file" class="cd-input" id="wsFiles" multiple>
+          <div id="wsFileList"></div>
+        </div>
+
+        <!-- Task List Placeholder for Compatibility -->
+        <div id="taskList" style="display:none;"></div>
+
+        <button type="submit" class="cd-btn cd-btn-primary cd-btn-block cd-mt-4">Create Workspace</button>
+      </form>
     </div>
   </div>
 </div>
 
-<!-- Workspace Create Modal -->
-<div id="wsCreateModal" class="w3-modal">
-  <div class="w3-modal-content w3-animate-top w3-round">
-    <header class="w3-container" style="background:#0ea5e9; color:#fff;">
-      <span onclick="closeWsModal()" class="w3-button w3-display-topright">&times;</span>
-      <h5 class="w3-margin">Create Subject Workspace</h5>
-    </header>
-    <div class="w3-container w3-padding">
-      <form id="workspaceForm" class="w3-margin-bottom">
-            <div class="w3-row-padding">
-          <div class="w3-col s12 m7">
-            <label class="w3-small">Subject
-              <input class="w3-input w3-border w3-round-small" id="wsSubject" placeholder="e.g., English" required>
-                </label>
-              </div>
-          <div class="w3-col s6 m2">
-            <label class="w3-small">Grade
-              <input class="w3-input w3-border w3-round-small" id="wsGrade" type="number" min="1" max="13" placeholder="7" required>
-                </label>
-              </div>
-          <div class="w3-col s6 m3">
-            <label class="w3-small">Term
-              <input class="w3-input w3-border w3-round-small" id="wsTerm" type="text" placeholder="e.g., Term 1">
-                </label>
-              </div>
-            </div>
-            <div class="w3-row-padding w3-margin-top">
-              <div class="w3-col s12">
-            <label class="w3-small">Description
-              <textarea class="w3-input w3-border w3-round-small" id="wsDescription" rows="2" placeholder="Short description of the workspace"></textarea>
-                </label>
-              </div>
-            </div>
-
-            <div class="w3-row-padding w3-margin-top">
-              <div class="w3-col s12">
-            <label class="w3-small">Collaborators
-              <select multiple class="w3-input w3-border w3-round-small" id="wsCollaboratorsSelect" size="6"></select>
-                </label>
-            <div class="w3-small w3-text-gray">Hold Ctrl (Windows) or Cmd (Mac) to select multiple</div>
-              </div>
-            </div>
-
-            <div class="w3-row-padding w3-margin-top">
-              <div class="w3-col s12">
-            <label class="w3-small">Files and Documents
-              <input class="w3-input w3-border w3-round-small" id="wsFiles" type="file" multiple>
-                </label>
-            <div id="wsFileList" class="w3-small w3-text-gray w3-margin-top"></div>
-              </div>
-            </div>
-
-            <div class="w3-row-padding w3-margin-top">
-              <div class="w3-col s12">
-            <div class="w3-small w3-text-gray">Tasks and Sub-tasks</div>
-            <div class="w3-row-padding" style="margin-left:-8px;margin-right:-8px;">
-              <div class="w3-col s8">
-                <input class="w3-input w3-border w3-round-small" id="taskInput" placeholder="Task title e.g., Prepare reading list">
-              </div>
-              <div class="w3-col s4">
-                <button type="button" class="w3-button w3-indigo w3-round w3-block" onclick="addTask()"><i class="fa fa-plus"></i> Add Task</button>
-              </div>
-            </div>
-            <ul id="taskList" class="w3-ul w3-margin-top w3-small" style="border:1px dashed #e5e7eb; border-radius:8px;"></ul>
-              </div>
-            </div>
-
-            <div class="w3-row-padding w3-margin-top">
-              <div class="w3-col s12 m6">
-            <button type="submit" class="w3-button w3-blue w3-round w3-block"><i class="fa fa-folder"></i> Create Workspace</button>
-              </div>
-              <div class="w3-col s12 m6">
-            <button type="button" class="w3-button w3-light-gray w3-round w3-block" onclick="closeWsModal()">Cancel</button>
-              </div>
-            </div>
-          </form>
+<!-- Modal: View Lesson -->
+<div id="lessonModal" class="w3-modal" style="z-index:9999;">
+  <div class="cd-card"
+    style="width:90%; max-width:800px; margin:40px auto; height:80vh; display:flex; flex-direction:column;">
+    <div class="cd-card-header cd-flex cd-justify-between cd-items-center">
+      <h2 id="lessonModalTitle">Lesson View</h2>
+      <button onclick="document.getElementById('lessonModal').style.display='none'"
+        style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
     </div>
-</div>
-</div>
-
-<!-- Lesson View Modal -->
-<div id="lessonModal" class="w3-modal">
-  <div class="w3-modal-content w3-animate-top w3-round" style="max-width: 900px;">
-    <header class="w3-container" style="background:#10b981; color:#fff;">
-      <span onclick="document.getElementById('lessonModal').style.display='none'" class="w3-button w3-display-topright">&times;</span>
-      <h5 id="lessonModalTitle" class="w3-margin">Lesson</h5>
-    </header>
-    <div class="w3-container w3-padding">
-      <pre id="lessonModalBody" class="w3-small" style="white-space: pre-wrap;"></pre>
+    <div class="cd-card-body" style="flex:1; overflow:hidden; display:flex;">
+      <div class="cd-paper" style="flex:1; overflow-y:auto; box-shadow:none; border:none;" id="lessonModalBody"></div>
+    </div>
+    <div class="cd-card-header" style="border-top:1px solid var(--border-color); border-bottom:none; text-align:right;">
+      <button class="cd-btn cd-btn-ghost" onclick="copyActivityQuestionModal()">Copy Text</button>
+      <button class="cd-btn cd-btn-primary"
+        onclick="document.getElementById('lessonModal').style.display='none'">Close</button>
     </div>
   </div>
 </div>
 
-<!-- Activity Question View Modal -->
-<div id="activityQuestionModal" class="w3-modal">
-  <div class="w3-modal-content w3-animate-top w3-round" style="max-width: 900px;">
-    <header class="w3-container" style="background:#f05dc6; color:#fff;">
-      <span onclick="document.getElementById('activityQuestionModal').style.display='none'" class="w3-button w3-display-topright">&times;</span>
-      <h5 id="activityQuestionModalTitle" class="w3-margin">Activity Questions</h5>
-    </header>
-    <div class="w3-container w3-padding">
-      <pre id="activityQuestionModalBody" class="w3-small" style="white-space: pre-wrap;"></pre>
-      <div class="w3-right w3-margin-top">
-        <button class="w3-button w3-indigo w3-round" type="button" onclick="copyActivityQuestionModal()">
-          <i class="fa fa-copy"></i> Copy
-        </button>
-      </div>
+<!-- Modal: View Activity -->
+<div id="activityQuestionModal" class="w3-modal" style="z-index:9999;">
+  <div class="cd-card"
+    style="width:90%; max-width:800px; margin:40px auto; height:80vh; display:flex; flex-direction:column;">
+    <div class="cd-card-header cd-flex cd-justify-between cd-items-center">
+      <h2 id="activityQuestionModalTitle">Activity View</h2>
+      <button onclick="document.getElementById('activityQuestionModal').style.display='none'"
+        style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+    </div>
+    <div class="cd-card-body" style="flex:1; overflow:hidden; display:flex;">
+      <div class="cd-paper" style="flex:1; overflow-y:auto; box-shadow:none; border:none;"
+        id="activityQuestionModalBody"></div>
+    </div>
+    <div class="cd-card-header" style="border-top:1px solid var(--border-color); border-bottom:none; text-align:right;">
+      <button class="cd-btn cd-btn-ghost" onclick="copyActivityQuestionModal()">Copy Text</button>
+      <button class="cd-btn cd-btn-primary"
+        onclick="document.getElementById('activityQuestionModal').style.display='none'">Close</button>
     </div>
   </div>
 </div>
@@ -528,881 +434,39 @@ Create a comprehensive lesson for 10-year-old students on 'The Water Cycle'. The
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/content_development.js') }}"></script>
 <script>
-  // State
-  let BOOTSTRAP = { collaborators: [], workspaces: [] };
-  let SELECTED_WORKSPACE = null;
-  let WORKSPACES_DATA = [];
-  let LESSON_MODE = 'structured';
-
-  // Elements
-  const wsFiles = document.getElementById('wsFiles');
-  const wsFileList = document.getElementById('wsFileList');
-  const workspaceForm = document.getElementById('workspaceForm');
-  const collaboratorsSelect = document.getElementById('wsCollaboratorsSelect');
-  const workspaceSelector = document.getElementById('workspaceSelector');
-  const lsModelSelect = document.getElementById('lsModelSelect');
-  const aqModelSelect = document.getElementById('aqModelSelect');
-  const lsWorkspaceDisplay = document.getElementById('lsWorkspaceDisplay');
-  const aqWorkspaceDisplay = document.getElementById('aqWorkspaceDisplay');
-
-  // Load initial data
-  document.addEventListener('DOMContentLoaded', async () => {
-    await bootstrapContentDev();
-    await loadWorkspaces();
-    await loadOllamaModels();
-  });
-
-  async function bootstrapContentDev(){
-    try{
-      const r = await fetch('/api/content-dev/bootstrap');
-      if(!r.ok) throw new Error('Failed bootstrap');
-      BOOTSTRAP = await r.json();
-      paintCollaborators();
-      paintWorkspaceSelector();
-    }catch(e){ console.error(e); }
+  // UI Helper: Handle output visibility for the Welcome State
+  const originalGenerateLesson = window.generateLesson;
+  window.generateLesson = async function () {
+    document.getElementById('welcomeState').classList.add('cd-hidden');
+    document.getElementById('lsOutputSection').classList.add('cd-hidden');
+    document.getElementById('lsLoading').classList.remove('cd-hidden');
+    await originalGenerateLesson.apply(this, arguments);
+    // After generation (handled in JS file), ensure loading is hidden and output shown is mostly handled by JS,
+    // but the JS file uses 'w3-hide'. We need to make sure our CSS handles 'w3-hide' or we patch the specific classes.
+    // The safest way without editing JS is ensuring 'w3-hide' works or mapping it.
+    // In our CSS, we can add .w3-hide { display: none !important; } if not present in base, but base probably has it.
+    // However, our new HTML doesn't use w3-hide for the new structure inputs, but the JS adds/removes it.
+    // We should add a small compatibility script or CSS rule.
   }
 
-  async function loadOllamaModels(){
-    // Load for lesson script model selector
-    lsModelSelect.innerHTML = '';
-    aqModelSelect.innerHTML = '';
-    try{
-      const r = await fetch('/api/ollama/models');
-      const data = await r.json();
-      const models = data.models || [];
-      models.forEach(name => {
-        const opt1 = document.createElement('option');
-        opt1.value = name;
-        opt1.textContent = name;
-        lsModelSelect.appendChild(opt1);
-        
-        const opt2 = document.createElement('option');
-        opt2.value = name;
-        opt2.textContent = name;
-        aqModelSelect.appendChild(opt2);
-      });
-      const defaultModel = (models.includes('llama3.1') ? 'llama3.1' : models[0]) || 'llama3.1';
-      if (lsModelSelect.options.length) {
-        lsModelSelect.value = defaultModel;
-        aqModelSelect.value = defaultModel;
-      } else {
-        const opt1 = document.createElement('option');
-        opt1.value = 'llama3.1';
-        opt1.textContent = 'llama3.1';
-        lsModelSelect.appendChild(opt1);
-        const opt2 = document.createElement('option');
-        opt2.value = 'llama3.1';
-        opt2.textContent = 'llama3.1';
-        aqModelSelect.appendChild(opt2);
-      }
-    }catch(e){
-      const opt1 = document.createElement('option');
-      opt1.value = 'llama3.1';
-      opt1.textContent = 'llama3.1';
-      lsModelSelect.appendChild(opt1);
-      const opt2 = document.createElement('option');
-      opt2.value = 'llama3.1';
-      opt2.textContent = 'llama3.1';
-      aqModelSelect.appendChild(opt2);
-    }
-  }
-
-  function paintCollaborators(){
-    collaboratorsSelect.innerHTML = '';
-    BOOTSTRAP.collaborators.forEach(u => {
-      const opt = document.createElement('option');
-      opt.value = u.id;
-      opt.textContent = `${u.name} (${u.username})`;
-      collaboratorsSelect.appendChild(opt);
-    });
-  }
-
-  function paintWorkspaceSelector(){
-    workspaceSelector.innerHTML = '<option value="">-- Select a workspace --</option>';
-    BOOTSTRAP.workspaces.forEach(w => {
-      const opt = document.createElement('option');
-      opt.value = w.id;
-      opt.textContent = w.name;
-      workspaceSelector.appendChild(opt);
-    });
-  }
-
-  // Workspace selection handler
-  workspaceSelector.addEventListener('change', (e) => {
-    const wsId = e.target.value;
-    if (!wsId) {
-      SELECTED_WORKSPACE = null;
-      document.getElementById('workspaceContentSection').classList.add('w3-hide');
-      document.getElementById('selectedWorkspaceInfo').classList.add('w3-hide');
-      return;
-    }
-    
-    const ws = WORKSPACES_DATA.find(w => w.id == wsId);
-    if (ws) {
-      SELECTED_WORKSPACE = ws;
-      document.getElementById('wsInfoName').textContent = ws.name;
-      document.getElementById('wsInfoDescription').textContent = ws.description || '';
-      document.getElementById('selectedWorkspaceInfo').classList.remove('w3-hide');
-      document.getElementById('workspaceContentSection').classList.remove('w3-hide');
-      lsWorkspaceDisplay.value = ws.name;
-      aqWorkspaceDisplay.value = ws.name;
-      
-      // Load lessons for this workspace
-      loadWorkspaceLessons(ws);
-      loadWorkspaceActivityQuestions(ws);
-      loadWorkspaceLessonsForSelect(ws);
-      
-      // Open first tab
-      openTab('lessonTab');
-    }
-  });
-
-  async function loadWorkspaces(){
-    try{
-      const r = await fetch('/api/workspaces/mine');
-      if(!r.ok) throw new Error('Failed to load workspaces');
-      const data = await r.json();
-      WORKSPACES_DATA = data.workspaces || [];
-      BOOTSTRAP.workspaces = WORKSPACES_DATA.map(w => ({id: w.id, name: w.name}));
-      paintWorkspaceSelector();
-    }catch(e){ console.error(e); }
-  }
-
-  function loadWorkspaceLessons(ws) {
-    const list = document.getElementById('workspaceLessonsList');
-    if (!ws.lessons || ws.lessons.length === 0) {
-      list.innerHTML = '<li class="w3-padding-small w3-text-gray">No lessons yet</li>';
-      return;
-    }
-    list.innerHTML = ws.lessons.map(l => `
-      <li class="w3-padding-small">
-        <b>${escapeHtml(l.topic)}</b>
-        <span class="w3-text-gray w3-tiny"> (Age ${escapeHtml(l.age||'')})</span>
-        <button class="w3-button w3-tiny w3-round w3-light-gray w3-right" type="button" onclick="viewLesson(${l.id})">View</button>
-      </li>
-    `).join('');
-  }
-
-  function loadWorkspaceActivityQuestions(ws) {
-    const list = document.getElementById('workspaceActivityQuestionsList');
-    if (!ws.activity_questions || ws.activity_questions.length === 0) {
-      list.innerHTML = '<li class="w3-padding-small w3-text-gray">No activity questions yet</li>';
-      return;
-    }
-    list.innerHTML = ws.activity_questions.map(aq => `
-      <li class="w3-padding-small">
-        <b>${escapeHtml(aq.topic)}</b>
-        <span class="w3-text-gray w3-tiny"> (${escapeHtml(aq.question_type)}, ${escapeHtml(aq.num_questions)} questions)</span>
-        <button class="w3-button w3-tiny w3-round w3-light-gray w3-right" type="button" onclick="viewActivityQuestion(${aq.id})">View</button>
-      </li>
-    `).join('');
-  }
-
-  function loadWorkspaceLessonsForSelect(ws) {
-    const select = document.getElementById('aqLessonSelect');
-    select.innerHTML = '<option value="">-- None --</option>';
-    if (ws.lessons && ws.lessons.length > 0) {
-      ws.lessons.forEach(l => {
-        const opt = document.createElement('option');
-        opt.value = l.id;
-        opt.textContent = l.topic;
-        select.appendChild(opt);
-      });
-    }
-  }
-
-  // Tab switching
-  function openTab(tabName) {
-    const tabs = ['lessonTab', 'activityTab', 'contentTab'];
-    tabs.forEach(tab => {
-      const el = document.getElementById(tab);
-      const btn = document.getElementById(tab + 'Btn');
-      if (tab === tabName) {
-        el.classList.remove('w3-hide');
-        if (btn) btn.classList.add('w3-blue');
-      } else {
-        el.classList.add('w3-hide');
-        if (btn) btn.classList.remove('w3-blue');
-      }
-    });
-  }
-
-  // File list
-  wsFiles.addEventListener('change', () => {
-    const names = Array.from(wsFiles.files).map(f => `• ${f.name}`).join('\n');
-    wsFileList.textContent = names || '';
-  });
-
-  async function testOllama(){
-    const status = document.getElementById('ollamaStatus');
-    status.textContent = 'Checking...';
-    try{
-      const r = await fetch('/api/ollama/models');
-      const data = await r.json();
-      if ((data.models||[]).length){
-        status.textContent = `OK: ${(data.models||[]).join(', ')}`;
-        status.className = 'w3-small w3-text-green w3-margin-left';
-      }else{
-        status.textContent = 'No models found';
-        status.className = 'w3-small w3-text-amber w3-margin-left';
-      }
-    }catch(e){
-      status.textContent = 'Not reachable';
-      status.className = 'w3-small w3-text-red w3-margin-left';
-    }
-  }
-
-  // Modal controls
-  function openWsModal(){ document.getElementById('wsCreateModal').style.display = 'block'; }
-  function closeWsModal(){ document.getElementById('wsCreateModal').style.display = 'none'; }
-  window.openWsModal = openWsModal; window.closeWsModal = closeWsModal;
-
-  // Tasks with subtasks
-  function addTask() {
-    const input = document.getElementById('taskInput');
-    const title = input.value.trim();
-    if (!title) return;
-    const li = document.createElement('li');
-    li.className = 'w3-padding-small';
-    li.innerHTML = `
-      <div class="w3-row">
-        <div class="w3-col s8"><b>${escapeHtml(title)}</b></div>
-        <div class="w3-col s4 w3-right-align">
-          <button class="w3-button w3-tiny w3-round w3-light-gray" type="button" onclick="this.closest('li').remove()"><i class="fa fa-trash"></i></button>
-        </div>
-      </div>
-      <div class="w3-margin-top">
-        <div class="w3-row" style="gap:8px; align-items:center;">
-          <input class="w3-input w3-border w3-round-small" style="width:70%; display:inline-block;" placeholder="Add sub-task">
-          <button class="w3-button w3-tiny w3-round w3-indigo" type="button">Add</button>
-        </div>
-        <ul class="w3-ul w3-small w3-margin-top" style="border-left:2px solid #e5e7eb; padding-left:8px;"></ul>
-      </div>
-    `;
-    const taskList = document.getElementById('taskList');
-    taskList.appendChild(li);
-    const addBtn = li.querySelector('button.w3-indigo');
-    const subInput = li.querySelector('input');
-    const subList = li.querySelector('ul');
-    addBtn.onclick = () => {
-      const st = subInput.value.trim();
-      if (!st) return;
-      const subLi = document.createElement('li');
-      subLi.className = 'w3-padding-small';
-      subLi.innerHTML = `
-        <span>${escapeHtml(st)}</span>
-        <button class="w3-button w3-tiny w3-round w3-light-gray w3-right" type="button" onclick="this.closest('li').remove()"><i class="fa fa-times"></i></button>
-      `;
-      subList.appendChild(subLi);
-      subInput.value = '';
-    };
-    input.value = '';
-  }
-
-  // Create workspace (persist to backend)
-  workspaceForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const subject = document.getElementById('wsSubject').value.trim();
-    const grade = document.getElementById('wsGrade').value.trim();
-    const term = document.getElementById('wsTerm').value.trim();
-    const description = document.getElementById('wsDescription').value.trim();
-
-    const tasks = Array.from(document.querySelectorAll('#taskList > li')).map(li => ({
-      title: li.querySelector('b')?.textContent || '',
-      subtasks: Array.from(li.querySelectorAll('ul > li > span')).map(s => s.textContent)
-    }));
-
-    const selectedCollabs = Array.from(collaboratorsSelect.selectedOptions).map(o => o.value);
-
-    const fd = new FormData();
-    fd.append('subject', subject);
-    fd.append('grade', grade);
-    fd.append('term', term);
-    fd.append('description', description);
-    selectedCollabs.forEach(id => fd.append('collaborators', id));
-    fd.append('tasks', JSON.stringify(tasks));
-    Array.from(wsFiles.files).forEach(f => fd.append('files', f));
-
-    try{
-      const r = await fetch('/api/workspaces', { method: 'POST', body: fd });
-      if(!r.ok) throw new Error('Failed to create workspace');
-      await r.json();
-      await loadWorkspaces();
-      workspaceForm.reset();
-      document.getElementById('taskList').innerHTML = '';
-      wsFileList.textContent = '';
-      closeWsModal();
-    }catch(err){
-      alert('Error creating workspace');
-      console.error(err);
-    }
-  });
-
-  // Lesson mode switching
-  function switchLessonMode(mode) {
-    LESSON_MODE = mode;
-    const structuredMode = document.getElementById('lsStructuredMode');
-    const promptMode = document.getElementById('lsPromptMode');
-    const structuredBtn = document.getElementById('lsModeStructuredBtn');
-    const promptBtn = document.getElementById('lsModePromptBtn');
-    
-    if (mode === 'structured') {
-      structuredMode.classList.remove('w3-hide');
-      promptMode.classList.add('w3-hide');
-      structuredBtn.style.background = '#10b981';
-      structuredBtn.style.color = '#fff';
-      promptBtn.style.background = '';
-      promptBtn.style.color = '';
-    } else {
-      structuredMode.classList.add('w3-hide');
-      promptMode.classList.remove('w3-hide');
-      promptBtn.style.background = '#10b981';
-      promptBtn.style.color = '#fff';
-      structuredBtn.style.background = '';
-      structuredBtn.style.color = '';
-    }
-  }
-  window.switchLessonMode = switchLessonMode;
-
-  // Lesson Generator via backend (Ollama)
-  async function generateLesson(){
-    if (!SELECTED_WORKSPACE) {
-      alert('Please select a workspace first.');
-      return;
-    }
-    
-    const generateBtn = document.getElementById('lsGenerateBtn');
-    const loading = document.getElementById('lsLoading');
-    const outputSection = document.getElementById('lsOutputSection');
-    const output = document.getElementById('lsOutput');
-    
-    let topic, age, subject, customPrompt;
-    let objectives = [], aspects = [], activities = [], images = [];
-    
-    if (LESSON_MODE === 'prompt') {
-      // Single prompt mode
-      customPrompt = document.getElementById('lsPrompt').value.trim();
-      topic = document.getElementById('lsPromptTopic').value.trim();
-      age = document.getElementById('lsPromptAge').value.trim();
-      
-      if (!customPrompt || !topic || !age) {
-        alert('Please provide a prompt, topic, and age.');
-        return;
-      }
-    } else {
-      // Structured input mode
-      topic = document.getElementById('lsTopic').value.trim();
-      age = document.getElementById('lsAge').value.trim();
-      subject = document.getElementById('lsSubject').value.trim();
-      objectives = splitLines(document.getElementById('lsObjectives').value);
-      aspects = splitLines(document.getElementById('lsAspects').value);
-      activities = splitLines(document.getElementById('lsActivities').value);
-      images = splitLines(document.getElementById('lsImages').value);
-
-    if (!topic || !age) {
-      alert('Please provide both Topic and Age.');
-      return;
-    }
-    }
-    
-    const includeQuestions = document.getElementById('lsIncludeQuestions').checked;
-
-    // Show loading state
-    generateBtn.disabled = true;
-    generateBtn.innerHTML = '<i class="fa fa-spinner w3-spin"></i> Generating...';
-    loading.classList.remove('w3-hide');
-    outputSection.classList.add('w3-hide');
-    output.textContent = ''; // Clear previous content
-    
-    // Reset progress
-    document.getElementById('lsProgressBar').style.width = '0%';
-    document.getElementById('lsProgressPercent').textContent = '0%';
-    document.getElementById('lsProgressMessage').textContent = 'Generating lesson...';
-    document.getElementById('lsProgressText').textContent = 'Initializing...';
-
-    try{
-      const requestBody = {
-        workspace_id: Number(SELECTED_WORKSPACE.id),
-        topic,
-        age: Number(age),
-        model: lsModelSelect.value || undefined
-      };
-      
-      if (LESSON_MODE === 'prompt') {
-        requestBody.custom_prompt = customPrompt;
-        requestBody.subject = subject; // Include subject for formatting
-      } else {
-        requestBody.subject = subject;
-        requestBody.objectives = objectives;
-        requestBody.aspects = aspects;
-        requestBody.activities = activities;
-        requestBody.images = images;
-      }
-      
-      // Use streaming endpoint
-      const response = await fetch('/api/lessons/generate-stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      });
-      
-      if (!response.ok) {
-        // Try to get error message
-        let errorMsg = 'Failed to generate lesson';
-        try {
-          const errorText = await response.text();
-          try {
-            const errorData = JSON.parse(errorText);
-            errorMsg = errorData.error || errorMsg;
-          } catch {
-            errorMsg = errorText || errorMsg;
-          }
-        } catch {
-          errorMsg = `HTTP ${response.status}: ${response.statusText}`;
-        }
-        throw new Error(errorMsg);
-      }
-      
-      // Check if response is actually streaming (text/event-stream)
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('text/event-stream') && !contentType.includes('text/plain')) {
-        // Fallback: might be regular JSON response
-        try {
-          const data = await response.json();
-          if (data.error) {
-            throw new Error(data.error);
-          }
-          // If it's a regular response, handle it
-          if (data.lesson && data.lesson.content) {
-            output.textContent = data.lesson.content;
-            outputSection.classList.remove('w3-hide');
-            loading.classList.add('w3-hide');
-            return;
-          }
-        } catch (e) {
-          // Not JSON, continue with streaming
-        }
-      }
-      
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let lessonId = null;
-      let fullContent = '';
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              
-              if (data.type === 'progress') {
-                // Update progress
-                const percentage = data.percentage || 0;
-                document.getElementById('lsProgressBar').style.width = percentage + '%';
-                document.getElementById('lsProgressPercent').textContent = percentage + '%';
-                document.getElementById('lsProgressMessage').textContent = data.message || `Generating... ${percentage}%`;
-                document.getElementById('lsProgressText').textContent = data.message || `Generating... ${percentage}%`;
-                
-                // Append content as it streams
-                if (data.content) {
-                  fullContent += data.content;
-                  output.textContent = fullContent;
-                  output.scrollTop = output.scrollHeight; // Auto-scroll
-                }
-              } else if (data.type === 'complete') {
-                // Generation complete
-                document.getElementById('lsProgressBar').style.width = '100%';
-                document.getElementById('lsProgressPercent').textContent = '100%';
-                document.getElementById('lsProgressMessage').textContent = 'Complete!';
-                document.getElementById('lsProgressText').textContent = 'Lesson generation complete!';
-                
-                fullContent = data.content || fullContent;
-                output.textContent = fullContent;
-                lessonId = data.lesson_id;
-                outputSection.classList.remove('w3-hide');
-                loading.classList.add('w3-hide');
-                
-                // If include questions is checked, generate questions too
-                if (includeQuestions && lessonId) {
-                  await generateActivityQuestionsForLesson(topic, subject, Number(age), lessonId);
-                }
-                
-                // Reload workspace data
-                await loadWorkspaces();
-                if (SELECTED_WORKSPACE) {
-                  const ws = WORKSPACES_DATA.find(w => w.id == SELECTED_WORKSPACE.id);
-                  if (ws) {
-                    loadWorkspaceLessons(ws);
-                    loadWorkspaceActivityQuestions(ws);
-                    loadWorkspaceLessonsForSelect(ws);
-                  }
-                }
-              } else if (data.type === 'error') {
-                // Handle error - might have partial content
-                if (data.partial_content) {
-                  output.textContent = data.partial_content;
-                  outputSection.classList.remove('w3-hide');
-                  loading.classList.add('w3-hide');
-                  alert('Warning: ' + (data.message || 'Generation was interrupted. Partial content displayed.'));
-                  // Still reload workspace if lesson was saved
-                  if (data.lesson_id) {
-                    await loadWorkspaces();
-                    if (SELECTED_WORKSPACE) {
-                      const ws = WORKSPACES_DATA.find(w => w.id == SELECTED_WORKSPACE.id);
-                      if (ws) {
-                        loadWorkspaceLessons(ws);
-                        loadWorkspaceActivityQuestions(ws);
-                        loadWorkspaceLessonsForSelect(ws);
-                      }
-                    }
-                  }
-                } else {
-                  throw new Error(data.message || 'Generation error');
-                }
-              }
-            } catch (e) {
-              // If it's a JSON parse error on a line that doesn't start with 'data: ', skip it
-              if (line.trim() && !line.startsWith('data: ')) {
-                continue; // Skip non-SSE lines (empty lines, comments, etc.)
-              }
-              // If it's actually a parse error on a data line, log it but don't break
-              if (line.startsWith('data: ')) {
-                console.error('Error parsing SSE data:', e, 'Line:', line);
-                // Try to continue - might be malformed but not critical
-              }
-            }
-          }
-        }
-      }
-    }catch(err){
-      console.error(err);
-      alert('Error generating lesson: ' + (err?.message || 'unknown error'));
-      loading.classList.add('w3-hide');
-    } finally {
-      // Reset button state
-      generateBtn.disabled = false;
-      generateBtn.innerHTML = '<i class="fa fa-magic"></i> Generate Lesson';
-    }
-  }
-  window.generateLesson = generateLesson;
-
-  async function generateActivityQuestionsForLesson(topic, subject, age, lessonId) {
-    // Generate questions with age range based on lesson age
-    const ageRange = { min_age: Math.max(3, age - 2), max_age: Math.min(21, age + 2) };
-    
-    try {
-      const r = await fetch('/api/activity-questions/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workspace_id: Number(SELECTED_WORKSPACE.id),
-          lesson_id: lessonId,
-          topic: topic,
-          subject: subject || null,
-          age_range: ageRange,
-          grade_range: null,
-          ability_levels: [],
-          question_type: 'mixed',
-          num_questions: 5,
-          model: aqModelSelect.value || undefined
-        })
-      });
-      const data = await r.json();
-      if (!r.ok) {
-        console.error('Failed to generate activity questions:', data.error);
-        return;
-      }
-    } catch (err) {
-      console.error('Error generating activity questions:', err);
-    }
-  }
-
-  // Activity Questions Generator
-  async function generateActivityQuestions(){
-    if (!SELECTED_WORKSPACE) {
-      alert('Please select a workspace first.');
-      return;
-    }
-    
-    const topic = document.getElementById('aqTopic').value.trim();
-    const subject = document.getElementById('aqSubject').value.trim();
-    const lessonId = document.getElementById('aqLessonSelect').value;
-    const minAge = document.getElementById('aqMinAge').value;
-    const maxAge = document.getElementById('aqMaxAge').value;
-    const minGrade = document.getElementById('aqMinGrade').value;
-    const maxGrade = document.getElementById('aqMaxGrade').value;
-    const questionType = document.getElementById('aqQuestionType').value;
-    const numQuestions = parseInt(document.getElementById('aqNumQuestions').value) || 5;
-    
-    // Get ability levels
-    const abilityLevels = [];
-    if (document.getElementById('aqAbilityBeginner').checked) abilityLevels.push('beginner');
-    if (document.getElementById('aqAbilityIntermediate').checked) abilityLevels.push('intermediate');
-    if (document.getElementById('aqAbilityAdvanced').checked) abilityLevels.push('advanced');
-    
-    if (!topic) {
-      alert('Please provide a topic.');
-      return;
-    }
-    
-    // Validate ranges
-    if (minAge && maxAge && parseInt(minAge) > parseInt(maxAge)) {
-      alert('Minimum age must be less than or equal to maximum age.');
-      return;
-    }
-    if (minGrade && maxGrade && parseInt(minGrade) > parseInt(maxGrade)) {
-      alert('Minimum grade must be less than or equal to maximum grade.');
-      return;
-    }
-    
-    const ageRange = (minAge && maxAge) ? { min_age: parseInt(minAge), max_age: parseInt(maxAge) } : null;
-    const gradeRange = (minGrade && maxGrade) ? { min_grade: parseInt(minGrade), max_grade: parseInt(maxGrade) } : null;
-    
-    const generateBtn = document.getElementById('aqGenerateBtn');
-    const loading = document.getElementById('aqLoading');
-    const outputSection = document.getElementById('aqOutputSection');
-    const output = document.getElementById('aqOutput');
-    
-    // Show loading state
-    generateBtn.disabled = true;
-    generateBtn.innerHTML = '<i class="fa fa-spinner w3-spin"></i> Generating...';
-    loading.classList.remove('w3-hide');
-    outputSection.classList.add('w3-hide');
-    
-    try {
-      const r = await fetch('/api/activity-questions/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workspace_id: Number(SELECTED_WORKSPACE.id),
-          lesson_id: lessonId || null,
-          topic: topic,
-          subject: subject || null,
-          age_range: ageRange,
-          grade_range: gradeRange,
-          ability_levels: abilityLevels,
-          question_type: questionType,
-          num_questions: numQuestions,
-          model: aqModelSelect.value || undefined
-        })
-      });
-      
-      const data = await r.json();
-      if (!r.ok) {
-        throw new Error(data.error || 'Failed to generate activity questions');
-      }
-      
-      output.textContent = data.activity_question.content || '';
-      outputSection.classList.remove('w3-hide');
-      
-      // Reload workspace data
-      await loadWorkspaces();
-      if (SELECTED_WORKSPACE) {
-        const ws = WORKSPACES_DATA.find(w => w.id == SELECTED_WORKSPACE.id);
-        if (ws) {
-          loadWorkspaceActivityQuestions(ws);
-          loadWorkspaceLessonsForSelect(ws);
-        }
-      }
-    } catch (error) {
-      console.error('Error generating activity questions:', error);
-      alert('Error generating activity questions: ' + (error.message || 'Unknown error'));
-    } finally {
-      generateBtn.disabled = false;
-      generateBtn.innerHTML = '<i class="fa fa-magic"></i> Generate Questions';
-      loading.classList.add('w3-hide');
-    }
-  }
-  
-  // Lesson view modal
-  async function viewLesson(lessonId){
-    try{
-      const r = await fetch(`/api/lessons/${lessonId}`);
-      const data = await r.json();
-      if(!r.ok){ throw new Error(data.error || 'Failed'); }
-      document.getElementById('lessonModalTitle').textContent = `${data.topic} (Age ${data.age})`;
-      document.getElementById('lessonModalBody').textContent = data.content || '';
-      document.getElementById('lessonModal').style.display = 'block';
-    }catch(e){ alert('Error loading lesson: ' + (e.message||'')); }
-  }
-  window.viewLesson = viewLesson;
-
-  // Activity Question view modal
-  async function viewActivityQuestion(questionId){
-    try{
-      const r = await fetch(`/api/activity-questions/${questionId}`);
-      const data = await r.json();
-      if(!r.ok){ throw new Error(data.error || 'Failed'); }
-      document.getElementById('activityQuestionModalTitle').textContent = `${data.topic} (${data.question_type}, ${data.num_questions} questions)`;
-      document.getElementById('activityQuestionModalBody').textContent = data.content || '';
-      document.getElementById('activityQuestionModal').style.display = 'block';
-    }catch(e){ alert('Error loading activity questions: ' + (e.message||'')); }
-  }
-  window.viewActivityQuestion = viewActivityQuestion;
-
-  function copyLessonOutput(){
-    const output = document.getElementById('lsOutput');
-    const text = output.textContent;
-    
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text).then(() => {
-        const btn = event.target.closest('button');
-        const original = btn.innerHTML;
-        btn.innerHTML = '<i class="fa fa-check"></i> Copied!';
-        btn.classList.remove('w3-indigo');
-        btn.classList.add('w3-green');
-        setTimeout(() => {
-          btn.innerHTML = original;
-          btn.classList.remove('w3-green');
-          btn.classList.add('w3-indigo');
-        }, 2000);
-      }).catch(err => {
-        console.error('Failed to copy text: ', err);
-        fallbackCopyLesson(text);
-        });
-      } else {
-      fallbackCopyLesson(text);
-      }
-  }
-
-  function fallbackCopyLesson(text) {
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    try {
-      document.execCommand('copy');
-      alert('Lesson copied to clipboard!');
-    } catch (err) {
-      console.error('Fallback copy failed: ', err);
-      alert('Failed to copy. Please select the text manually.');
-    }
-    document.body.removeChild(textArea);
-  }
-  
-  function downloadLessonOutput() {
-    const output = document.getElementById('lsOutput');
-    const text = output.textContent;
-    const topic = LESSON_MODE === 'prompt' 
-      ? document.getElementById('lsPromptTopic').value.trim() 
-      : document.getElementById('lsTopic').value.trim();
-    const filename = topic ? `${topic.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_lesson.txt` : 'lesson.txt';
-    
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  }
-  
-  function copyActivityQuestions(){
-    const output = document.getElementById('aqOutput');
-    const text = output.textContent;
-    
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text).then(() => {
-        const btn = event.target.closest('button');
-        const original = btn.innerHTML;
-        btn.innerHTML = '<i class="fa fa-check"></i> Copied!';
-        btn.classList.remove('w3-indigo');
-        btn.classList.add('w3-green');
-        setTimeout(() => {
-          btn.innerHTML = original;
-          btn.classList.remove('w3-green');
-          btn.classList.add('w3-indigo');
-        }, 2000);
-      }).catch(err => {
-        console.error('Failed to copy text: ', err);
-        fallbackCopyActivityQuestions(text);
-      });
-    } else {
-      fallbackCopyActivityQuestions(text);
-    }
-  }
-  
-  function fallbackCopyActivityQuestions(text) {
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    try {
-      document.execCommand('copy');
-      alert('Activity questions copied to clipboard!');
-    } catch (err) {
-      console.error('Fallback copy failed: ', err);
-      alert('Failed to copy. Please select the text manually.');
-    }
-    document.body.removeChild(textArea);
-  }
-  
-  function downloadActivityQuestions() {
-    const output = document.getElementById('aqOutput');
-    const text = output.textContent;
-    const topic = document.getElementById('aqTopic').value.trim() || 'activity_questions';
-    
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = url;
-    a.download = `${topic.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_activity_questions.txt`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  }
-
-  function copyActivityQuestionModal() {
-    const text = document.getElementById('activityQuestionModalBody').textContent;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text).then(() => {
-        alert('Copied to clipboard!');
-      }).catch(err => {
-        console.error('Failed to copy:', err);
-        alert('Failed to copy. Please select the text manually.');
-      });
-    } else {
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      try {
-        document.execCommand('copy');
-        alert('Copied to clipboard!');
-      } catch (err) {
-        alert('Failed to copy. Please select the text manually.');
-      }
-      document.body.removeChild(textArea);
-    }
-  }
-
-  // Helpers
-  function splitLines(v){
-    return v.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-  }
-  function formatDate(d){
-    const date = (d instanceof Date) ? d : new Date(d);
-    return date.toLocaleString();
-  }
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"]+/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] || c));
+  const originalGenerateActivity = window.generateActivityQuestions;
+  window.generateActivityQuestions = async function () {
+    document.getElementById('welcomeState').classList.add('cd-hidden');
+    document.getElementById('aqOutputSection').classList.add('cd-hidden');
+    document.getElementById('aqLoading').classList.remove('cd-hidden');
+    await originalGenerateActivity.apply(this, arguments);
   }
 </script>
+<style>
+  /* Compatibility for JS toggling */
+  .w3-hide {
+    display: none !important;
+  }
+
+  .w3-show {
+    display: block !important;
+  }
+</style>
 {% endblock %}

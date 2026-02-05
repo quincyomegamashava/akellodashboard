@@ -1,417 +1,436 @@
 {% extends "base.html" %}
-<head>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
-<link rel="stylesheet" href="https://www.w3schools.com/lib/w3-theme-blue-grey.css">
-<link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Open+Sans'>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-
- <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+{% block head_extra %}
+<!-- Flatpickr CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
 
 <style>
-html, body, h1, h2, h3, h4, h5 {font-family: "Open Sans", sans-serif}
+  /* Glass Morphism Base Styles (Sync with Help Desk) */
+  body {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
+    min-height: 100vh;
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 1.5rem;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    transition: all 0.3s ease;
+  }
+
+  .glass-card:hover {
+    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.1);
+  }
+
+  .stat-card-accent {
+    border-top: 4px solid #6366f1;
+  }
+
+  .modern-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .modern-table thead th {
+    background: rgba(248, 250, 252, 0.8);
+    padding: 1rem;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid #f1f5f9;
+  }
+
+  .modern-table tbody td {
+    padding: 1rem;
+    color: #334155;
+    border-bottom: 1px solid #f1f5f9;
+    transition: all 0.2s;
+  }
+
+  .modern-table tbody tr:hover td {
+    background: rgba(99, 102, 241, 0.03);
+  }
+
+  .btn-modern {
+    padding: 0.625rem 1.25rem;
+    border-radius: 1rem;
+    font-weight: 600;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-modern-primary {
+    background: #6366f1;
+    color: white;
+  }
+
+  .btn-modern-primary:hover {
+    background: #4f46e5;
+    transform: translateY(-2px);
+  }
+
+  .glass-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .glass-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+  }
+
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+  }
 </style>
-</head>
+{% endblock %}
+
 {% block content %}
+
 <body data-school-id="{{ school_id }}" data-school-name="{{ school_name }}">
-<style>
-  /* Modern, responsive layout */
-  .profile-wrapper { max-width: 1200px; margin: 60px auto 40px; padding: 0 16px; }
-  .profile-grid { display: grid; grid-template-columns: 320px 1fr 320px; gap: 20px; }
-  .card { background: #fff; border-radius: 14px; box-shadow: 0 6px 18px rgba(10, 31, 68, 0.08); overflow: hidden; }
-  .card-header { padding: 16px 18px; border-bottom: 1px solid #eef2f7; background: linear-gradient(180deg, #f7faff 0%, #ffffff 100%); }
-  .card-body { padding: 18px; }
-  .soft { color: #6b7a90; }
-  .pill { display: inline-flex; align-items: center; gap: 8px; background: #edf4ff; color: #0b5ed7; border-radius: 999px; padding: 6px 12px; font-size: .85rem; font-weight: 600; }
-  .stat { display: grid; grid-template-columns: 56px 1fr; align-items: center; gap: 12px; padding: 14px; border-radius: 12px; background: #f9fbff; border: 1px solid #eef2f7; }
-  .stat .icon { width: 56px; height: 56px; border-radius: 12px; display: grid; place-items: center; color: #fff; }
-  .stat .value { font: 700 1.35rem/1.1 system-ui, -apple-system, Segoe UI, Roboto; color: #0b213f; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; background: #e9f7f7; color: #116a6a; border-radius: 999px; border: 1px solid #cdeaea; text-decoration: none; font-size: .85rem; transition: all .15s; }
-  .chip:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.05); }
-  .profile-avatar { width: 110px; height: 110px; border-radius: 50%; object-fit: cover; border: 4px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
-  .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
-  .kv .k { font: 600 .75rem/1 system-ui; text-transform: uppercase; letter-spacing: .04em; color: #77849a; }
-  .kv .v { font: 600 1rem/1.4 system-ui; color: #0f2547; background: #f9fbff; border: 1px solid #eef2f7; border-radius: 10px; padding: 8px 12px; }
 
-  /* Modern table styling */
-  #student-table { border-collapse: separate; border-spacing: 0; background: #fff; overflow: hidden; }
-  #student-table thead th, #student-table thead td { position: sticky; top: 0; z-index: 2; background: linear-gradient(180deg,#f7faff,#ffffff); font-weight: 600; text-transform: uppercase; font-size: 0.8rem; letter-spacing: .02em; border-bottom: 1px solid #e6ebf2; }
-  #student-table tbody tr:hover { background: #f9fbff; }
-  #student-table td, #student-table th { padding: 10px 12px !important; vertical-align: middle; }
-  #student-table tbody td { border-top: 1px solid #f0f3f8; }
+  <div class="max-w-[1400px] mx-auto p-4 md:p-8 space-y-8" data-school-id="{{ school_id }}"
+    data-school-name="{{ school_name }}">
 
-  .table-shell { border-radius: 14px; box-shadow: 0 6px 18px rgba(13, 38, 76, 0.06); background: #fff; }
-  .search-shell { max-width: 520px; margin: 6px auto 0; }
-  .search-shell .input-group-text { background: #f7f9fc; border-color: #e6ebf2; }
-  .search-shell input { border-color: #e6ebf2; }
-
-  .no-matches { text-align: center; color: #6b7a90; font-size: 0.9rem; }
-
-  @media (max-width: 1100px) { .profile-grid { grid-template-columns: 3200px 1fr; } .profile-right { order: 3; grid-column: 1 / -1; } }
-  @media (max-width: 780px) { .profile-grid { grid-template-columns: 1fr; } .profile-left, .profile-main, .profile-right { grid-column: 1 / -1; } .kv { grid-template-columns: 1fr; } .profile-avatar { width: 84px; height: 84px; } .profile-wrapper { max-width: 85vw; } }
-</style>
-
-<div class="profile-wrapper w3-small "  data-school-id="{{ school_id }}" data-school-name="{{ school_name }}">
-  <div class="profile-grid " style="width: 65vw;">
-
-    <!-- Left: Profile summary -->
-    <section class="profile-left card">
-      <div class="card-body" style="text-align:center">
-        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="currentColor" class="bi bi-mortarboard text-primary" viewBox="0 0 16 16">
-            <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917zM8 8.46 1.758 5.965 8 3.052l6.242 2.913z"/>
-            <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466zm-.068 1.873.22-.748 3.496 1.311a.5.5 0 0 0 .352 0l3.496-1.311.22.748L8 12.46z"/>
-        </svg>
-        <div style="margin-top:12px">
-          <span class="pill"><i class="fa fa-user"></i>{{ school_name }}</span>
-        </div>
-        <div class="soft" style="margin-top:10px"><i class="fa fa-map-marker soft"></i> {{ school_province }}</div>
-        <div class="soft" style="margin-top:6px"><i class="fa fa-clock-o soft"></i>
-            <p>
-                <span class="badge bg-primary bg-opacity-20 w3-text-white px-3 py-2 rounded-pill">
-                    <i class="fas fa-graduation-cap me-1"></i> School Profile
-                </span>
-            </p>
-        </div>
-      </div>
-<div id="school-profile" data-asl-school-id="{{ asl_school_id }}"></div>
-    </section>
-
-    <!-- Main: General information + Schools -->
-    <main class="profile-main card">
-      <header class="card-header"><strong>General Information</strong></header>
-      <div class="card-body">
-        <div class="kv">
-          <!-- First Name & Last Name -->
-            <div class="w3-col l6 m6 s12 w3-padding-small">
-            <label class="w3-opacity w3-small">School</label>
-            <div class="mt-2">
-                <span class="badge w3-light-gray bg-gradient px-3 py-2" style="font-size: 0.85rem; border-radius: 50px;">
-                <i class="fas fa-school me-2"></i>{{ school_name }}
-                </span>
-            </div>
-            </div>
-            <div class="w3-col l6 m6 s12 w3-padding-small">
-            <label class="w3-opacity w3-small">Provincee</label>
-            <div class="mt-2">
-                <span class="badge w3-light-gray bg-gradient px-3 py-2" style="font-size: 0.85rem; border-radius: 50px;">
-                <i class="fas fa-map-marker-alt me-1"></i>{{ school_province }}
-                </span>
-            </div>
-            </div>
-        </div>
+    <!-- Hero Header section -->
+    <div class="glass-card p-6 md:p-8 relative overflow-hidden">
+      <div class="absolute top-0 right-0 p-8 opacity-5">
+        <i class="fa fa-university text-9xl"></i>
       </div>
 
-      <!-- <header class="card-header"><strong>Schools</strong></header> -->
-      <div class="card-body">
-        <div class="w3-center w3-border w3-border-light-gray w3-round w3-padding w3-container">
-            <div id="grade-counts"></div>
-        </div>
-      </div>
-
-      <!-- <div class="w3-col l3 m6 s12 w3-padding-small">
-          <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border">
-            <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Ask Akello</b></div>
-<div class="w3-container w3-padding-small"><div class="value" id="mon-ask">—</div><div id="grade-counts" class="w3-text-gray w3-tiny">Ask metric</div></div>
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+        <div class="flex items-center gap-6">
+          <div
+            class="w-20 h-20 bg-indigo-100 rounded-3xl flex items-center justify-center text-indigo-600 shadow-inner">
+            <i class="fa fa-graduation-cap text-3xl"></i>
           </div>
-      </div> -->
+          <div>
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+              <span
+                class="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-bold uppercase tracking-wider rounded-full border border-indigo-100">
+                School Profile
+              </span>
+              <span
+                class="px-3 py-1 bg-emerald-50 text-emerald-600 text-xs font-bold uppercase tracking-wider rounded-full border border-emerald-100">
+                <i class="fa fa-map-marker mr-1"></i> {{ school_province }}
+              </span>
+            </div>
+            <h1 class="text-3xl font-black text-gray-800 leading-tight">
+              {{ school_name }}
+            </h1>
+          </div>
+        </div>
 
-      <div class="table-responsive table-shell w3-padding" style="height: 60vh; overflow-y: auto;">
-    <table class="table w3-small table-hover" id="student-table">
-        <thead>
-          <tr>
-            <td colspan="5">
-              <div class="w3-center mb-1 search-shell">
-    <!-- Search input -->
-    <div class="input-group input-group-sm">
-        <span class="input-group-text bg-light border-end-0">
-            <i class="fa fa-search text-muted"></i>
-        </span>
-        <input type="text" 
-               id="userSearchInput" 
-               placeholder="Search students by any field…" 
-               class="form-control border-start-0" />
+        <div class="flex items-center gap-3">
+          <button onclick="window.location.href='/all-champion-details'"
+            class="btn-modern bg-white text-gray-600 border border-gray-200 hover:bg-gray-50">
+            <i class="fa fa-arrow-left"></i> Back to Tracking
+          </button>
+        </div>
+      </div>
     </div>
-</div>
-<br>
-            </td>
-          </tr>
-            <tr id="student-table-header" class="table-light"></tr>
-        </thead>
-        <tbody id="student-table-body">
-          <tr id="noMatchesRow" class="no-matches" style="display:none"><td colspan="5">No matching records</td></tr>
-        </tbody>
-    </table>
-</div>
 
-    </main>
+    <!-- Hidden Hook for JS -->
+    <div id="school-profile" data-asl-school-id="{{ asl_school_id }}" class="hidden"></div>
 
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
 
-    <!-- Right: Key stats -->
-    <aside class="profile-right">
-      <!-- Date Range Filter -->
-      <div class="card" style="margin-bottom: 20px">
-        <header class="card-header"><strong>Date Range Filter</strong></header>
-        <div class="card-body">
-          <form id="date-filter-form" style="display: grid; gap: 10px">
-            <div>
-              <label for="start-date" style="display: block; font-size: 0.85rem; color: #6b7a90; margin-bottom: 4px;">Start Date</label>
-              <input type="date" id="start-date" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #eef2f7; border-radius: 8px;" />
+      <!-- Left sidebar: Controls & Context -->
+      <div class="lg:col-span-1 space-y-6">
+
+        <!-- Filter Card -->
+        <div class="glass-card p-6">
+          <h5 class="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <i class="fa fa-calendar text-indigo-500"></i> Date Range
+          </h5>
+          <form id="date-filter-form" class="space-y-4">
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider">Start Date</label>
+              <div class="relative">
+                <input type="text" id="start-date"
+                  class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm">
+                <i class="fa fa-calendar absolute right-4 top-3 text-gray-300"></i>
+              </div>
             </div>
-            <div>
-              <label for="end-date" style="display: block; font-size: 0.85rem; color: #6b7a90; margin-bottom: 4px;">End Date</label>
-              <input type="date" id="end-date" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #eef2f7; border-radius: 8px;" />
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider">End Date</label>
+              <div class="relative">
+                <input type="text" id="end-date"
+                  class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm">
+                <i class="fa fa-calendar absolute right-4 top-3 text-gray-300"></i>
+              </div>
             </div>
-            <button type="submit" class="w3-button w3-blue" style="border-radius: 8px; padding: 10px;">Apply Filter</button>
-            <button type="button" id="reset-filter" class="w3-button w3-light-grey" style="border-radius: 8px; padding: 10px;">Reset to MTD</button>
+            <div class="pt-2 flex flex-col gap-2">
+              <button type="submit" class="btn-modern btn-modern-primary w-full justify-center text-sm py-2.5">
+                Apply Filter
+              </button>
+              <button type="button" id="reset-filter"
+                class="w-full text-xs font-bold text-gray-500 hover:text-indigo-600 transition-colors py-2">
+                Reset to MTD
+              </button>
+            </div>
           </form>
         </div>
-      </div>
 
-      <div class="card" style="margin-bottom:20px">
-        <header class="card-header"><strong>Quick Stats</strong></header>
-        <div class="card-body" style="display:grid; gap:12px">
-
-          <div class="stat">
-            <div class="icon" style="background:#6f42c1"><i class="fa fa-school"></i></div>
-            <div>
-              <div class="soft" style="font-size:.8rem">Ask Akello</div>
-              <div class="value" id="chatlog-count">0</div>
-            </div>
+        <!-- Grade Distribution Pre-render -->
+        <div class="glass-card p-6">
+          <h5 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="fa fa-tags text-indigo-500"></i> Grade Summary
+          </h5>
+          <div id="grade-counts" class="grid grid-cols-2 gap-3">
+            <!-- Dynamically populated -->
           </div>
-          <script>
-            async function loadChatlogData(startDate = null, endDate = null) {
-              // Grab school ID from the body tag
-              const schoolEl = document.querySelector("#school-profile");
-              const schoolId = schoolEl?.dataset.aslSchoolId;
-
-              if (!schoolId) {
-                document.getElementById('chatlog-count').innerText = "No school ID found.";
-                return;
-              }
-
-              try {
-                let url = `/api/ask-akello-chosen-school/${schoolId}`;
-                if (startDate && endDate) {
-                  url += `?start_date=${startDate}&end_date=${endDate}`;
-                }
-                const res = await fetch(url);
-                const data = await res.json();
-
-                if (res.ok) {
-                  document.getElementById('chatlog-count').innerText =
-                    `${data.chatlog_count}`;
-                } else {
-                  document.getElementById('chatlog-count').innerText =
-                    `Error: ${data.error || 'Failed to load data.'}`;
-                }
-              } catch (err) {
-                document.getElementById('chatlog-count').innerText =
-                  `Error fetching data: ${err.message}`;
-              }
-            }
-          </script>
-
-
-          <div class="stat">
-            <div class="icon" style="background:#0d6efd"><i class="fa fa-laptop"></i></div>
-            <div>
-              <div class="soft" style="font-size:.8rem">ASL MTD</div>
-              <div id="total-count" class="value">0</div>
-            </div>
-          </div>
-
-          <div class="stat">
-            <div class="icon" style="background:#14a199"><i class="fa fa-book"></i></div>
-            <div>
-              <div class="soft" style="font-size:.8rem">AL MTD</div>
-              <div class="value"  id="active-users">0</div>
-            </div>
-          </div>
-
         </div>
       </div>
-    </aside>
 
+      <!-- Center & Right: Stats and Table -->
+      <div class="lg:col-span-3 space-y-8">
 
+        <!-- Quick Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="glass-card p-6 border-t-4 border-purple-500">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600">
+                <i class="fa fa-comments text-xl"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-gray-400 uppercase tracking-wider">Ask Akello</div>
+                <div class="text-2xl font-black text-gray-800" id="chatlog-count">0</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="glass-card p-6 border-t-4 border-indigo-500">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
+                <i class="fa fa-laptop text-xl"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-gray-400 uppercase tracking-wider">ASL Usage</div>
+                <div class="text-2xl font-black text-gray-800" id="total-count">0</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="glass-card p-6 border-t-4 border-emerald-500">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
+                <i class="fa fa-book text-xl"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-gray-400 uppercase tracking-wider">AL Usage</div>
+                <div class="text-2xl font-black text-gray-800" id="active-users">0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Student Table Card -->
+        <div class="glass-card overflow-hidden">
+          <div class="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <h5 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <i class="fa fa-users text-indigo-500"></i> Student Profiles
+            </h5>
+
+            <div class="relative w-full md:w-80">
+              <i class="fa fa-search absolute left-4 top-3 text-gray-300"></i>
+              <input type="text" id="userSearchInput" placeholder="Search students..."
+                class="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm">
+            </div>
+          </div>
+
+          <div class="overflow-x-auto max-h-[600px] glass-scroll">
+            <table class="modern-table" id="student-table">
+              <thead class="sticky top-0 z-10 shadow-sm">
+                <tr id="student-table-header">
+                  <!-- JS Generates this -->
+                </tr>
+              </thead>
+              <tbody id="student-table-body">
+                <tr id="noMatchesRow" class="hidden">
+                  <td colspan="10" class="py-20 text-center">
+                    <div class="flex flex-col items-center gap-2 text-gray-400 italic">
+                      <i class="fa fa-search-minus text-3xl opacity-20"></i>
+                      No matching student records found
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
   </div>
-</div>
 
-<script src="{{ url_for('static', filename='smartlearning-school-profile.js') }}"></script>
-<script>
-// Debounce utility
-function debounce(fn, wait){
-  let t; return function(...args){ clearTimeout(t); t=setTimeout(()=>fn.apply(this,args), wait); };
-}
+  {% endblock %}
 
-// Client-side table filter by text across all cells
-function filterUsersImmediate(){
-  const input = document.getElementById('userSearchInput');
-  const term = (input?.value || '').trim().toLowerCase();
-  const tbody = document.getElementById('student-table-body');
-  if (!tbody) return;
-  const rows = Array.from(tbody.querySelectorAll('tr'));
-  let matchCount = 0;
+  {% block scripts %}
+  <!-- Flatpickr JS -->
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-  rows.forEach(row => {
-    if (row.id === 'noMatchesRow') return; // skip special row
-    const text = row.textContent.trim().toLowerCase();
-    const match = term === '' ? true : text.includes(term);
-    row.style.display = match ? '' : 'none';
-    if (match) matchCount++;
-  });
+  <!-- External Page Logic -->
+  <script src="{{ url_for('static', filename='smartlearning-school-profile.js') }}"></script>
 
-  const noRow = document.getElementById('noMatchesRow');
-  if (noRow){
-    noRow.style.display = matchCount === 0 ? '' : 'none';
-  }
-}
+  <script>
+    // --- Chatlog Stats Loader ---
+    async function loadChatlogData(startDate = null, endDate = null) {
+      const schoolEl = document.querySelector("#school-profile");
+      const schoolId = schoolEl?.dataset.aslSchoolId;
 
-const filterUsers = debounce(filterUsersImmediate, 200);
+      if (!schoolId) {
+        document.getElementById('chatlog-count').innerText = "-";
+        return;
+      }
 
-// Wire up input listener
-document.addEventListener('DOMContentLoaded', () => {
-  const input = document.getElementById('userSearchInput');
-  if (input){
-    input.addEventListener('input', filterUsers);
-  }
-});
-</script>
+      try {
+        let url = `/api/ask-akello-chosen-school/${schoolId}`;
+        if (startDate && endDate) {
+          url += `?start_date=${startDate}&end_date=${endDate}`;
+        }
+        const res = await fetch(url);
+        const data = await res.json();
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-
-
-
-
-<script>
-async function loadLibraryProfile(startDate = null, endDate = null) {
-  try {
-    // --- Get asl_school_id from the page ---
-    const schoolEl = document.querySelector("#school-profile");
-    const aslSchoolId = schoolEl?.dataset.aslSchoolId;
-
-    if (!aslSchoolId) {
-      console.error("asl_school_id not found on page");
-      return;
-    }
-
-    // --- Call the API with optional date range ---
-    let url = `/api/library/school_profile?asl_school_id=${encodeURIComponent(aslSchoolId)}`;
-    if (startDate && endDate) {
-      url += `&start_date=${startDate}&end_date=${endDate}`;
-    }
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("API error:", data.error || data.message || data);
-      return;
-    }
-
-    // --- Display total active users ---
-    const totalEl = document.querySelector("#active-users");
-    totalEl.textContent = `${data.total_active_users}`;
-
-    // --- Display per-school breakdown ---
-    const breakdownEl = document.querySelector("#school-breakdown");
-    if (breakdownEl) {
-      breakdownEl.innerHTML = ""; // clear old data
-
-      if (data.schools && data.schools.length > 0) {
-        const list = document.createElement("ul");
-        data.schools.forEach(school => {
-          const li = document.createElement("li");
-          li.textContent = `${school.institution_name}: ${school.active_users} active users`;
-          list.appendChild(li);
-        });
-        breakdownEl.appendChild(list);
-      } else {
-        breakdownEl.textContent = "No schools with activity found.";
+        if (res.ok) {
+          document.getElementById('chatlog-count').innerText = `${data.chatlog_count}`;
+        } else {
+          document.getElementById('chatlog-count').innerText = "Err";
+        }
+      } catch (err) {
+        console.error("Chatlog fetch error:", err);
+        document.getElementById('chatlog-count').innerText = "Err";
       }
     }
 
-  } catch (err) {
-    console.error("Error fetching school profile:", err);
-  }
-}
-</script>
+    // --- Library Profile Loader ---
+    async function loadLibraryProfile(startDate = null, endDate = null) {
+      try {
+        const schoolEl = document.querySelector("#school-profile");
+        const aslSchoolId = schoolEl?.dataset.aslSchoolId;
 
-<script>
-// Date filter coordination script
-(function() {
-  // Helper to get default MTD dates
-  function getDefaultDates() {
-    const today = new Date();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    return {
-      startDate: startOfMonth.toISOString().split('T')[0],
-      endDate: today.toISOString().split('T')[0]
-    };
-  }
+        if (!aslSchoolId) return;
 
-  // Function to load all data with date range
-  async function loadAllData(startDate = null, endDate = null) {
-    // Load Ask Akello data
-    if (typeof loadChatlogData === 'function') {
-      await loadChatlogData(startDate, endDate);
-    }
-
-    // Load Library profile data
-    if (typeof loadLibraryProfile === 'function') {
-      await loadLibraryProfile(startDate, endDate);
-    }
-
-    // Load Smartlearning data
-    if (typeof window.loadSmartlearningData === 'function') {
-      await window.loadSmartlearningData(startDate, endDate);
-    }
-  }
-
-  // Initialize on page load
-  document.addEventListener('DOMContentLoaded', function() {
-    const startInput = document.getElementById('start-date');
-    const endInput = document.getElementById('end-date');
-    const filterForm = document.getElementById('date-filter-form');
-    const resetBtn = document.getElementById('reset-filter');
-
-    // Set default MTD dates
-    const { startDate, endDate } = getDefaultDates();
-    if (startInput && endInput) {
-      startInput.value = startDate;
-      endInput.value = endDate;
-    }
-
-    // Load initial data
-    loadAllData();
-
-    // Handle form submission
-    if (filterForm) {
-      filterForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const start = startInput.value;
-        const end = endInput.value;
-        if (start && end) {
-          loadAllData(start, end);
+        let url = `/api/library/school_profile?asl_school_id=${encodeURIComponent(aslSchoolId)}`;
+        if (startDate && endDate) {
+          url += `&start_date=${startDate}&end_date=${endDate}`;
         }
-      });
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (response.ok) {
+          const totalEl = document.querySelector("#active-users");
+          if (totalEl) totalEl.textContent = `${data.total_active_users}`;
+        }
+      } catch (err) {
+        console.error("Error fetching library profile:", err);
+      }
     }
 
-    // Handle reset button
-    if (resetBtn) {
-      resetBtn.addEventListener('click', function() {
-        const { startDate, endDate } = getDefaultDates();
-        startInput.value = startDate;
-        endInput.value = endDate;
-        loadAllData();
+    // --- Form & Table Logic ---
+    document.addEventListener('DOMContentLoaded', function () {
+
+      // 1. Initialize Flatpickr
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+      const formatDate = (d) => d.toISOString().split('T')[0];
+
+      const fpConfig = {
+        dateFormat: "Y-m-d",
+        allowInput: false,
+        disable: [
+          {
+            from: "2025-12-04",
+            to: "2026-01-12"
+          }
+        ]
+      };
+
+      const startPicker = flatpickr("#start-date", {
+        ...fpConfig,
+        defaultDate: startOfMonth
       });
-    }
-  });
-})();
-</script>
-</body>
-{% endblock %}
+
+      const endPicker = flatpickr("#end-date", {
+        ...fpConfig,
+        defaultDate: today
+      });
+
+      // 2. Data Loader
+      async function loadAllData(start, end) {
+        if (typeof loadChatlogData === 'function') await loadChatlogData(start, end);
+        if (typeof loadLibraryProfile === 'function') await loadLibraryProfile(start, end);
+        if (typeof window.loadSmartlearningData === 'function') await window.loadSmartlearningData(start, end);
+      }
+
+      // Initial Load
+      loadAllData(formatDate(startOfMonth), formatDate(today));
+
+      // 3. Filter Event
+      const filterForm = document.getElementById('date-filter-form');
+      if (filterForm) {
+        filterForm.addEventListener('submit', function (e) {
+          e.preventDefault();
+          const start = document.getElementById('start-date').value;
+          const end = document.getElementById('end-date').value;
+          if (start && end) {
+            loadAllData(start, end);
+          }
+        });
+      }
+
+      // 4. Reset Event
+      const resetBtn = document.getElementById('reset-filter');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', function () {
+          startPicker.setDate(startOfMonth);
+          endPicker.setDate(today);
+          loadAllData(formatDate(startOfMonth), formatDate(today));
+        });
+      }
+
+      // 5. Table Search (Debounced)
+      const searchInput = document.getElementById('userSearchInput');
+      if (searchInput) {
+        let timeout = null;
+        searchInput.addEventListener('input', function () {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => {
+            const term = this.value.toLowerCase().trim();
+            const tbody = document.getElementById('student-table-body');
+            const rows = Array.from(tbody.querySelectorAll('tr:not(#noMatchesRow)'));
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+              const text = row.textContent.toLowerCase();
+              const match = text.includes(term);
+              row.style.display = match ? '' : 'none';
+              if (match) visibleCount++;
+            });
+
+            const noRow = document.getElementById('noMatchesRow');
+            if (noRow) {
+              if (visibleCount === 0) {
+                noRow.classList.remove('hidden');
+              } else {
+                noRow.classList.add('hidden');
+              }
+            }
+          }, 200);
+        });
+      }
+    });
+  </script>
+  {% endblock %}
