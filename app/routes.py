@@ -19745,34 +19745,34 @@ def all_champions_school_tracker():
         app.logger.info(f"DEBUG: Found {len(champion_schools)} ChampionSchool records")
         
         # 2. Extract unique school_ids and map to champion info
-        school_id_map = {} # school_id -> list of {champion, username, province}
+        school_id_map = {} # school_id -> list of {champion, province, fallback_name}
         unique_school_ids = set()
         
         for cs in champion_schools:
-            # ChampionSchool stores schools in a JSON text field
-            schools_list = cs.get_schools() # Returns list of dicts with asl_school_id, etc.
-            # app.logger.info(f"DEBUG: Champion {cs.firstname} has schools: {schools_list}")
+            current_schools_list = cs.get_schools() or []
+            current_champion_name = f"{cs.firstname} {cs.lastname}"
             
-            champion_name = f"{cs.firstname} {cs.lastname}"
-            
-            for school in schools_list:
-                # Some entries might use 'id' or 'asl_school_id', check structure based on model
-                # Model says: "asl_school_id", "library_school_id", "school_name"
-                s_id = school.get('asl_school_id')
+            for school_entry in current_schools_list:
+                raw_sid = school_entry.get('asl_school_id')
+                raw_sname = school_entry.get('school_name', 'Unknown School')
                 
-                if s_id:
+                if raw_sid:
                     try:
-                        s_id_int = int(s_id)
-                        unique_school_ids.add(s_id_int)
-                        if s_id_int not in school_id_map:
-                            school_id_map[s_id_int] = []
+                        sid_val = int(raw_sid)
+                        if sid_val == 0:
+                            continue
+                            
+                        unique_school_ids.add(sid_val)
+                        if sid_val not in school_id_map:
+                            school_id_map[sid_val] = []
                         
-                        school_id_map[s_id_int].append({
-                            'champion': champion_name,
+                        school_id_map[sid_val].append({
+                            'champion': current_champion_name,
                             'province': cs.province,
+                            'fallback_name': raw_sname
                         })
-                    except ValueError:
-                         app.logger.warning(f"DEBUG: Invalid school ID found: {s_id}")
+                    except (ValueError, TypeError):
+                         app.logger.warning(f"DEBUG: Invalid school ID found: {raw_sid}")
 
         app.logger.info(f"DEBUG: Extracted {len(unique_school_ids)} unique school IDs")
         if not unique_school_ids:
@@ -19818,11 +19818,11 @@ def all_champions_school_tracker():
             for row in since_2025_rows:
                 today_date = date.today()
                 if isinstance(row, dict):
-                    sid = row['school_id']
+                    q_sid = row['school_id']
                     fa = row['first_awarded_at']
                     total_m = row['total_months'] or 0
                 else:
-                    sid = row[0]
+                    q_sid = row[0]
                     total_m = row[1] or 0
                     fa = row[2]
                 
@@ -19832,19 +19832,19 @@ def all_champions_school_tracker():
                     if isinstance(fa_dt, date) and fa_dt <= today_date - timedelta(days=365):
                         is_over_12 = True
 
-                since_2025_map[sid] = {
+                since_2025_map[q_sid] = {
                     "total_months": total_m,
                     "first_awarded_at": fa,
                     "is_over_12_months": is_over_12
                 }
             
             # Fetch active subscriptions for expired checks
-            today = datetime.now().date()
-            first_day_of_month = today.replace(day=1)
-            if today.month == 12:
-                first_day_next_month = today.replace(year=today.year + 1, month=1, day=1)
+            today_now = datetime.now().date()
+            first_day_of_month = today_now.replace(day=1)
+            if today_now.month == 12:
+                first_day_next_month = today_now.replace(year=today_now.year + 1, month=1, day=1)
             else:
-                first_day_next_month = today.replace(month=today.month + 1, day=1)
+                first_day_next_month = today_now.replace(month=today_now.month + 1, day=1)
 
             sub_query = f"""
                 SELECT s.school_id, COUNT(DISTINCT p.student_id) as active_count
@@ -19871,11 +19871,11 @@ def all_champions_school_tracker():
             scholarship_map = {}
             for row in scholarship_rows:
                 if isinstance(row, dict):
-                    sid = row['school_id']
-                    scholarship_map[sid] = row
+                    q_sid = row['school_id']
+                    scholarship_map[q_sid] = row
                 else:
-                    sid = row[0]
-                    scholarship_map[sid] = {
+                    q_sid = row[0]
+                    scholarship_map[q_sid] = {
                         'school_name': row[1],
                         'scholarship_type': row[2],
                         'expiry_date': row[3],
@@ -19884,71 +19884,76 @@ def all_champions_school_tracker():
                     }
 
             # Process all unique school IDs from ChampionSchool
-            for sid in chunk:
-                champ_infos = school_id_map.get(sid, [])
-                s_data = scholarship_map.get(sid)
+            for current_sid in chunk:
+                champ_infos = school_id_map.get(current_sid, [])
+                s_data = scholarship_map.get(current_sid)
                 
                 if s_data:
-                    sname = s_data['school_name']
-                    stype = s_data['scholarship_type']
-                    sexpiry = s_data['expiry_date']
-                    sactive = s_data['active']
+                    current_sname = s_data['school_name']
+                    current_stype = s_data['scholarship_type']
+                    current_sexpiry = s_data['expiry_date']
+                    current_sactive = s_data['active']
                     
                     # Normalize Expiry
-                    if sexpiry:
-                        if isinstance(sexpiry, str):
+                    if current_sexpiry:
+                        if isinstance(current_sexpiry, str):
                             try:
-                                sexpiry = datetime.strptime(sexpiry, "%Y-%m-%d").date()
+                                current_sexpiry = datetime.strptime(current_sexpiry, "%Y-%m-%d").date()
                             except:
                                 try:
-                                    sexpiry = datetime.strptime(sexpiry, "%Y-%m-%d %H:%M:%S").date()
+                                    current_sexpiry = datetime.strptime(current_sexpiry, "%Y-%m-%d %H:%M:%S").date()
                                 except:
                                     pass
-                        elif hasattr(sexpiry, 'date'):
-                            sexpiry = sexpiry.date()
+                        elif hasattr(current_sexpiry, 'date'):
+                            current_sexpiry = current_sexpiry.date()
                     
-                    is_expired = False
-                    if sexpiry and isinstance(sexpiry, date):
-                         if sexpiry < today:
-                             is_expired = True
+                    current_is_expired = False
+                    if current_sexpiry and isinstance(current_sexpiry, date):
+                         if current_sexpiry < today_now:
+                             current_is_expired = True
                     
-                    normalized_active = normalize_active_flag(sactive)
+                    normalized_active = normalize_active_flag(current_sactive)
                     
                     # Determine Status
-                    status = "Inactive"
+                    current_status = "Inactive"
                     if normalized_active:
-                        if is_expired:
-                             status = "Expired"
+                        if current_is_expired:
+                             current_status = "Expired"
                         else:
-                             status = "Active"
+                             current_status = "Active"
                     
-                    active_subs = sub_map.get(sid, 0)
-                    over_12 = since_2025_map.get(sid, {}).get("is_over_12_months", False)
-                    first_awarded = since_2025_map.get(sid, {}).get("first_awarded_at", "N/A")
-                    total_m = since_2025_map.get(sid, {}).get("total_months", 0)
+                    current_active_subs = sub_map.get(current_sid, 0)
+                    current_over_12 = since_2025_map.get(current_sid, {}).get("is_over_12_months", False)
+                    current_first_awarded = since_2025_map.get(current_sid, {}).get("first_awarded_at", "N/A")
+                    current_total_m = since_2025_map.get(current_sid, {}).get("total_months", 0)
                 else:
                     # Not in scholarship table
-                    sname = "Unknown School"
-                    stype = "N/A"
-                    sexpiry = None
-                    status = "Never Assigned"
-                    active_subs = 0
-                    over_12 = False
-                    first_awarded = "N/A"
-                    total_m = 0
+                    # Use fallback name from the first champ info if available
+                    fallback_name_found = "Unknown School"
+                    if champ_infos:
+                        fallback_name_found = champ_infos[0].get('fallback_name', "Unknown School")
+                        
+                    current_sname = fallback_name_found
+                    current_stype = "N/A"
+                    current_sexpiry = None
+                    current_status = "Never Assigned"
+                    current_active_subs = 0
+                    current_over_12 = False
+                    current_first_awarded = "N/A"
+                    current_total_m = 0
 
                 for info in champ_infos:
                     results.append({
                         "champion": info['champion'],
                         "province": info['province'],
-                        "school_name": sname,
-                        "status": status,
-                        "expiry_date": sexpiry.isoformat() if sexpiry else None,
-                        "first_awarded_at": first_awarded,
-                        "is_over_12_months": over_12,
-                        "scholarship_type": stype,
-                        "active_subscriptions": active_subs,
-                        "duration": total_m
+                        "school_name": current_sname,
+                        "status": current_status,
+                        "expiry_date": current_sexpiry.isoformat() if current_sexpiry else None,
+                        "first_awarded_at": current_first_awarded,
+                        "is_over_12_months": current_over_12,
+                        "scholarship_type": current_stype,
+                        "active_subscriptions": current_active_subs,
+                        "duration": current_total_m
                     })
 
         return jsonify(results), 200
