@@ -16,1702 +16,1908 @@
 {% block content %}
 <div class="container-fluid px-3 px-md-4">
   <style>
-    /* Ensure Bootstrap modals sit above any W3 overlays/sidebars */
-    .modal {
-      z-index: 2000 !important;
-    }
-
-    .modal-backdrop {
-      z-index: 1999 !important;
-    }
-
-    /* Admin theme tweaks */
     :root {
-      --akello-primary: #00407d;
-      --akello-soft: #e6f0ff;
+      --admin-primary: #4f46e5;
+      --admin-secondary: #0ea5e9;
+      --admin-bg: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
     }
 
-    .admin-chip {
-      display: inline-block;
-      padding: 4px 10px;
-      font-size: 12px;
-      border-radius: 999px;
-      background: var(--akello-soft);
-      color: var(--akello-primary);
-      border: 1px solid rgba(0, 64, 125, 0.15);
+    body {
+      background-color: var(--admin-bg);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text-main);
     }
 
-    .admin-action i {
-      color: var(--akello-primary);
-    }
-
-    .admin-action {
-      border-radius: 999px !important;
-      padding: 4px 10px !important;
-    }
-
-    .card {
+    .minimal-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
       border-radius: 16px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      transition: all 0.2s ease;
     }
 
-    .card-title {
+    .minimal-card:hover {
+      border-color: #cbd5e1;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .page-header {
+      padding: 32px 0;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 40px;
+    }
+
+    .kpi-icon-minimal {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
       display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .table-minimal {
+      border-collapse: separate;
+      border-spacing: 0;
+      width: 100%;
+    }
+
+    .table-minimal th {
+      background: #f1f5f9;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.65rem;
+      letter-spacing: 0.05em;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .table-minimal td {
+      padding: 16px;
+      border-bottom: 1px solid var(--card-border);
+      background: white;
+    }
+
+    .table-minimal tr:hover td {
+      background: #f8fafc;
+    }
+
+    .table-minimal tr:last-child td:first-child {
+      border-bottom-left-radius: 12px;
+    }
+
+    .table-minimal tr:last-child td:last-child {
+      border-bottom-right-radius: 12px;
+    }
+
+    .modal-minimal .w3-modal-content {
+      border-radius: 16px;
+      border: 1px solid var(--card-border);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+      overflow: hidden;
+    }
+
+    .search-input-minimal {
+      background: white;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 8px 12px 8px 36px;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+
+    .search-input-minimal:focus {
+      outline: none;
+      border-color: var(--admin-primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    .btn-minimal {
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      padding: 8px 16px;
+      transition: all 0.2s;
+      display: inline-flex;
       align-items: center;
       gap: 8px;
     }
 
-    .card-title .fa {
-      color: var(--akello-primary);
+    .btn-minimal:active {
+      transform: translateY(1px);
     }
 
-    .table thead th {
-      position: sticky;
-      top: 0;
-      background: #fff;
-      z-index: 1;
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
     }
 
-    .table tbody tr:hover {
-      background-color: #f9fbff;
+    ::-webkit-scrollbar-track {
+      background: transparent;
     }
 
-    /* W3 modal adjustments */
-    #download .w3-modal-content {
-      border-radius: 16px;
-      overflow: hidden;
+    ::-webkit-scrollbar-thumb {
+      background: #e2e8f0;
+      border-radius: 4px;
     }
 
-    #download header {
-      border-bottom: 1px solid #dde6f2;
-    }
-
-    #download footer {
-      border-top: 1px solid #f0f3f8;
+    ::-webkit-scrollbar-thumb:hover {
+      background: #cbd5e1;
     }
   </style>
   <!-- Header -->
-  <section>
-    <div class="d-flex flex-column flex-md-row align-items-md-center gap-3 justify-content-between">
-      <div class=" w3-white p-3 p-md-4 mb-4">
-        <!-- <h3 class="mb-1" style="color:#00407d;">Administration</h3> -->
-        <p class="text-muted w3-margin-left mb-0"
-          style="border-radius: 16px; background: linear-gradient(135deg, #f0f6ff 0%, #ffffff 100%);">Manage users,
-          privileges, and bulk registrations. Admin-only area.</p>
+  <header class="page-header px-4 lg:px-8">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 overflow-hidden">
+      <div>
+        <h1 class="text-3xl font-black text-slate-800 tracking-tight mb-2">Administration Control</h1>
+        <p class="text-slate-500 font-medium">Manage users, school mappings, and data synchronization.</p>
       </div>
-      <!-- <div class="text-nowrap">
-        <a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-sm" style="border-color:#00407d; color:#00407d; border-radius:10px;">Open Settings</a>
-      </div> -->
+      <div class="flex items-center gap-4">
+        <a href="{{ url_for('settings') }}"
+          class="btn-minimal bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
+          <i class="fas fa-cog"></i> Settings
+        </a>
+      </div>
     </div>
-  </section>
+  </header>
 
   <div class="row g-3 g-md-4">
 
-    <!-- Users & Privileges -->
-    <div class="w3-col l3 m6 s12 w3-padding-small">
-      <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border"
-        onclick="document.getElementById('usersModal').style.display='block'">
-        <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Users ({{ users|length
-            }})</b></div>
-        <div class="w3-container w3-padding-small">
-          <div class="value" id="mon-ask">—</div>
-          <div class="w3-text-gray w3-tiny">Manage, search and edit users in a focused modal.</div>
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+      <div class="minimal-card p-6" onclick="document.getElementById('usersModal').style.display='block';">
+        <div class="kpi-icon-minimal bg-indigo-50 text-indigo-600 mb-4">
+          <i class="fas fa-users"></i>
         </div>
+        <div class="text-2xl font-black text-slate-800">{{ users|length }}</div>
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Platform Users</div>
+      </div>
+
+      <div class="minimal-card p-6" onclick="document.getElementById('csModal').style.display='block';">
+        <div class="kpi-icon-minimal bg-sky-50 text-sky-600 mb-4">
+          <i class="fas fa-graduation-cap"></i>
+        </div>
+        <div class="text-2xl font-black text-slate-800">{{ (champion_schools|default([]))|length }}</div>
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">School Mappings</div>
+      </div>
+
+      <div class="minimal-card p-6" onclick="document.getElementById('duplicateModal').style.display='block';">
+        <div class="kpi-icon-minimal bg-amber-50 text-amber-600 mb-4">
+          <i class="fas fa-copy"></i>
+        </div>
+        <div class="text-2xl font-black text-slate-800">Scanner</div>
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">ID Validation</div>
+      </div>
+
+      <div class="minimal-card p-6">
+        <div class="kpi-icon-minimal bg-emerald-50 text-emerald-600 mb-4">
+          <i class="fas fa-database"></i>
+        </div>
+        <div class="text-2xl font-black text-slate-800">Healthy</div>
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">System State</div>
       </div>
     </div>
 
-    <div class="w3-col l3 m6 s12 w3-padding-small">
-      <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border"
-        onclick="document.getElementById('csModal').style.display='block'">
-        <div class="w3-container w3-indigo w3-text-white w3-round-top w3-padding-small"><b>Champion Schools ({{
-            (champion_schools|default([]))|length }})</b></div>
-        <div class="w3-container w3-padding-small">
-          <div class="value" id="mon-ask">—</div>
-          <div class="w3-text-gray w3-tiny">View, search and manage champion-to-school mappings in a modal.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="w3-col l3 m6 s12 w3-padding-small">
-      <div class="w3-card w3-white w3-round kpi-card w3-hover-shadow w3-border" onclick="openDuplicateChecker()">
-        <div class="w3-container w3-orange w3-text-white w3-round-top w3-padding-small"><b>Duplicate Checker</b></div>
-        <div class="w3-container w3-padding-small">
-          <div class="value" id="mon-ask">—</div>
-          <div class="w3-text-gray w3-tiny">Check for duplicate ASL or Library IDs in Champion Schools.</div>
-        </div>
-      </div>
-    </div>
-
-
-
-    <!-- Bulk Actions -->
-    <div class="col-12 col-lg-4">
-      <!-- Bulk User Upload -->
-      <div class="card shadow-sm mb-3" style="border-radius: 16px;">
-        <div class="card-body">
-          <h6 class="mb-2" style="color:#00407d;"><i class="fa fa-upload"></i> Bulk Register Users (CSV)</h6>
-          <form id="userCsvForm" method="POST" action="{{ url_for('upload_users') }}" enctype="multipart/form-data">
-            {{ csvform.hidden_tag() }}
-            <div class="mb-2">{{ csvform.csv_file(class="form-control form-control-sm", id="userCsvFile") }}</div>
-            <div class="d-grid">
-              {{ csvform.submit(class="btn btn-primary btn-sm", id="userCsvSubmit", style="background:#00407d;
-              border-color:#00407d; border-radius:10px;") }}
-            </div>
-          </form>
-          <div class="small text-muted mt-2">
-            CSV columns: firstname, lastname, email, userRole, department, province
+    <!-- Upload Forms -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 px-4 lg:px-8">
+      <!-- Champion School Bulk Upload -->
+      <div class="minimal-card p-8">
+        <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+          <i class="fas fa-cloud-arrow-up text-sky-500"></i>
+          Champion School Ingest
+        </h3>
+        <form id="championCsvForm" method="POST" action="{{ url_for('upload_csv') }}" enctype="multipart/form-data"
+          class="space-y-6">
+          {{ championcsvform.hidden_tag() }}
+          <div
+            class="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-sky-300 transition-colors group cursor-pointer relative"
+            onclick="document.getElementById('championCsvFile').click()">
+            {{ championcsvform.file(class="hidden", id="championCsvFile",
+            onchange="document.getElementById('champFileName').textContent = this.files[0].name") }}
+            <i class="fas fa-file-csv text-4xl text-slate-300 mb-4 group-hover:text-sky-400 transition-colors"></i>
+            <p class="text-slate-500 text-sm" id="champFileName">Drop CSV here or <span
+                class="text-sky-600 font-bold">browse files</span></p>
           </div>
-        </div>
+          <button id="championCsvSubmit" type="submit"
+            class="w-full btn-minimal bg-sky-600 hover:bg-sky-700 text-white justify-center py-3">
+            Analyze Mapping Data
+          </button>
+        </form>
       </div>
 
-      <!-- Champions Bulk Upload -->
-      <div class="card shadow-sm" style="border-radius: 16px;">
-        <div class="card-body">
-          <h6 class="mb-2" style="color:#00407d;"><i class="fa fa-users"></i> Bulk Register Champions (CSV)</h6>
-          <form id="championCsvForm" method="POST" action="{{ url_for('upload_csv') }}" enctype="multipart/form-data">
-            {{ championcsvform.hidden_tag() }}
-            <div class="mb-2">{{ championcsvform.file(class="form-control form-control-sm", id="championCsvFile") }}
-            </div>
-            <div class="d-grid">
-              {{ championcsvform.submit(class="btn btn-success btn-sm", id="championCsvSubmit",
-              style="border-radius:10px;") }}
-            </div>
-          </form>
-          <div class="small text-muted mt-2">
-            CSV columns: firstname, lastname, province, school_name, asl_school_id, library_school_id
+      <!-- User Bulk Upload -->
+      <div class="minimal-card p-8">
+        <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+          <i class="fas fa-user-plus text-indigo-500"></i>
+          User Directory Ingest
+        </h3>
+        <form id="userCsvForm" method="POST" action="{{ url_for('upload_users') }}" enctype="multipart/form-data"
+          class="space-y-6">
+          {{ csvform.hidden_tag() }}
+          <div
+            class="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-indigo-300 transition-colors group cursor-pointer relative"
+            onclick="document.getElementById('userCsvFile').click()">
+            {{ csvform.csv_file(class="hidden", id="userCsvFile",
+            onchange="document.getElementById('userFileName').textContent = this.files[0].name") }}
+            <i
+              class="fas fa-users-viewfinder text-4xl text-slate-300 mb-4 group-hover:text-indigo-400 transition-colors"></i>
+            <p class="text-slate-500 text-sm" id="userFileName">Drop CSV here or <span
+                class="text-indigo-600 font-bold">browse files</span></p>
           </div>
-        </div>
+          <button id="userCsvSubmit" type="submit"
+            class="w-full btn-minimal bg-indigo-600 hover:bg-indigo-700 text-white justify-center py-3">
+            Analyze User Data
+          </button>
+        </form>
       </div>
     </div>
   </div>
 
-  <!-- W3 Modal -->
   <!-- Users Modal -->
-  <div id="usersModal" class="w3-modal" style="z-index:2950;">
-    <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 75vw; height: 85vh; overflow-y: scroll;">
-      <header class="w3-container w3-padding" style="background: linear-gradient(135deg,#0ea5e9,#14b8a6); color:#fff;">
-        <span onclick="document.getElementById('usersModal').style.display='none'"
-          class="w3-button w3-display-topright">&times;</span>
-        <h5 class="w3-margin-0"><i class="fa fa-users"></i> Users</h5>
-      </header>
-      <div class="w3-container" style="padding:16px; max-height: 70vh; overflow-y: auto;">
-        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-3">
-          <span class="admin-chip">{{ users|length }} users</span>
-          <div class="input-group" style="max-width: 320px;">
-            <span class="input-group-text bg-light border-end-0"><i class="fa fa-search text-muted"></i></span>
-            <input id="user-search" type="text" class="form-control border-start-0" placeholder="Search users...">
+  <div id="usersModal" class="w3-modal modal-minimal" style="z-index:2950;">
+    <div class="w3-modal-content w3-animate-top shadow-2xl bg-white"
+      style="width: 90vw; max-width: 1200px; height: 90vh; display: flex; flex-direction: column;">
+      <header class="p-6 bg-white border-b border-slate-100 flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+            <i class="fas fa-users-cog text-xl"></i>
           </div>
+          <h2 class="text-xl font-bold text-slate-800 m-0">Platform User Directory</h2>
         </div>
-        <div class="table-responsive">
-          <table class="table w3-small table-sm table-hover table-bordered table-striped align-middle">
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
+        <button onclick="document.getElementById('usersModal').style.display='none'"
+          class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors">
+          <i class="fas fa-times text-slate-400"></i>
+        </button>
+      </header>
 
-                <th class="text-nowrap {% if current_user.userRole != 'Admin' %} w3-hide {% endif %}">Actions</th>
+      <div class="p-6 border-b border-slate-50 flex items-center justify-between shrink-0">
+        <div class="relative max-w-md w-full">
+          <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input id="user-search" type="text" class="search-input-minimal w-full"
+            placeholder="Search by name, email, or role...">
+        </div>
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ users|length }} Total Users</div>
+      </div>
+
+      <div class="flex-1 overflow-auto p-0 bg-white">
+        <table class="table-minimal">
+          <thead class="sticky top-0 z-10 shadow-sm">
+            <tr>
+              <th>Identity</th>
+              <th>Contact Information</th>
+              <th>Assignment</th>
+              <th class="text-right">Management</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr data-user-row data-id="{{ u.id }}" data-username="{{ (u.username or '')|lower }}"
+              data-name="{{ (u.firstname or '')|lower }} {{ (u.lastname or '')|lower }}"
+              data-email="{{ (u.email or '')|lower }}" data-role="{{ (u.userRole or '')|lower }}" class="group">
+              <td class="align-middle">
+                <div class="flex items-center gap-3">
+                  <div
+                    class="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-sm border border-indigo-100">
+                    {{ (u.firstname[0]|default('U'))|upper }}
+                  </div>
+                  <div>
+                    <div class="font-bold text-slate-800">{{ u.firstname }} {{ u.lastname }}</div>
+                    <div class="text-xs text-slate-400 font-medium">@{{ u.username }}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="align-middle text-slate-600 font-medium font-mono text-xs">{{ u.email }}</td>
+              <td class="align-middle">
+                <span
+                  class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border {{ 'bg-indigo-50 text-indigo-700 border-indigo-100' if u.userRole == 'Admin' else 'bg-slate-50 text-slate-600 border-slate-100' }}">
+                  {{ u.userRole }}
+                </span>
+              </td>
+              <td class="align-middle text-right">
+                <div class="flex justify-end gap-2 opacity-10 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600 transition-all shadow-sm"
+                    title="Edit"
+                    data-user='{{ {"id": u.id, "username": u.username, "firstname": u.firstname, "lastname": u.lastname, "email": u.email, "userRole": u.userRole, "department": u.department, "province": u.province} | tojson | safe }}'
+                    onclick="setEditContent(JSON.parse(this.dataset.user)); document.getElementById('download').style.display='block'">
+                    <i class="fas fa-pencil-alt text-[10px]"></i>
+                  </button>
+                  <button
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-600 transition-all shadow-sm"
+                    title="Reset Password" data-username="{{ u.username }}" data-uid="{{ u.id }}"
+                    onclick="setResetContent(this.dataset.username, this.dataset.uid); document.getElementById('download').style.display='block'">
+                    <i class="fas fa-key text-[10px]"></i>
+                  </button>
+                  <button
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600 transition-all shadow-sm"
+                    title="Privileges" data-username="{{ u.username }}" data-uid="{{ u.id }}"
+                    data-priv='{{ u.get_privileges() | tojson | safe }}'
+                    onclick="setPrivilegesContent(this.dataset.username, this.dataset.uid, this.dataset.priv); document.getElementById('download').style.display='block'">
+                    <i class="fas fa-shield-alt text-[10px]"></i>
+                  </button>
+                  <button
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 transition-all shadow-sm"
+                    title="Delete" data-uid="{{ u.id }}" data-username="{{ u.username }}"
+                    onclick="confirmDeleteUser(this.dataset.uid, this.dataset.username)">
+                    <i class="fas fa-trash-alt text-[10px]"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Champion Schools Modal -->
+<div id="csModal" class="w3-modal modal-minimal" style="z-index:2950;">
+  <div class="w3-modal-content w3-animate-top shadow-2xl bg-white"
+    style="width: 85vw; max-width: 1200px; height: 85vh; display: flex; flex-direction: column;">
+    <header class="p-6 bg-white border-b border-slate-100 flex justify-between items-center shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-sky-50 text-sky-600 rounded-xl flex items-center justify-center">
+          <i class="fas fa-graduation-cap text-xl"></i>
+        </div>
+        <h2 class="text-xl font-bold text-slate-800 m-0">Institution Mappings</h2>
+      </div>
+      <button onclick="document.getElementById('csModal').style.display='none'"
+        class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors">
+        <i class="fas fa-times text-slate-400"></i>
+      </button>
+    </header>
+
+    <div class="p-6 border-b border-slate-50 shrink-0">
+      <div class="relative max-w-md">
+        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input id="cs-search" type="text" class="search-input-minimal w-full"
+          placeholder="Search by champion, school, or province...">
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-auto p-0 bg-white">
+      <table class="table-minimal">
+        <thead class="sticky top-0 z-10 shadow-sm">
+          <tr>
+            <th>Champion</th>
+            <th>Username</th>
+            <th>Institution Name</th>
+            <th>Region</th>
+            <th>ASL Ref</th>
+            <th>Lib Ref</th>
+            <th class="text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody id="cs-table">
+          {% for cs in (champion_schools|default([])) %}
+          <tr data-cs-row data-id="{{ cs.id }}" data-champion="{{ (cs.champion or '')|lower }}"
+            data-username="{{ (cs.username or '')|lower }}" data-school="{{ (cs.school_name or '')|lower }}"
+            data-province="{{ (cs.province or '')|lower }}" data-asl="{{ (cs.asl_school_id or '') }}"
+            data-lib="{{ (cs.library_school_id or '') }}" class="group text-xs">
+            <td class="align-middle font-bold text-slate-800" data-editable="champion" contenteditable="true">{{
+              cs.champion
+              }}</td>
+            <td class="align-middle text-slate-500 font-medium">{{ cs.username }}</td>
+            <td class="align-middle" data-editable="school" contenteditable="true">{{ cs.school_name }}</td>
+            <td class="align-middle" data-editable="province" contenteditable="true">{{ cs.province }}</td>
+            <td class="align-middle font-mono" data-editable="asl" contenteditable="true">{{ cs.asl_school_id }}</td>
+            <td class="align-middle font-mono" data-editable="lib" contenteditable="true">{{ cs.library_school_id }}
+            </td>
+            <td class="align-middle text-right">
+              <div class="flex justify-end gap-2">
+                <button
+                  class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-all shadow-sm disabled:opacity-20"
+                  data-save-btn title="Save" onclick="saveCsInline(this)" disabled>
+                  <i class="fas fa-save text-[10px]"></i>
+                </button>
+                <button
+                  class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all shadow-sm"
+                  title="Delete" data-uid="{{ cs.id }}" data-champion="{{ cs.champion }}"
+                  data-asl="{{ cs.asl_school_id or '' }}" data-lib="{{ cs.library_school_id or '' }}"
+                  onclick="confirmDeleteChampionSchool(this.dataset.uid, this.dataset.champion, this.dataset.asl, this.dataset.lib)">
+                  <i class="fas fa-trash-alt text-[10px]"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Duplicate Checker Modal -->
+<div id="duplicateModal" class="w3-modal modal-minimal" style="z-index:2950;">
+  <div class="w3-modal-content w3-animate-top shadow-2xl bg-white"
+    style="width: 85vw; max-width: 1000px; height: 85vh; display: flex; flex-direction: column;">
+    <header class="p-6 bg-white border-b border-slate-100 flex justify-between items-center shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
+          <i class="fas fa-magnifying-glass-chart text-xl"></i>
+        </div>
+        <h2 class="text-xl font-bold text-slate-800 m-0 text-amber-600">Cross-Reference Conflict Finder</h2>
+      </div>
+      <button onclick="document.getElementById('duplicateModal').style.display='none'"
+        class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors">
+        <i class="fas fa-times text-slate-400"></i>
+      </button>
+    </header>
+
+    <div class="p-8 flex-1 overflow-auto bg-slate-50">
+      <div id="duplicate-intro" class="text-center max-w-2xl mx-auto py-12">
+        <div
+          class="w-20 h-20 bg-white rounded-3xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-6">
+          <i class="fas fa-shield-halved text-3xl text-slate-300"></i>
+        </div>
+        <h3 class="text-xl font-bold text-slate-800 mb-2">Data Integrity Audit</h3>
+        <p class="text-slate-500 text-sm mb-8 leading-relaxed">Runs a deep scan across all institution mappings to
+          identify redundant ASL or Library Reference IDs. Highlighting will also occur in the main database view.</p>
+        <button onclick="checkForDuplicates()"
+          class="px-10 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl shadow-xl shadow-amber-100 transition-all active:scale-95">
+          Begin Conflict Analysis
+        </button>
+      </div>
+
+      <div id="duplicate-results-container" class="space-y-8" style="display:none;">
+        <div id="duplicate-results-notice"></div>
+
+        <div id="asl-duplicates-section" class="bg-white rounded-2xl border border-slate-100 overflow-hidden"
+          style="display:none;">
+          <div
+            class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-700 text-xs uppercase tracking-widest flex justify-between">
+            <span>Redundant ASL Identifiers</span>
+            <span id="asl-duplicate-count" class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md">0</span>
+          </div>
+          <table class="w-full text-xs">
+            <thead class="bg-white text-slate-400 text-left">
+              <tr class="border-b border-slate-50">
+                <th class="p-4">Reference ID</th>
+                <th class="p-4">Clashes</th>
+                <th class="p-4">Affected Owners</th>
+                <th class="p-4">Linked Institutions</th>
+                <th class="p-4">Districts</th>
               </tr>
             </thead>
-            <tbody id="users-table">
-              {% for u in users %}
-              <tr data-user-row data-id="{{ u.id }}" data-username="{{ u.username|lower }}"
-                data-name="{{ (u.firstname ~ ' ' ~ u.lastname)|lower }}" data-email="{{ u.email|lower }}"
-                data-role="{{ u.userRole|lower }}">
-                <td class="fw-semibold">{{ u.username }}</td>
-                <td>{{ u.firstname }} {{ u.lastname }}</td>
-                <td>{{ u.email }}</td>
-                <td><span class="badge bg-light text-dark border">{{ u.userRole }}</span></td>
-                <td class="{% if current_user.userRole != 'Admin' %} w3-hide {% endif %}">
-                  <div class="d-flex flex-wrap gap-1">
-                    <button class="btn btn-sm btn-outline-secondary admin-action" title="Edit user"
-                      data-user='{{ {"id": u.id, "username": u.username, "firstname": u.firstname, "lastname": u.lastname, "email": u.email, "userRole": u.userRole, "department": u.department, "province": u.province} | tojson | safe }}'
-                      onclick="setEditContent(JSON.parse(this.dataset.user)); document.getElementById('download').style.display='block'">
-                      <i class="fa fa-pencil"></i><span class="d-none d-md-inline ms-1">Edit</span>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger admin-action" title="Reset password"
-                      onclick="setResetContent('{{ u.username }}', {{ u.id }}); document.getElementById('download').style.display='block'">
-                      <i class="fa fa-refresh"></i><span class="d-none d-md-inline ms-1">Reset</span>
-                    </button>
-                    {% set privs = u.get_privileges() %}
-                    <button class="btn btn-sm btn-outline-primary admin-action" title="Manage privileges"
-                      data-priv='{{ privs | tojson | safe }}'
-                      onclick="setPrivilegesContent('{{ u.username }}', {{ u.id }}, this.dataset.priv); document.getElementById('download').style.display='block'">
-                      <i class="fa fa-shield"></i><span class="d-none d-md-inline ms-1">Privileges</span>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger admin-action" title="Delete user"
-                      onclick="confirmDeleteUser({{ u.id }}, '{{ u.username }}')">
-                      <i class="fa fa-trash"></i><span class="d-none d-md-inline ms-1">Delete</span>
-                    </button>
-                  </div>
-                </td>
+            <tbody id="asl-duplicates-table" class="divide-y divide-slate-50"></tbody>
+          </table>
+        </div>
+
+        <div id="lib-duplicates-section" class="bg-white rounded-2xl border border-slate-100 overflow-hidden"
+          style="display:none;">
+          <div
+            class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-700 text-xs uppercase tracking-widest flex justify-between">
+            <span>Redundant Library Identifiers</span>
+            <span id="lib-duplicate-count" class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md">0</span>
+          </div>
+          <table class="w-full text-xs">
+            <thead class="bg-white text-slate-400 text-left">
+              <tr class="border-b border-slate-50">
+                <th class="p-4">Reference ID</th>
+                <th class="p-4">Clashes</th>
+                <th class="p-4">Affected Owners</th>
+                <th class="p-4">Linked Institutions</th>
+                <th class="p-4">Districts</th>
               </tr>
-              {% endfor %}
-            </tbody>
+            </thead>
+            <tbody id="lib-duplicates-table" class="divide-y divide-slate-50"></tbody>
+          </table>
+        </div>
+
+        <div id="no-duplicates-section" class="bg-emerald-50 border border-emerald-100 p-8 rounded-3xl text-center"
+          style="display:none;">
+          <div
+            class="w-16 h-16 bg-white rounded-2xl shadow-sm border border-emerald-50 flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-check-circle text-2xl text-emerald-500"></i>
+          </div>
+          <h4 class="font-bold text-emerald-900 text-lg mb-1">Integrity Maintained</h4>
+          <p class="text-emerald-700 text-sm">No duplicate identifiers were found in the current dataset mapping.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Champion CSV Duplicate Resolution Modal -->
+<div id="csvDuplicateModal" class="w3-modal modal-minimal" style="z-index:3000;">
+  <div class="w3-modal-content w3-animate-top shadow-2xl bg-white"
+    style="width: 90vw; max-width: 1200px; height: 90vh; display: flex; flex-direction: column;">
+    <header class="p-6 bg-white border-b border-slate-100 flex justify-between items-center shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
+          <i class="fas fa-file-shield text-xl"></i>
+        </div>
+        <h2 class="text-xl font-bold text-slate-800 m-0">Mapping Validation Results</h2>
+      </div>
+      <button onclick="closeCsvDuplicateModal()"
+        class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors">
+        <i class="fas fa-times text-slate-400"></i>
+      </button>
+    </header>
+
+    <div class="p-6 flex-1 overflow-auto bg-slate-50">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+          <div class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Clashes</div>
+          <div id="csv-dup-count" class="text-2xl font-black text-amber-600">0</div>
+        </div>
+        <div id="champ-stats" class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+          <div class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Existing</div>
+          <div id="champ-dup-count" class="text-2xl font-black text-sky-600">0</div>
+        </div>
+        <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+          <div class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Conflicts</div>
+          <div id="school-dup-count" class="text-2xl font-black text-red-600">0</div>
+        </div>
+        <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+          <div class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">New Records</div>
+          <div id="new-count" class="text-2xl font-black text-emerald-600">0</div>
+        </div>
+      </div>
+
+      <div class="space-y-8">
+        <div id="csv-duplicates-section" class="bg-white rounded-2xl border border-slate-100 overflow-hidden"
+          style="display:none;">
+          <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-700 text-sm">Internal File
+            Duplicates</div>
+          <table class="w-full text-xs">
+            <thead class="bg-white text-slate-400 text-left">
+              <tr class="border-b border-slate-50">
+                <th class="p-4 w-16">Skip</th>
+                <th class="p-4">Reference</th>
+                <th class="p-4">Type</th>
+                <th class="p-4">Total Hits</th>
+              </tr>
+            </thead>
+            <tbody id="csv-dup-table" class="divide-y divide-slate-50"></tbody>
+          </table>
+        </div>
+
+        <div id="existing-champions-section" class="bg-white rounded-2xl border border-slate-100 overflow-hidden"
+          style="display:none;">
+          <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-700 text-sm">Recognized Champions
+          </div>
+          <table class="w-full text-xs">
+            <thead class="bg-white text-slate-400 text-left">
+              <tr class="border-b border-slate-50">
+                <th class="p-4 w-16">Skip</th>
+                <th class="p-4">Champion Name</th>
+                <th class="p-4">Region</th>
+                <th class="p-4">Current Entry</th>
+                <th class="p-4">Incoming</th>
+              </tr>
+            </thead>
+            <tbody id="existing-champ-table" class="divide-y divide-slate-50"></tbody>
+          </table>
+        </div>
+
+        <div id="duplicate-schools-section" class="bg-white rounded-2xl border border-slate-100 overflow-hidden"
+          style="display:none;">
+          <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-red-600 text-sm">Institution ID Conflicts
+          </div>
+          <table class="w-full text-xs">
+            <thead class="bg-white text-slate-400 text-left">
+              <tr class="border-b border-slate-50">
+                <th class="p-4 w-16">Skip</th>
+                <th class="p-4">ID Value</th>
+                <th class="p-4">System Ref</th>
+                <th class="p-4">Active Owner</th>
+                <th class="p-4">CSV Applicant</th>
+              </tr>
+            </thead>
+            <tbody id="dup-school-table" class="divide-y divide-slate-50"></tbody>
           </table>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Champion Schools Modal -->
-  <div id="csModal" class="w3-modal" style="z-index:2950;">
-    <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 75vw; height: 85vh; overflow-y: scroll;">
-      <header class="w3-container w3-padding" style="background: linear-gradient(135deg,#6366f1,#3b82f6); color:#fff;">
-        <span onclick="document.getElementById('csModal').style.display='none'"
-          class="w3-button w3-display-topright">&times;</span>
-        <h5 class="w3-margin-0"><i class="fa fa-graduation-cap"></i> Champion Schools</h5>
-      </header>
-      <div class="w3-container" style="padding:16px; max-height: 70vh; overflow-y: auto;">
-        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-3">
-          <span class="admin-chip">{{ (champion_schools|default([]))|length }} records</span>
-          <div class="input-group" style="max-width: 320px;">
-            <span class="input-group-text bg-light border-end-0"><i class="fa fa-search text-muted"></i></span>
-            <input id="cs-search" type="text" class="form-control border-start-0"
-              placeholder="Search champion schools...">
-          </div>
+    <footer class="p-6 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
+      <div class="text-xs text-slate-500 font-medium">
+        Excluding <span id="skip-champ-count" class="font-bold text-slate-800">0</span> owners and <span
+          id="skip-school-count" class="font-bold text-slate-800">0</span> institutions
+      </div>
+      <div class="flex gap-4">
+        <button class="btn-minimal bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 px-6 py-2"
+          onclick="closeCsvDuplicateModal()">Cancel</button>
+        <button class="btn-minimal bg-amber-600 hover:bg-amber-700 text-white px-8 py-2"
+          onclick="proceedWithCsvUpload()">
+          Begin Synchronization
+        </button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- User CSV Duplicate Resolution Modal -->
+<div id="userDuplicateModal" class="w3-modal modal-minimal" style="z-index:3000;">
+  <div class="w3-modal-content w3-animate-top shadow-2xl bg-white"
+    style="width: 90vw; max-width: 1200px; height: 90vh; display: flex; flex-direction: column;">
+    <header class="p-6 bg-white border-b border-slate-100 flex justify-between items-center shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+          <i class="fas fa-user-gear text-xl"></i>
         </div>
-        <div class="table-responsive">
-          <table class="table table-sm w3-small table-hover table-bordered table-striped align-middle">
-            <thead>
-              <tr>
-                <th>Champion</th>
-                <th>Username</th>
-                <th>School</th>
-                <th>Province</th>
-                <th>ASL ID</th>
-                <th>Library ID</th>
-                <th class="text-nowrap">Actions</th>
+        <h2 class="text-xl font-bold text-slate-800 m-0">Directory Validation</h2>
+      </div>
+      <button onclick="closeUserDuplicateModal()"
+        class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors">
+        <i class="fas fa-times text-slate-400"></i>
+      </button>
+    </header>
+
+    <div class="p-6 flex-1 overflow-auto bg-slate-50">
+      <div class="grid grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+          <div class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">File Clashes</div>
+          <div id="user-csv-dup-count" class="text-2xl font-black text-indigo-600">0</div>
+        </div>
+        <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+          <div class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">System Matches</div>
+          <div id="user-existing-dup-count" class="text-2xl font-black text-red-600">0</div>
+        </div>
+        <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+          <div class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Queue Size</div>
+          <div id="user-new-count" class="text-2xl font-black text-emerald-600">0</div>
+        </div>
+      </div>
+
+      <div class="space-y-8">
+        <div id="user-csv-duplicates-section" class="bg-white rounded-2xl border border-slate-100 overflow-hidden"
+          style="display:none;">
+          <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-700 text-sm">Internal File Conflict
+          </div>
+          <table class="w-full text-xs">
+            <thead class="bg-white text-slate-400 text-left">
+              <tr class="border-b border-slate-50">
+                <th class="p-4 w-16">Skip</th>
+                <th class="p-4">Email</th>
+                <th class="p-4">Name</th>
+                <th class="p-4">Duplicate Hits</th>
               </tr>
             </thead>
-            <tbody id="cs-table">
-              {% for cs in (champion_schools|default([])) %}
-              <tr data-cs-row data-id="{{ cs.id }}" data-champion="{{ (cs.champion or '')|lower }}"
-                data-username="{{ (cs.username or '')|lower }}" data-school="{{ (cs.school_name or '')|lower }}"
-                data-province="{{ (cs.province or '')|lower }}" data-asl="{{ (cs.asl_school_id or '') }}"
-                data-lib="{{ (cs.library_school_id or '') }}">
-                <td class="fw-semibold">{{ cs.champion }}</td>
-                <td>{{ cs.username }}</td>
-                <td data-editable="school" contenteditable="true">{{ cs.school_name }}</td>
-                <td><span class="badge bg-light text-dark border">{{ cs.province }}</span></td>
-                <td data-editable="asl" contenteditable="true">{{ cs.asl_school_id }}</td>
-                <td data-editable="lib" contenteditable="true">{{ cs.library_school_id }}</td>
-                <td>
-                  <div class="d-flex flex-wrap gap-1">
-                    <button class="btn btn-sm btn-outline-success admin-action" data-save-btn title="Save changes"
-                      onclick="saveCsInline(this)" disabled>
-                      <i class="fa fa-save"></i><span class="d-none d-md-inline ms-1">Save</span>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger admin-action" title="Delete record"
-                      onclick="confirmDeleteChampionSchool({{ cs.id }}, '{{ cs.champion }}')">
-                      <i class="fa fa-trash"></i><span class="d-none d-md-inline ms-1">Delete</span>
-                    </button>
-                  </div>
-                </td>
+            <tbody id="user-csv-dup-table" class="divide-y divide-slate-50"></tbody>
+          </table>
+        </div>
+
+        <div id="user-existing-duplicates-section" class="bg-white rounded-2xl border border-slate-100 overflow-hidden"
+          style="display:none;">
+          <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-red-600 text-sm">Existing Record Matches
+          </div>
+          <table class="w-full text-xs">
+            <thead class="bg-white text-slate-400 text-left">
+              <tr class="border-b border-slate-50">
+                <th class="p-4 w-16">Skip</th>
+                <th class="p-4">Email</th>
+                <th class="p-4">Active Profile</th>
+                <th class="p-4">Status</th>
               </tr>
-              {% endfor %}
-            </tbody>
+            </thead>
+            <tbody id="user-existing-dup-table" class="divide-y divide-slate-50"></tbody>
           </table>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Duplicate Checker Modal -->
-  <div id="duplicateModal" class="w3-modal" style="z-index:2950;">
-    <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 75vw; height: 85vh; overflow-y: scroll;">
-      <header class="w3-container w3-padding" style="background: linear-gradient(135deg,#f97316,#fb923c); color:#fff;">
-        <span onclick="document.getElementById('duplicateModal').style.display='none'"
-          class="w3-button w3-display-topright">&times;</span>
-        <h5 class="w3-margin-0"><i class="fa fa-exclamation-triangle"></i> Duplicate ID Checker</h5>
-      </header>
-      <div class="w3-container" style="padding:16px; max-height: 70vh; overflow-y: auto;">
-        <div class="mb-3">
-          <button class="btn btn-primary btn-sm" onclick="checkForDuplicates()" style="border-radius:10px;">
-            <i class="fa fa-refresh"></i> Check for Duplicates
-          </button>
-        </div>
-
-        <div id="duplicate-results">
-          <p class="text-muted">Click "Check for Duplicates" to scan for duplicate ASL or Library IDs.</p>
-        </div>
-
-        <!-- ASL ID Duplicates Section -->
-        <div id="asl-duplicates-section" style="display:none;">
-          <h6 class="mb-2" style="color:#dc2626;"><i class="fa fa-warning"></i> ASL ID Duplicates</h6>
-          <div class="alert alert-danger" role="alert">
-            <strong>Found <span id="asl-duplicate-count">0</span> duplicate ASL ID(s)</strong>
-          </div>
-          <div class="table-responsive">
-            <table class="table table-sm w3-small table-hover table-bordered align-middle">
-              <thead>
-                <tr class="table-danger">
-                  <th>ASL ID</th>
-                  <th>Count</th>
-                  <th>Champions</th>
-                  <th>Schools</th>
-                  <th>Provinces</th>
-                </tr>
-              </thead>
-              <tbody id="asl-duplicates-table">
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Library ID Duplicates Section -->
-        <div id="lib-duplicates-section" style="display:none;" class="mt-4">
-          <h6 class="mb-2" style="color:#dc2626;"><i class="fa fa-warning"></i> Library ID Duplicates</h6>
-          <div class="alert alert-danger" role="alert">
-            <strong>Found <span id="lib-duplicate-count">0</span> duplicate Library ID(s)</strong>
-          </div>
-          <div class="table-responsive">
-            <table class="table table-sm w3-small table-hover table-bordered align-middle">
-              <thead>
-                <tr class="table-danger">
-                  <th>Library ID</th>
-                  <th>Count</th>
-                  <th>Champions</th>
-                  <th>Schools</th>
-                  <th>Provinces</th>
-                </tr>
-              </thead>
-              <tbody id="lib-duplicates-table">
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- No Duplicates Section -->
-        <div id="no-duplicates-section" style="display:none;">
-          <div class="alert alert-success" role="alert">
-            <i class="fa fa-check-circle"></i> <strong>No duplicates found!</strong> All ASL and Library IDs are unique
-            (excluding IDs with value 0).
-          </div>
-        </div>
+    <footer class="p-6 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
+      <div class="text-xs text-slate-500 font-medium">
+        Excluding <span id="skip-email-count" class="font-bold text-slate-800">0</span> records from sync
       </div>
-    </div>
-  </div>
-
-  <!-- CSV Duplicate Resolution Modal -->
-  <div id="csvDuplicateModal" class="w3-modal" style="z-index:3000;">
-    <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 85vw; max-height: 90vh; overflow-y: auto;">
-      <header class="w3-container w3-padding" style="background: linear-gradient(135deg,#f97316,#ea580c); color:#fff;">
-        <span onclick="closeCsvDuplicateModal()" class="w3-button w3-display-topright">&times;</span>
-        <h5 class="w3-margin-0"><i class="fa fa-warning"></i> CSV Duplicate Analysis</h5>
-      </header>
-      <div class="w3-container" style="padding:16px;">
-        <!-- Summary Badges -->
-        <div class="mb-3 d-flex flex-wrap gap-2">
-          <span class="badge bg-warning text-dark">CSV Internal Duplicates: <strong id="csv-dup-count">0</strong></span>
-          <span class="badge bg-info">Existing Champions: <strong id="existing-champ-count">0</strong></span>
-          <span class="badge bg-danger">Duplicate School IDs: <strong id="dup-school-count">0</strong></span>
-          <span class="badge bg-success">New Champions: <strong id="new-champ-count">0</strong></span>
-        </div>
-
-        <div class="alert alert-info mb-3">
-          <i class="fa fa-info-circle"></i> <strong>Review duplicates below.</strong> Checked items will be
-          <strong>skipped</strong> during upload. Uncheck items you want to include.
-        </div>
-
-        <!-- Selection Summary -->
-        <div class="mb-3 p-3" style="background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
-          <strong>Current Selection:</strong>
-          <span class="ms-2">Champions to skip: <strong id="skip-champ-count">0</strong></span>
-          <span class="ms-3">Schools to skip: <strong id="skip-school-count">0</strong></span>
-        </div>
-
-        <!-- CSV Internal Duplicates Section -->
-        <div id="csv-internal-duplicates-section" class="mb-4" style="display:none;">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0" style="color:#f97316;"><i class="fa fa-warning"></i> CSV Internal Duplicates</h6>
-            <div>
-              <button class="btn btn-sm btn-outline-warning" onclick="toggleAllChampions(true)">Skip All</button>
-              <button class="btn btn-sm btn-outline-secondary" onclick="toggleAllChampions(false)">Select All</button>
-            </div>
-          </div>
-          <p class="small text-muted">These IDs appear multiple times within your CSV file.</p>
-          <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-              <thead style="background-color: #fef3c7;">
-                <tr>
-                  <th style="width:50px;">Skip</th>
-                  <th>Duplicate ID</th>
-                  <th>Type</th>
-                  <th>Count</th>
-                  <th>CSV Rows</th>
-                </tr>
-              </thead>
-              <tbody id="csv-dup-table"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Existing Champions Section -->
-        <div id="existing-champions-section" class="mb-4" style="display:none;">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0" style="color:#3b82f6;"><i class="fa fa-info-circle"></i> Existing Champions (Will Be
-              Updated)</h6>
-            <div>
-              <button class="btn btn-sm btn-outline-info" onclick="toggleAllChampions(true)">Skip All</button>
-              <button class="btn btn-sm btn-outline-secondary" onclick="toggleAllChampions(false)">Select All</button>
-            </div>
-          </div>
-          <p class="small text-muted">These champions already exist. Their schools will be merged with new ones from
-            CSV.</p>
-          <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-              <thead style="background-color: #dbeafe;">
-                <tr>
-                  <th style="width:50px;">Skip</th>
-                  <th>Champion Name</th>
-                  <th>Province</th>
-                  <th>Current Schools</th>
-                  <th>New Schools</th>
-                </tr>
-              </thead>
-              <tbody id="existing-champ-table"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Duplicate School IDs Section -->
-        <div id="duplicate-schools-section" class="mb-4" style="display:none;">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0" style="color:#dc2626;"><i class="fa fa-exclamation-triangle"></i> Duplicate School IDs</h6>
-            <div>
-              <button class="btn btn-sm btn-outline-danger" onclick="toggleAllSchools(true)">Skip All</button>
-              <button class="btn btn-sm btn-outline-secondary" onclick="toggleAllSchools(false)">Select All</button>
-            </div>
-          </div>
-          <p class="small text-muted">These school IDs already exist in the database with different champions.</p>
-          <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-              <thead style="background-color: #fee2e2;">
-                <tr>
-                  <th style="width:50px;">Skip</th>
-                  <th>School ID</th>
-                  <th>Type</th>
-                  <th>Existing Champion</th>
-                  <th>Existing School</th>
-                  <th>CSV Champion</th>
-                </tr>
-              </thead>
-              <tbody id="dup-school-table"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="d-flex justify-content-end gap-2 mt-4">
-          <button class="btn btn-secondary" onclick="closeCsvDuplicateModal()">Cancel</button>
-          <button class="btn btn-success" onclick="proceedWithCsvUpload()">
-            <i class="fa fa-upload"></i> Proceed with Upload
-          </button>
-        </div>
+      <div class="flex gap-4">
+        <button class="btn-minimal bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 px-6 py-2"
+          onclick="closeUserDuplicateModal()">Abort</button>
+        <button class="btn-minimal bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-2"
+          onclick="proceedWithUserCsvUpload()">Commit Upload</button>
       </div>
+    </footer>
+  </div>
+</div>
+
+<!-- Form Container (Download/Edit/Reset) -->
+<div id="download" class="w3-modal modal-minimal" style="z-index:3000;">
+  <div class="w3-modal-content w3-animate-top shadow-2xl bg-white" style="max-width: 500px; margin-top: 80px;">
+    <header class="p-6 bg-white border-b border-slate-100 flex justify-between items-center">
+      <h2 id="download-title" class="text-base font-bold text-slate-800 m-0 uppercase tracking-widest">Update Profile
+      </h2>
+      <button onclick="document.getElementById('download').style.display='none'"
+        class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors">
+        <i class="fas fa-times text-slate-400 text-sm"></i>
+      </button>
+    </header>
+    <div class="p-8" id="download-body">
+      <!-- Dynamic Content -->
     </div>
   </div>
+</div>
 
-  <!-- User CSV Duplicate Resolution Modal -->
-  <div id="userDuplicateModal" class="w3-modal" style="z-index:3000;">
-    <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 85vw; max-height: 90vh; overflow-y: auto;">
-      <header class="w3-container w3-padding" style="background: linear-gradient(135deg,#3b82f6,#2563eb); color:#fff;">
-        <span onclick="closeUserDuplicateModal()" class="w3-button w3-display-topright">&times;</span>
-        <h5 class="w3-margin-0"><i class="fa fa-warning"></i> User CSV Duplicate Analysis</h5>
-      </header>
-      <div class="w3-container" style="padding:16px;">
-        <!-- Summary Badges -->
-        <div class="mb-3 d-flex flex-wrap gap-2">
-          <span class="badge bg-warning text-dark">CSV Email Duplicates: <strong
-              id="user-csv-dup-count">0</strong></span>
-          <span class="badge bg-danger">Existing Email Duplicates: <strong
-              id="user-existing-dup-count">0</strong></span>
-          <span class="badge bg-success">New Users: <strong id="user-new-count">0</strong></span>
-        </div>
+<!-- Minimal Toast -->
+<div id="admin-toast"
+  class="fixed top-8 right-8 z-[6000] px-6 py-4 rounded-xl shadow-xl transition-all duration-300 transform translate-x-full opacity-0 flex items-center gap-4 bg-white border"
+  style="display: none;">
+  <div id="toast-icon-box" class="w-8 h-8 rounded-lg flex items-center justify-center text-sm"></div>
+  <div id="toast-message" class="text-sm font-semibold text-slate-700"></div>
+</div>
 
-        <div class="alert alert-info mb-3">
-          <i class="fa fa-info-circle"></i> <strong>Review duplicates below.</strong> Checked items will be
-          <strong>skipped</strong> during upload. Uncheck items you want to include.
-        </div>
-
-        <!-- Selection Summary -->
-        <div class="mb-3 p-3" style="background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
-          <strong>Current Selection:</strong>
-          <span class="ms-2">Emails to skip: <strong id="skip-email-count">0</strong></span>
-        </div>
-
-        <!-- CSV Internal Email Duplicates -->
-        <div id="user-csv-duplicates-section" class="mb-4" style="display:none;">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0" style="color:#f97316;"><i class="fa fa-warning"></i> CSV Internal Email Duplicates</h6>
-            <div>
-              <button class="btn btn-sm btn-outline-warning" onclick="toggleAllUserEmails(true)">Skip All</button>
-              <button class="btn btn-sm btn-outline-secondary" onclick="toggleAllUserEmails(false)">Select All</button>
-            </div>
-          </div>
-          <p class="small text-muted">These emails appear multiple times within your CSV file.</p>
-          <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-              <thead style="background-color: #fef3c7;">
-                <tr>
-                  <th style="width:50px;">Skip</th>
-                  <th>Email</th>
-                  <th>Name</th>
-                  <th>CSV Rows</th>
-                </tr>
-              </thead>
-              <tbody id="user-csv-dup-table"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Existing Email Duplicates -->
-        <div id="user-existing-duplicates-section" class="mb-4" style="display:none;">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0" style="color:#dc2626;"><i class="fa fa-exclamation-triangle"></i> Existing Email Duplicates
-            </h6>
-            <div>
-              <button class="btn btn-sm btn-outline-danger" onclick="toggleAllUserEmails(true)">Skip All</button>
-              <button class="btn btn-sm btn-outline-secondary" onclick="toggleAllUserEmails(false)">Select All</button>
-            </div>
-          </div>
-          <p class="small text-muted">These emails already exist in the database.</p>
-          <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-              <thead style="background-color: #fee2e2;">
-                <tr>
-                  <th style="width:50px;">Skip</th>
-                  <th>Email</th>
-                  <th>CSV Name</th>
-                  <th>Existing User</th>
-                  <th>Username</th>
-                  <th>CSV Row</th>
-                </tr>
-              </thead>
-              <tbody id="user-existing-dup-table"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="d-flex justify-content-end gap-2 mt-4">
-          <button class="btn btn-secondary" onclick="closeUserDuplicateModal()">Cancel</button>
-          <button class="btn btn-success" onclick="proceedWithUserCsvUpload()">
-            <i class="fa fa-upload"></i> Proceed with Upload
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="download" class="w3-modal" style="z-index:3000;">
-    <div class="w3-modal-content w3-animate-top w3-card-4" style="max-width: 780px;">
-      <header class="w3-container w3-padding" style="background-color:#e6f0ff; color:#00407d;">
-        <span onclick="document.getElementById('download').style.display='none'"
-          class="w3-button w3-display-topright">&times;</span>
-        <h5 id="download-title" class="w3-margin-0">Details</h5>
-      </header>
-      <div class="w3-container" id="download-body" style="padding:16px;">
-        <!-- dynamic -->
-      </div>
-      <footer class="w3-container w3-padding w3-light-grey">
-        <button class="w3-button w3-teal w3-small"
-          onclick="document.getElementById('download').style.display='none'">Close</button>
-      </footer>
-    </div>
-    <div id="admin-toast" class="w3-panel w3-green"
-      style="display:none; position: fixed; top: 84px; right: 20px; z-index: 4000; border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,0.12);">
-    </div>
-  </div>
-
-  <script>
-    // Search filter
-    const userSearch = document.getElementById('user-search');
-    userSearch.addEventListener('input', () => {
-      const q = userSearch.value.toLowerCase();
-      document.querySelectorAll('[data-user-row]').forEach(row => {
-        const match = row.dataset.username.includes(q) || row.dataset.name.includes(q) || row.dataset.email.includes(q) || row.dataset.role.includes(q);
-        row.style.display = match ? '' : 'none';
-      });
+<script>
+  // Search filter
+  const userSearch = document.getElementById('user-search');
+  userSearch.addEventListener('input', () => {
+    const q = userSearch.value.toLowerCase();
+    document.querySelectorAll('[data-user-row]').forEach(row => {
+      const match = row.dataset.username.includes(q) || row.dataset.name.includes(q) || row.dataset.email.includes(q) || row.dataset.role.includes(q);
+      row.style.display = match ? '' : 'none';
     });
+  });
 
-    function showToast(message, type = 'success') {
-      const t = document.getElementById('admin-toast');
-      t.className = 'w3-panel ' + (type === 'success' ? 'w3-green' : (type === 'error' ? 'w3-red' : 'w3-blue'));
-      t.textContent = message;
-      t.style.display = 'block';
-      setTimeout(() => { t.style.display = 'none'; }, 2200);
+  function showToast(message, type = 'success') {
+    const t = document.getElementById('admin-toast');
+    const msg = document.getElementById('toast-message');
+    const iconBox = document.getElementById('toast-icon-box');
+
+    // Reset classes
+    t.className = 'fixed top-8 right-8 z-[5000] px-6 py-4 rounded-2xl shadow-2xl transition-all duration-500 transform flex items-center gap-4 bg-white border';
+
+    if (type === 'success') {
+      t.classList.add('border-emerald-100', 'text-emerald-900');
+      iconBox.className = 'w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-emerald-50 text-emerald-600';
+      iconBox.innerHTML = '<i class="fas fa-check-circle"></i>';
+    } else if (type === 'error') {
+      t.classList.add('border-red-100', 'text-red-900');
+      iconBox.className = 'w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-red-50 text-red-600';
+      iconBox.innerHTML = '<i class="fas fa-circle-xmark"></i>';
+    } else {
+      t.classList.add('border-indigo-100', 'text-indigo-900');
+      iconBox.className = 'w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-indigo-50 text-indigo-600';
+      iconBox.innerHTML = '<i class="fas fa-info-circle"></i>';
     }
 
-    // W3 modal content setters
-    function setTitle(t) { document.getElementById('download-title').textContent = t; }
-    function setBodyHtml(html) { document.getElementById('download-body').innerHTML = html; }
+    msg.textContent = message;
+    t.style.display = 'flex';
 
-    function setEditContent(user) {
-      setTitle('Edit User: ' + (user.username || ''));
-      const html = `
-    <div class="w3-small">
+    // Animate in
+    setTimeout(() => {
+      t.classList.remove('translate-x-full', 'opacity-0');
+    }, 10);
+
+    // Auto hide
+    setTimeout(() => {
+      t.classList.add('translate-x-full', 'opacity-0');
+      setTimeout(() => { t.style.display = 'none'; }, 500);
+    }, 4000);
+  }
+
+  // W3 modal content setters
+  function setTitle(t) { document.getElementById('download-title').textContent = t; }
+  function setBodyHtml(html) { document.getElementById('download-body').innerHTML = html; }
+
+  function setEditContent(user) {
+    setTitle('Edit User Profile');
+    const html = `
+    <div class="space-y-6">
       <input type="hidden" id="edit-user-id" value="${user.id || ''}">
-      <div class="w3-row-padding">
-        <div class="w3-half">
-          <label class="w3-small">Username</label>
-          <input id="edit-username" class="w3-input w3-border" value="${user.username || ''}">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Username</label>
+          <input id="edit-username" class="search-input-minimal w-full" value="${user.username || ''}">
         </div>
-        <div class="w3-half">
-          <label class="w3-small">Email</label>
-          <input id="edit-email" type="email" class="w3-input w3-border" value="${user.email || ''}">
-        </div>
-      </div>
-      <div class="w3-row-padding w3-margin-top">
-        <div class="w3-half">
-          <label class="w3-small">First name</label>
-          <input id="edit-firstname" class="w3-input w3-border" value="${user.firstname || ''}">
-        </div>
-        <div class="w3-half">
-          <label class="w3-small">Last name</label>
-          <input id="edit-lastname" class="w3-input w3-border" value="${user.lastname || ''}">
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Email Address</label>
+          <input id="edit-email" type="email" class="search-input-minimal w-full" value="${user.email || ''}">
         </div>
       </div>
-      <div class="w3-row-padding w3-margin-top">
-        <div class="w3-half">
-          <label class="w3-small">Role</label>
-          <select id="edit-role" class="w3-select w3-border">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">First Name</label>
+          <input id="edit-firstname" class="search-input-minimal w-full" value="${user.firstname || ''}">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Last Name</label>
+          <input id="edit-lastname" class="search-input-minimal w-full" value="${user.lastname || ''}">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">System Role</label>
+          <select id="edit-role" class="search-input-minimal w-full appearance-none">
             ${['Brand Ambassador', 'Manager', 'Software Engineer', 'DevOps Engineer', 'Admin'].map(r => `<option ${r === (user.userRole || '') ? 'selected' : ''}>${r}</option>`).join('')}
           </select>
         </div>
-        <div class="w3-half">
-          <label class="w3-small">Department</label>
-          <select id="edit-department" class="w3-select w3-border">
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Department</label>
+          <select id="edit-department" class="search-input-minimal w-full appearance-none">
             ${['Sales & Marketing', 'Product development', 'Content development'].map(r => `<option ${r === (user.department || '') ? 'selected' : ''}>${r}</option>`).join('')}
           </select>
         </div>
       </div>
-      <div class="w3-row-padding w3-margin-top">
-        <div class="w3-col s12">
-          <label class="w3-small">Province</label>
-          <select id="edit-province" class="w3-select w3-border">
-            ${['Harare', 'Bulawayo', 'Manicaland', 'Mashonaland Central', 'Mashonaland East', 'Mashonaland West', 'Masvingo', 'Matabeleland North', 'Matabeleland South', 'Midlands'].map(p => `<option ${p === (user.province || '') ? 'selected' : ''}>${p}</option>`).join('')}
-          </select>
-        </div>
+      <div class="space-y-1.5">
+        <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Primary Province</label>
+        <select id="edit-province" class="search-input-minimal w-full appearance-none">
+          ${['Harare', 'Bulawayo', 'Manicaland', 'Mashonaland Central', 'Mashonaland East', 'Mashonaland West', 'Masvingo', 'Matabeleland North', 'Matabeleland South', 'Midlands'].map(p => `<option ${p === (user.province || '') ? 'selected' : ''}>${p}</option>`).join('')}
+        </select>
       </div>
-      <div class="w3-margin-top w3-right">
-        <button class="w3-button w3-light-grey w3-small" onclick="document.getElementById('download').style.display='none'">Cancel</button>
-        <button class="w3-button w3-teal w3-small" onclick="saveUserEditsFromModal()">Save</button>
+      <div class="flex justify-end gap-3 pt-4">
+        <button class="btn-minimal bg-white text-slate-600 border border-slate-200 hover:bg-slate-50" onclick="document.getElementById('download').style.display='none'">Cancel</button>
+        <button class="btn-minimal bg-indigo-600 text-white hover:bg-indigo-700" onclick="saveUserEditsFromModal()">Save Changes</button>
       </div>
     </div>`;
-      setBodyHtml(html);
-    }
+    setBodyHtml(html);
+  }
 
-    async function saveUserEditsFromModal() {
-      const id = document.getElementById('edit-user-id').value;
-      const payload = {
-        username: document.getElementById('edit-username').value,
-        email: document.getElementById('edit-email').value,
-        firstname: document.getElementById('edit-firstname').value,
-        lastname: document.getElementById('edit-lastname').value,
-        userRole: document.getElementById('edit-role').value,
-        department: document.getElementById('edit-department').value,
-        province: document.getElementById('edit-province').value
-      };
-      const res = await fetch(`/admin/users/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Failed to save'); return; }
-      // Update row in table
-      const row = document.querySelector(`[data-user-row][data-id="${id}"]`);
-      if (row) {
-        row.dataset.username = (payload.username || '').toLowerCase();
-        row.dataset.name = `${(payload.firstname || '')} ${(payload.lastname || '')}`.trim().toLowerCase();
-        row.dataset.email = (payload.email || '').toLowerCase();
-        row.dataset.role = (payload.userRole || '').toLowerCase();
-        const tds = row.querySelectorAll('td');
-        if (tds[0]) tds[0].textContent = payload.username || '';
-        if (tds[1]) tds[1].textContent = `${payload.firstname || ''} ${payload.lastname || ''}`.trim();
-        if (tds[2]) tds[2].textContent = payload.email || '';
-        if (tds[3]) tds[3].innerHTML = `<span class="badge bg-light text-dark border">${payload.userRole || ''}</span>`;
-        const editBtn = row.querySelector('button[data-user]');
-        if (editBtn) { editBtn.dataset.user = JSON.stringify({ id: Number(id), ...payload }); }
+  async function saveUserEditsFromModal() {
+    const id = document.getElementById('edit-user-id').value;
+    const payload = {
+      username: document.getElementById('edit-username').value,
+      email: document.getElementById('edit-email').value,
+      firstname: document.getElementById('edit-firstname').value,
+      lastname: document.getElementById('edit-lastname').value,
+      userRole: document.getElementById('edit-role').value,
+      department: document.getElementById('edit-department').value,
+      province: document.getElementById('edit-province').value
+    };
+    const res = await fetch(`/admin/users/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Failed to save'); return; }
+
+    // Update row in table
+    const row = document.querySelector(`[data-user-row][data-id="${id}"]`);
+    if (row) {
+      row.dataset.username = (payload.username || '').toLowerCase();
+      row.dataset.name = `${(payload.firstname || '')} ${(payload.lastname || '')}`.trim().toLowerCase();
+      row.dataset.email = (payload.email || '').toLowerCase();
+      row.dataset.role = (payload.userRole || '').toLowerCase();
+
+      // Target specific elements in the new structure
+      const nameEl = row.querySelector('.font-bold.text-slate-800');
+      const usernameEl = row.querySelector('.text-xs.text-slate-400');
+      const avatarEl = row.querySelector('.font-bold.border-2.border-white');
+      const emailCell = row.querySelectorAll('td')[1];
+      const roleCell = row.querySelectorAll('td')[2];
+
+      if (nameEl) nameEl.textContent = `${payload.firstname || ''} ${payload.lastname || ''}`.trim();
+      if (usernameEl) usernameEl.textContent = `@${payload.username || ''}`;
+      if (avatarEl) avatarEl.textContent = (payload.firstname ? payload.firstname[0] : 'U').toUpperCase();
+      if (emailCell) emailCell.textContent = payload.email || '';
+      if (roleCell) {
+        roleCell.innerHTML = `
+              <span class="px-2.5 py-1 rounded-lg text-xs font-bold border ${payload.userRole === 'Admin' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-slate-100 text-slate-700 border-slate-200'}">
+                ${payload.userRole || ''}
+              </span>
+            `;
       }
-      showToast('User updated successfully', 'success');
-      document.getElementById('download').style.display = 'none';
-    }
 
-    function generatePassword(len = 12) {
-      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      let out = '';
-      for (let i = 0; i < len; i++) { out += chars[Math.floor(Math.random() * chars.length)]; }
-      return out;
+      const editBtn = row.querySelector('button[data-user]');
+      if (editBtn) { editBtn.dataset.user = JSON.stringify({ id: Number(id), ...payload }); }
     }
+    showToast('User profile updated', 'success');
+    document.getElementById('download').style.display = 'none';
+  }
 
-    function setResetContent(username, id) {
-      setTitle('Reset Password');
-      const html = `
-    <div class="w3-small">
+  function generatePassword(len = 12) {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let out = '';
+    for (let i = 0; i < len; i++) { out += chars[Math.floor(Math.random() * chars.length)]; }
+    return out;
+  }
+
+  function setResetContent(username, id) {
+    setTitle('Reset Credentials');
+    const html = `
+    <div class="space-y-6">
       <input type="hidden" id="reset-user-id" value="${id}">
-      <p>Reset password for <b>${username}</b> (ID: ${id}).</p>
-      <label class="w3-small">New password (leave blank to auto-generate on submit)</label>
-      <input id="reset-password-input" class="w3-input w3-border" placeholder="Enter new password">
-      <div class="w3-margin-top w3-right">
-        <button class="w3-button w3-light-grey w3-small" onclick="document.getElementById('reset-password-input').value = generatePassword()">Generate</button>
-        <button class="w3-button w3-teal w3-small" onclick="resetPasswordSubmit()">Submit</button>
+      <p class="text-sm text-slate-600">You are about to reset the password for <span class="font-bold text-slate-800">${username}</span>.</p>
+      <div class="space-y-1.5">
+        <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">New Security Key</label>
+        <input id="reset-password-input" class="search-input-minimal w-full" placeholder="Enter manual password or generate...">
+      </div>
+      <div class="flex justify-end gap-3 pt-4">
+        <button class="btn-minimal bg-white text-slate-600 border border-slate-200 hover:bg-slate-50" onclick="document.getElementById('reset-password-input').value = generatePassword()">Generate Key</button>
+        <button class="btn-minimal bg-amber-600 text-white hover:bg-amber-700 font-bold" onclick="resetPasswordSubmit()">Update Password</button>
       </div>
     </div>`;
-      setBodyHtml(html);
-    }
+    setBodyHtml(html);
+  }
 
-    async function resetPasswordSubmit() {
-      const id = document.getElementById('reset-user-id').value;
-      const pw = document.getElementById('reset-password-input').value;
-      const res = await fetch(`/admin/users/${id}/reset_password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pw ? { password: pw } : {}) });
-      const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Failed to reset'); return; }
-      showToast('Password reset successfully', 'success');
-      document.getElementById('download').style.display = 'none';
-    }
+  async function resetPasswordSubmit() {
+    const id = document.getElementById('reset-user-id').value;
+    const pw = document.getElementById('reset-password-input').value;
+    const res = await fetch(`/admin/users/${id}/reset_password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pw ? { password: pw } : {}) });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Failed to reset'); return; }
+    showToast('Password reset successfully', 'success');
+    document.getElementById('download').style.display = 'none';
+  }
 
-    function setPrivilegesContent(username, id, privJson) {
-      setTitle('User Privileges');
-      let privs = {};
-      try { privs = JSON.parse(privJson || '{}'); } catch (e) { privs = {}; }
-      const items = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access"];
-      const html = `
-    <div class="w3-small">
-      <p>Manage privileges for <b>${username}</b> (ID: ${id}).</p>
-      <div class="w3-row-padding">
+  function setPrivilegesContent(username, id, privJson) {
+    setTitle('Manage Access Keys');
+    let privs = {};
+    try { privs = JSON.parse(privJson || '{}'); } catch (e) { privs = {}; }
+    const items = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access"];
+    const html = `
+    <div class="space-y-6">
+      <p class="text-sm text-slate-600">Adjusting access levels for <span class="font-bold text-slate-800">${username}</span>.</p>
+      <div class="grid grid-cols-2 gap-y-3 gap-x-6">
         ${items.map(p => `
-          <div class="w3-half w3-padding-small">
-            <label>
-              <input type="checkbox" class="w3-check" ${privs[p] ? 'checked' : ''} onchange="toggleUserPrivilege(${id}, '${p}', this.checked)">
-              <span class="w3-small">${p}</span>
-            </label>
-          </div>
+          <label class="flex items-center gap-3 cursor-pointer group">
+            <input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" ${privs[p] ? 'checked' : ''} onchange="toggleUserPrivilege(${id}, '${p}', this.checked)">
+            <span class="text-xs font-semibold text-slate-600 group-hover:text-slate-800 transition-colors">${p}</span>
+          </label>
         `).join('')}
       </div>
-      <p class="w3-text-grey w3-margin-top">Changes save instantly.</p>
+      <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-[10px] text-indigo-700 font-bold uppercase tracking-widest text-center mt-6">
+        Permissions are updated in real-time
+      </div>
     </div>`;
-      setBodyHtml(html);
-    }
+    setBodyHtml(html);
+  }
 
-    async function toggleUserPrivilege(userId, privilege, value) {
-      try {
-        const res = await fetch(`/admin/users/${userId}/toggle_privilege`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ privilege, value }) });
-        const data = await res.json();
-        if (!res.ok) {
-          showToast(data.error || 'Failed to update privilege', 'error');
-          // Revert the checkbox
-          const checkbox = event.target;
-          if (checkbox) checkbox.checked = !value;
-          return;
-        }
-        // Update the privilege button's dataset to reflect the new state
-        const userRow = document.querySelector(`[data-user-row][data-id="${userId}"]`);
-        if (userRow) {
-          const privBtn = userRow.querySelector('button[data-priv]');
-          if (privBtn) {
-            try {
-              const privs = JSON.parse(privBtn.dataset.priv || '{}');
-              privs[privilege] = value;
-              privBtn.dataset.priv = JSON.stringify(privs);
-            } catch (e) {
-              console.error('Failed to update privilege dataset:', e);
-            }
-          }
-        }
-        showToast(`Privilege '${privilege}' ${value ? 'granted' : 'removed'}`, 'success');
-      } catch (err) {
-        console.error(err);
-        showToast('Failed to update privilege', 'error');
+  async function toggleUserPrivilege(userId, privilege, value) {
+    try {
+      const res = await fetch(`/admin/users/${userId}/toggle_privilege`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ privilege, value }) });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to update privilege', 'error');
         // Revert the checkbox
         const checkbox = event.target;
         if (checkbox) checkbox.checked = !value;
-      }
-    }
-
-    // Delete user flow
-    function confirmDeleteUser(id, username) {
-      setTitle('Delete User');
-      const html = `
-    <div class="w3-small">
-      <p>Are you sure you want to delete user <b>${username}</b> (ID: ${id})? This action cannot be undone.</p>
-      <div class="w3-right w3-margin-top">
-        <button class="w3-button w3-light-grey w3-small" onclick="document.getElementById('download').style.display='none'">Cancel</button>
-        <button class="w3-button w3-red w3-small" onclick="deleteUser(${id})">Delete</button>
-      </div>
-    </div>`;
-      setBodyHtml(html);
-      document.getElementById('download').style.display = 'block';
-    }
-
-    async function deleteUser(id) {
-      try {
-        const res = await fetch(`/admin/users/${id}`, { method: 'DELETE' });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) { throw new Error(data.error || 'Failed to delete user'); }
-        const row = document.querySelector(`[data-user-row][data-id="${id}"]`);
-        if (row) row.remove();
-        showToast('User deleted', 'success');
-      } catch (err) {
-        console.error(err);
-        showToast(err.message || 'Delete failed', 'error');
-      } finally {
-        document.getElementById('download').style.display = 'none';
-      }
-    }
-
-    // Edit ChampionSchool flow
-    function setEditChampionSchool(rec) {
-      setTitle('Edit Champion School');
-      const html = `
-    <div class=\"w3-small\">\n      <input type=\"hidden\" id=\"cs-id\" value=\"${rec.id}\">\n      <input type=\"hidden\" id=\"orig-asl\" value=\"${rec.asl_school_id || ''}\">\n      <input type=\"hidden\" id=\"orig-lib\" value=\"${rec.library_school_id || ''}\">\n      <div class=\"w3-row-padding\">\n        <div class=\"w3-half\">\n          <label class=\"w3-small\">First name</label>\n          <input id=\"cs-firstname\" class=\"w3-input w3-border\" value=\"${rec.firstname || (rec.champion || '').split(' ')[0] || ''}\">\n        </div>\n        <div class=\"w3-half\">\n          <label class=\"w3-small\">Last name</label>\n          <input id=\"cs-lastname\" class=\"w3-input w3-border\" value=\"${rec.lastname || (rec.champion || '').split(' ').slice(1).join(' ') || ''}\">\n        </div>\n      </div>\n      <div class=\"w3-row-padding w3-margin-top\">\n        <div class=\"w3-half\">\n          <label class=\"w3-small\">Province</label>\n          <select id=\"cs-province\" class=\"w3-select w3-border\">\n            ${['Harare', 'Bulawayo', 'Manicaland', 'Mashonaland Central', 'Mashonaland East', 'Mashonaland West', 'Masvingo', 'Matabeleland North', 'Matabeleland South', 'Midlands'].map(p => `<option ${p === (rec.province || '') ? 'selected' : ''}>${p}</option>`).join('')}\n          </select>\n        </div>\n        <div class=\"w3-half\">\n          <label class=\"w3-small\">School name</label>\n          <input id=\"cs-school-name\" class=\"w3-input w3-border\" value=\"${rec.school_name || ''}\">\n        </div>\n      </div>\n      <div class=\"w3-row-padding w3-margin-top\">\n        <div class=\"w3-half\">\n          <label class=\"w3-small\">ASL School ID</label>\n          <input id=\"cs-asl\" class=\"w3-input w3-border\" value=\"${rec.asl_school_id || ''}\">\n        </div>\n        <div class=\"w3-half\">\n          <label class=\"w3-small\">Library School ID</label>\n          <input id=\"cs-library\" class=\"w3-input w3-border\" value=\"${rec.library_school_id || ''}\">\n        </div>\n      </div>\n      <div class=\"w3-margin-top w3-right\">\n        <button class=\"w3-button w3-light-grey w3-small\" onclick=\"document.getElementById('download').style.display='none'\">Cancel</button>\n        <button class=\"w3-button w3-teal w3-small\" onclick=\"saveChampionSchoolEdit()\">Save</button>\n      </div>\n    </div>`;
-      setBodyHtml(html);
-      document.getElementById('download').style.display = 'block';
-    }
-
-    async function saveChampionSchoolEdit() {
-      const id = document.getElementById('cs-id').value;
-      const payload = {
-        firstname: document.getElementById('cs-firstname').value,
-        lastname: document.getElementById('cs-lastname').value,
-        province: document.getElementById('cs-province').value,
-        school_name: document.getElementById('cs-school-name').value,
-        asl_school_id: document.getElementById('cs-asl').value,
-        library_school_id: document.getElementById('cs-library').value,
-        original_asl_school_id: document.getElementById('orig-asl').value,
-        original_library_school_id: document.getElementById('orig-lib').value
-      };
-      if (!(payload.asl_school_id || payload.library_school_id)) {
-        alert('Provide at least one of ASL or Library School ID');
         return;
       }
-      const res = await fetch(`/admin/champion_schools/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { alert(data.error || 'Failed to save'); return; }
-      // Update the table row
-      const row = document.querySelector(`[data-cs-row][data-id=\"${id}\"]`);
-      if (row) {
-        const tds = row.querySelectorAll('td');
-        if (tds[0]) tds[0].textContent = `${payload.firstname || ''} ${payload.lastname || ''}`.trim();
-        if (tds[2]) tds[2].textContent = payload.school_name || '';
-        if (tds[3]) tds[3].innerHTML = `<span class=\"badge bg-light text-dark border\">${payload.province || ''}</span>`;
-        if (tds[4]) tds[4].textContent = payload.asl_school_id || '';
-        if (tds[5]) tds[5].textContent = payload.library_school_id || '';
-        row.dataset.champion = `${(payload.firstname || '').toLowerCase()} ${(payload.lastname || '').toLowerCase()}`.trim();
-        row.dataset.school = (payload.school_name || '').toLowerCase();
-        row.dataset.province = (payload.province || '').toLowerCase();
-        // Update the edit button dataset
-        const editBtn = row.querySelector('button[data-cs]');
-        if (editBtn) {
-          const current = JSON.parse(editBtn.dataset.cs || '{}');
-          editBtn.dataset.cs = JSON.stringify({
-            ...current,
-            firstname: payload.firstname,
-            lastname: payload.lastname,
-            province: payload.province,
-            school_name: payload.school_name,
-            asl_school_id: payload.asl_school_id,
-            library_school_id: payload.library_school_id
-          });
+      // Update the privilege button's dataset to reflect the new state
+      const userRow = document.querySelector(`[data-user-row][data-id="${userId}"]`);
+      if (userRow) {
+        const privBtn = userRow.querySelector('button[data-priv]');
+        if (privBtn) {
+          try {
+            const privs = JSON.parse(privBtn.dataset.priv || '{}');
+            privs[privilege] = value;
+            privBtn.dataset.priv = JSON.stringify(privs);
+          } catch (e) {
+            console.error('Failed to update privilege dataset:', e);
+          }
         }
       }
-      showToast('Champion School updated', 'success');
+      showToast(`Privilege '${privilege}' ${value ? 'granted' : 'removed'}`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to update privilege', 'error');
+      // Revert the checkbox
+      const checkbox = event.target;
+      if (checkbox) checkbox.checked = !value;
+    }
+  }
+
+  // Delete user flow
+  function confirmDeleteUser(id, username) {
+    setTitle('Terminate User Profile');
+    const html = `
+    <div class="space-y-6">
+      <div class="p-4 bg-red-50 border border-red-100 rounded-xl text-red-700 text-sm font-medium">
+        Warning: This will permanently remove <span class="font-bold underline">${username}</span> from the system.
+      </div>
+      <div class="flex justify-end gap-3 pt-4">
+        <button class="btn-minimal bg-white text-slate-600 border border-slate-200 hover:bg-slate-50" onclick="document.getElementById('download').style.display='none'">Abort</button>
+        <button class="btn-minimal bg-red-600 text-white hover:bg-red-700 font-bold" onclick="deleteUser(${id})">Confirm Deletion</button>
+      </div>
+    </div>`;
+    setBodyHtml(html);
+    document.getElementById('download').style.display = 'block';
+  }
+
+  async function deleteUser(id) {
+    try {
+      const res = await fetch(`/admin/users/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { throw new Error(data.error || 'Failed to delete user'); }
+      const row = document.querySelector(`[data-user-row][data-id="${id}"]`);
+      if (row) row.remove();
+      showToast('User deleted', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Delete failed', 'error');
+    } finally {
       document.getElementById('download').style.display = 'none';
     }
+  }
 
-    // Delete ChampionSchool flow
-    function confirmDeleteChampionSchool(id, title) {
-      setTitle('Delete Champion School Record');
-      const html = `
-    <div class=\"w3-small\">\n      <p>Are you sure you want to delete <b>${title}</b> record (ID: ${id})? This action cannot be undone.</p>
-      <div class=\"w3-right w3-margin-top\">\n        <button class=\"w3-button w3-light-grey w3-small\" onclick=\"document.getElementById('download').style.display='none'\">Cancel</button>
-        <button class=\"w3-button w3-red w3-small\" onclick=\"deleteChampionSchool(${id})\">Delete</button>
+  // Edit ChampionSchool flow
+  function setEditChampionSchool(rec) {
+    setTitle('Update Institution Mapping');
+    const html = `
+    <div class="space-y-6">
+      <input type="hidden" id="cs-id" value="${rec.id}">
+      <input type="hidden" id="orig-asl" value="${rec.asl_school_id || ''}">
+      <input type="hidden" id="orig-lib" value="${rec.library_school_id || ''}">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Champion First Name</label>
+          <input id="cs-firstname" class="search-input-minimal w-full" value="${rec.firstname || (rec.champion || '').split(' ')[0] || ''}">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Champion Last Name</label>
+          <input id="cs-lastname" class="search-input-minimal w-full" value="${rec.lastname || (rec.champion || '').split(' ').slice(1).join(' ') || ''}">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Region</label>
+          <select id="cs-province" class="search-input-minimal w-full appearance-none">
+            ${['Harare', 'Bulawayo', 'Manicaland', 'Mashonaland Central', 'Mashonaland East', 'Mashonaland West', 'Masvingo', 'Matabeleland North', 'Matabeleland South', 'Midlands'].map(p => `<option ${p === (rec.province || '') ? 'selected' : ''}>${p}</option>`).join('')}
+          </select>
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Institution Name</label>
+          <input id="cs-school-name" class="search-input-minimal w-full" value="${rec.school_name || ''}">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">ASL Reference ID</label>
+          <input id="cs-asl" class="search-input-minimal w-full font-mono" value="${rec.asl_school_id || ''}">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Library Reference ID</label>
+          <input id="cs-library" class="search-input-minimal w-full font-mono" value="${rec.library_school_id || ''}">
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 pt-4">
+        <button class="btn-minimal bg-white text-slate-600 border border-slate-200 hover:bg-slate-50" onclick="document.getElementById('download').style.display='none'">Cancel</button>
+        <button class="btn-minimal bg-indigo-600 text-white hover:bg-indigo-700" onclick="saveChampionSchoolEdit()">Commit Changes</button>
       </div>
     </div>`;
-      setBodyHtml(html);
-      document.getElementById('download').style.display = 'block';
-    }
+    setBodyHtml(html);
+    document.getElementById('download').style.display = 'block';
+  }
 
-    async function deleteChampionSchool(id) {
-      try {
-        const res = await fetch(`/admin/champion_schools/${id}`, { method: 'DELETE' });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) { throw new Error(data.error || 'Failed to delete record'); }
-        const row = document.querySelector(`[data-cs-row][data-id="${id}"]`);
-        if (row) row.remove();
-        showToast('Champion School deleted', 'success');
-      } catch (err) {
-        console.error(err);
-        showToast(err.message || 'Delete failed', 'error');
-      } finally {
-        document.getElementById('download').style.display = 'none';
-      }
+  async function saveChampionSchoolEdit() {
+    const id = document.getElementById('cs-id').value;
+    const payload = {
+      firstname: document.getElementById('cs-firstname').value,
+      lastname: document.getElementById('cs-lastname').value,
+      province: document.getElementById('cs-province').value,
+      school_name: document.getElementById('cs-school-name').value,
+      asl_school_id: document.getElementById('cs-asl').value,
+      library_school_id: document.getElementById('cs-library').value,
+      original_asl_school_id: document.getElementById('orig-asl').value,
+      original_library_school_id: document.getElementById('orig-lib').value
+    };
+    if (!(payload.asl_school_id || payload.library_school_id)) {
+      showToast('Provide at least one of ASL or Library School ID', 'error');
+      return;
     }
+    const res = await fetch(`/admin/champion_schools/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { alert(data.error || 'Failed to save'); return; }
 
-    // Champion Schools search
-    const csSearch = document.getElementById('cs-search');
-    if (csSearch) {
-      csSearch.addEventListener('input', () => {
-        const q = (csSearch.value || '').toLowerCase();
-        document.querySelectorAll('[data-cs-row]').forEach(row => {
-          // Try both dataset and visible cell text to be robust
-          const cells = row.querySelectorAll('td');
-          const championText = ((row.dataset.champion || '') || (cells[0]?.textContent || '')).toLowerCase();
-          const usernameText = ((row.dataset.username || '') || (cells[1]?.textContent || '')).toLowerCase();
-          const schoolText = ((row.dataset.school || '') || (cells[2]?.textContent || '')).toLowerCase();
-          const provinceText = ((row.dataset.province || '') || (cells[3]?.textContent || '')).toLowerCase();
-          const match = championText.includes(q) || usernameText.includes(q) || schoolText.includes(q) || provinceText.includes(q);
-          row.style.display = match ? '' : 'none';
-        });
-      });
-    }
-
-    // Inline editing for Champion Schools table (no auto-save) + dirty tracking
-    function attachInlineEditors() {
-      document.querySelectorAll('[data-cs-row]').forEach(row => {
-        const cells = row.querySelectorAll('td[data-editable]');
-        cells.forEach(td => {
-          // Initialize original values
-          if (!('original' in td.dataset)) td.dataset.original = (td.textContent || '').trim();
-          td.addEventListener('focus', () => { td.dataset.original = td.dataset.original ?? (td.textContent || '').trim(); });
-          td.addEventListener('input', () => updateRowSaveState(row));
-          td.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); td.blur(); }
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              td.textContent = td.dataset.original || td.textContent;
-              td.blur();
-              updateRowSaveState(row);
-            }
-          });
-          td.addEventListener('blur', () => {
-            // Normalize whitespace
-            td.textContent = (td.textContent || '').trim();
-            updateRowSaveState(row);
-          });
-        });
-        // Initialize button state on load
-        updateRowSaveState(row);
-      });
-    }
-
-    function isRowDirty(row) {
-      const cells = row.querySelectorAll('td[data-editable]');
-      for (const td of cells) {
-        const current = (td.textContent || '').trim();
-        const original = td.dataset.original || '';
-        if (current !== original) return true;
-      }
-      return false;
-    }
-
-    function updateRowSaveState(row) {
-      const dirty = isRowDirty(row);
-      const btn = row.querySelector('button[data-save-btn]');
-      if (!btn) return;
-      btn.disabled = !dirty;
-      btn.classList.toggle('btn-success', dirty);
-      btn.classList.toggle('btn-outline-success', !dirty);
-    }
-
-    // Save button handler per row
-    async function saveCsInline(btn) {
-      const row = btn.closest('[data-cs-row]');
-      if (!row) return;
-      const id = row.dataset.id;
+    // Update the table row
+    const row = document.querySelector(`[data-cs-row][data-id="${id}"]`);
+    if (row) {
       const cells = row.querySelectorAll('td');
-      const champText = (cells[0]?.textContent || '').trim();
-      const schoolTd = row.querySelector('td[data-editable="school"]');
-      const aslTd = row.querySelector('td[data-editable="asl"]');
-      const libTd = row.querySelector('td[data-editable="lib"]');
-      // Derive first/last name like the modal did
-      const parts = champText.split(/\s+/).filter(Boolean);
-      const firstname = parts[0] || '';
-      const lastname = parts.slice(1).join(' ') || '';
-      const province = (row.dataset.province || '').trim() || (cells[3]?.textContent || '').trim();
-      const payload = {
-        firstname,
-        lastname,
-        province,
-        school_name: (schoolTd?.textContent || '').trim(),
-        asl_school_id: (aslTd?.textContent || '').trim(),
-        library_school_id: (libTd?.textContent || '').trim(),
-        original_asl_school_id: row.dataset.asl || '',
-        original_library_school_id: row.dataset.lib || ''
-      };
-      if (!(payload.asl_school_id || payload.library_school_id)) {
-        showToast('Provide at least one of ASL or Library School ID', 'error');
+      if (cells[0]) cells[0].textContent = `${payload.firstname || ''} ${payload.lastname || ''}`.trim();
+      if (cells[2]) cells[2].textContent = payload.school_name || '';
+      if (cells[3]) {
+        cells[3].innerHTML = `
+              <span class="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-600 font-medium">
+                ${payload.province || ''}
+              </span>
+            `;
+      }
+      if (cells[4]) cells[4].textContent = payload.asl_school_id || '';
+      if (cells[5]) cells[5].textContent = payload.library_school_id || '';
+
+      row.dataset.champion = `${(payload.firstname || '').toLowerCase()} ${(payload.lastname || '').toLowerCase()}`.trim();
+      row.dataset.school = (payload.school_name || '').toLowerCase();
+      row.dataset.province = (payload.province || '').toLowerCase();
+      row.dataset.asl = payload.asl_school_id || '';
+      row.dataset.lib = payload.library_school_id || '';
+
+      // Update edit/save visibility if needed
+      updateRowSaveState(row);
+    }
+    showToast('Mapping updated successfully', 'success');
+    document.getElementById('download').style.display = 'none';
+  }
+
+  // Delete ChampionSchool flow
+  function confirmDeleteChampionSchool(id, title, asl = '', lib = '') {
+    setTitle('Revoke Institution Mapping');
+    const html = `
+    <div class="space-y-6">
+      <div class="p-4 bg-red-50 border border-red-100 rounded-xl text-red-700 text-sm font-medium">
+        Note: You are about to decouple <span class="font-bold underline">${title}</span> from the mapping: <br>
+        <span class="text-xs font-mono bg-white/50 px-1 rounded">${asl || 'N/A'} (ASL)</span> | 
+        <span class="text-xs font-mono bg-white/50 px-1 rounded">${lib || 'N/A'} (LIB)</span>
+      </div>
+      <div class="flex justify-end gap-3 pt-4">
+        <button class="btn-minimal bg-white text-slate-600 border border-slate-200 hover:bg-slate-50" onclick="document.getElementById('download').style.display='none'">Abort</button>
+        <button class="btn-minimal bg-red-600 text-white hover:bg-red-700 font-bold" onclick="deleteChampionSchool(${id}, '${asl}', '${lib}')">Delete Record</button>
+      </div>
+    </div>`;
+    setBodyHtml(html);
+    document.getElementById('download').style.display = 'block';
+  }
+
+  async function deleteChampionSchool(id, asl = '', lib = '') {
+    try {
+      let url = `/admin/champion_schools/${id}`;
+      const params = new URLSearchParams();
+      if (asl) params.append('asl', asl);
+      if (lib) params.append('lib', lib);
+      if (params.toString()) url += `?${params.toString()}`;
+
+      const res = await fetch(url, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { throw new Error(data.error || 'Failed to delete record'); }
+
+      // Surgical removal: find the exact row with matching IDs
+      const selector = `[data-cs-row][data-id="${id}"][data-asl="${asl}"][data-lib="${lib}"]`;
+      const row = document.querySelector(selector);
+      if (row) row.remove();
+
+      showToast('Mapping removed successfully', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Delete failed', 'error');
+    } finally {
+      document.getElementById('download').style.display = 'none';
+    }
+  }
+
+  // Champion Schools search
+  const csSearch = document.getElementById('cs-search');
+  if (csSearch) {
+    csSearch.addEventListener('input', () => {
+      const q = (csSearch.value || '').toLowerCase();
+      document.querySelectorAll('[data-cs-row]').forEach(row => {
+        // Try both dataset and visible cell text to be robust
+        const cells = row.querySelectorAll('td');
+        const championText = ((row.dataset.champion || '') || (cells[0]?.textContent || '')).toLowerCase();
+        const usernameText = ((row.dataset.username || '') || (cells[1]?.textContent || '')).toLowerCase();
+        const schoolText = ((row.dataset.school || '') || (cells[2]?.textContent || '')).toLowerCase();
+        const provinceText = ((row.dataset.province || '') || (cells[3]?.textContent || '')).toLowerCase();
+        const match = championText.includes(q) || usernameText.includes(q) || schoolText.includes(q) || provinceText.includes(q);
+        row.style.display = match ? '' : 'none';
+      });
+    });
+  }
+
+  // Inline editing for Champion Schools table (no auto-save) + dirty tracking
+  function attachInlineEditors() {
+    document.querySelectorAll('[data-cs-row]').forEach(row => {
+      const cells = row.querySelectorAll('td[data-editable]');
+      cells.forEach(td => {
+        // Initialize original values
+        if (!('original' in td.dataset)) td.dataset.original = (td.textContent || '').trim();
+        td.addEventListener('focus', () => { td.dataset.original = td.dataset.original ?? (td.textContent || '').trim(); });
+        td.addEventListener('input', () => updateRowSaveState(row));
+        td.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); td.blur(); }
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            td.textContent = td.dataset.original || td.textContent;
+            td.blur();
+            updateRowSaveState(row);
+          }
+        });
+        td.addEventListener('blur', () => {
+          // Normalize whitespace
+          td.textContent = (td.textContent || '').trim();
+          updateRowSaveState(row);
+        });
+      });
+      // Initialize button state on load
+      updateRowSaveState(row);
+    });
+  }
+
+  function isRowDirty(row) {
+    const cells = row.querySelectorAll('td[data-editable]');
+    for (const td of cells) {
+      const current = (td.textContent || '').trim();
+      const original = td.dataset.original || '';
+      if (current !== original) return true;
+    }
+    return false;
+  }
+
+  function updateRowSaveState(row) {
+    const dirty = isRowDirty(row);
+    const btn = row.querySelector('button[data-save-btn]');
+    if (!btn) return;
+    btn.disabled = !dirty;
+
+    if (dirty) {
+      btn.className = 'w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 transition-all shadow-sm';
+    } else {
+      btn.className = 'w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 transition-all shadow-sm opacity-20';
+    }
+  }
+
+  // Save button handler per row
+  async function saveCsInline(btn) {
+    const row = btn.closest('[data-cs-row]');
+    if (!row) return;
+    const id = row.dataset.id;
+    const champTd = row.querySelector('td[data-editable="champion"]');
+    const schoolTd = row.querySelector('td[data-editable="school"]');
+    const provinceTd = row.querySelector('td[data-editable="province"]');
+    const aslTd = row.querySelector('td[data-editable="asl"]');
+    const libTd = row.querySelector('td[data-editable="lib"]');
+
+    const champText = (champTd?.textContent || '').trim();
+    // Derive first/last name like the modal did
+    const parts = champText.split(/\s+/).filter(Boolean);
+    const firstname = parts[0] || '';
+    const lastname = parts.slice(1).join(' ') || '';
+    const province = (provinceTd?.textContent || '').trim();
+    const payload = {
+      firstname,
+      lastname,
+      province,
+      school_name: (schoolTd?.textContent || '').trim(),
+      asl_school_id: (aslTd?.textContent || '').trim(),
+      library_school_id: (libTd?.textContent || '').trim(),
+      original_asl_school_id: row.dataset.asl || '',
+      original_library_school_id: row.dataset.lib || ''
+    };
+    if (!(payload.asl_school_id || payload.library_school_id)) {
+      showToast('Provide at least one of ASL or Library School ID', 'error');
+      return;
+    }
+    const oldHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin text-[10px]"></i>';
+    try {
+      const res = await fetch(`/admin/champion_schools/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || 'Update failed', 'error');
         return;
       }
-      const oldHtml = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i><span class="d-none d-md-inline ms-1">Saving</span>';
-      try {
-        const res = await fetch(`/admin/champion_schools/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          showToast(data.error || 'Update failed', 'error');
-          return;
-        }
-        const updated = data.updated || {};
-        // Update row datasets for searching and originals using server-confirmed values
-        row.dataset.school = (updated.school_name ?? payload.school_name ?? '').toLowerCase();
-        row.dataset.asl = updated.asl_school_id ?? payload.asl_school_id ?? '';
-        row.dataset.lib = updated.library_school_id ?? payload.library_school_id ?? '';
-        // Update visible cells if server normalized values
-        if (schoolTd) schoolTd.textContent = updated.school_name ?? payload.school_name ?? '';
-        if (aslTd) aslTd.textContent = updated.asl_school_id ?? payload.asl_school_id ?? '';
-        if (libTd) libTd.textContent = updated.library_school_id ?? payload.library_school_id ?? '';
-        // Update original values for cells to reflect saved state
-        if (schoolTd) schoolTd.dataset.original = schoolTd.textContent.trim();
-        if (aslTd) aslTd.dataset.original = aslTd.textContent.trim();
-        if (libTd) libTd.dataset.original = libTd.textContent.trim();
-        // Recompute dirty state to disable Save again
-        updateRowSaveState(row);
-        showToast('Champion School updated', 'success');
-      } catch (err) {
-        console.error(err);
-        showToast('Update failed', 'error');
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = oldHtml;
+      const updated = data.updated || {};
+      // Update row datasets for searching and originals using server-confirmed values
+      row.dataset.school = (updated.school_name ?? payload.school_name ?? '').toLowerCase();
+      row.dataset.asl = updated.asl_school_id ?? payload.asl_school_id ?? '';
+      row.dataset.lib = updated.library_school_id ?? payload.library_school_id ?? '';
+
+      // Sync delete button dataset for granular deletion
+      const delBtn = row.querySelector('button[title="Delete"]');
+      if (delBtn) {
+        delBtn.dataset.asl = row.dataset.asl;
+        delBtn.dataset.lib = row.dataset.lib;
       }
+
+      // Update visible cells if server normalized values
+      if (schoolTd) schoolTd.textContent = updated.school_name ?? payload.school_name ?? '';
+      if (aslTd) aslTd.textContent = updated.asl_school_id ?? payload.asl_school_id ?? '';
+      if (libTd) libTd.textContent = updated.library_school_id ?? payload.library_school_id ?? '';
+      // Update original values for cells to reflect saved state
+      if (schoolTd) schoolTd.dataset.original = schoolTd.textContent.trim();
+      if (aslTd) aslTd.dataset.original = aslTd.textContent.trim();
+      if (libTd) libTd.dataset.original = libTd.textContent.trim();
+      // Recompute dirty state to disable Save again
+      updateRowSaveState(row);
+      showToast('Champion School updated', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Update failed', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = oldHtml;
     }
+  }
 
-    // Initialize inline editors after DOM content
-    attachInlineEditors();
+  // Initialize inline editors after DOM content
+  attachInlineEditors();
 
-    // Duplicate Checker Functions
-    function openDuplicateChecker() {
-      document.getElementById('duplicateModal').style.display = 'block';
-      // Reset the view
+  // Duplicate Checker Functions
+  function openDuplicateChecker() {
+    document.getElementById('duplicateModal').style.display = 'block';
+    // Reset the view to initial state
+    document.getElementById('duplicate-intro').style.display = 'block';
+    document.getElementById('duplicate-results-container').style.display = 'none';
+    document.getElementById('asl-duplicates-section').style.display = 'none';
+    document.getElementById('lib-duplicates-section').style.display = 'none';
+    document.getElementById('no-duplicates-section').style.display = 'none';
+  }
+
+  function checkForDuplicates() {
+    // Get all champion school rows from the table
+    const rows = document.querySelectorAll('[data-cs-row]');
+
+    // Clear any existing highlights first
+    rows.forEach(row => {
+      const aslCell = row.querySelector('td[data-editable="asl"]');
+      const libCell = row.querySelector('td[data-editable="lib"]');
+      if (aslCell) {
+        aslCell.style.backgroundColor = '';
+        aslCell.style.fontWeight = '';
+        aslCell.style.color = '';
+      }
+      if (libCell) {
+        libCell.style.backgroundColor = '';
+        libCell.style.fontWeight = '';
+        libCell.style.color = '';
+      }
+    });
+
+    // Maps to track IDs
+    const aslMap = {};
+    const libMap = {};
+
+    rows.forEach(row => {
+      const aslId = (row.dataset.asl || '').trim();
+      const libId = (row.dataset.lib || '').trim();
+      const champion = (row.dataset.champion || '').trim();
+      const school = (row.dataset.school || '').trim();
+      const province = (row.dataset.province || '').trim();
+
+      if (aslId && aslId !== '0') {
+        if (!aslMap[aslId]) aslMap[aslId] = [];
+        aslMap[aslId].push({ champion, school, province, row });
+      }
+
+      if (libId && libId !== '0') {
+        if (!libMap[libId]) libMap[libId] = [];
+        libMap[libId].push({ champion, school, province, row });
+      }
+    });
+
+    const aslDuplicates = Object.entries(aslMap).filter(([id, records]) => records.length > 1);
+    const libDuplicates = Object.entries(libMap).filter(([id, records]) => records.length > 1);
+
+    // Highlight in table
+    aslDuplicates.forEach(([id, records]) => {
+      records.forEach(({ row }) => {
+        const aslCell = row.querySelector('td[data-editable="asl"]');
+        if (aslCell) {
+          aslCell.style.backgroundColor = '#fff7ed';
+          aslCell.style.fontWeight = 'bold';
+          aslCell.style.color = '#c2410c';
+        }
+      });
+    });
+
+    libDuplicates.forEach(([id, records]) => {
+      records.forEach(({ row }) => {
+        const libCell = row.querySelector('td[data-editable="lib"]');
+        if (libCell) {
+          libCell.style.backgroundColor = '#eef2ff';
+          libCell.style.fontWeight = 'bold';
+          libCell.style.color = '#4338ca';
+        }
+      });
+    });
+
+    // Switch views
+    document.getElementById('duplicate-intro').style.display = 'none';
+    document.getElementById('duplicate-results-container').style.display = 'block';
+
+    if (aslDuplicates.length === 0 && libDuplicates.length === 0) {
       document.getElementById('asl-duplicates-section').style.display = 'none';
       document.getElementById('lib-duplicates-section').style.display = 'none';
+      document.getElementById('no-duplicates-section').style.display = 'block';
+    } else {
       document.getElementById('no-duplicates-section').style.display = 'none';
-      document.getElementById('duplicate-results').style.display = 'block';
-    }
 
-    function checkForDuplicates() {
-      // Get all champion school rows from the table
-      const rows = document.querySelectorAll('[data-cs-row]');
-
-      // Clear any existing highlights first
-      rows.forEach(row => {
-        const aslCell = row.querySelector('td[data-editable="asl"]');
-        const libCell = row.querySelector('td[data-editable="lib"]');
-        if (aslCell) {
-          aslCell.style.backgroundColor = '';
-          aslCell.style.fontWeight = '';
-        }
-        if (libCell) {
-          libCell.style.backgroundColor = '';
-          libCell.style.fontWeight = '';
-        }
-      });
-
-      // Maps to track IDs: { id_value: [{champion, school, province, row}, ...] }
-      const aslMap = {};
-      const libMap = {};
-
-      rows.forEach(row => {
-        const aslId = (row.dataset.asl || '').trim();
-        const libId = (row.dataset.lib || '').trim();
-        const champion = (row.dataset.champion || '').trim();
-        const school = (row.dataset.school || '').trim();
-        const province = (row.dataset.province || '').trim();
-
-        // Only track non-zero IDs
-        if (aslId && aslId !== '0') {
-          if (!aslMap[aslId]) aslMap[aslId] = [];
-          aslMap[aslId].push({ champion, school, province, row });
-        }
-
-        if (libId && libId !== '0') {
-          if (!libMap[libId]) libMap[libId] = [];
-          libMap[libId].push({ champion, school, province, row });
-        }
-      });
-
-      // Find duplicates (where count > 1)
-      const aslDuplicates = Object.entries(aslMap).filter(([id, records]) => records.length > 1);
-      const libDuplicates = Object.entries(libMap).filter(([id, records]) => records.length > 1);
-
-      // Highlight duplicates in the main Champion Schools table
-      aslDuplicates.forEach(([id, records]) => {
-        records.forEach(({ row }) => {
-          const aslCell = row.querySelector('td[data-editable="asl"]');
-          if (aslCell) {
-            aslCell.style.backgroundColor = '#fee2e2';
-            aslCell.style.fontWeight = 'bold';
-            aslCell.style.color = '#dc2626';
-          }
-        });
-      });
-
-      libDuplicates.forEach(([id, records]) => {
-        records.forEach(({ row }) => {
-          const libCell = row.querySelector('td[data-editable="lib"]');
-          if (libCell) {
-            libCell.style.backgroundColor = '#fee2e2';
-            libCell.style.fontWeight = 'bold';
-            libCell.style.color = '#dc2626';
-          }
-        });
-      });
-
-      // Hide initial message
-      document.getElementById('duplicate-results').style.display = 'none';
-
-      if (aslDuplicates.length === 0 && libDuplicates.length === 0) {
-        // No duplicates found
-        document.getElementById('asl-duplicates-section').style.display = 'none';
-        document.getElementById('lib-duplicates-section').style.display = 'none';
-        document.getElementById('no-duplicates-section').style.display = 'block';
-      } else {
-        // Display duplicates
-        document.getElementById('no-duplicates-section').style.display = 'none';
-
-        // Show info alert about highlighting
-        const infoAlert = `
-      <div class="alert alert-info" role="alert">
-        <i class="fa fa-info-circle"></i> <strong>Note:</strong> Duplicate IDs are also highlighted in red in the Champion Schools table for easy identification.
-      </div>
-    `;
-        document.getElementById('duplicate-results').innerHTML = infoAlert;
-        document.getElementById('duplicate-results').style.display = 'block';
-
-        // ASL Duplicates
-        if (aslDuplicates.length > 0) {
-          document.getElementById('asl-duplicates-section').style.display = 'block';
-          document.getElementById('asl-duplicate-count').textContent = aslDuplicates.length;
-
-          const tbody = document.getElementById('asl-duplicates-table');
-          tbody.innerHTML = aslDuplicates.map(([id, records]) => {
-            const champions = records.map(r => r.champion).filter(Boolean).join(', ');
-            const schools = records.map(r => r.school).filter(Boolean).join(', ');
-            const provinces = [...new Set(records.map(r => r.province).filter(Boolean))].join(', ');
-
-            return `
-          <tr style="background-color: #fee2e2;">
-            <td><strong style="color: #dc2626;">${id}</strong></td>
-            <td><span class="badge bg-danger">${records.length}</span></td>
-            <td>${champions || 'N/A'}</td>
-            <td>${schools || 'N/A'}</td>
-            <td>${provinces || 'N/A'}</td>
-          </tr>
-        `;
-          }).join('');
-        } else {
-          document.getElementById('asl-duplicates-section').style.display = 'none';
-        }
-
-        // Library Duplicates
-        if (libDuplicates.length > 0) {
-          document.getElementById('lib-duplicates-section').style.display = 'block';
-          document.getElementById('lib-duplicate-count').textContent = libDuplicates.length;
-
-          const tbody = document.getElementById('lib-duplicates-table');
-          tbody.innerHTML = libDuplicates.map(([id, records]) => {
-            const champions = records.map(r => r.champion).filter(Boolean).join(', ');
-            const schools = records.map(r => r.school).filter(Boolean).join(', ');
-            const provinces = [...new Set(records.map(r => r.province).filter(Boolean))].join(', ');
-
-            return `
-          <tr style="background-color: #fee2e2;">
-            <td><strong style="color: #dc2626;">${id}</strong></td>
-            <td><span class="badge bg-danger">${records.length}</span></td>
-            <td>${champions || 'N/A'}</td>
-            <td>${schools || 'N/A'}</td>
-            <td>${provinces || 'N/A'}</td>
-          </tr>
-        `;
-          }).join('');
-        } else {
-          document.getElementById('lib-duplicates-section').style.display = 'none';
-        }
-      }
-    }
-
-    // ===== CSV Duplicate Detection =====
-    let currentCsvFile = null;
-    let currentAnalysisData = null;
-    let currentCsvToken = null; // token returned by /analyze_champion_csv when file is saved server-side
-
-    // Intercept the champion CSV form submission
-    document.getElementById('championCsvForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const fileInput = document.getElementById('championCsvFile');
-      const file = fileInput.files[0];
-
-      if (!file) {
-        alert('Please select a CSV file');
-        return;
-      }
-
-      currentCsvFile = file;
-      analyzeCsvForDuplicates(file);
-    });
-
-    function analyzeCsvForDuplicates(file) {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // Show loading
-      const submitBtn = document.getElementById('championCsvSubmit');
-      const originalText = submitBtn.textContent;
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Analyzing...';
-
-      fetch('/analyze_champion_csv', {
-        method: 'POST',
-        body: formData
-      })
-        .then(response => response.json())
-        .then(data => {
-          submitBtn.disabled = false;
-          submitBtn.textContent = originalText;
-
-          if (data.error) {
-            alert('Error: ' + data.error);
-            return;
-          }
-
-          currentAnalysisData = data;
-          // Save server-side token (if provided) so we can reference the saved file when confirming upload
-          if (data.file_token) {
-            currentCsvToken = data.file_token;
-          } else {
-            currentCsvToken = null;
-          }
-
-          if (data.has_duplicates) {
-            showDuplicateResolutionModal(data);
-          } else {
-            // No duplicates, proceed with upload
-            if (confirm(`No duplicates found!\n\nNew champions: ${data.total_new_champions}\nUpdates: ${data.total_updates}\n\nProceed with upload?`)) {
-              proceedWithUpload([], []);
-            }
-          }
-        })
-        .catch(error => {
-          submitBtn.disabled = false;
-          submitBtn.textContent = originalText;
-          alert('Error analyzing CSV: ' + error);
-        });
-    }
-
-    function showDuplicateResolutionModal(data) {
-      // Update counts
-      document.getElementById('csv-dup-count').textContent = data.csv_internal_duplicates.length;
-      document.getElementById('existing-champ-count').textContent = data.existing_champion_duplicates.length;
-      document.getElementById('dup-school-count').textContent = data.duplicate_school_ids.length;
-      document.getElementById('new-champ-count').textContent = data.total_new_champions;
-
-      // CSV Internal Duplicates
-      const csvDupSection = document.getElementById('csv-internal-duplicates-section');
-      if (data.csv_internal_duplicates.length > 0) {
-        csvDupSection.style.display = 'block';
-        const tbody = document.getElementById('csv-dup-table');
-        tbody.innerHTML = data.csv_internal_duplicates.map((dup, idx) => {
-          const idValue = dup.value || dup.id_value || 'N/A';
-          const idType = dup.type || dup.id_type || 'N/A';
-          const rows = Array.isArray(dup.rows) ? dup.rows : [];
-          const count = rows.length || dup.count || 0;
-
-          return `
-        <tr>
-          <td><input type="checkbox" class="form-check-input skip-school-check" value="${idValue}" checked></td>
-          <td><strong style="color: #dc2626;">${idValue}</strong></td>
-          <td>${idType}</td>
-          <td><span class="badge bg-warning text-dark">${count}</span></td>
-          <td class="small">${rows.join(', ')}</td>
-        </tr>
+      const notice = document.getElementById('duplicate-results-notice');
+      notice.innerHTML = `
+        <div class="p-4 bg-white border border-slate-100 rounded-2xl flex items-center gap-3 shadow-sm mb-6">
+          <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+            <i class="fas fa-circle-info text-sm"></i>
+          </div>
+          <p class="text-xs font-semibold text-slate-600">Conflicting IDs have been highlighted in the database view for immediate resolution.</p>
+        </div>
       `;
-        }).join('');
-      } else {
-        csvDupSection.style.display = 'none';
-      }
 
-      // Existing Champions (will be updated)
-      const existingChampSection = document.getElementById('existing-champions-section');
-      if (data.existing_champion_duplicates.length > 0) {
-        existingChampSection.style.display = 'block';
-        const tbody = document.getElementById('existing-champ-table');
-        tbody.innerHTML = data.existing_champion_duplicates.map(champ => {
-          const champKey = `${champ.firstname}|${champ.lastname}|${champ.province}`;
-          const existingCount = Array.isArray(champ.existing_schools) ? champ.existing_schools.length : 0;
-          const newCount = Array.isArray(champ.new_schools) ? champ.new_schools.length : 0;
-
+      if (aslDuplicates.length > 0) {
+        document.getElementById('asl-duplicates-section').style.display = 'block';
+        document.getElementById('asl-duplicate-count').textContent = aslDuplicates.length;
+        const tbody = document.getElementById('asl-duplicates-table');
+        tbody.innerHTML = aslDuplicates.map(([id, records]) => {
+          const champions = records.map(r => r.champion).join(', ');
+          const schools = records.map(r => r.school).join(', ');
           return `
-        <tr>
-          <td><input type="checkbox" class="form-check-input skip-champion-check" value="${champKey}"></td>
-          <td>${champ.firstname} ${champ.lastname}</td>
-          <td>${champ.province}</td>
-          <td><span class="badge bg-secondary">${existingCount}</span></td>
-          <td><span class="badge bg-success">+${newCount}</span></td>
-        </tr>
-      `;
+            <tr>
+              <td class="p-4 font-mono font-bold text-amber-700">${id}</td>
+              <td class="p-4"><span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-black">${records.length}</span></td>
+              <td class="p-4 font-medium text-slate-600">${champions}</td>
+              <td class="p-4 text-slate-500">${schools}</td>
+              <td class="p-4"><span class="text-[10px] uppercase font-black tracking-tighter text-slate-400">${records[0].province}</span></td>
+            </tr>
+          `;
         }).join('');
-      } else {
-        existingChampSection.style.display = 'none';
       }
 
-      // Duplicate School IDs
-      const dupSchoolSection = document.getElementById('duplicate-schools-section');
-      if (data.duplicate_school_ids.length > 0) {
-        dupSchoolSection.style.display = 'block';
-        const tbody = document.getElementById('dup-school-table');
-        tbody.innerHTML = data.duplicate_school_ids.map(school => `
-      <tr>
-        <td><input type="checkbox" class="form-check-input skip-school-check" value="${school.id_value}" checked></td>
-        <td><strong style="color: #dc2626;">${school.id_value}</strong></td>
-        <td>${school.type || 'N/A'}</td>
-        <td>${school.existing_champion || 'N/A'}</td>
-        <td>${school.existing_school || 'N/A'}</td>
-        <td>${school.csv_school || 'N/A'}</td>
-      </tr>
-    `).join('');
-      } else {
-        dupSchoolSection.style.display = 'none';
+      if (libDuplicates.length > 0) {
+        document.getElementById('lib-duplicates-section').style.display = 'block';
+        document.getElementById('lib-duplicate-count').textContent = libDuplicates.length;
+        const tbody = document.getElementById('lib-duplicates-table');
+        tbody.innerHTML = libDuplicates.map(([id, records]) => {
+          const champions = records.map(r => r.champion).join(', ');
+          const schools = records.map(r => r.school).join(', ');
+          return `
+            <tr>
+              <td class="p-4 font-mono font-bold text-indigo-700">${id}</td>
+              <td class="p-4"><span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-black">${records.length}</span></td>
+              <td class="p-4 font-medium text-slate-600">${champions}</td>
+              <td class="p-4 text-slate-500">${schools}</td>
+              <td class="p-4"><span class="text-[10px] uppercase font-black tracking-tighter text-slate-400">${records[0].province}</span></td>
+            </tr>
+          `;
+        }).join('');
       }
+    }
+  }
 
-      updateSelectionCounts();
-      document.getElementById('csvDuplicateModal').style.display = 'block';
+  // ===== CSV Duplicate Detection =====
+  let currentCsvFile = null;
+  let currentAnalysisData = null;
+  let currentCsvToken = null; // token returned by /analyze_champion_csv when file is saved server-side
+
+  // Intercept the champion CSV form submission
+  document.getElementById('championCsvForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const fileInput = document.getElementById('championCsvFile');
+    const file = fileInput.files[0];
+
+    if (!file) {
+      alert('Please select a CSV file');
+      return;
     }
 
-    function updateSelectionCounts() {
-      const skipChampChecks = document.querySelectorAll('.skip-champion-check:checked');
-      const skipSchoolChecks = document.querySelectorAll('.skip-school-check:checked');
-      document.getElementById('skip-champ-count').textContent = skipChampChecks.length;
-      document.getElementById('skip-school-count').textContent = skipSchoolChecks.length;
-    }
+    currentCsvFile = file;
+    analyzeCsvForDuplicates(file);
+  });
 
-    function toggleAllChampions(checked) {
-      document.querySelectorAll('.skip-champion-check').forEach(cb => {
-        cb.checked = checked;
-      });
-      updateSelectionCounts();
-    }
+  function analyzeCsvForDuplicates(file) {
+    const formData = new FormData();
+    formData.append('file', file);
 
-    function toggleAllSchools(checked) {
-      document.querySelectorAll('.skip-school-check').forEach(cb => {
-        cb.checked = checked;
-      });
-      updateSelectionCounts();
-    }
+    // Show loading
+    const submitBtn = document.getElementById('championCsvSubmit');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Analyzing...';
 
-    function closeCsvDuplicateModal() {
-      document.getElementById('csvDuplicateModal').style.display = 'none';
-      currentCsvFile = null;
-      currentAnalysisData = null;
-    }
+    fetch('/analyze_champion_csv', {
+      method: 'POST',
+      body: formData
+    })
+      .then(response => response.json())
+      .then(data => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
 
-    function proceedWithCsvUpload() {
-      const skipChampions = Array.from(document.querySelectorAll('.skip-champion-check:checked')).map(cb => cb.value);
-      const skipSchools = Array.from(document.querySelectorAll('.skip-school-check:checked')).map(cb => cb.value);
-
-      // Proceed with upload while the currentCsvFile is still available
-      proceedWithUpload(skipChampions, skipSchools);
-      // Close the modal after initiating the upload (clears currentCsvFile)
-      closeCsvDuplicateModal();
-    }
-
-    function proceedWithUpload(skipChampions, skipSchools) {
-      if (!currentCsvFile) {
-        // If the client-side File object was cleared (e.g. modal closed), but the server
-        // holds a saved copy referenced by `currentCsvToken`, allow proceeding using that token.
-        if (!currentCsvToken) {
-          alert('No file selected');
+        if (data.error) {
+          alert('Error: ' + data.error);
           return;
         }
-      }
 
-      const formData = new FormData();
-      // If we have a server-side token, send that instead of re-sending the file
-      if (currentCsvToken) {
-        formData.append('file_token', currentCsvToken);
-      } else {
-        formData.append('file', currentCsvFile);
-      }
-      formData.append('skip_champions', JSON.stringify(skipChampions));
-      formData.append('skip_schools', JSON.stringify(skipSchools));
+        currentAnalysisData = data;
+        // Save server-side token (if provided) so we can reference the saved file when confirming upload
+        if (data.file_token) {
+          currentCsvToken = data.file_token;
+        } else {
+          currentCsvToken = null;
+        }
 
-      // Show loading
-      const submitBtn = document.getElementById('championCsvSubmit');
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Uploading...';
-
-      fetch('/upload_csv_confirmed', {
-        method: 'POST',
-        body: formData
+        if (data.has_duplicates) {
+          showDuplicateResolutionModal(data);
+        } else {
+          // No duplicates, proceed with upload
+          if (confirm(`No duplicates found!\n\nNew champions: ${data.total_new_champions}\nUpdates: ${data.total_updates}\n\nProceed with upload?`)) {
+            proceedWithUpload([], []);
+          }
+        }
       })
-        .then(response => response.json())
-        .then(data => {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Upload CSV';
+      .catch(error => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        alert('Error analyzing CSV: ' + error);
+      });
+  }
 
-          if (data.error) {
-            alert('Error: ' + data.error);
-          } else if (data.success) {
-            alert(data.message);
-            location.reload();
-          }
-        })
-        .catch(error => {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Upload CSV';
-          alert('Upload error: ' + error);
-        });
-    }
+  function showDuplicateResolutionModal(data) {
+    document.getElementById('csv-dup-count').textContent = data.csv_internal_duplicates.length;
+    document.getElementById('champ-dup-count').textContent = data.existing_champion_duplicates.length;
+    document.getElementById('school-dup-count').textContent = data.duplicate_school_ids.length;
+    document.getElementById('new-count').textContent = data.total_new_champions;
 
-    // Add change listeners to checkboxes
-    document.addEventListener('change', function (e) {
-      if (e.target.classList.contains('skip-champion-check') || e.target.classList.contains('skip-school-check')) {
-        updateSelectionCounts();
-      }
-    });
-
-    // ===== User CSV Duplicate Detection =====
-    let currentUserCsvFile = null;
-
-    // Intercept the user CSV form submission
-    document.getElementById('userCsvForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const fileInput = document.getElementById('userCsvFile');
-      const file = fileInput.files[0];
-
-      if (!file) {
-        alert('Please select a CSV file');
-        return;
-      }
-
-      currentUserCsvFile = file;
-      analyzeUserCsvForDuplicates(file);
-    });
-
-    function analyzeUserCsvForDuplicates(file) {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const submitBtn = document.getElementById('userCsvSubmit');
-      const originalText = submitBtn.textContent;
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Analyzing...';
-
-      fetch('/analyze_users_csv', {
-        method: 'POST',
-        body: formData
-      })
-        .then(response => response.json())
-        .then(data => {
-          submitBtn.disabled = false;
-          submitBtn.textContent = originalText;
-
-          if (data.error) {
-            // Check if it's a column validation error
-            if (data.missing_columns) {
-              showColumnValidationError(data, 'Users');
-            } else {
-              alert('Error: ' + data.error);
-            }
-            return;
-          }
-
-          if (data.has_duplicates) {
-            showUserDuplicateResolutionModal(data);
-          } else {
-            if (confirm(`No duplicates found!\n\nNew users: ${data.total_new_users}\n\nProceed with upload?`)) {
-              proceedWithUserUpload([]);
-            }
-          }
-        })
-        .catch(error => {
-          submitBtn.disabled = false;
-          submitBtn.textContent = originalText;
-          alert('Error analyzing CSV: ' + error);
-        });
-    }
-
-    function showUserDuplicateResolutionModal(data) {
-      document.getElementById('user-csv-dup-count').textContent = data.csv_email_duplicates.length;
-      document.getElementById('user-existing-dup-count').textContent = data.existing_email_duplicates.length;
-      document.getElementById('user-new-count').textContent = data.total_new_users;
-
-      // CSV Internal Email Duplicates
-      const csvDupSection = document.getElementById('user-csv-duplicates-section');
-      if (data.csv_email_duplicates.length > 0) {
-        csvDupSection.style.display = 'block';
-        const tbody = document.getElementById('user-csv-dup-table');
-        tbody.innerHTML = data.csv_email_duplicates.map(dup => {
-          const rows = Array.isArray(dup.rows) ? dup.rows : [];
-          return `
-        <tr>
-          <td><input type="checkbox" class="form-check-input skip-email-check" value="${dup.email}" checked></td>
-          <td>${dup.email}</td>
-          <td>${dup.firstname} ${dup.lastname}</td>
-          <td class="small">${rows.join(', ')}</td>
+    const csvDupSection = document.getElementById('csv-duplicates-section');
+    if (data.csv_internal_duplicates.length > 0) {
+      csvDupSection.style.display = 'block';
+      const tbody = document.getElementById('csv-dup-table');
+      tbody.innerHTML = data.csv_internal_duplicates.map(dup => {
+        const idValue = dup.value || dup.id_value || 'N/A';
+        return `
+        <tr class="hover:bg-slate-50 transition-colors">
+          <td class="p-4"><input type="checkbox" class="skip-school-check" value="${idValue}" checked></td>
+          <td class="p-4 font-mono font-bold text-amber-600">${idValue}</td>
+          <td class="p-4 font-medium text-slate-600">${dup.type || 'ID Reference'}</td>
+          <td class="p-4"><span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold">${dup.rows?.length || 0}</span></td>
         </tr>
       `;
-        }).join('');
-      } else {
-        csvDupSection.style.display = 'none';
-      }
+      }).join('');
+    } else {
+      csvDupSection.style.display = 'none';
+    }
 
-      // Existing Email Duplicates
-      const existingDupSection = document.getElementById('user-existing-duplicates-section');
-      if (data.existing_email_duplicates.length > 0) {
-        existingDupSection.style.display = 'block';
-        const tbody = document.getElementById('user-existing-dup-table');
-        tbody.innerHTML = data.existing_email_duplicates.map(dup => `
-      <tr>
-        <td><input type="checkbox" class="form-check-input skip-email-check" value="${dup.email}" checked></td>
-        <td>${dup.email}</td>
-        <td>${dup.firstname} ${dup.lastname}</td>
-        <td>${dup.existing_user || 'N/A'}</td>
-        <td>${dup.existing_username || 'N/A'}</td>
-        <td>${dup.row || 'N/A'}</td>
+    const existingChampSection = document.getElementById('existing-champions-section');
+    if (data.existing_champion_duplicates.length > 0) {
+      existingChampSection.style.display = 'block';
+      const tbody = document.getElementById('existing-champ-table');
+      tbody.innerHTML = data.existing_champion_duplicates.map(champ => {
+        const champKey = `${champ.firstname}|${champ.lastname}|${champ.province}`;
+        return `
+        <tr class="hover:bg-slate-50 transition-colors">
+          <td class="p-4"><input type="checkbox" class="skip-champion-check" value="${champKey}"></td>
+          <td class="p-4 font-bold text-slate-800">${champ.firstname} ${champ.lastname}</td>
+          <td class="p-4 text-slate-500 font-medium">${champ.province}</td>
+          <td class="p-4"><span class="px-2 py-0.5 rounded bg-sky-50 text-sky-700 font-bold">${champ.existing_schools?.length || 0} Records</span></td>
+          <td class="p-4"><span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">+${champ.new_schools?.length || 0} Updates</span></td>
+        </tr>
+      `;
+      }).join('');
+    } else {
+      existingChampSection.style.display = 'none';
+    }
+
+    const dupSchoolSection = document.getElementById('duplicate-schools-section');
+    if (data.duplicate_school_ids.length > 0) {
+      dupSchoolSection.style.display = 'block';
+      const tbody = document.getElementById('dup-school-table');
+      tbody.innerHTML = data.duplicate_school_ids.map(school => `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="p-4"><input type="checkbox" class="skip-school-check" value="${school.id_value}" checked></td>
+        <td class="p-4 font-mono font-bold text-red-600">${school.id_value}</td>
+        <td class="p-4 font-medium text-slate-600">${school.type || 'ID Reference'}</td>
+        <td class="p-4 font-bold text-slate-800">${school.existing_champion || 'N/A'}</td>
+        <td class="p-4 text-slate-500">${school.csv_school || 'N/A'}</td>
       </tr>
     `).join('');
-      } else {
-        existingDupSection.style.display = 'none';
-      }
-
-      updateUserSelectionCounts();
-      document.getElementById('userDuplicateModal').style.display = 'block';
+    } else {
+      dupSchoolSection.style.display = 'none';
     }
 
-    function updateUserSelectionCounts() {
-      const skipEmailChecks = document.querySelectorAll('.skip-email-check:checked');
-      document.getElementById('skip-email-count').textContent = skipEmailChecks.length;
-    }
+    updateSelectionCounts();
+    document.getElementById('csvDuplicateModal').style.display = 'block';
+  }
 
-    function toggleAllUserEmails(checked) {
-      document.querySelectorAll('.skip-email-check').forEach(cb => {
-        cb.checked = checked;
-      });
-      updateUserSelectionCounts();
-    }
+  function updateSelectionCounts() {
+    const skipChampChecks = document.querySelectorAll('.skip-champion-check:checked');
+    const skipSchoolChecks = document.querySelectorAll('.skip-school-check:checked');
+    document.getElementById('skip-champ-count').textContent = skipChampChecks.length;
+    document.getElementById('skip-school-count').textContent = skipSchoolChecks.length;
+  }
 
-    function closeUserDuplicateModal() {
-      document.getElementById('userDuplicateModal').style.display = 'none';
-      currentUserCsvFile = null;
-    }
+  function toggleAllChampions(checked) {
+    document.querySelectorAll('.skip-champion-check').forEach(cb => {
+      cb.checked = checked;
+    });
+    updateSelectionCounts();
+  }
 
-    function proceedWithUserCsvUpload() {
-      const skipEmails = Array.from(document.querySelectorAll('.skip-email-check:checked')).map(cb => cb.value);
-      // Initiate upload first while file reference exists
-      proceedWithUserUpload(skipEmails);
-      // Then close the modal which clears the selected file reference
-      closeUserDuplicateModal();
-    }
+  function toggleAllSchools(checked) {
+    document.querySelectorAll('.skip-school-check').forEach(cb => {
+      cb.checked = checked;
+    });
+    updateSelectionCounts();
+  }
 
-    function proceedWithUserUpload(skipEmails) {
-      if (!currentUserCsvFile) {
+  function closeCsvDuplicateModal() {
+    document.getElementById('csvDuplicateModal').style.display = 'none';
+    currentCsvFile = null;
+    currentAnalysisData = null;
+  }
+
+  function proceedWithCsvUpload() {
+    const skipChampions = Array.from(document.querySelectorAll('.skip-champion-check:checked')).map(cb => cb.value);
+    const skipSchools = Array.from(document.querySelectorAll('.skip-school-check:checked')).map(cb => cb.value);
+
+    // Proceed with upload while the currentCsvFile is still available
+    proceedWithUpload(skipChampions, skipSchools);
+    // Close the modal after initiating the upload (clears currentCsvFile)
+    closeCsvDuplicateModal();
+  }
+
+  function proceedWithUpload(skipChampions, skipSchools) {
+    if (!currentCsvFile) {
+      // If the client-side File object was cleared (e.g. modal closed), but the server
+      // holds a saved copy referenced by `currentCsvToken`, allow proceeding using that token.
+      if (!currentCsvToken) {
         alert('No file selected');
         return;
       }
-
-      const formData = new FormData();
-      formData.append('file', currentUserCsvFile);
-      formData.append('skip_emails', JSON.stringify(skipEmails));
-
-      const submitBtn = document.getElementById('userCsvSubmit');
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Uploading...';
-
-      fetch('/upload_users_confirmed', {
-        method: 'POST',
-        body: formData
-      })
-        .then(response => response.json())
-        .then(data => {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Upload CSV';
-
-          if (data.error) {
-            alert('Error: ' + data.error);
-          } else if (data.success) {
-            alert(data.message);
-            location.reload();
-          }
-        })
-        .catch(error => {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Upload CSV';
-          alert('Upload error: ' + error);
-        });
     }
 
-    // Add change listeners for user email checkboxes
-    document.addEventListener('change', function (e) {
-      if (e.target.classList.contains('skip-email-check')) {
-        updateUserSelectionCounts();
-      }
-    });
+    const formData = new FormData();
+    // If we have a server-side token, send that instead of re-sending the file
+    if (currentCsvToken) {
+      formData.append('file_token', currentCsvToken);
+    } else {
+      formData.append('file', currentCsvFile);
+    }
+    formData.append('skip_champions', JSON.stringify(skipChampions));
+    formData.append('skip_schools', JSON.stringify(skipSchools));
 
-    // ===== Column Validation Error Display =====
-    function showColumnValidationError(data, uploadType) {
-      const missing = data.missing_columns || [];
-      const required = data.required_columns || [];
-      const found = data.found_columns || [];
+    // Show loading
+    const submitBtn = document.getElementById('championCsvSubmit');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Uploading...';
 
-      let message = `❌ CSV Column Validation Failed for ${uploadType}\n\n`;
-      message += `Missing Columns: ${missing.join(', ')}\n\n`;
-      message += `Required Columns: ${required.join(', ')}\n\n`;
-      message += `Found Columns: ${found.join(', ')}\n\n`;
-      message += `Please update your CSV file to include all required columns.`;
+    fetch('/upload_csv_confirmed', {
+      method: 'POST',
+      body: formData
+    })
+      .then(response => response.json())
+      .then(data => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload CSV';
 
-      alert(message);
+        if (data.error) {
+          alert('Error: ' + data.error);
+        } else if (data.success) {
+          alert(data.message);
+          location.reload();
+        }
+      })
+      .catch(error => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload CSV';
+        alert('Upload error: ' + error);
+      });
+  }
+
+  // Add change listeners to checkboxes
+  document.addEventListener('change', function (e) {
+    if (e.target.classList.contains('skip-champion-check') || e.target.classList.contains('skip-school-check')) {
+      updateSelectionCounts();
+    }
+  });
+
+  // ===== User CSV Duplicate Detection =====
+  let currentUserCsvFile = null;
+
+  // Intercept the user CSV form submission
+  document.getElementById('userCsvForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const fileInput = document.getElementById('userCsvFile');
+    const file = fileInput.files[0];
+
+    if (!file) {
+      alert('Please select a CSV file');
+      return;
     }
 
-    // Update champion CSV to show column validation errors
-    const originalAnalyzeCsvForDuplicates = analyzeCsvForDuplicates;
-    analyzeCsvForDuplicates = function (file) {
-      const formData = new FormData();
-      formData.append('file', file);
+    currentUserCsvFile = file;
+    analyzeUserCsvForDuplicates(file);
+  });
 
-      const submitBtn = document.getElementById('championCsvSubmit');
-      const originalText = submitBtn.textContent;
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Analyzing...';
+  function analyzeUserCsvForDuplicates(file) {
+    const formData = new FormData();
+    formData.append('file', file);
 
-      fetch('/analyze_champion_csv', {
-        method: 'POST',
-        body: formData
-      })
-        .then(response => response.json())
-        .then(data => {
-          submitBtn.disabled = false;
-          submitBtn.textContent = originalText;
+    const submitBtn = document.getElementById('userCsvSubmit');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Analyzing...';
 
-          if (data.error) {
-            // Check if it's a column validation error
-            if (data.missing_columns) {
-              showColumnValidationError(data, 'Champions');
-            } else {
-              alert('Error: ' + data.error);
-            }
-            return;
-          }
+    fetch('/analyze_users_csv', {
+      method: 'POST',
+      body: formData
+    })
+      .then(response => response.json())
+      .then(data => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
 
-          currentAnalysisData = data;
-
-          if (data.has_duplicates) {
-            showDuplicateResolutionModal(data);
+        if (data.error) {
+          // Check if it's a column validation error
+          if (data.missing_columns) {
+            showColumnValidationError(data, 'Users');
           } else {
-            if (confirm(`No duplicates found!\n\nNew champions: ${data.total_new_champions}\nUpdates: ${data.total_updates}\n\nProceed with upload?`)) {
-              proceedWithUpload([], []);
-            }
+            alert('Error: ' + data.error);
           }
-        })
-        .catch(error => {
-          submitBtn.disabled = false;
-          submitBtn.textContent = originalText;
-          alert('Error analyzing CSV: ' + error);
-        });
-    };
+          return;
+        }
 
-  </script>
-  {% endblock %}
+        if (data.has_duplicates) {
+          showUserDuplicateResolutionModal(data);
+        } else {
+          if (confirm(`No duplicates found!\n\nNew users: ${data.total_new_users}\n\nProceed with upload?`)) {
+            proceedWithUserUpload([]);
+          }
+        }
+      })
+      .catch(error => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        alert('Error analyzing CSV: ' + error);
+      });
+  }
+
+  function showUserDuplicateResolutionModal(data) {
+    document.getElementById('user-csv-dup-count').textContent = data.csv_email_duplicates.length;
+    document.getElementById('user-existing-dup-count').textContent = data.existing_email_duplicates.length;
+    document.getElementById('user-new-count').textContent = data.total_new_users;
+
+    const csvDupSection = document.getElementById('user-csv-duplicates-section');
+    if (data.csv_email_duplicates.length > 0) {
+      csvDupSection.style.display = 'block';
+      const tbody = document.getElementById('user-csv-dup-table');
+      tbody.innerHTML = data.csv_email_duplicates.map(dup => {
+        return `
+        <tr class="hover:bg-slate-50 transition-colors">
+          <td class="p-4"><input type="checkbox" class="skip-email-check" value="${dup.email}" checked></td>
+          <td class="p-4 font-mono font-bold text-indigo-600">${dup.email}</td>
+          <td class="p-4 font-bold text-slate-800">${dup.firstname} ${dup.lastname}</td>
+          <td class="p-4"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold">${dup.rows?.length || 0} Hits</span></td>
+        </tr>
+      `;
+      }).join('');
+    } else {
+      csvDupSection.style.display = 'none';
+    }
+
+    const existingDupSection = document.getElementById('user-existing-duplicates-section');
+    if (data.existing_email_duplicates.length > 0) {
+      existingDupSection.style.display = 'block';
+      const tbody = document.getElementById('user-existing-dup-table');
+      tbody.innerHTML = data.existing_email_duplicates.map(dup => `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="p-4"><input type="checkbox" class="skip-email-check" value="${dup.email}" checked></td>
+        <td class="p-4 font-mono font-bold text-red-600">${dup.email}</td>
+        <td class="p-4 font-bold text-slate-800">${dup.firstname} ${dup.lastname}</td>
+        <td class="p-4"><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-black uppercase text-[10px]">Active Profile</span></td>
+      </tr>
+    `).join('');
+    } else {
+      existingDupSection.style.display = 'none';
+    }
+
+    updateUserSelectionCounts();
+    document.getElementById('userDuplicateModal').style.display = 'block';
+  }
+
+  function updateUserSelectionCounts() {
+    const skipEmailChecks = document.querySelectorAll('.skip-email-check:checked');
+    document.getElementById('skip-email-count').textContent = skipEmailChecks.length;
+  }
+
+  function toggleAllUserEmails(checked) {
+    document.querySelectorAll('.skip-email-check').forEach(cb => {
+      cb.checked = checked;
+    });
+    updateUserSelectionCounts();
+  }
+
+  function closeUserDuplicateModal() {
+    document.getElementById('userDuplicateModal').style.display = 'none';
+    currentUserCsvFile = null;
+  }
+
+  function proceedWithUserCsvUpload() {
+    const skipEmails = Array.from(document.querySelectorAll('.skip-email-check:checked')).map(cb => cb.value);
+    // Initiate upload first while file reference exists
+    proceedWithUserUpload(skipEmails);
+    // Then close the modal which clears the selected file reference
+    closeUserDuplicateModal();
+  }
+
+  function proceedWithUserUpload(skipEmails) {
+    if (!currentUserCsvFile) {
+      alert('No file selected');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', currentUserCsvFile);
+    formData.append('skip_emails', JSON.stringify(skipEmails));
+
+    const submitBtn = document.getElementById('userCsvSubmit');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Uploading...';
+
+    fetch('/upload_users_confirmed', {
+      method: 'POST',
+      body: formData
+    })
+      .then(response => response.json())
+      .then(data => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload CSV';
+
+        if (data.error) {
+          alert('Error: ' + data.error);
+        } else if (data.success) {
+          alert(data.message);
+          location.reload();
+        }
+      })
+      .catch(error => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload CSV';
+        alert('Upload error: ' + error);
+      });
+  }
+
+  // Add change listeners for user email checkboxes
+  document.addEventListener('change', function (e) {
+    if (e.target.classList.contains('skip-email-check')) {
+      updateUserSelectionCounts();
+    }
+  });
+
+  // ===== Column Validation Error Display =====
+  function showColumnValidationError(data, uploadType) {
+    const missing = data.missing_columns || [];
+    const required = data.required_columns || [];
+    const found = data.found_columns || [];
+
+    let message = `❌ CSV Column Validation Failed for ${uploadType}\n\n`;
+    message += `Missing Columns: ${missing.join(', ')}\n\n`;
+    message += `Required Columns: ${required.join(', ')}\n\n`;
+    message += `Found Columns: ${found.join(', ')}\n\n`;
+    message += `Please update your CSV file to include all required columns.`;
+
+    alert(message);
+  }
+
+  // Update champion CSV to show column validation errors
+  const originalAnalyzeCsvForDuplicates = analyzeCsvForDuplicates;
+  analyzeCsvForDuplicates = function (file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const submitBtn = document.getElementById('championCsvSubmit');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Analyzing...';
+
+    fetch('/analyze_champion_csv', {
+      method: 'POST',
+      body: formData
+    })
+      .then(response => response.json())
+      .then(data => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+
+        if (data.error) {
+          // Check if it's a column validation error
+          if (data.missing_columns) {
+            showColumnValidationError(data, 'Champions');
+          } else {
+            alert('Error: ' + data.error);
+          }
+          return;
+        }
+
+        currentAnalysisData = data;
+
+        if (data.has_duplicates) {
+          showDuplicateResolutionModal(data);
+        } else {
+          if (confirm(`No duplicates found!\n\nNew champions: ${data.total_new_champions}\nUpdates: ${data.total_updates}\n\nProceed with upload?`)) {
+            proceedWithUpload([], []);
+          }
+        }
+      })
+      .catch(error => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        alert('Error analyzing CSV: ' + error);
+      });
+  };
+
+</script>
+{% endblock %}

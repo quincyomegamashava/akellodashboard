@@ -980,8 +980,36 @@ def admin_delete_champion_school(cs_id):
     rec = db.session.get(ChampionSchool, cs_id)
     if not rec:
         return jsonify({"error": "Record not found"}), 404
+        
+    asl_id = request.args.get('asl')
+    lib_id = request.args.get('lib')
+    
     try:
-        db.session.delete(rec)
+        if asl_id or lib_id:
+            # Granular deletion: remove specific school from the list
+            schools = rec.get_schools() or []
+            new_schools = []
+            for s in schools:
+                s_asl = str(s.get('asl_school_id') or '').strip()
+                s_lib = str(s.get('library_school_id') or '').strip()
+                
+                # Check for match (handling potential empty strings/nulls)
+                is_match = False
+                if asl_id and s_asl == asl_id: is_match = True
+                if lib_id and s_lib == lib_id: is_match = True
+                
+                if not is_match:
+                    new_schools.append(s)
+            
+            if not new_schools:
+                # If no schools left, delete the entire record
+                db.session.delete(rec)
+            else:
+                rec.set_schools(new_schools)
+        else:
+            # Fallback/Legacy: Delete the entire champion record
+            db.session.delete(rec)
+            
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
