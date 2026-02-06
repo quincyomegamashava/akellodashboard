@@ -1,187 +1,321 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="w3-container w3-padding w3-margin w3-small w3-full">
-  
-  <style>
-    /* Scoped styles for akello_weekly_reports */
-    .awr-shell { display: grid; grid-template-columns: 300px 1fr; gap: 16px; }
-    @media (max-width: 991px) { .awr-shell { grid-template-columns: 1fr; } }
+<div class="max-w-[1600px] mx-auto">
 
-    .awr-side { border: 1px solid #e6eef9; border-radius: 16px; background: #fff; overflow: hidden; }
-    .awr-side header { background: linear-gradient(135deg, #eaf2ff, #ffffff); border-bottom: 1px solid #d8e7ff; }
-    .awr-side .list { padding: 10px; max-height: 65vh; overflow-y: auto; }
-
-    .awr-user { display:flex; align-items:center; gap:10px; padding:10px 12px; margin:6px 0; border-radius:10px; text-decoration:none; border:1px solid #e7eefc; color:#1f2c48; background:#fff; transition:.18s ease; }
-    .awr-user:hover { background:#f7faff; border-color:#d6e5ff; }
-    .awr-user.active { background:#1e88e5; color:#fff !important; border-color:#1e88e5; box-shadow:0 6px 16px rgba(30,136,229,.25); }
-
-    .awr-card { border:1px solid #e6eef9; border-left:4px solid #8ec5ff; border-radius: 14px; background:#fff; padding:14px; margin-bottom:14px; box-shadow: 0 2px 10px rgba(0,0,0,.03); }
-    .awr-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; background:#f7f9ff; border-radius:10px; border:1px solid #e7eefc; }
-    .awr-meta { font-size: 12px; color: #7a8799; }
-    .awr-grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:10px; }
-    .awr-block { padding:10px; border:1px solid #eff3fb; border-radius:10px; background:#fcfdff; max-height: 200px; overflow-y:auto; }
-    @media (max-width: 991px) { .awr-grid { grid-template-columns: 1fr; } }
-
-    .chip-btn { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; border:1px solid #dfe8f7; background:#fff; color:#00407d; text-decoration:none; transition:.18s; }
-    .chip-btn:hover { background:#f7faff; border-color:#d6e5ff; }
-
-    .modal-narrow { width: 55vw; height: 75vh; }
-    @media (max-width: 991px) { .modal-narrow { width: 95vw; height: 80vh; } }
-    .modal-body-scroll { height: calc(100% - 80px); overflow-y: auto; }
-  </style>
-
-  <!-- Header Row -->
-  <div class="w3-row w3-margin-bottom">
-    <div class="w3-col s12 m8">
-      <h4 class="w3-margin-0" style="color:#1f2c48; font-weight:700;">Akello Weekly Reports</h4>
-      <span class="w3-small w3-text-grey">Department: {{ user_department }}</span>
+  <!-- Header Section -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Weekly Status Reports</h1>
+      <p class="text-sm text-slate-500 mt-1">
+        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 font-medium">
+          {{ user_department }}
+        </span>
+        &bull; Tracking team progress and upcoming milestones
+      </p>
     </div>
-    <div class="w3-col s12 m4 w3-right-align w3-margin-top">
-      <a class="chip-btn" onclick="document.getElementById('new_report').style.display='block'">
-        <i class="bi bi-patch-plus"></i> New Report
-      </a>
-    </div>
+    <button onclick="openModal('new_report_modal')"
+      class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition-all shadow-sm hover:shadow-indigo-100 group">
+      <i class="fas fa-plus text-xs group-hover:rotate-90 transition-transform"></i>
+      New Weekly Report
+    </button>
   </div>
 
-  <div class="awr-shell">
+  <div class="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-8 items-start">
 
-    <!-- Sidebar with users -->
-    <aside class="awr-side">
-      <header class="w3-padding w3-center w3-small">
-        <b>Team Members</b>
-      </header>
-      <div class="list" style="height: 85vh; overflow-y: auto;">
+    <!-- Left Sidebar: Team Members -->
+    <aside
+      class="bg-white/70 backdrop-blur-md rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden sticky top-24">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wider">Team Directory</h2>
+        <span class="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-full">
+          {{ users|selectattr('department', 'equalto', user_department)|list|length }} Members
+        </span>
+      </div>
+      <div class="p-2 space-y-1 max-h-[calc(100vh-250px)] overflow-y-auto custom-scrollbar">
         {% for user in users %}
-          {% if user.department == user_department %}
-            <a href="{{ url_for('akello_weekly_reports', user_id=user.id) }}" class="awr-user {% if user.id == selected_user_id %} active {% endif %}">
-              <i class="bi bi-person-circle"></i>
-              <span>{{ user.username }}</span>
-            </a>
+        {% if user.department == user_department %}
+        <a href="{{ url_for('akello_weekly_reports', user_id=user.id) }}"
+          class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all group
+               {{ 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' if user.id == selected_user_id else 'hover:bg-slate-50 text-slate-600' }}">
+          <div
+            class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-xs border
+                {{ 'bg-white/20 border-white/30 text-white' if user.id == selected_user_id else 'bg-indigo-50 border-indigo-100 text-indigo-600' }}">
+            {{ user.username[:2]|upper }}
+          </div>
+          <div class="overflow-hidden">
+            <p class="text-sm font-semibold truncate">{{ user.username }}</p>
+            <p class="text-[10px] opacity-70 truncate">{{ user.userRole or 'Member' }}</p>
+          </div>
+          {% if user.id == selected_user_id %}
+          <i class="fas fa-chevron-right ml-auto text-xs animate-pulse"></i>
           {% endif %}
+        </a>
+        {% endif %}
         {% endfor %}
       </div>
     </aside>
 
-    <!-- Main content: reports -->
-    <section style="height: 85vh; overflow-y: auto;">
+    <!-- Right Content: Reports Feed -->
+    <main class="space-y-6">
+      <div class="flex items-center gap-3 mb-2">
+        <div
+          class="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+          <i class="fas fa-file-alt"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-800">Reports for {{ selected_report_user.username }}</h3>
+          <p class="text-xs text-slate-500">Showing historical submissions in reverse chronological order</p>
+        </div>
+      </div>
+
       {% if reports %}
+      <div class="space-y-6">
         {% for report in reports %}
-          <div class="awr-card {% if selected_report_user.department != user_department %} w3-hide {% endif %}">
-            <div class="awr-head">
+        <div
+          class="group relative bg-white rounded-2xl border border-slate-200 p-6 transition-all hover:shadow-xl hover:shadow-slate-100 hover:border-indigo-200">
+          <!-- Report Header -->
+          <div
+            class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-50">
+            <div class="flex items-center gap-4">
+              <div
+                class="w-12 h-12 rounded-xl bg-slate-50 flex flex-col items-center justify-center border border-slate-100">
+                <span class="text-[10px] font-bold text-slate-400 uppercase leading-none mb-1">Week</span>
+                <span class="text-sm font-bold text-slate-700 leading-none">{{ report.week_start.split('-')[-1]
+                  }}</span>
+              </div>
               <div>
-                <span class="w3-small w3-text-grey">Week starting</span>
-                <div><b>{{ report.week_start }}</b></div>
-              </div>
-              <a class="chip-btn" onclick="document.getElementById('edit_report_{{report.id}}').style.display='block'">
-                <i class="bi bi-pen"></i> Edit
-              </a>
-            </div>
-
-            <div class="awr-grid">
-              <div class="awr-block">
-                <strong class="w3-text-dark-grey">✅ This week</strong>
-                <div class="w3-small" style="white-space: pre-wrap;">{{ report.work_done }}</div>
-              </div>
-              <div class="awr-block">
-                <strong class="w3-text-dark-grey">📌 Next week</strong>
-                <div class="w3-small" style="white-space: pre-wrap;">{{ report.work_next }}</div>
+                <h4 class="font-bold text-slate-800">Week Starting: {{ report.week_start }}</h4>
+                <p class="text-xs text-slate-400">
+                  <i class="far fa-clock mr-1"></i> Submitted {{ report.created_at.strftime("%b %d, %Y at %H:%M") }}
+                </p>
               </div>
             </div>
-
-            <div class="awr-block w3-margin-top">
-              <strong class="w3-text-dark-grey">⚠️ Challenges</strong>
-              <div class="w3-small" style="white-space: pre-wrap;">{{ report.challenges }}</div>
-            </div>
-
-            <div class="awr-meta w3-right-align w3-margin-top">
-              🕒 Submitted: {{ report.created_at.strftime("%Y-%m-%d %H:%M") }}
-            </div>
+            <button onclick="openModal('edit_report_{{report.id}}')"
+              class="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:border-indigo-600 hover:text-indigo-600 transition-all bg-white">
+              <i class="fas fa-pen"></i> Edit Entry
+            </button>
           </div>
 
-          <!-- Edit Modal -->
-          <div id="edit_report_{{report.id}}" class="w3-modal w3-white w3-card w3-border">
-            <div class="w3-modal-content w3-white w3-card w3-border modal-narrow">
-              <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff; border-bottom:1px solid #d8e7ff;">
-                <span onclick="document.getElementById('edit_report_{{report.id}}').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
-                <span class="w3-large"><b>Edit report</b></span>
-              </header>
-              <div class="w3-container w3-margin-top modal-body-scroll">
-                <div class="w3-padding w3-small w3-margin">
-                  <form action="{{url_for('edit_report',report_id=report.id)}}" method="POST">
-                    <label>Week Start:</label><br>
-                    <input type="date" name="week_start" class="w3-input form-control w3-border w3-round" value="{{ report.week_start }}" required><br><br>
+          <!-- Report Sections Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Achievement Block -->
+            <div class="p-5 rounded-2xl bg-emerald-50/30 border border-emerald-100/50">
+              <div class="flex items-center gap-2 mb-3 text-emerald-700 font-bold text-sm tracking-tight uppercase">
+                <i class="fas fa-check-circle"></i>
+                Accomplishments
+              </div>
+              <div class="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{{ report.work_done }}</div>
+            </div>
 
-                    <label>Work Done:</label><br>
-                    <textarea name="work_done" class="w3-input form-control w3-border w3-round" required>{{ report.work_done }}</textarea><br><br>
+            <!-- Planned Block -->
+            <div class="p-5 rounded-2xl bg-indigo-50/30 border border-indigo-100/50">
+              <div class="flex items-center gap-2 mb-3 text-indigo-700 font-bold text-sm tracking-tight uppercase">
+                <i class="fas fa-rocket"></i>
+                Next Objectives
+              </div>
+              <div class="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{{ report.work_next }}</div>
+            </div>
 
-                    <label>Work Next:</label><br>
-                    <textarea name="work_next" class="w3-input form-control w3-border w3-round" required>{{ report.work_next }}</textarea><br><br>
+            <!-- Challenges Block -->
+            <div class="md:col-span-2 p-5 rounded-2xl bg-amber-50/30 border border-amber-100/50">
+              <div class="flex items-center gap-2 mb-3 text-amber-700 font-bold text-sm tracking-tight uppercase">
+                <i class="fas fa-exclamation-triangle"></i>
+                Blockers & Challenges
+              </div>
+              <div class="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{{ report.challenges or 'No
+                significant blockers reported.' }}</div>
+            </div>
+          </div>
+        </div>
 
-                    <label>Challenges:</label><br>
-                    <textarea name="challenges" class="w3-input form-control w3-border w3-round">{{ report.challenges }}</textarea><br><br>
-
-                    <button class="w3-button w3-round w3-border w3-teal" type="submit">Save Changes</button>
-                  </form>
+        <!-- Edit Entry Modal -->
+        <div id="edit_report_{{report.id}}" class="fixed inset-0 z-[60] hidden overflow-y-auto">
+          <div
+            class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0 backdrop-blur-sm bg-slate-900/20">
+            <div
+              class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl border border-slate-200">
+              <div class="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+                <h3 class="text-lg font-bold text-slate-800">Review & Update Report</h3>
+                <button onclick="closeModal('edit_report_{{report.id}}')"
+                  class="text-slate-400 hover:text-slate-600 transition-colors">
+                  <i class="fas fa-times text-lg"></i>
+                </button>
+              </div>
+              <form action="{{url_for('edit_report', report_id=report.id)}}" method="POST" class="p-8 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div class="space-y-1.5 md:col-span-2">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Reporting Week</label>
+                    <input type="date" name="week_start"
+                      class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                      value="{{ report.week_start }}" required>
+                  </div>
+                  <div class="space-y-1.5 md:col-span-2">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Work Completed</label>
+                    <textarea name="work_done"
+                      class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none min-h-[120px]"
+                      required placeholder="What was achieved this week?">{{ report.work_done }}</textarea>
+                  </div>
+                  <div class="space-y-1.5 md:col-span-2">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Planned
+                      Activities</label>
+                    <textarea name="work_next"
+                      class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none min-h-[120px]"
+                      required placeholder="Key focus for next week?">{{ report.work_next }}</textarea>
+                  </div>
+                  <div class="space-y-1.5 md:col-span-2">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Obstacles</label>
+                    <textarea name="challenges"
+                      class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none min-h-[100px]"
+                      placeholder="Any blockers?">{{ report.challenges }}</textarea>
+                  </div>
                 </div>
-              </div>
+                <div class="flex gap-3 pt-4">
+                  <button type="button" onclick="closeModal('edit_report_{{report.id}}')"
+                    class="flex-1 px-6 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+                  <button type="submit"
+                    class="flex-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-100 transition-all">Save
+                    Changes</button>
+                </div>
+              </form>
             </div>
           </div>
-          <!-- Edit Modal Ends -->
-
+        </div>
         {% endfor %}
+      </div>
       {% else %}
-        <div class="awr-card w3-center w3-text-grey">No reports found for this user.</div>
+      <div
+        class="flex flex-col items-center justify-center p-16 bg-white border-2 border-dashed border-slate-200 rounded-3xl text-center">
+        <div class="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 mb-4">
+          <i class="fas fa-folder-open text-2xl"></i>
+        </div>
+        <h4 class="font-bold text-slate-800">No reports found</h4>
+        <p class="text-sm text-slate-500 max-w-[280px] mt-1">This user hasn't submitted any weekly reports for this
+          department yet.</p>
+        <button onclick="openModal('new_report_modal')"
+          class="mt-6 text-indigo-600 font-bold hover:underline text-sm">Start a new report instead &rarr;</button>
+      </div>
       {% endif %}
-    </section>
-
+    </main>
   </div>
 
   <!-- New Report Modal -->
-  <div id="new_report" class="w3-modal w3-white w3-card w3-border">
-    <div class="w3-modal-content w3-white w3-card w3-border modal-narrow">
-      <header class="w3-container w3-padding w3-center" style="background-color: #e6f0ff; border-bottom:1px solid #d8e7ff;">
-        <span onclick="document.getElementById('new_report').style.display='none'" class="w3-button w3-card w3-red w3-display-topright w3-large">&times;</span>
-        <span class="w3-large"><b>Add new report</b></span>
-      </header>
-      <div class="w3-container w3-margin-top modal-body-scroll">
-        <div class="w3-padding w3-small w3-margin">
-          <form class="w3-small" method="POST" action="/submit_weekly_report">
-            <label>Week Start (must be Monday):</label><br>
-            <input type="date" id="week_start" name="week_start" class="w3-input form-control w3-border w3-round" required><br><br>
-
-            <label>Work Done This Week:</label><br>
-            <textarea name="work_done" class="w3-input form-control w3-border w3-round" required></textarea><br><br>
-
-            <label>Work Planned Next Week:</label><br>
-            <textarea name="work_next" class="w3-input form-control w3-border w3-round" required></textarea><br><br>
-
-            <label>Challenges:</label><br>
-            <textarea name="challenges" class="w3-input form-control w3-border w3-round"></textarea><br><br>
-
-            <button class="w3-button w3-round w3-border w3-teal" type="submit">Submit Report</button>
-          </form>
+  <div id="new_report_modal" class="fixed inset-0 z-[60] hidden overflow-y-auto">
+    <div
+      class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0 backdrop-blur-sm bg-slate-900/20">
+      <div
+        class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl border border-slate-200">
+        <div class="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+          <div>
+            <h3 class="text-lg font-bold text-slate-800">Submit New Weekly Report</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Please ensure the start date is a Monday</p>
+          </div>
+          <button onclick="closeModal('new_report_modal')"
+            class="text-slate-400 hover:text-slate-600 transition-colors">
+            <i class="fas fa-times text-lg"></i>
+          </button>
         </div>
-
-        <script>
-          // Restrict calendar to Mondays only
-          (function() {
-            var input = document.getElementById('week_start');
-            if (!input) return;
-            input.addEventListener('input', function () {
-              var d = new Date(this.value);
-              if (d && d.getDay && d.getDay() !== 1) { // 1 = Monday
-                alert('Please select a Monday as the week start date.');
-                this.value = '';
-              }
-            });
-          })();
-        </script>
-
+        <form action="/submit_weekly_report" method="POST" class="p-8 space-y-6">
+          <div class="space-y-1.5">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Week Starting (Monday)</label>
+            <input type="date" id="new_week_start" name="week_start"
+              class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+              required>
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Achievements This Week</label>
+            <textarea name="work_done"
+              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none min-h-[120px]"
+              required placeholder="List key tasks completed successfully..."></textarea>
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Planned for Next Week</label>
+            <textarea name="work_next"
+              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none min-h-[120px]"
+              required placeholder="What are your main objectives for the coming week?"></textarea>
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Challenges & Concerns</label>
+            <textarea name="challenges"
+              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none min-h-[100px]"
+              placeholder="Anything blocking your progress?"></textarea>
+          </div>
+          <div class="flex gap-3 pt-4">
+            <button type="button" onclick="closeModal('new_report_modal')"
+              class="flex-1 px-6 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors">Discard</button>
+            <button type="submit"
+              class="flex-[2] px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-100 transition-all">Submit
+              Report</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
-  <!-- New Report Modal Ends -->
+
+  <style>
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #e2e8f0;
+      border-radius: 10px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #cbd5e1;
+    }
+  </style>
+
+  <script>
+    function openModal(id) {
+      const m = document.getElementById(id);
+      if (m) {
+        m.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      }
+    }
+
+    function closeModal(id) {
+      const m = document.getElementById(id);
+      if (m) {
+        m.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+    }
+
+    // Monday validation
+    (function () {
+      const input = document.getElementById('new_week_start');
+      if (input) {
+        input.addEventListener('change', function () {
+          const d = new Date(this.value);
+          if (d && d.getDay() !== 1) { // 1 = Monday
+            alert('Selection Error: Please choose a Monday to define the start of your reporting week.');
+            this.value = '';
+          }
+        });
+      }
+    })();
+
+    // Close on escape
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.fixed.inset-0:not(.hidden)').forEach(m => closeModal(m.id));
+      }
+    });
+
+    // Close on outside click
+    document.querySelectorAll('.fixed.inset-0').forEach(m => {
+      m.addEventListener('click', (e) => {
+        if (e.target === m) closeModal(m.id);
+      });
+    });
+  </script>
 
 </div>
 {% endblock %}

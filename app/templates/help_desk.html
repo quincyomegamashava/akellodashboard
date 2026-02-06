@@ -788,7 +788,7 @@
             <p class="text-sm text-gray-500">Choose how you want to be identified in this query.</p>
           </div>
           <div class="grid grid-cols-2 gap-4">
-            <div class="choice-card group" data-value="anonymous">
+            <div class="choice-card group" data-value="anonymous" onclick="setIdentity('anonymous')">
               <div
                 class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 group-hover:bg-slate-200 transition-colors">
                 <i class="fas fa-user-secret text-xl text-slate-600"></i>
@@ -796,7 +796,7 @@
               <div class="font-bold text-gray-800">Anonymous</div>
               <div class="text-[10px] text-gray-400 uppercase">Privacy mode</div>
             </div>
-            <div class="choice-card group active" data-value="self">
+            <div class="choice-card group active" data-value="self" onclick="setIdentity('self')">
               <div
                 class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mx-auto mb-3 group-hover:bg-indigo-200 transition-colors">
                 <i class="fas fa-user text-xl text-indigo-600"></i>
@@ -812,14 +812,15 @@
         <div class="step-pane hidden space-y-4" data-step="2">
           <div class="space-y-1">
             <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider">Quick Title</label>
-            {{ form.query_title(class="w-full px-4 py-2 bg-white/50 border border-gray-200 rounded-xl focus:ring-2
-            focus:ring-indigo-500 outline-none transition-all", placeholder="e.g. Broken link in Year 7 module") }}
+            {{ form.query_title(id="query_title", class="w-full px-4 py-2 bg-white/50 border border-gray-200 rounded-xl
+            focus:ring-2 focus:ring-indigo-500 outline-none transition-all", placeholder="e.g. Broken link in Year 7
+            module") }}
           </div>
           <div class="space-y-1">
             <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider">Full Description</label>
-            {{ form.query_description(class="w-full px-4 py-2 bg-white/50 border border-gray-200 rounded-xl focus:ring-2
-            focus:ring-indigo-500 outline-none transition-all", rows="4", placeholder="Explain exactly what
-            happened...") }}
+            {{ form.query_description(id="query_description", class="w-full px-4 py-2 bg-white/50 border border-gray-200
+            rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all", rows="4", placeholder="Explain
+            exactly what happened...") }}
           </div>
         </div>
 
@@ -1185,7 +1186,11 @@
     const form = document.getElementById('helpDeskForm');
     if (form) {
       form.reset();
-      document.getElementById('queryTypeHidden').value = '';
+      document.getElementById('queryTypeHidden').value = 'self'; // Default to self
+      // Reset choice card highlights
+      document.querySelectorAll('.choice-card').forEach(c => {
+        c.classList.toggle('active', c.dataset.value === 'self');
+      });
       document.getElementById('prevBtn').disabled = true;
       document.getElementById('nextBtn').style.display = '';
       document.getElementById('nextBtn').textContent = 'Next';
@@ -1193,12 +1198,27 @@
   }
 
   function showStep(n) {
-    document.querySelectorAll('.step-pane').forEach(p => p.style.display = 'none');
-    const pane = document.querySelector(`.step-pane[data-step="${n}"]`);
-    if (pane) pane.style.display = '';
-    document.querySelectorAll('.step').forEach((s, i) => {
-      s.classList.toggle('active', (i + 1) === n);
+    document.querySelectorAll('.step-pane').forEach(p => {
+      p.classList.add('hidden');
+      p.style.display = 'none';
     });
+    const pane = document.querySelector(`.step-pane[data-step="${n}"]`);
+    if (pane) {
+      pane.classList.remove('hidden');
+      pane.style.display = '';
+    }
+
+    // Update step bubbles
+    document.querySelectorAll('.step-bubble').forEach((s, i) => {
+      const stepNum = i + 1;
+      s.classList.remove('active', 'completed');
+      if (stepNum === n) {
+        s.classList.add('active');
+      } else if (stepNum < n) {
+        s.classList.add('completed');
+      }
+    });
+
     document.getElementById('prevBtn').disabled = n === 1;
     document.getElementById('nextBtn').textContent = n === totalSteps ? 'Review' : 'Next';
   }
@@ -1209,15 +1229,16 @@
       if (!v) { alert('Please choose Anonymous or As myself'); return; }
     }
     if (currentStep === 2) {
-      const t = document.getElementById('{{ form.query_title.id }}').value.trim();
-      const d = document.getElementById('{{ form.query_description.id }}').value.trim();
+      const t = document.getElementById('query_title').value.trim();
+      const d = document.getElementById('query_description').value.trim();
       if (!t || !d) { alert('Please provide a title and description'); return; }
     }
     if (currentStep < totalSteps) { currentStep++; }
     if (currentStep === 4) {
-      document.getElementById('reviewIdentity').textContent = document.getElementById('queryTypeHidden').value || '-';
-      document.getElementById('reviewTitle').textContent = document.getElementById('{{ form.query_title.id }}').value || '-';
-      document.getElementById('reviewDesc').textContent = document.getElementById('{{ form.query_description.id }}').value || '-';
+      const identityVal = document.getElementById('queryTypeHidden').value;
+      document.getElementById('reviewIdentity').textContent = identityVal === 'anonymous' ? 'Anonymous' : 'As Myself';
+      document.getElementById('reviewTitle').textContent = document.getElementById('query_title').value || '-';
+      document.getElementById('reviewDesc').textContent = document.getElementById('query_description').value || '-';
       const fileInput = document.getElementById('{{ form.image.id }}');
       document.getElementById('reviewFile').textContent = (fileInput && fileInput.files && fileInput.files[0]) ? fileInput.files[0].name : 'None';
       document.getElementById('nextBtn').style.display = 'none';
@@ -1233,13 +1254,17 @@
   }
 
   // Identity choices
-  document.addEventListener('click', function (e) {
-    if (e.target.closest('.choice')) {
-      const v = e.target.closest('.choice').dataset.value;
-      document.getElementById('queryTypeHidden').value = v;
-      nextStep();
-    }
-  });
+  function setIdentity(v) {
+    document.getElementById('queryTypeHidden').value = v;
+
+    // Update UI highlights
+    document.querySelectorAll('.choice-card').forEach(c => {
+      c.classList.toggle('active', c.dataset.value === v);
+    });
+
+    // Optional: Auto-advance to next step or just leave it to the user
+    // nextStep(); 
+  }
 
   function filterTable(tableId, searchId, statusId) {
     const f = (document.getElementById(searchId).value || '').toLowerCase();

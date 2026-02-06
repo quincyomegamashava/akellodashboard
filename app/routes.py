@@ -11576,6 +11576,7 @@ def akello_weekly_reports():
 
 
 @app.route("/submit_weekly_report", methods=["GET", "POST"])
+@login_required
 def submit_report():
     if request.method == "POST":
         week_start = request.form["week_start"]
@@ -11586,7 +11587,7 @@ def submit_report():
 
         report = WeeklyReport(
             user_id=current_user.id,
-            department=current_user.department,
+            department=current_user.department or 'General',
             week_start=week_start,
             work_done=request.form["work_done"],
             work_next=request.form["work_next"],
@@ -11595,13 +11596,14 @@ def submit_report():
         db.session.add(report)
         db.session.commit()
         flash("Report submitted successfully!", "success")
-        return redirect(url_for("reports"))
+        return redirect(url_for("akello_weekly_reports"))
 
-    return redirect(url_for('reports'))
+    return redirect(url_for('akello_weekly_reports'))
 
 
 
 @app.route("/edit_report/<int:report_id>", methods=["GET", "POST"])
+@login_required
 def edit_report(report_id):
 
     report = WeeklyReport.query.get_or_404(report_id)
@@ -11609,15 +11611,15 @@ def edit_report(report_id):
     # Ensure user owns this report
     if report.user_id != current_user.id:
         flash("You are not authorized to edit this report.", "error")
-        return redirect(url_for("reports"))
+        return redirect(url_for("akello_weekly_reports"))
 
     # Check if report is older than 7 days
     if datetime.utcnow() > report.created_at + timedelta(days=7):
         flash("You can only edit reports within 7 days of submission.", "error")
-        return redirect(url_for("reports"))
+        return redirect(url_for("akello_weekly_reports"))
 
     if request.method == "POST":
-        report.department = current_user.department
+        report.department = current_user.department or report.department or 'General'
         report.week_start = request.form["week_start"]
         report.work_done = request.form["work_done"]
         report.work_next = request.form["work_next"]
@@ -11625,7 +11627,7 @@ def edit_report(report_id):
 
         db.session.commit()
         flash("Report updated successfully!", "success")
-        return redirect(url_for("reports"))
+        return redirect(url_for("akello_weekly_reports"))
 
 @app.route('/workspaces', methods=['GET', 'POST'])
 @login_required
