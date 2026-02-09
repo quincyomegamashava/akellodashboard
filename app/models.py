@@ -375,6 +375,48 @@ class GameScore(db.Model):
     def __repr__(self):
         return f'<GameScore User:{self.game_user_id} Game:{self.game_id} Score:{self.score}>'
 
+
+class AppSetting(db.Model):
+    """Model for storing application-wide settings"""
+    __tablename__ = 'app_settings'
+    
+    id: so.Mapped[int] = so.mapped_column(primary_key=True)
+    setting_key: so.Mapped[str] = so.mapped_column(sa.String(100), unique=True, nullable=False, index=True)
+    setting_value: so.Mapped[str] = so.mapped_column(sa.String(500), nullable=False)
+    description: so.Mapped[Optional[str]] = so.mapped_column(sa.Text)
+    updated_at: so.Mapped[datetime] = so.mapped_column(default=lambda: datetime.now(timezone.utc))
+    updated_by: so.Mapped[Optional[int]] = so.mapped_column(sa.Integer, sa.ForeignKey('user.id'))
+    
+    # Relationship to user who last updated the setting
+    updater: so.Mapped[Optional['User']] = so.relationship('User', foreign_keys=[updated_by])
+    
+    @staticmethod
+    def get_value(key: str, default: str = 'false') -> str:
+        """Get a setting value by key, return default if not found"""
+        setting = AppSetting.query.filter_by(setting_key=key).first()
+        return setting.setting_value if setting else default
+    
+    @staticmethod
+    def set_value(key: str, value: str, user_id: Optional[int] = None, description: Optional[str] = None):
+        """Set a setting value, creating it if it doesn't exist"""
+        setting = AppSetting.query.filter_by(setting_key=key).first()
+        if setting:
+            setting.setting_value = value
+            setting.updated_at = datetime.now(timezone.utc)
+            setting.updated_by = user_id
+        else:
+            setting = AppSetting(
+                setting_key=key,
+                setting_value=value,
+                description=description,
+                updated_by=user_id
+            )
+            db.session.add(setting)
+        db.session.commit()
+    
+    def __repr__(self):
+        return f'<AppSetting {self.setting_key}: {self.setting_value}>'
+
 class Scorecard(db.Model):
     _tablename_ = 'scorecard'
 

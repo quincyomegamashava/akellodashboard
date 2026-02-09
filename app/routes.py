@@ -10690,13 +10690,88 @@ def profile(username):
             return normalized in {"1", "true", "t", "yes", "y"}
         return False
 
-    # ✅ Batch query instead of loop - much faster
+    # ✅ STEP 1: Calculate duration data FIRST (moved from later in the code)
+    # This allows us to filter schools before calculating ASL MTD
+    duration_map = {}
     if preselected_asl_ids:
+        try:
+            conn = get_ruzivo_conn()
+            cursor = conn.cursor()
+            
+            # Create placeholders for IN clause
+            placeholders = ','.join(['%s'] * len(preselected_asl_ids))
+            
+            duration_query = f"""
+                SELECT SUM(x.duration) AS total_months, x.school_id, MIN(x.awarded_at) AS first_awarded_at
+                FROM tblscholarships_schools x
+                WHERE x.school_id IN ({placeholders})
+                AND x.awarded_at >= %s
+                GROUP BY x.school_id
+            """
+            cursor.execute(duration_query, (*preselected_asl_ids, '2025-01-01'))
+            duration_rows = cursor.fetchall()
+
+            cursor.close()
+            conn.close()
+            
+            for duration_row in duration_rows:
+                if isinstance(duration_row, dict):
+                    school_key = duration_row.get("school_id")
+                    total_months = duration_row.get("total_months") or 0
+                    first_awarded = duration_row.get("first_awarded_at")
+                else:
+                    school_key = duration_row[1]
+                    total_months = duration_row[0] or 0
+                    first_awarded = duration_row[2]
+                if school_key:
+                    is_over_12 = False
+                    if first_awarded:
+                        # Normalize first_awarded to date if it's datetime
+                        fa_date = first_awarded.date() if hasattr(first_awarded, 'date') else first_awarded
+                        if isinstance(fa_date, date) and fa_date <= today - timedelta(days=365):
+                            is_over_12 = True
+                            
+                    duration_map[school_key] = {
+                        "total_months": total_months,
+                        "first_awarded_at": first_awarded,
+                        "is_over_12_months": is_over_12
+                    }
+        except Exception as e:
+            print(f"Error calculating duration data: {e}")
+            duration_map = {}
+
+    # ✅ STEP 2: Filter out schools with expired/long-term scholarships from ASL MTD
+    # Get admin settings to determine which filters to apply
+    from app.models import AppSetting
+    exclude_12_months = AppSetting.get_value('asl_mtd_exclude_12_months', 'true') == 'true'
+    exclude_1_year_awarded = AppSetting.get_value('asl_mtd_exclude_1_year_awarded', 'true') == 'true'
+    
+    schools_to_exclude_from_mtd = set()
+    for school_id, duration_info in duration_map.items():
+        total_months = duration_info.get("total_months", 0)
+        is_over_12 = duration_info.get("is_over_12_months", False)
+        
+        should_exclude = False
+        
+        # Apply filters based on admin settings
+        if exclude_12_months and total_months >= 12:
+            should_exclude = True
+        if exclude_1_year_awarded and is_over_12:
+            should_exclude = True
+        
+        if should_exclude:
+            schools_to_exclude_from_mtd.add(school_id)
+
+    # Create filtered list for ASL MTD calculation
+    filtered_asl_ids = [sid for sid in preselected_asl_ids if sid not in schools_to_exclude_from_mtd]
+
+    # ✅ STEP 3: Calculate ASL MTD using FILTERED school IDs
+    if filtered_asl_ids:
         conn = get_ruzivo_conn()
         cursor = conn.cursor()
 
         # Create placeholders for IN clause
-        placeholders = ','.join(['%s'] * len(preselected_asl_ids))
+        placeholders = ','.join(['%s'] * len(filtered_asl_ids))
         query = f"""
             SELECT SUM(student_count) AS total_count
             FROM (
@@ -10707,8 +10782,8 @@ def profile(username):
             ) AS subquery
         """
         
-        # Execute with all IDs at once
-        cursor.execute(query, (*preselected_asl_ids, start_date, today))
+        # Execute with filtered IDs
+        cursor.execute(query, (*filtered_asl_ids, start_date, today))
         row = cursor.fetchone()
         cursor.close()
         conn.close()
@@ -10738,8 +10813,8 @@ def profile(username):
     # Track schools found in scholarship table
     schools_with_scholarship_ids = set()
     
+    # Note: duration_map was already calculated above for filtering ASL MTD
     if preselected_asl_ids:
-        duration_map = {}
         try:
             conn = get_ruzivo_conn()
             cursor = conn.cursor()
@@ -10759,42 +10834,8 @@ def profile(username):
             cursor.execute(scholarship_query, preselected_asl_ids)
             scholarship_results = cursor.fetchall()
 
-            duration_query = f"""
-                SELECT SUM(x.duration) AS total_months, x.school_id, MIN(x.awarded_at) AS first_awarded_at
-                FROM tblscholarships_schools x
-                WHERE x.school_id IN ({placeholders})
-                AND x.awarded_at >= %s
-                GROUP BY x.school_id
-            """
-            cursor.execute(duration_query, (*preselected_asl_ids, '2025-01-01'))
-            duration_rows = cursor.fetchall()
-
             cursor.close()
             conn.close()
-            
-            for duration_row in duration_rows:
-                if isinstance(duration_row, dict):
-                    school_key = duration_row.get("school_id")
-                    total_months = duration_row.get("total_months") or 0
-                    first_awarded = duration_row.get("first_awarded_at")
-                else:
-                    school_key = duration_row[1]
-                    total_months = duration_row[0] or 0
-                    first_awarded = duration_row[2]
-                if school_key:
-                    today = date.today()
-                    is_over_12 = False
-                    if first_awarded:
-                        # Normalize first_awarded to date if it's datetime
-                        fa_date = first_awarded.date() if hasattr(first_awarded, 'date') else first_awarded
-                        if isinstance(fa_date, date) and fa_date <= today - timedelta(days=365):
-                            is_over_12 = True
-                            
-                    duration_map[school_key] = {
-                        "total_months": total_months,
-                        "first_awarded_at": first_awarded,
-                        "is_over_12_months": is_over_12
-                    }
 
             for row in scholarship_results:
                 if isinstance(row, dict):
@@ -19991,6 +20032,7 @@ def all_champions_school_tracker():
     except Exception as e:
         app.logger.error(f"Error in school tracker: {e}")
         return jsonify({'error': str(e)}), 500
+
 
 
 

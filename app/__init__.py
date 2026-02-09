@@ -8,6 +8,7 @@ from config import Config
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.config['TEMPLATES_AUTO_RELOAD'] = True  # Force template reloading
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 login = LoginManager(app)
@@ -29,6 +30,9 @@ from app.logging_config import setup_logging
 logger = setup_logging(app)
 
 from app import routes, models, monitoring_routes
+
+# Import ASL MTD settings routes
+from app import routes_asl_settings
 
 # Import and register database routes
 from app.database_routes import database_bp

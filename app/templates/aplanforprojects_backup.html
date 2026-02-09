@@ -1,16 +1,22 @@
-{% extends "base.html" %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sortable Project Board</title>
 
-{% block head_extra %}
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css">
   <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
 
   <script>
+    // This object would be populated by your backend rendering engine (e.g., Jinja, EJS)
     const current_user = { username: "{{current_user.username}}", id: "{{ current_user.id }}" }; 
   </script>
 
   <style>
-
     :root {
       --tl-bg: #ffffff;
     }
@@ -201,13 +207,11 @@
         justify-content: center;
       }
     }
-  
   </style>
-{% endblock %}
+</head>
+<body class="bg-white-100 font-sans text-gray-800 min-h-screen p-6">
 
-{% block content %}
-<div class="max-w-[1800px] mx-auto">
-
+  <div class="w3-full login-container mx-auto">
     <div class="grid grid-cols-1 lg:grid-cols-[280px,1fr] gap-6">
       <!-- Sidebar: Projects list (desktop) -->
       <aside id="sidebarPanel" class="hidden lg:block bg-white/80 rounded-2xl p-3 shadow border border-slate-200">
@@ -356,8 +360,7 @@
         </div>
       </section>
     </div>
-  
-</div>
+  </div>
 
 <div id="modalBackdrop" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
     <div id="modalContent" class="bg-white p-6 rounded-xl shadow-lg w-full max-w-2xl">
@@ -369,9 +372,8 @@
         <button id="modalConfirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">OK</button>
       </div>
     </div>
-{% endblock %}
+  </div>
 
-{% block scripts %}
 <script>
 /* ---------- Configuration ---------- */
 const API_BASE = '/api';
@@ -1993,4 +1995,5 @@ window.onload = async () => {
   await loadProjects();
 };
 </script>
-{% endblock %}
+</body>
+</html>
