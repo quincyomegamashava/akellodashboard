@@ -10746,24 +10746,34 @@ def profile(username):
     exclude_12_months = AppSetting.get_value('asl_mtd_exclude_12_months', 'true') == 'true'
     exclude_1_year_awarded = AppSetting.get_value('asl_mtd_exclude_1_year_awarded', 'true') == 'true'
     
+    # Debug logging
+    print(f"[ASL MTD Filter Debug] Settings: exclude_12_months={exclude_12_months}, exclude_1_year={exclude_1_year_awarded}")
+    print(f"[ASL MTD Filter Debug] Total schools before filtering: {len(preselected_asl_ids)}")
+    
     schools_to_exclude_from_mtd = set()
     for school_id, duration_info in duration_map.items():
         total_months = duration_info.get("total_months", 0)
         is_over_12 = duration_info.get("is_over_12_months", False)
         
         should_exclude = False
-        
-        # Apply filters based on admin settings
+        reasons = []
         if exclude_12_months and total_months >= 12:
             should_exclude = True
+            reasons.append(f"{total_months} months scholarship")
         if exclude_1_year_awarded and is_over_12:
             should_exclude = True
+            reasons.append("awarded >1 year ago")
         
         if should_exclude:
-            schools_to_exclude_from_mtd.add(school_id)
+            # Store as string for easier comparison
+            schools_to_exclude_from_mtd.add(str(school_id))
+            print(f"[ASL MTD Filter Debug] Excluding school {school_id}: {', '.join(reasons)}")
 
     # Create filtered list for ASL MTD calculation
-    filtered_asl_ids = [sid for sid in preselected_asl_ids if sid not in schools_to_exclude_from_mtd]
+    # Use string comparison for robustness (JSON vs Database types)
+    filtered_asl_ids = [sid for sid in preselected_asl_ids if str(sid) not in schools_to_exclude_from_mtd]
+    
+    print(f"[ASL MTD Filter Debug] Schools after filtering: {len(filtered_asl_ids)} ({filtered_asl_ids})")
 
     # ✅ STEP 3: Calculate ASL MTD using FILTERED school IDs
     if filtered_asl_ids:
