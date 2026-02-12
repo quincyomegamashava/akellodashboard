@@ -362,7 +362,7 @@
                 <div>
                   <div class="text-muted small">Scholarship Elapsed</div>
                   <div class="h5 mb-0 fw-bold" id="st-elapsed-count">-</div>
-                  <div class="text-mini text-muted">(12+ months)</div>
+                  <div class="text-mini text-muted">(> 12 months)</div>
                 </div>
               </div>
             </div>
@@ -374,7 +374,7 @@
                 <div>
                   <div class="text-muted small">Valid Scholarship</div>
                   <div class="h5 mb-0 fw-bold" id="st-valid-count">-</div>
-                  <div class="text-mini text-muted">(Active < 12mo)</div>
+                  <div class="text-mini text-muted">(Active <= 12mo)</div>
                   </div>
                 </div>
               </div>
@@ -792,7 +792,7 @@
         schools.forEach(s => {
           if (s.status === 'Never Assigned') {
             neverCount++;
-          } else if (s.is_over_12_months || s.status === 'Expired' || (s.duration && s.duration >= 12)) {
+          } else if (s.is_over_12_months || s.status === 'Expired' || (s.duration && s.duration > 12)) {
             elapsedCount++;
           } else if (s.status === 'Active') {
             validCount++;

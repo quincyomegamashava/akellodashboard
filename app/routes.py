@@ -2241,9 +2241,64 @@ def champion_schools_smartlearning_usage_analytics():
     all_asl_ids = sorted(set(all_asl_ids))
     all_lib_ids = sorted(set(all_lib_ids))
 
-    # Early return if nothing to process
-    if not all_asl_ids and not all_lib_ids:
-        return jsonify([])
+    # ✅ ASL MTD Filtering: Exclude schools based on scholarship duration/award date
+    # Fetch admin settings
+    from app.models import AppSetting
+    from datetime import date, timedelta
+    exclude_12_months = AppSetting.get_value('asl_mtd_exclude_12_months', 'true') == 'true'
+    exclude_1_year_awarded = AppSetting.get_value('asl_mtd_exclude_1_year_awarded', 'true') == 'true'
+    
+    schools_to_exclude = set()
+    if all_asl_ids and (exclude_12_months or exclude_1_year_awarded):
+        try:
+            pool = get_ruzivo_pool()
+            if pool:
+                conn = pool.connection()
+                cursor = conn.cursor(pymysql.cursors.DictCursor)
+                
+                # Fetch durations and first awards since 2025
+                CHUNK = 1000
+                for i in range(0, len(all_asl_ids), CHUNK):
+                    chunk = all_asl_ids[i:i+CHUNK]
+                    placeholders = ','.join(['%s'] * len(chunk))
+                    duration_query = f"""
+                        SELECT x.school_id, SUM(x.duration) AS total_months, MIN(x.awarded_at) AS first_awarded_at
+                        FROM tblscholarships_schools x
+                        WHERE x.school_id IN ({placeholders})
+                        AND x.awarded_at >= %s
+                        GROUP BY x.school_id
+                    """
+                    cursor.execute(duration_query, (*chunk, '2025-01-01'))
+                    duration_rows = cursor.fetchall()
+                    
+                    for row in duration_rows:
+                        sid = int(row['school_id'])
+                        total_m = row['total_months'] or 0
+                        fa = row['first_awarded_at']
+                        
+                        is_over_1_year = False
+                        if fa:
+                            fa_dt = fa.date() if hasattr(fa, 'date') else fa
+                            if isinstance(fa_dt, date) and fa_dt <= today - timedelta(days=365):
+                                is_over_1_year = True
+                        
+                        should_exclude = False
+                        if exclude_12_months and total_m >= 12:
+                            should_exclude = True
+                        if exclude_1_year_awarded and is_over_1_year:
+                            should_exclude = True
+                            
+                        if should_exclude:
+                            schools_to_exclude.add(sid)
+                
+                cursor.close()
+                conn.close()
+        except Exception as e:
+            app.logger.error(f"Error filtering schools for champion analytics: {e}")
+
+    # Use filtered ASL IDs for student count queries
+    final_asl_ids = [sid for sid in all_asl_ids if sid not in schools_to_exclude]
+    app.logger.info(f"ASL MTD Filter: Total {len(all_asl_ids)} schools, excluded {len(schools_to_exclude)}, final {len(final_asl_ids)}")
 
     # Time bounds as datetimes for BETWEEN comparisons
     start_dt = datetime.combine(start_date, datetime.min.time())
@@ -2260,8 +2315,8 @@ def champion_schools_smartlearning_usage_analytics():
             import pymysql.cursors
             cursor = conn.cursor(pymysql.cursors.DictCursor)
             CHUNK = 1000
-            for i in range(0, len(all_asl_ids), CHUNK):
-                chunk = all_asl_ids[i:i+CHUNK]
+            for i in range(0, len(final_asl_ids), CHUNK):
+                chunk = final_asl_ids[i:i+CHUNK]
                 placeholders = ','.join(['%s'] * len(chunk))
                 query = f"""
                     SELECT school_id, COUNT(DISTINCT student_id) AS student_count
@@ -10728,7 +10783,7 @@ def profile(username):
                     if first_awarded:
                         # Normalize first_awarded to date if it's datetime
                         fa_date = first_awarded.date() if hasattr(first_awarded, 'date') else first_awarded
-                        if isinstance(fa_date, date) and fa_date <= today - timedelta(days=365):
+                        if isinstance(fa_date, date) and fa_date < today - timedelta(days=365):
                             is_over_12 = True
                             
                     duration_map[school_key] = {
@@ -10757,12 +10812,12 @@ def profile(username):
         
         should_exclude = False
         reasons = []
-        if exclude_12_months and total_months >= 12:
+        if exclude_12_months and total_months > 12:
             should_exclude = True
-            reasons.append(f"{total_months} months scholarship")
+            reasons.append(f"{total_months} months scholarship (>12mo)")
         if exclude_1_year_awarded and is_over_12:
             should_exclude = True
-            reasons.append("awarded >1 year ago")
+            reasons.append("awarded >=1 year ago")
         
         if should_exclude:
             # Store as string for easier comparison
@@ -11072,7 +11127,7 @@ def profile(username):
         is_over_12 = duration_info.get("is_over_12_months", False)
         total_m = duration_info.get("total_months", 0)
         
-        if not is_active or is_expired or is_over_12 or (total_m >= 12):
+        if not is_active or is_expired or is_over_12 or (total_m > 12):
             count_elapsed_scholarship += 1
         elif is_active:
             count_valid_scholarship += 1
