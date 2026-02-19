@@ -102,7 +102,7 @@ class User(UserMixin, db.Model):
 
     def get_privileges(self):
         """Ensure all expected privileges exist in dict, default False."""
-        all_privs = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access"]
+        all_privs = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access", "Approve Champion Schools"]
         if not self.privileges:
             self.privileges = {}
         for p in all_privs:
@@ -476,7 +476,45 @@ class ChampionSchool(db.Model):
         }
 
 
+# ----------------------
+# ChampionSchoolRequest Model (pending admin approval to add school to champion profile)
+# ----------------------
+class ChampionSchoolRequest(db.Model):
+    __tablename__ = 'champion_school_requests'
 
+    id = db.Column(db.Integer, primary_key=True)
+    champion_school_id = db.Column(db.Integer, db.ForeignKey('championschools.id'), nullable=False, index=True)
+    requested_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
+    asl_school_id = db.Column(db.String(50), nullable=True)
+    library_school_id = db.Column(db.String(50), nullable=True)
+    school_name = db.Column(db.String(255), nullable=False)
+    province = db.Column(db.String(100), nullable=True)
+    status = db.Column(db.String(20), nullable=False, default='Pending', index=True)  # Pending, Approved, Declined
+    reviewed_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    decline_reason = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    champion_school = db.relationship('ChampionSchool', backref=db.backref('school_requests', lazy='dynamic'))
+    requested_by = db.relationship('User', foreign_keys=[requested_by_user_id])
+    reviewed_by = db.relationship('User', foreign_keys=[reviewed_by_user_id])
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'champion_school_id': self.champion_school_id,
+            'requested_by_user_id': self.requested_by_user_id,
+            'asl_school_id': self.asl_school_id,
+            'library_school_id': self.library_school_id,
+            'school_name': self.school_name,
+            'province': self.province,
+            'status': self.status,
+            'reviewed_by_user_id': self.reviewed_by_user_id,
+            'reviewed_at': self.reviewed_at.isoformat() if self.reviewed_at else None,
+            'decline_reason': self.decline_reason,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'champion_name': f'{self.champion_school.firstname} {self.champion_school.lastname}' if self.champion_school else None,
+        }
 
 
 class PerfomanceTargets(db.Model):

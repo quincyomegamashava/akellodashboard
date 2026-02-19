@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block head_extra %}
+<style>
+  .champion-schools-page { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+  .champion-schools-page .card { border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; margin-bottom: 24px; overflow: hidden; }
+  .champion-schools-page .card-header { padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #334155; }
+  .champion-schools-page .card-body { padding: 20px; }
+  .champion-schools-page table { width: 100%; border-collapse: collapse; }
+  .champion-schools-page th, .champion-schools-page td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f1f5f9; }
+  .champion-schools-page th { font-weight: 600; color: #475569; font-size: 0.85rem; }
+  .champion-schools-page .search-bar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .champion-schools-page .search-bar input { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; min-width: 180px; }
+  .champion-schools-page .search-bar button { padding: 8px 16px; border-radius: 8px; font-weight: 500; border: none; cursor: pointer; }
+  .champion-schools-page .btn-search { background: #2563eb; color: #fff; }
+  .champion-schools-page .btn-request { background: #16a34a; color: #fff; margin-top: 12px; }
+  .champion-schools-page .btn-request:disabled { opacity: 0.6; cursor: not-allowed; }
+  .champion-schools-page .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem; }
+  .champion-schools-page .badge-pending { background: #fef3c7; color: #92400e; }
+  .champion-schools-page .badge-approved { background: #d1fae5; color: #065f46; }
+  .champion-schools-page .badge-declined { background: #fee2e2; color: #991b1b; }
+  .champion-schools-page .empty-msg { color: #64748b; padding: 24px; text-align: center; }
+  .champion-schools-page .error-msg { color: #dc2626; padding: 8px 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="champion-schools-page">
+  <h1 class="mb-4" style="font-size: 1.5rem; font-weight: 700; color: #0f172a;">My Schools</h1>
+
+  <!-- Add schools: search and request -->
+  <div class="card">
+    <div class="card-header">Add schools to my profile</div>
+    <div class="card-body">
+      <p class="text-muted small mb-3">Search for schools, then select the ones you want to add. An admin will approve your request.</p>
+      <div class="search-bar">
+        <input type="text" id="searchQ" placeholder="School name..." />
+        <input type="text" id="searchProvince" placeholder="Province (optional)" />
+        <button type="button" class="btn-search" id="btnSearch">Search</button>
+      </div>
+      <div id="searchError" class="error-msg" style="display: none;"></div>
+      <div id="searchResultsWrap" style="display: none;">
+        <table>
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="selectAll" title="Select all" /></th>
+              <th>ASL ID</th>
+              <th>Library ID</th>
+              <th>School name</th>
+              <th>Province</th>
+            </tr>
+          </thead>
+          <tbody id="searchResults"></tbody>
+        </table>
+        <button type="button" class="btn-request" id="btnRequest" disabled>Request selected schools</button>
+      </div>
+      <div id="searchEmpty" class="empty-msg" style="display: none;">Enter a name and click Search.</div>
+    </div>
+  </div>
+
+  <!-- Pending requests -->
+  <div class="card">
+    <div class="card-header">Pending requests</div>
+    <div class="card-body">
+      <div id="pendingList"></div>
+      <div id="pendingEmpty" class="empty-msg">No pending requests.</div>
+    </div>
+  </div>
+
+  <!-- Current schools -->
+  <div class="card">
+    <div class="card-header">Current schools on my profile</div>
+    <div class="card-body">
+      <div id="currentList"></div>
+      <div id="currentEmpty" class="empty-msg">No schools yet.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const apiBase = '{{ request.url_root.rstrip("/") }}';
+  function getCookie(name) {
+    const v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+    return v ? v[2] : null;
+  }
+  function headers() {
+    const csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content;
+    const h = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+    if (csrf) h['X-CSRFToken'] = csrf;
+    return h;
+  }
+
+  let searchResults = [];
+
+  document.getElementById('btnSearch').addEventListener('click', function() {
+    const q = document.getElementById('searchQ').value.trim();
+    const province = document.getElementById('searchProvince').value.trim();
+    document.getElementById('searchError').style.display = 'none';
+    fetch(apiBase + '/api/schools/search?q=' + encodeURIComponent(q) + (province ? '&province=' + encodeURIComponent(province) : '') + '&limit=50', { credentials: 'same-origin', headers: headers() })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { document.getElementById('searchError').textContent = data.error; document.getElementById('searchError').style.display = 'block'; searchResults = []; }
+        else { searchResults = Array.isArray(data) ? data : []; }
+        renderSearchResults();
+      })
+      .catch(e => { document.getElementById('searchError').textContent = e.message || 'Search failed'; document.getElementById('searchError').style.display = 'block'; searchResults = []; });
+  });
+
+  function renderSearchResults() {
+    const tbody = document.getElementById('searchResults');
+    const wrap = document.getElementById('searchResultsWrap');
+    const empty = document.getElementById('searchEmpty');
+    tbody.innerHTML = '';
+    if (searchResults.length === 0) {
+      wrap.style.display = 'none';
+      empty.style.display = 'block';
+      empty.textContent = document.getElementById('searchQ').value.trim() ? 'No schools found.' : 'Enter a name and click Search.';
+      document.getElementById('btnRequest').disabled = true;
+      return;
+    }
+    wrap.style.display = 'block';
+    empty.style.display = 'none';
+    searchResults.forEach((row, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td><input type="checkbox" class="row-select" data-idx="' + i + '" /></td><td>' + (row.asl_school_id ?? '') + '</td><td>' + (row.library_school_id ?? '') + '</td><td>' + (row.school_name || '') + '</td><td>' + (row.province ?? '') + '</td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById('selectAll').checked = false;
+    document.getElementById('btnRequest').disabled = true;
+    document.querySelectorAll('.row-select').forEach(cb => cb.addEventListener('change', updateRequestBtn));
+    document.getElementById('selectAll').addEventListener('change', function() {
+      document.querySelectorAll('.row-select').forEach(c => { c.checked = document.getElementById('selectAll').checked; });
+      updateRequestBtn();
+    });
+  }
+
+  function updateRequestBtn() {
+    const n = document.querySelectorAll('.row-select:checked').length;
+    document.getElementById('btnRequest').disabled = n === 0;
+  }
+
+  document.getElementById('btnRequest').addEventListener('click', function() {
+    const indices = Array.from(document.querySelectorAll('.row-select:checked')).map(c => parseInt(c.dataset.idx, 10));
+    const schools = indices.map(i => ({
+      asl_school_id: searchResults[i].asl_school_id,
+      library_school_id: searchResults[i].library_school_id || '',
+      school_name: searchResults[i].school_name,
+      province: searchResults[i].province || ''
+    }));
+    document.getElementById('btnRequest').disabled = true;
+    fetch(apiBase + '/api/champion/school-requests', { method: 'POST', credentials: 'same-origin', headers: headers(), body: JSON.stringify({ schools }) })
+      .then(r => r.json().then(d => ({ status: r.status, data: d })))
+      .then(({ status, data }) => {
+        if (status === 201) {
+          loadPending();
+          document.querySelectorAll('.row-select:checked').forEach(c => { c.checked = false; });
+          updateRequestBtn();
+          alert('Request submitted. An admin will review it.');
+        } else {
+          alert(data.error || 'Request failed');
+          updateRequestBtn();
+        }
+      })
+      .catch(() => { alert('Request failed'); updateRequestBtn(); });
+  });
+
+  function loadPending() {
+    fetch(apiBase + '/api/champion/school-requests?status=Pending', { credentials: 'same-origin', headers: headers() })
+      .then(r => r.json())
+      .then(d => {
+        const list = document.getElementById('pendingList');
+        const empty = document.getElementById('pendingEmpty');
+        const reqs = (d.requests || []).filter(r => r.status === 'Pending');
+        if (reqs.length === 0) { list.innerHTML = ''; list.style.display = 'none'; empty.style.display = 'block'; return; }
+        empty.style.display = 'none';
+        list.style.display = 'block';
+        list.innerHTML = '<table><thead><tr><th>School name</th><th>ASL ID</th><th>Library ID</th><th>Province</th><th>Requested</th></tr></thead><tbody>' +
+          reqs.map(r => '<tr><td>' + (r.school_name || '') + '</td><td>' + (r.asl_school_id ?? '') + '</td><td>' + (r.library_school_id ?? '') + '</td><td>' + (r.province ?? '') + '</td><td>' + (r.created_at ? new Date(r.created_at).toLocaleDateString() : '') + '</td></tr>').join('') +
+          '</tbody></table>';
+      })
+      .catch(() => {});
+  }
+
+  function loadCurrent() {
+    fetch(apiBase + '/api/champion/my-schools', { credentials: 'same-origin', headers: headers() })
+      .then(r => r.json())
+      .then(d => {
+        const list = document.getElementById('currentList');
+        const empty = document.getElementById('currentEmpty');
+        const schools = d.schools || [];
+        if (schools.length === 0) { list.innerHTML = ''; list.style.display = 'none'; empty.style.display = 'block'; return; }
+        empty.style.display = 'none';
+        list.style.display = 'block';
+        list.innerHTML = '<table><thead><tr><th>School name</th><th>ASL ID</th><th>Library ID</th></tr></thead><tbody>' +
+          schools.map(s => '<tr><td>' + (s.school_name || '') + '</td><td>' + (s.asl_school_id ?? '') + '</td><td>' + (s.library_school_id ?? '') + '</td></tr>').join('') +
+          '</tbody></table>';
+      })
+      .catch(() => {});
+  }
+
+  loadPending();
+  loadCurrent();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block head_extra %}
+<style>
+  .csr-admin-page { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+  .csr-admin-page .card { border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; margin-bottom: 24px; overflow: hidden; }
+  .csr-admin-page .card-header { padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #334155; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .csr-admin-page .card-body { padding: 20px; }
+  .csr-admin-page table { width: 100%; border-collapse: collapse; }
+  .csr-admin-page th, .csr-admin-page td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f1f5f9; }
+  .csr-admin-page th { font-weight: 600; color: #475569; font-size: 0.85rem; }
+  .csr-admin-page .btn { padding: 6px 12px; border-radius: 8px; font-weight: 500; border: none; cursor: pointer; font-size: 0.875rem; }
+  .csr-admin-page .btn-approve { background: #16a34a; color: #fff; }
+  .csr-admin-page .btn-decline { background: #dc2626; color: #fff; margin-left: 8px; }
+  .csr-admin-page .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem; }
+  .csr-admin-page .badge-pending { background: #fef3c7; color: #92400e; }
+  .csr-admin-page .badge-approved { background: #d1fae5; color: #065f46; }
+  .csr-admin-page .badge-declined { background: #fee2e2; color: #991b1b; }
+  .csr-admin-page .empty-msg { color: #64748b; padding: 24px; text-align: center; }
+  .csr-admin-page .filter select { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="csr-admin-page">
+  <h1 class="mb-4" style="font-size: 1.5rem; font-weight: 700; color: #0f172a;">Champion School Requests</h1>
+  <p class="text-muted mb-4">Review and approve or decline requests from champions to add schools to their profiles.</p>
+
+  <div class="card">
+    <div class="card-header">
+      <span>Requests</span>
+      <span class="filter">
+        <label for="filterStatus">Status:</label>
+        <select id="filterStatus">
+          <option value="">All</option>
+          <option value="Pending" selected>Pending</option>
+          <option value="Approved">Approved</option>
+          <option value="Declined">Declined</option>
+        </select>
+        <button type="button" class="btn btn-approve" id="btnRefresh" style="margin-left: 12px;">Refresh</button>
+      </span>
+    </div>
+    <div class="card-body">
+      <div id="requestsList"></div>
+      <div id="requestsEmpty" class="empty-msg">No requests found.</div>
+    </div>
+  </div>
+
+  <div id="declineModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: #fff; padding: 24px; border-radius: 12px; max-width: 400px; width: 90%;">
+      <h3 style="margin-top: 0;">Decline request</h3>
+      <p>Optional reason:</p>
+      <textarea id="declineReason" rows="3" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px;"></textarea>
+      <div style="margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end;">
+        <button type="button" class="btn" id="declineCancel" style="background: #e2e8f0;">Cancel</button>
+        <button type="button" class="btn btn-decline" id="declineConfirm">Decline</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const apiBase = '{{ request.url_root.rstrip("/") }}';
+  function headers() {
+    const h = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+    const csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content;
+    if (csrf) h['X-CSRFToken'] = csrf;
+    return h;
+  }
+
+  let declineRequestId = null;
+
+  function loadRequests() {
+    const status = document.getElementById('filterStatus').value;
+    const url = apiBase + '/api/admin/champion-school-requests' + (status ? '?status=' + encodeURIComponent(status) : '');
+    fetch(url, { credentials: 'same-origin', headers: headers() })
+      .then(r => r.json())
+      .then(d => {
+        const list = document.getElementById('requestsList');
+        const empty = document.getElementById('requestsEmpty');
+        const reqs = d.requests || [];
+        if (reqs.length === 0) {
+          list.innerHTML = '';
+          list.style.display = 'none';
+          empty.style.display = 'block';
+          empty.textContent = status ? 'No ' + status.toLowerCase() + ' requests.' : 'No requests found.';
+          return;
+        }
+        empty.style.display = 'none';
+        list.style.display = 'block';
+        list.innerHTML = '<table><thead><tr><th>Champion</th><th>School name</th><th>ASL ID</th><th>Library ID</th><th>Province</th><th>Requested</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
+          reqs.map(r => {
+            const actions = r.status === 'Pending'
+              ? '<button type="button" class="btn btn-approve" data-action="approve" data-id="' + r.id + '">Approve</button><button type="button" class="btn btn-decline" data-action="decline" data-id="' + r.id + '">Decline</button>'
+              : '-';
+            const badgeClass = r.status === 'Pending' ? 'badge-pending' : r.status === 'Approved' ? 'badge-approved' : 'badge-declined';
+            return '<tr><td>' + (r.champion_name || '') + '</td><td>' + (r.school_name || '') + '</td><td>' + (r.asl_school_id ?? '') + '</td><td>' + (r.library_school_id ?? '') + '</td><td>' + (r.province ?? '') + '</td><td>' + (r.created_at ? new Date(r.created_at).toLocaleString() : '') + '</td><td><span class="badge ' + badgeClass + '">' + (r.status || '') + '</span></td><td>' + actions + '</td></tr>';
+          }).join('') +
+          '</tbody></table>';
+        list.querySelectorAll('[data-action="approve"]').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const id = parseInt(this.dataset.id, 10);
+            fetch(apiBase + '/api/admin/champion-school-requests/' + id + '/approve', { method: 'POST', credentials: 'same-origin', headers: headers(), body: '{}' })
+              .then(r => r.json().then(data => ({ status: r.status, data })))
+              .then(({ status, data }) => {
+                if (status === 200) { loadRequests(); } else { alert(data.error || 'Failed'); }
+              })
+              .catch(() => alert('Failed'));
+          });
+        });
+        list.querySelectorAll('[data-action="decline"]').forEach(btn => {
+          btn.addEventListener('click', function() {
+            declineRequestId = parseInt(this.dataset.id, 10);
+            document.getElementById('declineReason').value = '';
+            document.getElementById('declineModal').style.display = 'flex';
+          });
+        });
+      })
+      .catch(() => {
+        document.getElementById('requestsEmpty').textContent = 'Error loading requests.';
+        document.getElementById('requestsEmpty').style.display = 'block';
+        document.getElementById('requestsList').style.display = 'none';
+      });
+  }
+
+  document.getElementById('filterStatus').addEventListener('change', loadRequests);
+  document.getElementById('btnRefresh').addEventListener('click', loadRequests);
+
+  document.getElementById('declineCancel').addEventListener('click', function() {
+    declineRequestId = null;
+    document.getElementById('declineModal').style.display = 'none';
+  });
+  document.getElementById('declineConfirm').addEventListener('click', function() {
+    if (declineRequestId == null) return;
+    const reason = document.getElementById('declineReason').value.trim();
+    fetch(apiBase + '/api/admin/champion-school-requests/' + declineRequestId + '/decline', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: headers(),
+      body: JSON.stringify({ reason: reason || undefined })
+    })
+      .then(r => r.json().then(data => ({ status: r.status, data })))
+      .then(({ status, data }) => {
+        document.getElementById('declineModal').style.display = 'none';
+        declineRequestId = null;
+        if (status === 200) loadRequests();
+        else alert(data.error || 'Failed');
+      })
+      .catch(() => { document.getElementById('declineModal').style.display = 'none'; declineRequestId = null; alert('Failed'); });
+  });
+
+  loadRequests();
+})();
+</script>
+{% endblock %}

@@ -15,7 +15,7 @@ from docx import Document
 import re
 from app import app, db
 from app.forms import EventForm, LoginForm, PerfomanceTargetsForm, RegistrationForm, BookAllocationForm, ReportForm, WorkspaceForm, ProjectForm, TaskForm, CSVUploadForm, ChampionCSVUploadForm, ChampionSchoolForm, AkelloSimEventForm
-from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, Event, WeeklyReport, TaskA, ColumnA, ProjectA, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore
+from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, Event, WeeklyReport, TaskA, ColumnA, ProjectA, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification
 from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from collections import defaultdict
@@ -1124,6 +1124,72 @@ def admin_update_champion_school(cs_id):
         return jsonify({"error": str(e)}), 400
 
 
+# -------- Champion school requests (admin approve/decline) --------
+@app.route('/api/admin/champion-school-requests', methods=['GET'])
+@login_required
+def api_admin_champion_school_requests_list():
+    """List champion school requests; optional ?status=Pending. Requires Admin or Approve Champion Schools privilege."""
+    if not can_approve_champion_schools():
+        return jsonify({"error": "Unauthorized"}), 403
+    status = request.args.get('status')
+    q = ChampionSchoolRequest.query
+    if status:
+        q = q.filter_by(status=status)
+    q = q.order_by(ChampionSchoolRequest.created_at.desc())
+    requests = q.all()
+    return jsonify({'requests': [r.to_dict() for r in requests]})
+
+
+@app.route('/api/admin/champion-school-requests/<int:request_id>/approve', methods=['POST'])
+@login_required
+def api_admin_champion_school_requests_approve(request_id):
+    """Approve a champion school request: add school to champion profile."""
+    if not can_approve_champion_schools():
+        return jsonify({"error": "Unauthorized"}), 403
+    req = ChampionSchoolRequest.query.get_or_404(request_id)
+    if req.status != 'Pending':
+        return jsonify({"error": f"Request is already {req.status}"}), 400
+    champ = req.champion_school
+    if not champ:
+        return jsonify({"error": "Champion not found"}), 404
+    champ.add_school(
+        asl_id=req.asl_school_id or '',
+        library_id=req.library_school_id or '',
+        school_name=req.school_name
+    )
+    req.status = 'Approved'
+    req.reviewed_by_user_id = current_user.id
+    req.reviewed_at = datetime.utcnow()
+    try:
+        db.session.commit()
+        return jsonify({'message': 'Approved', 'request': req.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/champion-school-requests/<int:request_id>/decline', methods=['POST'])
+@login_required
+def api_admin_champion_school_requests_decline(request_id):
+    """Decline a champion school request."""
+    if not can_approve_champion_schools():
+        return jsonify({"error": "Unauthorized"}), 403
+    req = ChampionSchoolRequest.query.get_or_404(request_id)
+    if req.status != 'Pending':
+        return jsonify({"error": f"Request is already {req.status}"}), 400
+    data = request.get_json() or {}
+    reason = (data.get('reason') or data.get('decline_reason') or '').strip() or None
+    req.status = 'Declined'
+    req.reviewed_by_user_id = current_user.id
+    req.reviewed_at = datetime.utcnow()
+    req.decline_reason = reason
+    try:
+        db.session.commit()
+        return jsonify({'message': 'Declined', 'request': req.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 
 # @app.route('/home', methods=['GET', 'POST'])
 # @login_required
@@ -1642,6 +1708,24 @@ def all_champion_details():
 
     return render_template('all_champions_data.html',
                            title='Champions')
+
+
+@app.route('/champion-my-schools', methods=['GET'])
+@login_required
+def champion_my_schools():
+    """My schools page for Brand Ambassadors: search, request additions, view current and pending."""
+    if getattr(current_user, 'userRole', None) != 'Brand Ambassador':
+        return redirect(url_for('index'))
+    return render_template('champion_my_schools.html', title='My Schools')
+
+
+@app.route('/champion-school-requests', methods=['GET'])
+@login_required
+def champion_school_requests_admin():
+    """Admin page to list and approve/decline champion school requests."""
+    if not can_approve_champion_schools():
+        return redirect(url_for('index'))
+    return render_template('champion_school_requests_admin.html', title='Champion School Requests')
 
 
 
@@ -5491,6 +5575,24 @@ def can_view_all_queries():
     except Exception:
         pass
     return False
+
+
+def can_approve_champion_schools():
+    """Check if user can approve champion school requests (Admin or Approve Champion Schools privilege)."""
+    try:
+        if getattr(current_user, 'userRole', None) == 'Admin':
+            return True
+        if hasattr(current_user, 'has_privilege'):
+            return current_user.has_privilege('Approve Champion Schools')
+    except Exception:
+        pass
+    return False
+
+
+def get_champion_school_approvers():
+    """Return list of User ids who can approve champion school requests (Admin role; privilege holders can still approve via UI)."""
+    return [u.id for u in User.query.filter(User.userRole == 'Admin').all()]
+
 
 @app.route('/api/branding/inventory', methods=['GET'])
 @login_required
@@ -9638,6 +9740,202 @@ def library_comparative_analytics():
                              error=str(e))
 
 
+@app.route('/api/schools/search', methods=['GET'])
+@login_required
+def api_schools_search():
+    """Search schools (ASL tblschools + optional library match) for champions. Returns asl_school_id, library_school_id, school_name, province."""
+    q = (request.args.get('q') or '').strip()
+    province = (request.args.get('province') or '').strip()
+    limit = min(int(request.args.get('limit', 50) or 50), 100)
+    results = []
+    conn_asl = None
+    conn_lib = None
+    try:
+        conn_asl = get_ruzivo_conn()
+        if not conn_asl:
+            return jsonify({'error': 'Database connection not available'}), 500
+        cursor_asl = conn_asl.cursor(pymysql.cursors.DictCursor)
+        if q:
+            sql = """
+                SELECT school_id AS asl_school_id, school_name, school_province AS province
+                FROM tblschools
+                WHERE school_name LIKE %s
+            """
+            params = [f'%{q}%']
+            if province:
+                sql += " AND school_province = %s"
+                params.append(province)
+            sql += " ORDER BY school_name LIMIT %s"
+            params.append(limit)
+            cursor_asl.execute(sql, params)
+        else:
+            sql = """
+                SELECT school_id AS asl_school_id, school_name, school_province AS province
+                FROM tblschools
+            """
+            params = []
+            if province:
+                sql += " WHERE school_province = %s"
+                params.append(province)
+            sql += " ORDER BY school_name LIMIT %s"
+            params.append(limit)
+            cursor_asl.execute(sql, params)
+        asl_rows = cursor_asl.fetchall()
+        asl_by_name_province = {}
+        for row in asl_rows:
+            key = ((row.get('school_name') or '').strip().lower(), (row.get('province') or '').strip().lower())
+            asl_by_name_province[key] = row
+        try:
+            conn_lib = get_direct_library_conn()
+            if conn_lib:
+                cursor_lib = conn_lib.cursor(pymysql.cursors.DictCursor)
+                lib_sql = "SELECT id, name, province FROM institutions"
+                lib_params = []
+                if q:
+                    lib_sql += " WHERE name LIKE %s"
+                    lib_params.append(f'%{q}%')
+                if province:
+                    lib_sql += " AND province = %s" if q else " WHERE province = %s"
+                    lib_params.append(province)
+                lib_sql += " LIMIT 200"
+                cursor_lib.execute(lib_sql, lib_params)
+                lib_rows = cursor_lib.fetchall()
+                lib_by_name_province = {}
+                for r in lib_rows:
+                    key = ((r.get('name') or '').strip().lower(), (r.get('province') or '').strip().lower())
+                    lib_by_name_province[key] = r.get('id')
+        except Exception:
+            lib_by_name_province = {}
+        for row in asl_rows:
+            name = (row.get('school_name') or '').strip()
+            prov = (row.get('province') or '').strip()
+            key = (name.lower(), prov.lower())
+            library_school_id = lib_by_name_province.get(key) if lib_by_name_province else None
+            if library_school_id is not None:
+                library_school_id = str(library_school_id)
+            results.append({
+                'asl_school_id': row.get('asl_school_id') if row.get('asl_school_id') is not None else None,
+                'library_school_id': library_school_id or '',
+                'school_name': name,
+                'province': prov
+            })
+        return jsonify(results)
+    except Exception as e:
+        logging.exception(e)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if conn_asl:
+            try:
+                conn_asl.close()
+            except Exception:
+                pass
+        if conn_lib:
+            try:
+                conn_lib.close()
+            except Exception:
+                pass
+
+
+def _resolve_champion_for_current_user():
+    """Resolve ChampionSchool record for current_user (Brand Ambassador). Returns (champion, error_response) or (champion, None)."""
+    if getattr(current_user, 'userRole', None) != 'Brand Ambassador':
+        return None, (jsonify({'error': 'Only Brand Ambassadors can request school additions'}), 403)
+    champion = ChampionSchool.query.filter(
+        ChampionSchool.firstname.ilike(f'%{(current_user.firstname or "").strip()}%'),
+        ChampionSchool.lastname.ilike(f'%{(current_user.lastname or "").strip()}%'),
+        ChampionSchool.province.ilike(f'%{(current_user.province or "").strip()}%')
+    ).first()
+    if not champion:
+        return None, (jsonify({'error': 'No champion profile found for your account. Please contact admin.'}), 404)
+    return champion, None
+
+
+@app.route('/api/champion/school-requests', methods=['POST'])
+@login_required
+def api_champion_school_requests_create():
+    """Champion submits school(s) to add; creates Pending ChampionSchoolRequest(s) and notifies admins."""
+    champion, err = _resolve_champion_for_current_user()
+    if err:
+        return err
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    schools = data.get('schools') if isinstance(data.get('schools'), list) else []
+    if not schools:
+        return jsonify({'error': 'Provide a non-empty list of schools (asl_school_id, library_school_id, school_name, optional province)'}), 400
+    created = []
+    for s in schools:
+        school_name = (s.get('school_name') or '').strip()
+        if not school_name:
+            continue
+        asl_id = s.get('asl_school_id')
+        if asl_id is not None:
+            asl_id = str(asl_id).strip() if asl_id else ''
+        else:
+            asl_id = ''
+        lib_id = s.get('library_school_id')
+        if lib_id is not None:
+            lib_id = str(lib_id).strip() if lib_id else ''
+        else:
+            lib_id = ''
+        province = (s.get('province') or '').strip() or None
+        req = ChampionSchoolRequest(
+            champion_school_id=champion.id,
+            requested_by_user_id=current_user.id,
+            asl_school_id=asl_id or None,
+            library_school_id=lib_id or None,
+            school_name=school_name,
+            province=province,
+            status='Pending'
+        )
+        db.session.add(req)
+        created.append(req)
+    if not created:
+        return jsonify({'error': 'No valid school entries to request'}), 400
+    db.session.commit()
+    approver_ids = get_champion_school_approvers()
+    champ_name = f'{champion.firstname} {champion.lastname}'
+    n = len(created)
+    msg = f'Champion {champ_name} requested to add {n} school(s).'
+    for uid in approver_ids:
+        notif = Notification(
+            user_id=uid,
+            query_id=None,
+            message=msg,
+            notification_type='champion_school_request'
+        )
+        db.session.add(notif)
+    db.session.commit()
+    return jsonify({'message': f'{len(created)} school(s) requested', 'requests': [r.to_dict() for r in created]}), 201
+
+
+@app.route('/api/champion/school-requests', methods=['GET'])
+@login_required
+def api_champion_school_requests_list():
+    """List school requests for the current champion."""
+    champion, err = _resolve_champion_for_current_user()
+    if err:
+        return err
+    status = request.args.get('status')
+    q = ChampionSchoolRequest.query.filter_by(champion_school_id=champion.id)
+    if status:
+        q = q.filter_by(status=status)
+    q = q.order_by(ChampionSchoolRequest.created_at.desc())
+    requests = q.all()
+    return jsonify({'requests': [r.to_dict() for r in requests]})
+
+
+@app.route('/api/champion/my-schools', methods=['GET'])
+@login_required
+def api_champion_my_schools():
+    """Return current champion's full school list (for My schools UI)."""
+    champion, err = _resolve_champion_for_current_user()
+    if err:
+        return err
+    schools = champion.get_schools() or []
+    return jsonify({'schools': schools})
+
+
 @app.route('/api/champion-schools-by-user/<username>', methods=['GET'])
 @login_required
 def get_champion_schools_by_user(username):
@@ -9932,15 +10230,23 @@ def add_champion():
     return jsonify(champ.to_dict()), 201
 
 
-# Update champion (add a school)
+# Update champion (add a school) – admin/privilege only; champions use POST /api/champion/school-requests
 @app.route("/api/champions/<int:champ_id>/add_school", methods=["POST"])
+@login_required
 def add_school(champ_id):
+    if not can_approve_champion_schools():
+        return jsonify({"error": "Unauthorized"}), 403
     champ = ChampionSchool.query.get_or_404(champ_id)
-    data = request.json
+    data = request.json or {}
+    asl_id = data.get("asl_school_id")
+    library_id = data.get("library_school_id")
+    school_name = (data.get("school_name") or "").strip()
+    if not school_name:
+        return jsonify({"error": "school_name is required"}), 400
     champ.add_school(
-        asl_id=data["asl_school_id"],
-        library_id=data["library_school_id"],
-        school_name=data["school_name"]
+        asl_id=asl_id or "",
+        library_id=library_id or "",
+        school_name=school_name
     )
     db.session.commit()
     return jsonify(champ.to_dict())

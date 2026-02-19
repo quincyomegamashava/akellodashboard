@@ -119,6 +119,11 @@
         <i class="fas fa-graduation-cap"></i> <span class="nav-text">Champions</span>
       </a>
       {% endif %}
+      {% if current_user.userRole == 'Admin' or (current_user.privileges and current_user.privileges.get('Approve Champion Schools')) %}
+      <a href="{{ url_for('champion_school_requests_admin') }}" class="nav-item {{ 'active' if request.endpoint == 'champion_school_requests_admin' else '' }}">
+        <i class="fas fa-user-check"></i> <span class="nav-text">Champion Requests</span>
+      </a>
+      {% endif %}
       {% endif %}
 
       {% if current_user.userRole != 'Brand Ambassador' %}
@@ -144,6 +149,10 @@
       </div>
 
       {% if current_user.userRole == 'Brand Ambassador' %}
+      <a href="{{ url_for('champion_my_schools') }}"
+        class="nav-item {{ 'active' if request.endpoint == 'champion_my_schools' else '' }}">
+        <i class="fas fa-school"></i> <span class="nav-text">My Schools</span>
+      </a>
       <a href="{{ url_for('provincestats', provincename=current_user.province) }}"
         class="nav-item {{ 'active' if request.endpoint == 'provincestats' else '' }}">
         <i class="fas fa-map-marker-alt"></i> <span class="nav-text">Province</span>
