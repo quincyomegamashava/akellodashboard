@@ -140,6 +140,15 @@
     document.getElementById('btnRequest').disabled = n === 0;
   }
 
+  function formatDuplicatesMessage(duplicates) {
+    if (!duplicates || duplicates.length === 0) return '';
+    const reasonText = { already_on_profile: 'already on your profile', already_pending: 'already have a pending request', duplicate_in_request: 'duplicate in your selection' };
+    return duplicates.map(function(d) {
+      const r = reasonText[d.reason] || d.reason;
+      return (d.school_name || 'Unknown') + ' (' + r + ')';
+    }).join('\n');
+  }
+
   document.getElementById('btnRequest').addEventListener('click', function() {
     const indices = Array.from(document.querySelectorAll('.row-select:checked')).map(c => parseInt(c.dataset.idx, 10));
     const schools = indices.map(i => ({
@@ -154,11 +163,20 @@
       .then(({ status, data }) => {
         if (status === 201) {
           loadPending();
+          loadCurrent();
           document.querySelectorAll('.row-select:checked').forEach(c => { c.checked = false; });
           updateRequestBtn();
-          alert('Request submitted. An admin will review it.');
+          var msg = 'Request submitted. An admin will review it.';
+          if (data.duplicates_skipped && data.duplicates_skipped.length > 0) {
+            msg += '\n\nThe following schools were not added:\n' + formatDuplicatesMessage(data.duplicates_skipped);
+          }
+          alert(msg);
         } else {
-          alert(data.error || 'Request failed');
+          var errMsg = data.error || 'Request failed';
+          if (data.duplicates_skipped && data.duplicates_skipped.length > 0) {
+            errMsg += '\n\n' + formatDuplicatesMessage(data.duplicates_skipped);
+          }
+          alert(errMsg);
           updateRequestBtn();
         }
       })

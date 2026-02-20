@@ -9850,10 +9850,17 @@ def _resolve_champion_for_current_user():
     return champion, None
 
 
+def _normalize_school_id(value):
+    """Return stripped string or empty string if missing."""
+    if value is None or value == '':
+        return ''
+    return str(value).strip()
+
+
 @app.route('/api/champion/school-requests', methods=['POST'])
 @login_required
 def api_champion_school_requests_create():
-    """Champion submits school(s) to add; creates Pending ChampionSchoolRequest(s) and notifies admins."""
+    """Champion submits school(s) to add; creates Pending ChampionSchoolRequest(s) and notifies admins. Skips duplicates (already on profile, already pending, or duplicate in request)."""
     champion, err = _resolve_champion_for_current_user()
     if err:
         return err
@@ -9863,22 +9870,84 @@ def api_champion_school_requests_create():
     schools = data.get('schools') if isinstance(data.get('schools'), list) else []
     if not schools:
         return jsonify({'error': 'Provide a non-empty list of schools (asl_school_id, library_school_id, school_name, optional province)'}), 400
+
+    # Build "existing on profile" sets (non-empty asl_id, non-empty lib_id, and names when both IDs empty)
+    profile_asl_ids = set()
+    profile_lib_ids = set()
+    profile_names_no_id = set()
+    for entry in (champion.get_schools() or []):
+        ea = _normalize_school_id(entry.get('asl_school_id'))
+        el = _normalize_school_id(entry.get('library_school_id'))
+        en = (entry.get('school_name') or '').strip().lower()
+        if ea:
+            profile_asl_ids.add(ea)
+        if el:
+            profile_lib_ids.add(el)
+        if not ea and not el and en:
+            profile_names_no_id.add(en)
+
+    # Build "already pending" sets
+    pending_asl_ids = set()
+    pending_lib_ids = set()
+    pending_names_no_id = set()
+    for req in ChampionSchoolRequest.query.filter_by(champion_school_id=champion.id, status='Pending').all():
+        pa = _normalize_school_id(req.asl_school_id)
+        pl = _normalize_school_id(req.library_school_id)
+        pn = (req.school_name or '').strip().lower()
+        if pa:
+            pending_asl_ids.add(pa)
+        if pl:
+            pending_lib_ids.add(pl)
+        if not pa and not pl and pn:
+            pending_names_no_id.add(pn)
+
+    # Track seen in this request (first occurrence wins)
+    seen_asl_ids = set()
+    seen_lib_ids = set()
+    seen_names_no_id = set()
+
     created = []
+    duplicates_skipped = []
+
     for s in schools:
         school_name = (s.get('school_name') or '').strip()
         if not school_name:
             continue
-        asl_id = s.get('asl_school_id')
-        if asl_id is not None:
-            asl_id = str(asl_id).strip() if asl_id else ''
-        else:
-            asl_id = ''
-        lib_id = s.get('library_school_id')
-        if lib_id is not None:
-            lib_id = str(lib_id).strip() if lib_id else ''
-        else:
-            lib_id = ''
+        asl_id = _normalize_school_id(s.get('asl_school_id'))
+        lib_id = _normalize_school_id(s.get('library_school_id'))
         province = (s.get('province') or '').strip() or None
+        name_lower = school_name.lower()
+
+        # Determine duplicate reason (order: in-request, profile, pending)
+        reason = None
+        if asl_id and asl_id in seen_asl_ids:
+            reason = 'duplicate_in_request'
+        elif lib_id and lib_id in seen_lib_ids:
+            reason = 'duplicate_in_request'
+        elif not asl_id and not lib_id and name_lower in seen_names_no_id:
+            reason = 'duplicate_in_request'
+        elif asl_id and asl_id in profile_asl_ids:
+            reason = 'already_on_profile'
+        elif lib_id and lib_id in profile_lib_ids:
+            reason = 'already_on_profile'
+        elif not asl_id and not lib_id and name_lower in profile_names_no_id:
+            reason = 'already_on_profile'
+        elif asl_id and asl_id in pending_asl_ids:
+            reason = 'already_pending'
+        elif lib_id and lib_id in pending_lib_ids:
+            reason = 'already_pending'
+        elif not asl_id and not lib_id and name_lower in pending_names_no_id:
+            reason = 'already_pending'
+
+        if reason:
+            duplicates_skipped.append({
+                'school_name': school_name,
+                'asl_school_id': asl_id or None,
+                'library_school_id': lib_id or None,
+                'reason': reason
+            })
+            continue
+
         req = ChampionSchoolRequest(
             champion_school_id=champion.id,
             requested_by_user_id=current_user.id,
@@ -9890,8 +9959,24 @@ def api_champion_school_requests_create():
         )
         db.session.add(req)
         created.append(req)
+        if asl_id:
+            seen_asl_ids.add(asl_id)
+            pending_asl_ids.add(asl_id)
+        if lib_id:
+            seen_lib_ids.add(lib_id)
+            pending_lib_ids.add(lib_id)
+        if not asl_id and not lib_id and name_lower:
+            seen_names_no_id.add(name_lower)
+            pending_names_no_id.add(name_lower)
+
     if not created:
+        if duplicates_skipped:
+            return jsonify({
+                'error': 'All selected schools are duplicates.',
+                'duplicates_skipped': duplicates_skipped
+            }), 400
         return jsonify({'error': 'No valid school entries to request'}), 400
+
     db.session.commit()
     approver_ids = get_champion_school_approvers()
     champ_name = f'{champion.firstname} {champion.lastname}'
@@ -9906,7 +9991,10 @@ def api_champion_school_requests_create():
         )
         db.session.add(notif)
     db.session.commit()
-    return jsonify({'message': f'{len(created)} school(s) requested', 'requests': [r.to_dict() for r in created]}), 201
+    payload = {'message': f'{len(created)} school(s) requested', 'requests': [r.to_dict() for r in created]}
+    if duplicates_skipped:
+        payload['duplicates_skipped'] = duplicates_skipped
+    return jsonify(payload), 201
 
 
 @app.route('/api/champion/school-requests', methods=['GET'])
