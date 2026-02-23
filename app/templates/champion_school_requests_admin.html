@@ -72,55 +72,71 @@
   let declineRequestId = null;
 
   function loadRequests() {
+    const list = document.getElementById('requestsList');
+    const empty = document.getElementById('requestsEmpty');
     const status = document.getElementById('filterStatus').value;
     const url = apiBase + '/api/admin/champion-school-requests' + (status ? '?status=' + encodeURIComponent(status) : '');
     fetch(url, { credentials: 'same-origin', headers: headers() })
-      .then(r => r.json())
-      .then(d => {
-        const list = document.getElementById('requestsList');
-        const empty = document.getElementById('requestsEmpty');
-        const reqs = d.requests || [];
-        if (reqs.length === 0) {
-          list.innerHTML = '';
-          list.style.display = 'none';
-          empty.style.display = 'block';
-          empty.textContent = status ? 'No ' + status.toLowerCase() + ' requests.' : 'No requests found.';
-          return;
-        }
-        empty.style.display = 'none';
-        list.style.display = 'block';
-        list.innerHTML = '<table><thead><tr><th>Champion</th><th>School name</th><th>ASL ID</th><th>Library ID</th><th>Province</th><th>Requested</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
-          reqs.map(r => {
-            const actions = r.status === 'Pending'
-              ? '<button type="button" class="btn btn-approve" data-action="approve" data-id="' + r.id + '">Approve</button><button type="button" class="btn btn-decline" data-action="decline" data-id="' + r.id + '">Decline</button>'
-              : '-';
-            const badgeClass = r.status === 'Pending' ? 'badge-pending' : r.status === 'Approved' ? 'badge-approved' : 'badge-declined';
-            return '<tr><td>' + (r.champion_name || '') + '</td><td>' + (r.school_name || '') + '</td><td>' + (r.asl_school_id ?? '') + '</td><td>' + (r.library_school_id ?? '') + '</td><td>' + (r.province ?? '') + '</td><td>' + (r.created_at ? new Date(r.created_at).toLocaleString() : '') + '</td><td><span class="badge ' + badgeClass + '">' + (r.status || '') + '</span></td><td>' + actions + '</td></tr>';
-          }).join('') +
-          '</tbody></table>';
-        list.querySelectorAll('[data-action="approve"]').forEach(btn => {
-          btn.addEventListener('click', function() {
-            const id = parseInt(this.dataset.id, 10);
-            fetch(apiBase + '/api/admin/champion-school-requests/' + id + '/approve', { method: 'POST', credentials: 'same-origin', headers: headers(), body: '{}' })
-              .then(r => r.json().then(data => ({ status: r.status, data })))
-              .then(({ status, data }) => {
-                if (status === 200) { loadRequests(); } else { alert(data.error || 'Failed'); }
-              })
-              .catch(() => alert('Failed'));
+      .then(function(r) {
+        if (!r.ok) {
+          return r.text().then(function(text) {
+            var msg = 'Error loading requests (HTTP ' + r.status + ').';
+            try {
+              var data = JSON.parse(text);
+              if (data.error) { msg += ' Server: ' + data.error; }
+            } catch (_) {
+              msg += ' ' + (r.statusText || 'Non-JSON response. Run migration on server?');
+            }
+            empty.textContent = msg;
+            empty.style.display = 'block';
+            list.style.display = 'none';
           });
-        });
-        list.querySelectorAll('[data-action="decline"]').forEach(btn => {
-          btn.addEventListener('click', function() {
-            declineRequestId = parseInt(this.dataset.id, 10);
-            document.getElementById('declineReason').value = '';
-            document.getElementById('declineModal').style.display = 'flex';
+        }
+        return r.json().then(function(d) {
+          const reqs = d.requests || [];
+          if (reqs.length === 0) {
+            list.innerHTML = '';
+            list.style.display = 'none';
+            empty.style.display = 'block';
+            empty.textContent = status ? 'No ' + status.toLowerCase() + ' requests.' : 'No requests found.';
+            return;
+          }
+          empty.style.display = 'none';
+          list.style.display = 'block';
+          list.innerHTML = '<table><thead><tr><th>Champion</th><th>School name</th><th>ASL ID</th><th>Library ID</th><th>Province</th><th>Requested</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
+            reqs.map(function(r) {
+              const actions = r.status === 'Pending'
+                ? '<button type="button" class="btn btn-approve" data-action="approve" data-id="' + r.id + '">Approve</button><button type="button" class="btn btn-decline" data-action="decline" data-id="' + r.id + '">Decline</button>'
+                : '-';
+              const badgeClass = r.status === 'Pending' ? 'badge-pending' : r.status === 'Approved' ? 'badge-approved' : 'badge-declined';
+              return '<tr><td>' + (r.champion_name || '') + '</td><td>' + (r.school_name || '') + '</td><td>' + (r.asl_school_id ?? '') + '</td><td>' + (r.library_school_id ?? '') + '</td><td>' + (r.province ?? '') + '</td><td>' + (r.created_at ? new Date(r.created_at).toLocaleString() : '') + '</td><td><span class="badge ' + badgeClass + '">' + (r.status || '') + '</span></td><td>' + actions + '</td></tr>';
+            }).join('') +
+            '</tbody></table>';
+          list.querySelectorAll('[data-action="approve"]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+              const id = parseInt(this.dataset.id, 10);
+              fetch(apiBase + '/api/admin/champion-school-requests/' + id + '/approve', { method: 'POST', credentials: 'same-origin', headers: headers(), body: '{}' })
+                .then(r => r.json().then(data => ({ status: r.status, data })))
+                .then(({ status, data }) => {
+                  if (status === 200) { loadRequests(); } else { alert(data.error || 'Failed'); }
+                })
+                .catch(() => alert('Failed'));
+            });
+          });
+          list.querySelectorAll('[data-action="decline"]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+              declineRequestId = parseInt(this.dataset.id, 10);
+              document.getElementById('declineReason').value = '';
+              document.getElementById('declineModal').style.display = 'flex';
+            });
           });
         });
       })
-      .catch(() => {
-        document.getElementById('requestsEmpty').textContent = 'Error loading requests.';
-        document.getElementById('requestsEmpty').style.display = 'block';
-        document.getElementById('requestsList').style.display = 'none';
+      .catch(function(e) {
+        console.error('Champion school requests load failed:', e);
+        empty.textContent = 'Error loading requests. Check browser console.';
+        empty.style.display = 'block';
+        list.style.display = 'none';
       });
   }
 
