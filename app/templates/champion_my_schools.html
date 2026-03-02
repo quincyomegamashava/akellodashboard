@@ -79,11 +79,6 @@
 
 <script>
 (function() {
-  const apiBase = '{{ request.url_root.rstrip("/") }}';
-  function getCookie(name) {
-    const v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
-    return v ? v[2] : null;
-  }
   function headers() {
     const csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content;
     const h = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
@@ -97,14 +92,41 @@
     const q = document.getElementById('searchQ').value.trim();
     const province = document.getElementById('searchProvince').value.trim();
     document.getElementById('searchError').style.display = 'none';
-    fetch(apiBase + '/api/schools/search?q=' + encodeURIComponent(q) + (province ? '&province=' + encodeURIComponent(province) : '') + '&limit=50', { credentials: 'same-origin', headers: headers() })
-      .then(r => r.json())
-      .then(data => {
+    const searchUrl = '/api/schools/search?q=' + encodeURIComponent(q) + (province ? '&province=' + encodeURIComponent(province) : '') + '&limit=50';
+    fetch(searchUrl, { credentials: 'same-origin', headers: headers() })
+      .then(function(r) {
+        if (!r.ok) {
+          return r.text().then(function(text) {
+            var msg = 'Server error. Please try again.';
+            if (r.status === 401 || r.status === 302) msg = 'Please log in again.';
+            else {
+              try {
+                var data = JSON.parse(text);
+                if (data && data.error) msg = data.error;
+              } catch (_) {}
+            }
+            document.getElementById('searchError').textContent = msg;
+            document.getElementById('searchError').style.display = 'block';
+            searchResults = [];
+            renderSearchResults();
+          });
+        }
+        return r.json();
+      })
+      .then(function(data) {
+        if (!data) return;
         if (data.error) { document.getElementById('searchError').textContent = data.error; document.getElementById('searchError').style.display = 'block'; searchResults = []; }
         else { searchResults = Array.isArray(data) ? data : []; }
         renderSearchResults();
       })
-      .catch(e => { document.getElementById('searchError').textContent = e.message || 'Search failed'; document.getElementById('searchError').style.display = 'block'; searchResults = []; });
+      .catch(function(e) {
+        var msg = e.message || 'Search failed';
+        if (msg === 'Failed to fetch') msg = 'Network error. Check your connection or try again.';
+        document.getElementById('searchError').textContent = msg;
+        document.getElementById('searchError').style.display = 'block';
+        searchResults = [];
+        renderSearchResults();
+      });
   });
 
   function renderSearchResults() {
@@ -158,7 +180,7 @@
       province: searchResults[i].province || ''
     }));
     document.getElementById('btnRequest').disabled = true;
-    fetch(apiBase + '/api/champion/school-requests', { method: 'POST', credentials: 'same-origin', headers: headers(), body: JSON.stringify({ schools }) })
+    fetch('/api/champion/school-requests', { method: 'POST', credentials: 'same-origin', headers: headers(), body: JSON.stringify({ schools }) })
       .then(r => r.json().then(d => ({ status: r.status, data: d })))
       .then(({ status, data }) => {
         if (status === 201) {
@@ -184,7 +206,7 @@
   });
 
   function loadPending() {
-    fetch(apiBase + '/api/champion/school-requests?status=Pending', { credentials: 'same-origin', headers: headers() })
+    fetch('/api/champion/school-requests?status=Pending', { credentials: 'same-origin', headers: headers() })
       .then(r => r.json())
       .then(d => {
         const list = document.getElementById('pendingList');
@@ -201,7 +223,7 @@
   }
 
   function loadCurrent() {
-    fetch(apiBase + '/api/champion/my-schools', { credentials: 'same-origin', headers: headers() })
+    fetch('/api/champion/my-schools', { credentials: 'same-origin', headers: headers() })
       .then(r => r.json())
       .then(d => {
         const list = document.getElementById('currentList');

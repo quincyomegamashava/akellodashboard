@@ -61,7 +61,6 @@
 
 <script>
 (function() {
-  const apiBase = '{{ request.url_root.rstrip("/") }}';
   function headers() {
     const h = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
     const csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content;
@@ -75,7 +74,7 @@
     const list = document.getElementById('requestsList');
     const empty = document.getElementById('requestsEmpty');
     const status = document.getElementById('filterStatus').value;
-    const url = apiBase + '/api/admin/champion-school-requests' + (status ? '?status=' + encodeURIComponent(status) : '');
+    const url = '/api/admin/champion-school-requests' + (status ? '?status=' + encodeURIComponent(status) : '');
     fetch(url, { credentials: 'same-origin', headers: headers() })
       .then(function(r) {
         if (!r.ok) {
@@ -115,7 +114,7 @@
           list.querySelectorAll('[data-action="approve"]').forEach(function(btn) {
             btn.addEventListener('click', function() {
               const id = parseInt(this.dataset.id, 10);
-              fetch(apiBase + '/api/admin/champion-school-requests/' + id + '/approve', { method: 'POST', credentials: 'same-origin', headers: headers(), body: '{}' })
+              fetch('/api/admin/champion-school-requests/' + id + '/approve', { method: 'POST', credentials: 'same-origin', headers: headers(), body: '{}' })
                 .then(r => r.json().then(data => ({ status: r.status, data })))
                 .then(({ status, data }) => {
                   if (status === 200) { loadRequests(); } else { alert(data.error || 'Failed'); }
@@ -150,7 +149,7 @@
   document.getElementById('declineConfirm').addEventListener('click', function() {
     if (declineRequestId == null) return;
     const reason = document.getElementById('declineReason').value.trim();
-    fetch(apiBase + '/api/admin/champion-school-requests/' + declineRequestId + '/decline', {
+    fetch('/api/admin/champion-school-requests/' + declineRequestId + '/decline', {
       method: 'POST',
       credentials: 'same-origin',
       headers: headers(),
