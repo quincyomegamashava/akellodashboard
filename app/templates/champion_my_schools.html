@@ -35,7 +35,6 @@
       <p class="text-muted small mb-3">Search for schools, then select the ones you want to add. An admin will approve your request.</p>
       <div class="search-bar">
         <input type="text" id="searchQ" placeholder="School name..." />
-        <input type="text" id="searchProvince" placeholder="Province (optional)" />
         <button type="button" class="btn-search" id="btnSearch">Search</button>
       </div>
       <div id="searchError" class="error-msg" style="display: none;"></div>
@@ -79,6 +78,7 @@
 
 <script>
 (function() {
+  const championProvince = ('{{ champion_province or "" }}').trim();
   function headers() {
     const csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content;
     const h = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
@@ -90,9 +90,8 @@
 
   document.getElementById('btnSearch').addEventListener('click', function() {
     const q = document.getElementById('searchQ').value.trim();
-    const province = document.getElementById('searchProvince').value.trim();
     document.getElementById('searchError').style.display = 'none';
-    const searchUrl = '/api/schools/search?q=' + encodeURIComponent(q) + (province ? '&province=' + encodeURIComponent(province) : '') + '&limit=50';
+    const searchUrl = '/api/schools/search?q=' + encodeURIComponent(q) + (championProvince ? '&province=' + encodeURIComponent(championProvince) : '') + '&limit=50';
     fetch(searchUrl, { credentials: 'same-origin', headers: headers() })
       .then(function(r) {
         if (!r.ok) {

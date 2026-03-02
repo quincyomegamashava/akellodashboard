@@ -1716,7 +1716,9 @@ def champion_my_schools():
     """My schools page for Brand Ambassadors: search, request additions, view current and pending."""
     if getattr(current_user, 'userRole', None) != 'Brand Ambassador':
         return redirect(url_for('index'))
-    return render_template('champion_my_schools.html', title='My Schools')
+    champion, _ = _resolve_champion_for_current_user()
+    champion_province = (champion.province or '').strip() if champion else ''
+    return render_template('champion_my_schools.html', title='My Schools', champion_province=champion_province)
 
 
 @app.route('/champion-school-requests', methods=['GET'])
@@ -20253,11 +20255,8 @@ def list_game_scores():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/all-champions-school-tracker', methods=['GET'])
-@login_required
-def all_champions_school_tracker():
-    """Fetch all schools for all champions with status"""
-    
+def _get_all_champions_school_tracker_data():
+    """Fetch all schools for all champions with status. Returns list of row dicts. Raises on error."""
     def normalize_active_flag(value):
         if value is None:
             return False
@@ -20269,230 +20268,481 @@ def all_champions_school_tracker():
             return value == 1
         return False
 
-    try:
-        # 1. Fetch all champion schools
-        champion_schools = ChampionSchool.query.all()
-        app.logger.info(f"DEBUG: Found {len(champion_schools)} ChampionSchool records")
-        
-        # 2. Extract unique school_ids and map to champion info
-        school_id_map = {} # school_id -> list of {champion, province, fallback_name}
-        unique_school_ids = set()
-        
-        for cs in champion_schools:
-            current_schools_list = cs.get_schools() or []
-            current_champion_name = f"{cs.firstname} {cs.lastname}"
-            
-            for school_entry in current_schools_list:
-                raw_sid = school_entry.get('asl_school_id')
-                raw_sname = school_entry.get('school_name', 'Unknown School')
-                
-                if raw_sid:
-                    try:
-                        sid_val = int(raw_sid)
-                        if sid_val == 0:
-                            continue
-                            
-                        unique_school_ids.add(sid_val)
-                        if sid_val not in school_id_map:
-                            school_id_map[sid_val] = []
-                        
-                        school_id_map[sid_val].append({
-                            'champion': current_champion_name,
-                            'province': cs.province,
-                            'fallback_name': raw_sname
-                        })
-                    except (ValueError, TypeError):
-                         app.logger.warning(f"DEBUG: Invalid school ID found: {raw_sid}")
+    # 1. Fetch all champion schools
+    champion_schools = ChampionSchool.query.all()
+    app.logger.info(f"DEBUG: Found {len(champion_schools)} ChampionSchool records")
 
-        app.logger.info(f"DEBUG: Extracted {len(unique_school_ids)} unique school IDs")
-        if not unique_school_ids:
-             return jsonify([]), 200
+    # 2. Extract unique school_ids and map to champion info
+    school_id_map = {} # school_id -> list of {champion, province, fallback_name}
+    unique_school_ids = set()
 
-        # Convert to list for SQL IN clause
-        school_ids_list = list(unique_school_ids)
-        
-        # 3. Query Ruzivo/Scholarship DB
-        results = []
-        
-        # Process in chunks if too many schools
-        chunk_size = 1000
-        for i in range(0, len(school_ids_list), chunk_size):
-            chunk = school_ids_list[i:i + chunk_size]
-            placeholders = ','.join(['%s'] * len(chunk))
-            
-            conn = get_ruzivo_conn()
-            cursor = conn.cursor()
-            
-            # Fetch scholarship details
-            query = f"""
-                SELECT ts.school_id, sc.school_name, ts.scholarship_type, 
-                       ts.expiry_date, ts.active, ts.duration
-                FROM tblscholarships_schools ts
-                LEFT JOIN tblschools sc ON sc.school_id = ts.school_id
-                WHERE ts.school_id IN ({placeholders})
-            """
-            cursor.execute(query, chunk)
-            scholarship_rows = cursor.fetchall()
+    for cs in champion_schools:
+        current_schools_list = cs.get_schools() or []
+        current_champion_name = f"{cs.firstname} {cs.lastname}"
 
-            # Fetch durations and first awards since 2025
-            since_2025_query = f"""
-                SELECT x.school_id, SUM(x.duration) AS total_months, MIN(x.awarded_at) AS first_awarded_at
-                FROM tblscholarships_schools x
-                WHERE x.school_id IN ({placeholders})
-                AND x.awarded_at >= %s
-                GROUP BY x.school_id
-            """
-            cursor.execute(since_2025_query, (*chunk, '2025-01-01'))
-            since_2025_rows = cursor.fetchall()
-            since_2025_map = {}
-            for row in since_2025_rows:
-                today_date = date.today()
-                if isinstance(row, dict):
-                    q_sid = row['school_id']
-                    fa = row['first_awarded_at']
-                    total_m = row['total_months'] or 0
-                else:
-                    q_sid = row[0]
-                    total_m = row[1] or 0
-                    fa = row[2]
-                
-                is_over_12 = False
-                if fa:
-                    fa_dt = fa.date() if hasattr(fa, 'date') else fa
-                    if isinstance(fa_dt, date) and fa_dt <= today_date - timedelta(days=365):
-                        is_over_12 = True
+        for school_entry in current_schools_list:
+            raw_sid = school_entry.get('asl_school_id')
+            raw_sname = school_entry.get('school_name', 'Unknown School')
 
-                since_2025_map[q_sid] = {
-                    "total_months": total_m,
-                    "first_awarded_at": fa,
-                    "is_over_12_months": is_over_12
-                }
-            
-            # Fetch active subscriptions for expired checks
-            today_now = datetime.now().date()
-            first_day_of_month = today_now.replace(day=1)
-            if today_now.month == 12:
-                first_day_next_month = today_now.replace(year=today_now.year + 1, month=1, day=1)
-            else:
-                first_day_next_month = today_now.replace(month=today_now.month + 1, day=1)
+            if raw_sid:
+                try:
+                    sid_val = int(raw_sid)
+                    if sid_val == 0:
+                        continue
 
-            sub_query = f"""
-                SELECT s.school_id, COUNT(DISTINCT p.student_id) as active_count
-                FROM tblpoints_purchase p
-                JOIN tblstudents s ON p.student_id = s.student_id
-                WHERE s.school_id IN ({placeholders})
-                  AND p.expiry_date >= %s
-                  AND p.expiry_date < %s
-                GROUP BY s.school_id
-            """
-            cursor.execute(sub_query, (*chunk, first_day_of_month, first_day_next_month))
-            sub_rows = cursor.fetchall()
-            sub_map = {}
-            for row in sub_rows:
-                 if isinstance(row, dict):
-                     sub_map[row['school_id']] = row['active_count']
-                 else:
-                     sub_map[row[0]] = row[1]
+                    unique_school_ids.add(sid_val)
+                    if sid_val not in school_id_map:
+                        school_id_map[sid_val] = []
 
-            cursor.close()
-            conn.close()
-            
-            # Create map for scholarship rows
-            scholarship_map = {}
-            for row in scholarship_rows:
-                if isinstance(row, dict):
-                    q_sid = row['school_id']
-                    scholarship_map[q_sid] = row
-                else:
-                    q_sid = row[0]
-                    scholarship_map[q_sid] = {
-                        'school_name': row[1],
-                        'scholarship_type': row[2],
-                        'expiry_date': row[3],
-                        'active': row[4],
-                        'duration': row[5]
-                    }
-
-            # Process all unique school IDs from ChampionSchool
-            for current_sid in chunk:
-                champ_infos = school_id_map.get(current_sid, [])
-                s_data = scholarship_map.get(current_sid)
-                
-                if s_data:
-                    current_sname = s_data['school_name']
-                    current_stype = s_data['scholarship_type']
-                    current_sexpiry = s_data['expiry_date']
-                    current_sactive = s_data['active']
-                    
-                    # Normalize Expiry
-                    if current_sexpiry:
-                        if isinstance(current_sexpiry, str):
-                            try:
-                                current_sexpiry = datetime.strptime(current_sexpiry, "%Y-%m-%d").date()
-                            except:
-                                try:
-                                    current_sexpiry = datetime.strptime(current_sexpiry, "%Y-%m-%d %H:%M:%S").date()
-                                except:
-                                    pass
-                        elif hasattr(current_sexpiry, 'date'):
-                            current_sexpiry = current_sexpiry.date()
-                    
-                    current_is_expired = False
-                    if current_sexpiry and isinstance(current_sexpiry, date):
-                         if current_sexpiry < today_now:
-                             current_is_expired = True
-                    
-                    normalized_active = normalize_active_flag(current_sactive)
-                    
-                    # Determine Status
-                    current_status = "Inactive"
-                    if normalized_active:
-                        if current_is_expired:
-                             current_status = "Expired"
-                        else:
-                             current_status = "Active"
-                    
-                    current_active_subs = sub_map.get(current_sid, 0)
-                    current_over_12 = since_2025_map.get(current_sid, {}).get("is_over_12_months", False)
-                    current_first_awarded = since_2025_map.get(current_sid, {}).get("first_awarded_at", "N/A")
-                    current_total_m = since_2025_map.get(current_sid, {}).get("total_months", 0)
-                else:
-                    # Not in scholarship table
-                    # Use fallback name from the first champ info if available
-                    fallback_name_found = "Unknown School"
-                    if champ_infos:
-                        fallback_name_found = champ_infos[0].get('fallback_name', "Unknown School")
-                        
-                    current_sname = fallback_name_found
-                    current_stype = "N/A"
-                    current_sexpiry = None
-                    current_status = "Never Assigned"
-                    current_active_subs = 0
-                    current_over_12 = False
-                    current_first_awarded = "N/A"
-                    current_total_m = 0
-
-                for info in champ_infos:
-                    results.append({
-                        "champion": info['champion'],
-                        "province": info['province'],
-                        "school_name": current_sname,
-                        "status": current_status,
-                        "expiry_date": current_sexpiry.isoformat() if current_sexpiry else None,
-                        "first_awarded_at": current_first_awarded,
-                        "is_over_12_months": current_over_12,
-                        "scholarship_type": current_stype,
-                        "active_subscriptions": current_active_subs,
-                        "duration": current_total_m
+                    school_id_map[sid_val].append({
+                        'champion': current_champion_name,
+                        'province': cs.province,
+                        'fallback_name': raw_sname,
+                        'asl_school_id': str(sid_val),
+                        'library_school_id': str(school_entry.get('library_school_id') or '').strip()
                     })
+                except (ValueError, TypeError):
+                    app.logger.warning(f"DEBUG: Invalid school ID found: {raw_sid}")
 
+    app.logger.info(f"DEBUG: Extracted {len(unique_school_ids)} unique school IDs")
+    if not unique_school_ids:
+        return []
+
+    # Convert to list for SQL IN clause
+    school_ids_list = list(unique_school_ids)
+
+    # 3. Query Ruzivo/Scholarship DB
+    results = []
+
+    # Process in chunks if too many schools
+    chunk_size = 1000
+    for i in range(0, len(school_ids_list), chunk_size):
+        chunk = school_ids_list[i:i + chunk_size]
+        placeholders = ','.join(['%s'] * len(chunk))
+
+        conn = get_ruzivo_conn()
+        cursor = conn.cursor()
+            
+        # Fetch scholarship details
+        query = f"""
+            SELECT ts.school_id, sc.school_name, ts.scholarship_type,
+                   ts.expiry_date, ts.active, ts.duration
+            FROM tblscholarships_schools ts
+            LEFT JOIN tblschools sc ON sc.school_id = ts.school_id
+            WHERE ts.school_id IN ({placeholders})
+        """
+        cursor.execute(query, chunk)
+        scholarship_rows = cursor.fetchall()
+
+        # Fetch durations and first awards since 2025
+        since_2025_query = f"""
+            SELECT x.school_id, SUM(x.duration) AS total_months, MIN(x.awarded_at) AS first_awarded_at
+            FROM tblscholarships_schools x
+            WHERE x.school_id IN ({placeholders})
+            AND x.awarded_at >= %s
+            GROUP BY x.school_id
+        """
+        cursor.execute(since_2025_query, (*chunk, '2025-01-01'))
+        since_2025_rows = cursor.fetchall()
+        since_2025_map = {}
+        for row in since_2025_rows:
+            today_date = date.today()
+            if isinstance(row, dict):
+                q_sid = row['school_id']
+                fa = row['first_awarded_at']
+                total_m = row['total_months'] or 0
+            else:
+                q_sid = row[0]
+                total_m = row[1] or 0
+                fa = row[2]
+
+            is_over_12 = False
+            if fa:
+                fa_dt = fa.date() if hasattr(fa, 'date') else fa
+                if isinstance(fa_dt, date) and fa_dt <= today_date - timedelta(days=365):
+                    is_over_12 = True
+
+            since_2025_map[q_sid] = {
+                "total_months": total_m,
+                "first_awarded_at": fa,
+                "is_over_12_months": is_over_12
+            }
+
+        # Fetch active subscriptions for expired checks
+        today_now = datetime.now().date()
+        first_day_of_month = today_now.replace(day=1)
+        if today_now.month == 12:
+            first_day_next_month = today_now.replace(year=today_now.year + 1, month=1, day=1)
+        else:
+            first_day_next_month = today_now.replace(month=today_now.month + 1, day=1)
+
+        sub_query = f"""
+            SELECT s.school_id, COUNT(DISTINCT p.student_id) as active_count
+            FROM tblpoints_purchase p
+            JOIN tblstudents s ON p.student_id = s.student_id
+            WHERE s.school_id IN ({placeholders})
+              AND p.expiry_date >= %s
+              AND p.expiry_date < %s
+            GROUP BY s.school_id
+        """
+        cursor.execute(sub_query, (*chunk, first_day_of_month, first_day_next_month))
+        sub_rows = cursor.fetchall()
+        sub_map = {}
+        for row in sub_rows:
+            if isinstance(row, dict):
+                sub_map[row['school_id']] = row['active_count']
+            else:
+                sub_map[row[0]] = row[1]
+
+        cursor.close()
+        conn.close()
+
+        # Create map for scholarship rows
+        scholarship_map = {}
+        for row in scholarship_rows:
+            if isinstance(row, dict):
+                q_sid = row['school_id']
+                scholarship_map[q_sid] = row
+            else:
+                q_sid = row[0]
+                scholarship_map[q_sid] = {
+                    'school_name': row[1],
+                    'scholarship_type': row[2],
+                    'expiry_date': row[3],
+                    'active': row[4],
+                    'duration': row[5]
+                }
+
+        # Process all unique school IDs from ChampionSchool
+        for current_sid in chunk:
+            champ_infos = school_id_map.get(current_sid, [])
+            s_data = scholarship_map.get(current_sid)
+
+            if s_data:
+                current_sname = s_data['school_name']
+                current_stype = s_data['scholarship_type']
+                current_sexpiry = s_data['expiry_date']
+                current_sactive = s_data['active']
+
+                # Normalize Expiry
+                if current_sexpiry:
+                    if isinstance(current_sexpiry, str):
+                        try:
+                            current_sexpiry = datetime.strptime(current_sexpiry, "%Y-%m-%d").date()
+                        except Exception:
+                            try:
+                                current_sexpiry = datetime.strptime(current_sexpiry, "%Y-%m-%d %H:%M:%S").date()
+                            except Exception:
+                                pass
+                    elif hasattr(current_sexpiry, 'date'):
+                        current_sexpiry = current_sexpiry.date()
+
+                current_is_expired = False
+                if current_sexpiry and isinstance(current_sexpiry, date):
+                    if current_sexpiry < today_now:
+                        current_is_expired = True
+
+                normalized_active = normalize_active_flag(current_sactive)
+
+                # Determine Status
+                current_status = "Inactive"
+                if normalized_active:
+                    if current_is_expired:
+                        current_status = "Expired"
+                    else:
+                        current_status = "Active"
+
+                current_active_subs = sub_map.get(current_sid, 0)
+                current_over_12 = since_2025_map.get(current_sid, {}).get("is_over_12_months", False)
+                current_first_awarded = since_2025_map.get(current_sid, {}).get("first_awarded_at", "N/A")
+                current_total_m = since_2025_map.get(current_sid, {}).get("total_months", 0)
+            else:
+                # Not in scholarship table
+                fallback_name_found = "Unknown School"
+                if champ_infos:
+                    fallback_name_found = champ_infos[0].get('fallback_name', "Unknown School")
+
+                current_sname = fallback_name_found
+                current_stype = "N/A"
+                current_sexpiry = None
+                current_status = "Never Assigned"
+                current_active_subs = 0
+                current_over_12 = False
+                current_first_awarded = "N/A"
+                current_total_m = 0
+
+            for info in champ_infos:
+                results.append({
+                    "champion": info['champion'],
+                    "province": info['province'],
+                    "school_name": current_sname,
+                    "status": current_status,
+                    "expiry_date": current_sexpiry.isoformat() if current_sexpiry else None,
+                    "first_awarded_at": current_first_awarded,
+                    "is_over_12_months": current_over_12,
+                    "scholarship_type": current_stype,
+                    "active_subscriptions": current_active_subs,
+                    "duration": current_total_m,
+                    "asl_school_id": info.get('asl_school_id') or str(current_sid),
+                    "library_school_id": info.get('library_school_id') or ''
+                })
+
+    return results
+
+
+@app.route('/api/all-champions-school-tracker', methods=['GET'])
+@login_required
+def all_champions_school_tracker():
+    """Fetch all schools for all champions with status"""
+    try:
+        results = _get_all_champions_school_tracker_data()
         return jsonify(results), 200
-        
     except Exception as e:
         app.logger.error(f"Error in school tracker: {e}")
         return jsonify({'error': str(e)}), 500
 
 
+# Column name normalization for champion compare upload (flexible header matching)
+CHAMPION_COMPARE_FILE_COLUMNS = {
+    'asl school id': 'asl_school_id',
+    'al id': 'al_id',
+    'akello champion': 'champion',
+    'school': 'school_name',
+    'province': 'province',
+    'asl scholarship check': 'asl_scholarship_check',
+    'duration on scholarship': 'duration_on_scholarship',
+    'validity of scholarship': 'validity_of_scholarship',
+}
+
+
+def _normalize_compare_file_columns(df):
+    """Normalize DataFrame columns to expected names. Returns new df with normalized cols, or raises ValueError if required missing."""
+    required = {'asl_school_id', 'asl_scholarship_check', 'duration_on_scholarship', 'validity_of_scholarship'}
+    col_map = {}
+    for c in df.columns:
+        key = (c or '').strip().lower()
+        if key in CHAMPION_COMPARE_FILE_COLUMNS:
+            col_map[c] = CHAMPION_COMPARE_FILE_COLUMNS[key]
+    df = df.rename(columns=col_map)
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {sorted(missing)}. Expected file columns: Asl School ID, AL ID, Akello Champion, School, Province, ASL Scholarship check, Duration on scholarship, Validity of scholarship.")
+    return df
+
+
+def _normalize_scholarship_status_for_compare(val):
+    """Normalize file or system status to comparable form (active vs not)."""
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return 'no'
+    s = str(val).strip().lower()
+    if s in ('yes', 'true', '1', 'active'):
+        return 'yes'
+    if s in ('no', 'false', '0', 'inactive', 'expired', 'never assigned', 'n/a'):
+        return 'no'
+    return s
+
+
+def _normalize_date_for_compare(val):
+    """Return date string YYYY-MM-DD or empty string."""
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return ''
+    if hasattr(val, 'strftime'):
+        return val.strftime('%Y-%m-%d')
+    s = str(val).strip()
+    if not s:
+        return ''
+    try:
+        from datetime import datetime as dt
+        parsed = pd.to_datetime(val)
+        return parsed.strftime('%Y-%m-%d')
+    except Exception:
+        return s
+
+
+@app.route('/api/all-champions-compare-upload', methods=['POST'])
+@login_required
+def all_champions_compare_upload():
+    """Accept CSV/Excel file; compare with school tracker data; return report and summary."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+        file = request.files['file']
+        if not file or not file.filename:
+            return jsonify({'error': 'No file selected'}), 400
+        ext = (file.filename or '').rsplit('.', 1)[-1].lower()
+        if ext not in ('csv', 'xlsx', 'xls'):
+            return jsonify({'error': 'Invalid file type (only .csv, .xlsx, .xls allowed)'}), 400
+
+        try:
+            if ext == 'csv':
+                df = pd.read_csv(file)
+            else:
+                df = pd.read_excel(file)
+        except Exception as e:
+            return jsonify({'error': f'Could not parse file: {str(e)}'}), 400
+
+        if df.empty:
+            return jsonify({'error': 'File has no data rows'}), 400
+
+        try:
+            df = _normalize_compare_file_columns(df)
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
+
+        try:
+            system_rows = _get_all_champions_school_tracker_data()
+        except Exception as e:
+            app.logger.error(f"Compare upload: failed to get school tracker data: {e}")
+            return jsonify({'error': 'Failed to load system data for comparison'}), 500
+
+        # Build lookup: (asl_school_id, library_school_id) -> list of system row dicts (may be multiple champions per school)
+        system_by_key = {}
+        for row in system_rows:
+            aid = str(row.get('asl_school_id') or '').strip()
+            lid = str(row.get('library_school_id') or '').strip()
+            key = (aid, lid)
+            if key not in system_by_key:
+                system_by_key[key] = []
+            system_by_key[key].append(row)
+
+        report = []
+        summary = {'total_file_rows': 0, 'matched': 0, 'mismatched': 0, 'file_only': 0, 'system_only': 0}
+        matched_system_keys = set()
+
+        for _, row in df.iterrows():
+            summary['total_file_rows'] += 1
+            f_asl = str(row.get('asl_school_id', '') or '').strip()
+            f_al = str(row.get('al_id', '') or '').strip() if 'al_id' in row else ''
+            f_champ = str(row.get('champion', '') or '') if 'champion' in row else ''
+            f_school = str(row.get('school_name', '') or '') if 'school_name' in row else ''
+            f_prov = str(row.get('province', '') or '') if 'province' in row else ''
+            f_check = _normalize_scholarship_status_for_compare(row.get('asl_scholarship_check'))
+            f_dur = row.get('duration_on_scholarship')
+            if f_dur is not None and not (isinstance(f_dur, float) and pd.isna(f_dur)):
+                try:
+                    f_dur = int(float(f_dur))
+                except (ValueError, TypeError):
+                    f_dur = str(f_dur)
+            else:
+                f_dur = ''
+            f_valid = _normalize_date_for_compare(row.get('validity_of_scholarship'))
+
+            file_row = {
+                'asl_school_id': f_asl,
+                'library_school_id': f_al,
+                'champion': f_champ,
+                'school_name': f_school,
+                'province': f_prov,
+                'asl_scholarship_check': f_check,
+                'duration_on_scholarship': f_dur,
+                'validity_of_scholarship': f_valid,
+            }
+            # Match: prefer (asl, al_id); if al_id missing in file, try (asl, '') and (asl, any)
+            candidates = []
+            if f_asl:
+                key1 = (f_asl, f_al)
+                key2 = (f_asl, '')
+                candidates = system_by_key.get(key1, []) or system_by_key.get(key2, [])
+                if not candidates and f_al == '':
+                    for (aid, lid), rows in system_by_key.items():
+                        if aid == f_asl:
+                            candidates.extend(rows)
+                            break
+
+            if not candidates:
+                report.append({
+                    'match': False,
+                    'in_system': False,
+                    'in_file_only': True,
+                    'file_row': file_row,
+                    'system_row': None,
+                    'differences': [],
+                    'status': 'File only',
+                })
+                summary['file_only'] += 1
+                continue
+
+            # Use first matching system row for comparison (same school may have multiple champions)
+            sys_row = candidates[0]
+            matched_system_keys.add((str(sys_row.get('asl_school_id') or ''), str(sys_row.get('library_school_id') or '')))
+
+            s_status = (sys_row.get('status') or '').strip().lower()
+            s_check = 'yes' if s_status in ('active',) else 'no'
+            s_dur = sys_row.get('duration')
+            if s_dur is not None:
+                try:
+                    s_dur = int(float(s_dur))
+                except (ValueError, TypeError):
+                    s_dur = str(s_dur)
+            else:
+                s_dur = ''
+            s_valid = _normalize_date_for_compare(sys_row.get('expiry_date'))
+
+            system_row = {
+                'asl_school_id': str(sys_row.get('asl_school_id') or ''),
+                'library_school_id': str(sys_row.get('library_school_id') or ''),
+                'champion': sys_row.get('champion', ''),
+                'school_name': sys_row.get('school_name', ''),
+                'province': sys_row.get('province', ''),
+                'asl_scholarship_check': s_check,
+                'duration_on_scholarship': s_dur,
+                'validity_of_scholarship': s_valid,
+            }
+
+            diffs = []
+            if f_check != s_check:
+                diffs.append('ASL Scholarship check')
+            if str(f_dur) != str(s_dur):
+                diffs.append('Duration on scholarship')
+            if f_valid != s_valid:
+                diffs.append('Validity of scholarship')
+
+            is_match = len(diffs) == 0
+            if is_match:
+                summary['matched'] += 1
+            else:
+                summary['mismatched'] += 1
+
+            report.append({
+                'match': is_match,
+                'in_system': True,
+                'in_file_only': False,
+                'file_row': file_row,
+                'system_row': system_row,
+                'differences': diffs,
+                'status': 'Match' if is_match else 'Mismatch',
+            })
+
+        # Optional: system-only rows (in system but not in file)
+        for (aid, lid), rows in system_by_key.items():
+            if (aid, lid) in matched_system_keys:
+                continue
+            for sys_row in rows:
+                summary['system_only'] += 1
+                system_row = {
+                    'asl_school_id': str(sys_row.get('asl_school_id') or ''),
+                    'library_school_id': str(sys_row.get('library_school_id') or ''),
+                    'champion': sys_row.get('champion', ''),
+                    'school_name': sys_row.get('school_name', ''),
+                    'province': sys_row.get('province', ''),
+                    'asl_scholarship_check': 'yes' if (sys_row.get('status') or '').strip().lower() == 'active' else 'no',
+                    'duration_on_scholarship': sys_row.get('duration') if sys_row.get('duration') is not None else '',
+                    'validity_of_scholarship': _normalize_date_for_compare(sys_row.get('expiry_date')),
+                }
+                report.append({
+                    'match': False,
+                    'in_system': True,
+                    'in_file_only': False,
+                    'file_row': None,
+                    'system_row': system_row,
+                    'differences': [],
+                    'status': 'System only',
+                })
+
+        return jsonify({'report': report, 'summary': summary}), 200
+    except Exception as e:
+        app.logger.exception(e)
+        return jsonify({'error': str(e)}), 500
 
 
 

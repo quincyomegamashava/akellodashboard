@@ -397,6 +397,49 @@
               </div>
             </div>
 
+            <!-- Compare with file -->
+            <div class="card border-0 shadow-sm mb-4">
+              <div class="card-header bg-white py-3">
+                <span class="fw-bold text-dark">Compare with file</span>
+                <p class="text-muted small fw-normal mt-1 mb-0">Upload a CSV or Excel file with columns: Asl School ID, AL ID, Akello Champion, School, Province, ASL Scholarship check, Duration on scholarship, Validity of scholarship</p>
+              </div>
+              <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+                  <input type="file" id="compareFileInput" accept=".csv,.xlsx,.xls" class="form-control form-control-sm" style="max-width: 280px;">
+                  <button type="button" class="btn btn-primary btn-sm" id="btnCompareUpload">
+                    <i class="fa fa-upload me-2"></i>Upload and compare
+                  </button>
+                </div>
+                <div id="compareError" class="text-danger small mb-2" style="display: none;"></div>
+                <div id="compareSummary" class="mb-3" style="display: none;"></div>
+                <div id="compareReportWrap" style="display: none;">
+                  <div class="d-flex justify-content-end mb-2">
+                    <button type="button" class="btn btn-outline-success btn-sm" id="btnDownloadCompareReport">
+                      <i class="fa fa-file-excel me-2"></i>Download report
+                    </button>
+                  </div>
+                  <div class="table-responsive" style="max-height: 50vh;">
+                    <table class="table table-sm table-bordered" id="compareReportTable">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Asl School ID</th>
+                          <th>AL ID</th>
+                          <th>Champion</th>
+                          <th>School</th>
+                          <th>Province</th>
+                          <th>ASL Scholarship (File vs System)</th>
+                          <th>Duration (File vs System)</th>
+                          <th>Validity (File vs System)</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody id="compareReportBody"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="card border-0 shadow-sm">
               <div class="card-header d-flex justify-content-between align-items-center bg-white py-3">
                 <div>
@@ -480,6 +523,7 @@
     let championsVT = null, championsAllRows = [], championsFilteredRows = [];
     let schoolVT = null, schoolAllRows = [], schoolFilteredRows = [];
     let analyticsController = null, championsLoaded = false, schoolTrackerLoaded = false;
+    let lastCompareReport = null, lastCompareSummary = null;
 
     // Initialize Date Objects
     const today = new Date();
@@ -1027,6 +1071,112 @@
         if (championsLoaded) {
           loadChampions(true);
         }
+      });
+
+      // ---- Compare with file ----
+      function renderCompareReport(report, summary) {
+        lastCompareReport = report;
+        lastCompareSummary = summary;
+        const wrap = document.getElementById('compareReportWrap');
+        const errEl = document.getElementById('compareError');
+        const sumEl = document.getElementById('compareSummary');
+        const tbody = document.getElementById('compareReportBody');
+        errEl.style.display = 'none';
+        if (!report || !report.length) {
+          sumEl.textContent = summary ? `${summary.total_file_rows} file row(s) processed.` : 'No report.';
+          sumEl.style.display = 'block';
+          tbody.innerHTML = '<tr><td colspan="9" class="text-muted">No rows</td></tr>';
+          wrap.style.display = 'block';
+          return;
+        }
+        const s = summary || {};
+        sumEl.innerHTML = `<strong>${s.total_file_rows || 0}</strong> file row(s): <span class="text-success">${s.matched || 0} matched</span>, <span class="text-warning">${s.mismatched || 0} mismatched</span>, <span class="text-info">${s.file_only || 0} file only</span>, <span class="text-secondary">${s.system_only || 0} system only</span>`;
+        sumEl.style.display = 'block';
+        tbody.innerHTML = report.map(r => {
+          const fr = r.file_row || {};
+          const sr = r.system_row || {};
+          const asl = (fr.asl_school_id || sr.asl_school_id || '').toString();
+          const alId = (fr.library_school_id || sr.library_school_id || '').toString();
+          const champ = fr.champion || sr.champion || '';
+          const school = fr.school_name || sr.school_name || '';
+          const prov = fr.province || sr.province || '';
+          const checkF = (fr.asl_scholarship_check ?? '').toString();
+          const checkS = (sr.asl_scholarship_check ?? '').toString();
+          const durF = (fr.duration_on_scholarship ?? '').toString();
+          const durS = (sr.duration_on_scholarship ?? '').toString();
+          const valF = (fr.validity_of_scholarship ?? '').toString();
+          const valS = (sr.validity_of_scholarship ?? '').toString();
+          const status = r.status || '';
+          const statusClass = status === 'Match' ? 'text-success' : status === 'Mismatch' ? 'text-warning' : status === 'File only' ? 'text-info' : 'text-secondary';
+          return `<tr><td>${asl}</td><td>${alId}</td><td>${champ}</td><td>${school}</td><td>${prov}</td><td>${checkF} vs ${checkS}</td><td>${durF} vs ${durS}</td><td>${valF} vs ${valS}</td><td class="${statusClass}">${status}</td></tr>`;
+        }).join('');
+        wrap.style.display = 'block';
+      }
+
+      document.getElementById('btnCompareUpload').addEventListener('click', async function () {
+        const input = document.getElementById('compareFileInput');
+        const errEl = document.getElementById('compareError');
+        errEl.style.display = 'none';
+        if (!input.files || !input.files.length) {
+          errEl.textContent = 'Please select a CSV or Excel file.';
+          errEl.style.display = 'block';
+          return;
+        }
+        const file = input.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        this.disabled = true;
+        try {
+          const resp = await fetch('/api/all-champions-compare-upload', { method: 'POST', credentials: 'same-origin', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+          let data = {};
+          try {
+            const text = await resp.text();
+            if (text) {
+              try { data = JSON.parse(text); } catch (_) {
+                if (!resp.ok && text.length < 500) data = { error: text };
+              }
+            }
+          } catch (_) {}
+          if (!resp.ok) {
+            let msg = data.error || ('Upload failed (HTTP ' + resp.status + ').');
+            if (resp.status === 302 || resp.status === 401) msg = 'Session may have expired. Please log in again.';
+            errEl.textContent = msg;
+            errEl.style.display = 'block';
+            return;
+          }
+          renderCompareReport(data.report || [], data.summary || {});
+        } catch (e) {
+          errEl.textContent = e.message || 'Network error';
+          errEl.style.display = 'block';
+        } finally {
+          this.disabled = false;
+        }
+      });
+
+      document.getElementById('btnDownloadCompareReport').addEventListener('click', function () {
+        if (!lastCompareReport || !lastCompareReport.length) return;
+        const rows = lastCompareReport.map(r => {
+          const fr = r.file_row || {};
+          const sr = r.system_row || {};
+          return {
+            'Asl School ID': (fr.asl_school_id || sr.asl_school_id || '').toString(),
+            'AL ID': (fr.library_school_id || sr.library_school_id || '').toString(),
+            'Champion': fr.champion || sr.champion || '',
+            'School': fr.school_name || sr.school_name || '',
+            'Province': fr.province || sr.province || '',
+            'ASL Scholarship (File)': (fr.asl_scholarship_check ?? '').toString(),
+            'ASL Scholarship (System)': (sr.asl_scholarship_check ?? '').toString(),
+            'Duration (File)': (fr.duration_on_scholarship ?? '').toString(),
+            'Duration (System)': (sr.duration_on_scholarship ?? '').toString(),
+            'Validity (File)': (fr.validity_of_scholarship ?? '').toString(),
+            'Validity (System)': (sr.validity_of_scholarship ?? '').toString(),
+            'Status': r.status || ''
+          };
+        });
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, 'Compare Report');
+        XLSX.writeFile(wb, `champion_compare_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
       });
 
     });
