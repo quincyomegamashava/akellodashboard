@@ -11356,20 +11356,16 @@ def profile(username):
                 # Ensure is_over_12_months and months_left_until_12 from duration_map
                 duration_info = duration_map.get(school_data["id"], {})
                 school_data["is_over_12_months"] = duration_info.get("is_over_12_months", False)
-                total_m = school_data.get("total_months")
-                if total_m is None:
-                    total_m = 0
-                elif not isinstance(total_m, (int, float)):
-                    try:
-                        total_m = int(float(total_m))
-                    except (TypeError, ValueError):
-                        total_m = 0
-                else:
-                    total_m = int(total_m)
-                if total_m < 12:
-                    school_data["months_left_until_12"] = max(0, 12 - total_m)
-                else:
-                    school_data["months_left_until_12"] = None
+                # Months left to 12: from first awarded date (month) to today, same as school tracker
+                school_data["months_left_until_12"] = None
+                fa_raw = duration_info.get("first_awarded_at")
+                if fa_raw and fa_raw != "N/A":
+                    fa_d = fa_raw.date() if hasattr(fa_raw, 'date') else fa_raw
+                    if isinstance(fa_d, date) and fa_d <= today:
+                        months_elapsed = (today.year - fa_d.year) * 12 + (today.month - fa_d.month)
+                        months_elapsed = max(0, months_elapsed)
+                        if months_elapsed < 12:
+                            school_data["months_left_until_12"] = 12 - months_elapsed
                 
                 # Convert expiry_date to date object if it's a datetime or string
                 if school_data["expiry_date"]:
