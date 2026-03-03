@@ -58,6 +58,19 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
+  /* Months left until 12 months highlight (all scholarship sections) */
+  .months-left-highlight {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+  }
+
   .profile-wrapper {
     padding: 52px 16px 72px;
     background: var(--page-bg);
@@ -673,9 +686,12 @@
               data-school-type="{{ school.scholarship_type or 'N/A' }}"
               data-school-duration="{{ school.total_months or 0 }}"
               data-school-awarded-at="{{ school.first_awarded_at or 'N/A' }}"
-              data-school-long-term="{{ 'true' if is_long_term else 'false' }}" data-school-url="{{ school_url }}">
+              data-school-long-term="{{ 'true' if is_long_term else 'false' }}" data-school-url="{{ school_url }}" data-school-months-left="{{ school.months_left_until_12 or '' }}">
               <i class="fa fa-university"></i> {{ school.name }}
               <span class="stat-subtle">( {{ school.scholarship_type or 'N/A' }} )</span>
+              {% if school.months_left_until_12 is defined and school.months_left_until_12 and school.months_left_until_12 > 0 %}
+              <span class="months-left-highlight">{{ school.months_left_until_12 }} mo left to 12 mo</span>
+              {% endif %}
             </a>
             {% endfor %}
           </div>
@@ -697,9 +713,13 @@
                 data-school-duration="{{ school.total_months or 0 }}"
                 data-school-awarded-at="{{ school.first_awarded_at or 'N/A' }}"
                 data-school-long-term="{{ 'true' if is_long_term else 'false' }}" data-school-url="{{ school_url }}"
+                data-school-months-left="{{ school.months_left_until_12 or '' }}"
                 style="background: #fff3e0 !important; color: #e65100 !important; border-color: #ffcc80 !important;">
                 <i class="fa fa-university"></i> {{ school.name }}
                 <span class="stat-subtle">( {{ school.scholarship_type or 'N/A' }} ) ⚠️</span>
+                {% if school.months_left_until_12 is defined and school.months_left_until_12 and school.months_left_until_12 > 0 %}
+                <span class="months-left-highlight">{{ school.months_left_until_12 }} mo left to 12 mo</span>
+                {% endif %}
                 {% if school.active_subscription_count %}
                 <span class="status-badge">{{ school.active_subscription_count }} active</span>
                 {% endif %}
@@ -724,9 +744,12 @@
                 data-school-type="{{ school.scholarship_type or 'N/A' }}"
                 data-school-duration="{{ school.total_months or 0 }}"
                 data-school-awarded-at="{{ school.first_awarded_at or 'N/A' }}"
-                data-school-long-term="{{ 'true' if is_long_term else 'false' }}" data-school-url="{{ school_url }}">
+                data-school-long-term="{{ 'true' if is_long_term else 'false' }}" data-school-url="{{ school_url }}" data-school-months-left="{{ school.months_left_until_12 or '' }}">
                 <i class="fa fa-university"></i> {{ school.name }}
                 <span class="stat-subtle">( {{ school.scholarship_type or 'N/A' }} )</span>
+                {% if school.months_left_until_12 is defined and school.months_left_until_12 and school.months_left_until_12 > 0 %}
+                <span class="months-left-highlight">{{ school.months_left_until_12 }} mo left to 12 mo</span>
+                {% endif %}
                 {% if school.active_subscription_count %}
                 <span class="status-badge">{{ school.active_subscription_count }} active</span>
                 {% endif %}
@@ -864,6 +887,10 @@
       <div>
         <dt>Total months (since Jan 2025)</dt>
         <dd data-modal-duration></dd>
+      </div>
+      <div data-modal-months-left-wrap>
+        <dt>Months left until 12 months</dt>
+        <dd data-modal-months-left></dd>
       </div>
     </dl>
     <p class="stat-subtle" data-modal-hint>Details preview</p>
@@ -1018,6 +1045,8 @@
     const modalGrades = schoolModal?.querySelector("[data-modal-grades]");
     const modalExpiry = schoolModal?.querySelector("[data-modal-expiry]");
     const modalDuration = schoolModal?.querySelector("[data-modal-duration]");
+    const modalMonthsLeft = schoolModal?.querySelector("[data-modal-months-left]");
+    const modalMonthsLeftWrap = schoolModal?.querySelector("[data-modal-months-left-wrap]");
     const modalLink = schoolModal?.querySelector("[data-modal-link]");
     const modalHint = schoolModal?.querySelector("[data-modal-hint]");
 
@@ -1041,6 +1070,7 @@
       const expiry = normalizeValue(source.dataset.schoolExpiry);
       const duration = normalizeValue(source.dataset.schoolDuration);
       const awardedAt = normalizeValue(source.dataset.schoolAwardedAt);
+      const monthsLeft = source.dataset.schoolMonthsLeft;
       const url = source.dataset.schoolUrl || "#";
 
       const modalAwardedAt = schoolModal?.querySelector("[data-modal-awarded-at]");
@@ -1051,6 +1081,8 @@
       modalExpiry && (modalExpiry.textContent = expiry);
       modalDuration && (modalDuration.textContent = duration);
       modalAwardedAt && (modalAwardedAt.textContent = awardedAt);
+      if (modalMonthsLeft) modalMonthsLeft.textContent = (monthsLeft !== undefined && monthsLeft !== null && String(monthsLeft).trim() !== "") ? (monthsLeft + " months") : "—";
+      if (modalMonthsLeftWrap) modalMonthsLeftWrap.style.display = (monthsLeft !== undefined && monthsLeft !== null && String(monthsLeft).trim() !== "") ? "" : "none";
       modalLink && (modalLink.href = url);
       modalLink && (modalLink.textContent = `View ${name} profile`);
       modalHint && (modalHint.textContent = "See the expiry, grades, type, and total scholarship months below.");

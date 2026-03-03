@@ -11349,8 +11349,27 @@ def profile(username):
                         "duration": row[10],
                         "active": normalize_active_flag(school_active_value),
                         "date_modified": row[12],
-                        "total_months": duration_map.get(row[0], 0)
+                        "total_months": duration_map.get(row[0], {}).get("total_months", 0),
+                        "first_awarded_at": duration_map.get(row[0], {}).get("first_awarded_at", "N/A")
                     }
+                
+                # Ensure is_over_12_months and months_left_until_12 from duration_map
+                duration_info = duration_map.get(school_data["id"], {})
+                school_data["is_over_12_months"] = duration_info.get("is_over_12_months", False)
+                total_m = school_data.get("total_months")
+                if total_m is None:
+                    total_m = 0
+                elif not isinstance(total_m, (int, float)):
+                    try:
+                        total_m = int(float(total_m))
+                    except (TypeError, ValueError):
+                        total_m = 0
+                else:
+                    total_m = int(total_m)
+                if total_m < 12:
+                    school_data["months_left_until_12"] = max(0, 12 - total_m)
+                else:
+                    school_data["months_left_until_12"] = None
                 
                 # Convert expiry_date to date object if it's a datetime or string
                 if school_data["expiry_date"]:
@@ -20471,6 +20490,16 @@ def _get_all_champions_school_tracker_data():
                 current_first_awarded = "N/A"
                 current_total_m = 0
 
+            # Months left to 12: from First Awarded month to now (not from summed duration)
+            months_left_until_12 = None
+            fa_raw = since_2025_map.get(current_sid, {}).get("first_awarded_at")
+            if fa_raw:
+                fa_d = fa_raw.date() if hasattr(fa_raw, 'date') else fa_raw
+                if isinstance(fa_d, date) and fa_d <= today_now:
+                    months_elapsed = (today_now.year - fa_d.year) * 12 + (today_now.month - fa_d.month)
+                    months_elapsed = max(0, months_elapsed)
+                    if months_elapsed < 12:
+                        months_left_until_12 = 12 - months_elapsed
             for info in champ_infos:
                 results.append({
                     "champion": info['champion'],
@@ -20483,6 +20512,7 @@ def _get_all_champions_school_tracker_data():
                     "scholarship_type": current_stype,
                     "active_subscriptions": current_active_subs,
                     "duration": current_total_m,
+                    "months_left_until_12": months_left_until_12,
                     "asl_school_id": info.get('asl_school_id') or str(current_sid),
                     "library_school_id": info.get('library_school_id') or ''
                 })
