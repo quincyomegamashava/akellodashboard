@@ -71,6 +71,64 @@
     border: 1px solid #93c5fd;
   }
 
+  .table-responsive {
+    overflow-x: auto;
+    margin-top: 12px;
+    border-radius: 12px;
+    border: 1px solid var(--card-border);
+  }
+
+  .profile-school-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  .profile-school-table thead th {
+    text-align: left;
+    padding: 12px 14px;
+    background: #f1f5f9;
+    color: var(--heading-color);
+    font-weight: 600;
+    border-bottom: 2px solid var(--card-border);
+  }
+
+  .profile-school-table tbody td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(15, 34, 82, 0.08);
+  }
+
+  .profile-school-table tbody tr:hover {
+    background: #f8fafc;
+  }
+
+  .profile-school-table tbody td a {
+    color: var(--accent-primary);
+    text-decoration: none;
+  }
+
+  .profile-school-table tbody td a:hover {
+    text-decoration: underline;
+  }
+
+  .profile-school-table-expired tbody td:first-child a {
+    color: #e65100;
+  }
+
+  .profile-school-table-no-schol tbody td:first-child a {
+    color: var(--muted-color);
+  }
+
+  .profile-table-loading {
+    text-align: center;
+    padding: 24px 14px;
+    color: var(--muted-color);
+  }
+
+  .profile-table-loading .fa-spinner {
+    margin-right: 8px;
+  }
+
   .profile-wrapper {
     padding: 52px 16px 72px;
     background: var(--page-bg);
@@ -615,24 +673,24 @@
           </article>
           <article class="hero-stat">
             <span class="hero-stat__label">Valid Scholarship</span>
-            <span class="hero-stat__value text-success-light">{{ count_valid_scholarship }}</span>
+            <span class="hero-stat__value text-success-light" id="hero-count-valid-schol">{{ count_valid_scholarship }}</span>
             <span class="hero-stat__hint">Active <= 12mo</span>
           </article>
           <article class="hero-stat">
             <span class="hero-stat__label">Scholarship Elapsed</span>
-            <span class="hero-stat__value text-warning-light">{{ count_elapsed_scholarship }}</span>
+            <span class="hero-stat__value text-warning-light" id="hero-count-elapsed-schol">{{ count_elapsed_scholarship }}</span>
             <span class="hero-stat__hint">Expired or > 12 mo</span>
           </article>
           <article class="hero-stat">
             <span class="hero-stat__label">Never Assigned</span>
-            <span class="hero-stat__value">{{ count_no_scholarship_schools }}</span>
+            <span class="hero-stat__value" id="hero-count-no-schol">{{ count_no_scholarship_schools }}</span>
             <span class="hero-stat__hint">No active record</span>
           </article>
         </div>
       </div>
     </section>
 
-    <div id="profile" class="w3-hide" data-firstname="{{ user.firstname }}" data-lastname="{{ user.lastname }}"></div>
+    <div id="profile" class="w3-hide" data-firstname="{{ user.firstname }}" data-lastname="{{ user.lastname }}" data-username="{{ user.username }}"></div>
 
     <div class="profile-content">
       <main class="profile-main card">
@@ -666,68 +724,57 @@
           </div>
         </div>
 
-        {# Schools section intentionally removed in favor of dedicated scholarship sections #}
+        {# School tables loaded async via /api/profile/<username>/school-tables; loading state shown until data arrives #}
 
-        {% set truly_active_schools = [] %}
-        {% set expired_scholarship_schools = [] %}
-        {% for school in active_scholarship_schools %}
-        {% set is_expired = school.expiry_date is not none and school.expiry_date < current_date %} {% if is_expired %}
-          {% set _=expired_scholarship_schools.append(school) %} {% else %} {% set _=truly_active_schools.append(school)
-          %} {% endif %} {% endfor %} {% if truly_active_schools %} <section class="section-group">
+        <section class="section-group">
           <div class="section-header">Schools with Active Scholarship</div>
-          <div class="chips-grid">
-            {% for school in truly_active_schools %}
-            {% set school_url = url_for('school_profile_usage', school_id=school.id) %}
-            {% set is_long_term = school.is_over_12_months %}
-            <a class="chip chip-detail active-schol {{ 'long-term' if is_long_term }}" href="{{ school_url }}"
-              title="Type: {{ school.scholarship_type or 'N/A' }} | Grades: {{ school.scholarship_grades or 'N/A' }} | Expires: {{ school.expiry_date or 'N/A' }} | Awarded by: {{ school.awarded_by or 'N/A' }}"
-              data-school-name="{{ school.name }}" data-school-expiry="{{ school.expiry_date or 'N/A' }}"
-              data-school-grades="{{ school.scholarship_grades or 'N/A' }}"
-              data-school-type="{{ school.scholarship_type or 'N/A' }}"
-              data-school-duration="{{ school.total_months or 0 }}"
-              data-school-awarded-at="{{ school.first_awarded_at or 'N/A' }}"
-              data-school-long-term="{{ 'true' if is_long_term else 'false' }}" data-school-url="{{ school_url }}" data-school-months-left="{{ school.months_left_until_12 or '' }}">
-              <i class="fa fa-university"></i> {{ school.name }}
-              <span class="stat-subtle">( {{ school.scholarship_type or 'N/A' }} )</span>
-              {% if school.months_left_until_12 is defined and school.months_left_until_12 and school.months_left_until_12 > 0 %}
-              <span class="months-left-highlight">{{ school.months_left_until_12 }} mo left to 12 mo</span>
-              {% endif %}
-            </a>
-            {% endfor %}
+          <div class="table-responsive">
+            <table class="profile-school-table">
+              <thead>
+                <tr>
+                  <th>School name</th>
+                  <th>First Awarded (2025+)</th>
+                  <th>Days left until 12 months</th>
+                  <th>ASL MTD</th>
+                  <th>AL MTD</th>
+                  <th>Total MTD</th>
+                </tr>
+              </thead>
+              <tbody id="profile-schools-active-tbody">
+                <tr>
+                  <td colspan="6" class="profile-table-loading">
+                    <i class="fa fa-spinner fa-spin"></i> Loading school data...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          </section>
-          {% endif %}
+        </section>
 
-          {% if expired_scholarship_schools %}
-          <section class="section-group">
-            <div class="section-header">Schools with Expired Scholarship</div>
-            <div class="chips-grid">
-              {% for school in expired_scholarship_schools %}
-              {% set school_url = url_for('school_profile_usage', school_id=school.id) %}
-              {% set is_long_term = school.is_over_12_months %}
-              <a class="chip reminder chip-detail {{ 'long-term' if is_long_term }}" href="{{ school_url }}"
-                title="Type: {{ school.scholarship_type or 'N/A' }} | Grades: {{ school.scholarship_grades or 'N/A' }} | Expires: {{ school.expiry_date or 'N/A' }} | Awarded by: {{ school.awarded_by or 'N/A' }} | STATUS: EXPIRED"
-                data-school-name="{{ school.name }}" data-school-expiry="{{ school.expiry_date or 'N/A' }}"
-                data-school-grades="{{ school.scholarship_grades or 'N/A' }}"
-                data-school-type="{{ school.scholarship_type or 'N/A' }}"
-                data-school-duration="{{ school.total_months or 0 }}"
-                data-school-awarded-at="{{ school.first_awarded_at or 'N/A' }}"
-                data-school-long-term="{{ 'true' if is_long_term else 'false' }}" data-school-url="{{ school_url }}"
-                data-school-months-left="{{ school.months_left_until_12 or '' }}"
-                style="background: #fff3e0 !important; color: #e65100 !important; border-color: #ffcc80 !important;">
-                <i class="fa fa-university"></i> {{ school.name }}
-                <span class="stat-subtle">( {{ school.scholarship_type or 'N/A' }} ) ⚠️</span>
-                {% if school.months_left_until_12 is defined and school.months_left_until_12 and school.months_left_until_12 > 0 %}
-                <span class="months-left-highlight">{{ school.months_left_until_12 }} mo left to 12 mo</span>
-                {% endif %}
-                {% if school.active_subscription_count %}
-                <span class="status-badge">{{ school.active_subscription_count }} active</span>
-                {% endif %}
-              </a>
-              {% endfor %}
-            </div>
-          </section>
-          {% endif %}
+        <section class="section-group">
+          <div class="section-header">Schools with Expired Scholarship</div>
+          <div class="table-responsive">
+            <table class="profile-school-table profile-school-table-expired">
+              <thead>
+                <tr>
+                  <th>School name</th>
+                  <th>First Awarded (2025+)</th>
+                  <th>Days left until 12 months</th>
+                  <th>ASL MTD</th>
+                  <th>AL MTD</th>
+                  <th>Total MTD</th>
+                </tr>
+              </thead>
+              <tbody id="profile-schools-expired-tbody">
+                <tr>
+                  <td colspan="6" class="profile-table-loading">
+                    <i class="fa fa-spinner fa-spin"></i> Loading school data...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
           {% if inactive_scholarship_schools %}
           <section class="section-group inactive-schools">
@@ -759,43 +806,45 @@
           </section>
           {% endif %}
 
-          {% if schools_without_scholarship %}
           <section class="section-group">
             <div class="section-header">Schools Without Scholarship</div>
-            <div class="chips-grid">
-              {% for school in schools_without_scholarship %}
-              {% set school_url = url_for('school_profile_usage', school_id=school.id) %}
-              <a class="chip neutral chip-detail" href="{{ school_url }}" title="STATUS: NO SCHOLARSHIP RECORD FOUND"
-                data-school-name="{{ school.name }}" data-school-type="No Scholarship"
-                data-school-url="{{ school_url }}">
-                <i class="fa fa-university"></i> {{ school.name }}
-                <span class="stat-subtle">( No Record )</span>
-              </a>
-              {% endfor %}
+            <div class="table-responsive">
+              <table class="profile-school-table profile-school-table-no-schol">
+                <thead>
+                  <tr>
+                    <th>School name</th>
+                    <th>First Awarded (2025+)</th>
+                    <th>Days left until 12 months</th>
+                    <th>ASL MTD</th>
+                    <th>AL MTD</th>
+                    <th>Total MTD</th>
+                  </tr>
+                </thead>
+                <tbody id="profile-schools-without-tbody">
+                  <tr>
+                    <td colspan="6" class="profile-table-loading">
+                      <i class="fa fa-spinner fa-spin"></i> Loading school data...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </section>
-          {% endif %}
       </main>
 
       {% if user.userRole == 'Brand Ambassador' %}
       <aside class="profile-aside">
         <div class="card">
-          <header class="card-header"><strong>Date Range Filter</strong></header>
+          <header class="card-header"><strong>Export</strong></header>
           <div class="card-body">
-            <form id="date-filter-form" class="filter-form">
-              <div class="filter-control">
-                <label class="field-label" for="start-date">Start Date</label>
-                <input type="text" id="start-date" class="input-field" autocomplete="off" />
-              </div>
-              <div class="filter-control">
-                <label class="field-label" for="end-date">End Date</label>
-                <input type="text" id="end-date" class="input-field" autocomplete="off" />
-              </div>
-              <div class="filter-actions">
-                <button type="submit" class="btn-primary">Apply filter</button>
-                <button type="button" id="reset-filter" class="btn-secondary">Reset to MTD</button>
-              </div>
-            </form>
+            <div class="filter-actions" style="display: flex; flex-direction: column; gap: 10px;">
+              <button type="button" id="export-pdf-btn" class="btn-primary" disabled title="Load school data first">
+                <i class="fa fa-file-pdf-o"></i> Export as PDF
+              </button>
+              <button type="button" id="export-excel-btn" class="btn-secondary" disabled title="Load school data first">
+                <i class="fa fa-file-excel-o"></i> Export as Excel
+              </button>
+            </div>
           </div>
         </div>
 
@@ -817,7 +866,7 @@
               </div>
               <div>
                 <div class="stat-label">ASL MTD</div>
-                <div class="stat-value" id="asl-count">{{ smartlearning_champ_mtd }}</div>
+                <div class="stat-value" id="asl-count">{{ active_schools_asl_mtd_total | default(0) }}</div>
               </div>
             </div>
             <div class="stat-card">
@@ -931,8 +980,8 @@
     };
   }
 
-  // Fetch stats with date range
-  async function fetchStats(startDate = null, endDate = null) {
+  // Fetch Quick Stats (ASL MTD, AL MTD). Backend always uses current month with per-school period; no date params sent.
+  async function fetchStats() {
     try {
       const profileEl = document.querySelector("#profile");
       if (!profileEl) return;
@@ -940,15 +989,8 @@
       const lastname = profileEl.dataset.lastname;
       if (!firstname || !lastname) return;
 
-      // Build query string for date range
-      let dateParams = '';
-      if (startDate && endDate) {
-        dateParams = `start_date=${startDate}&end_date=${endDate}`;
-      }
-
-      // Fetch AL (Library) stats
-      const alQueryParams = `firstname=${encodeURIComponent(firstname)}&lastname=${encodeURIComponent(lastname)}${dateParams ? '&' + dateParams : ''
-        }`;
+      // AL (Library) - no date params; backend uses current month and per-institution period
+      const alQueryParams = `firstname=${encodeURIComponent(firstname)}&lastname=${encodeURIComponent(lastname)}`;
       const alResponse = await fetch(`/api/champ-library-usage?${alQueryParams}`);
       const alData = await alResponse.json();
       if (alResponse.ok) {
@@ -956,88 +998,200 @@
         if (alTargetEl) alTargetEl.textContent = alData.library_student_count ?? 0;
       }
 
-      // Fetch ASL (SmartLearning) stats
-      // Get username from the URL
-      const pathSegments = window.location.pathname.split('/');
-      const username = pathSegments[pathSegments.length - 1];
-
-      const aslQueryParams = dateParams ? `?${dateParams}` : '';
-      const aslResponse = await fetch(`/api/champion/${username}/asl_active${aslQueryParams}`);
-      const aslData = await aslResponse.json();
-      if (aslResponse.ok) {
-        const aslTargetEl = document.querySelector("#asl-count");
-        if (aslTargetEl) aslTargetEl.textContent = aslData.asl_student_count ?? 0;
-      }
+      // ASL MTD is not updated from API so it stays equal to the "Schools with Active Scholarship" table total
     } catch (err) {
       console.error(err);
     }
   }
 
-  // Initialize on page load
-  document.addEventListener("DOMContentLoaded", () => {
-    // Set default dates
-    const { startDate, endDate } = getDefaultDates();
+  // Load school tables and hero stats from API (replaces loading indicators)
+  async function loadProfileSchoolTables() {
+    const tbodyActive = document.getElementById("profile-schools-active-tbody");
+    const tbodyExpired = document.getElementById("profile-schools-expired-tbody");
+    const tbodyWithout = document.getElementById("profile-schools-without-tbody");
+    if (!tbodyActive) return;
 
-    // Configuration for Flatpickr
-    if (typeof flatpickr === 'undefined') {
-      console.error('Flatpickr library not loaded!');
+    const profileEl = document.getElementById("profile");
+    const username = (profileEl && profileEl.dataset.username) || (window.location.pathname.split("/").filter(Boolean).pop());
+    if (!username) return;
+
+    try {
+      const res = await fetch("/api/profile/" + encodeURIComponent(username) + "/school-tables");
+      const data = await res.json();
+
+      if (!res.ok) {
+        const errMsg = data.error || "Failed to load school data.";
+        [tbodyActive, tbodyExpired, tbodyWithout].forEach((tb) => {
+          if (tb) tb.innerHTML = '<tr><td colspan="6" class="profile-table-loading">' + errMsg + ' Try refreshing.</td></tr>';
+        });
+        return;
+      }
+
+      function renderRow(school) {
+        const url = "/school_profile_usage/" + (school.id || "");
+        const name = (school.name || "—").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const fa = school.first_awarded_2025 != null ? school.first_awarded_2025 : "—";
+        const days = school.days_left_until_12 != null ? school.days_left_until_12 : "—";
+        const asl = school.asl_mtd != null ? school.asl_mtd : 0;
+        const al = school.al_mtd != null ? school.al_mtd : 0;
+        const total = school.total_mtd != null ? school.total_mtd : 0;
+        return "<tr><td><a href=\"" + url + "\"><i class=\"fa fa-university\"></i> " + name + "</a></td><td>" + fa + "</td><td>" + days + "</td><td>" + asl + "</td><td>" + al + "</td><td>" + total + "</td></tr>";
+      }
+
+      function fillBody(tbody, schools) {
+        if (!tbody) return;
+        if (!schools || schools.length === 0) {
+          tbody.innerHTML = "<tr><td colspan=\"6\">No schools</td></tr>";
+          return;
+        }
+        tbody.innerHTML = schools.map(renderRow).join("");
+      }
+
+      fillBody(tbodyActive, data.truly_active_schools);
+      fillBody(tbodyExpired, data.expired_schools);
+      fillBody(tbodyWithout, data.schools_without_scholarship);
+
+      const heroValid = document.getElementById("hero-count-valid-schol");
+      const heroElapsed = document.getElementById("hero-count-elapsed-schol");
+      const heroNo = document.getElementById("hero-count-no-schol");
+      const aslCount = document.getElementById("asl-count");
+      if (heroValid) heroValid.textContent = data.count_valid_scholarship != null ? data.count_valid_scholarship : 0;
+      if (heroElapsed) heroElapsed.textContent = data.count_elapsed_scholarship != null ? data.count_elapsed_scholarship : 0;
+      if (heroNo) heroNo.textContent = data.count_no_scholarship_schools != null ? data.count_no_scholarship_schools : 0;
+      if (aslCount) aslCount.textContent = data.active_schools_asl_mtd_total != null ? data.active_schools_asl_mtd_total : 0;
+
+      window.__profileSchoolTablesData = data;
+      const exportPdfBtn = document.getElementById("export-pdf-btn");
+      const exportExcelBtn = document.getElementById("export-excel-btn");
+      if (exportPdfBtn) { exportPdfBtn.disabled = false; exportPdfBtn.removeAttribute("title"); }
+      if (exportExcelBtn) { exportExcelBtn.disabled = false; exportExcelBtn.removeAttribute("title"); }
+    } catch (err) {
+      console.error("loadProfileSchoolTables:", err);
+      [tbodyActive, tbodyExpired, tbodyWithout].forEach((tb) => {
+        if (tb) tb.innerHTML = '<tr><td colspan="6" class="profile-table-loading">Failed to load school data. Try refreshing.</td></tr>';
+      });
+    }
+  }
+
+  const COLUMNS = ["School name", "First Awarded (2025+)", "Days left until 12 months", "ASL MTD", "AL MTD", "Total MTD"];
+
+  function exportProfileSchoolsToPDF() {
+    const data = window.__profileSchoolTablesData;
+    if (!data) {
+      alert("Load school data first.");
       return;
     }
-    const flatpickrConfig = {
-      dateFormat: "Y-m-d",
-      allowInput: false,
-      disable: [
-        {
-          from: "2025-12-04",
-          to: "2026-01-12"
-        }
-      ]
-    };
+    try {
+      const { jsPDF } = window.jspdf;
+      if (!jsPDF) { alert("PDF library not loaded."); return; }
+      const doc = new jsPDF("l", "mm", "a4");
+      const username = (document.getElementById("profile") && document.getElementById("profile").dataset.username) || "profile";
+      const dateStr = new Date().toISOString().slice(0, 10);
 
-    // Initialize Flatpickr instances
-    const startPicker = flatpickr("#start-date", {
-      ...flatpickrConfig,
-      defaultDate: startDate
-    });
+      function rowsFor(schools) {
+        return (schools || []).map((s) => [
+          (s.name || "—").toString(),
+          (s.first_awarded_2025 != null ? s.first_awarded_2025 : "—").toString(),
+          (s.days_left_until_12 != null ? s.days_left_until_12 : "—").toString(),
+          String(s.asl_mtd != null ? s.asl_mtd : 0),
+          String(s.al_mtd != null ? s.al_mtd : 0),
+          String(s.total_mtd != null ? s.total_mtd : 0)
+        ]);
+      }
 
-    const endPicker = flatpickr("#end-date", {
-      ...flatpickrConfig,
-      defaultDate: endDate
-    });
+      let y = 15;
+      doc.setFontSize(14);
+      doc.text("Profile school tables – " + username, 14, y); y += 10;
+      doc.setFontSize(10);
 
-    // Fetch initial stats
-    fetchStats();
+      doc.text("Schools with Active Scholarship", 14, y); y += 6;
+      doc.autoTable({ head: [COLUMNS], body: rowsFor(data.truly_active_schools), startY: y, theme: "grid" });
+      y = doc.lastAutoTable.finalY + 12;
 
-    // Handle filter form submission
-    const filterForm = document.querySelector("#date-filter-form");
-    if (filterForm) {
-      filterForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        // Get values from the Flatpickr inputs (which are regular inputs now)
-        const startInput = document.querySelector("#start-date");
-        const endInput = document.querySelector("#end-date");
-        const start = startInput.value;
-        const end = endInput.value;
+      doc.text("Schools with Expired Scholarship", 14, y); y += 6;
+      doc.autoTable({ head: [COLUMNS], body: rowsFor(data.expired_schools), startY: y, theme: "grid" });
+      y = doc.lastAutoTable.finalY + 12;
 
-        if (start && end) {
-          fetchStats(start, end);
-        }
-      });
+      doc.text("Schools Without Scholarship", 14, y); y += 6;
+      doc.autoTable({ head: [COLUMNS], body: rowsFor(data.schools_without_scholarship), startY: y, theme: "grid" });
+
+      doc.save("profile_schools_" + username + "_" + dateStr + ".pdf");
+    } catch (e) {
+      console.error("exportProfileSchoolsToPDF:", e);
+      alert("Failed to export PDF.");
     }
+  }
 
-    // Handle reset button
-    const resetBtn = document.querySelector("#reset-filter");
-    if (resetBtn) {
-      resetBtn.addEventListener("click", () => {
-        const { startDate, endDate } = getDefaultDates();
+  function exportProfileSchoolsToExcel() {
+    const data = window.__profileSchoolTablesData;
+    if (!data) {
+      alert("Load school data first.");
+      return;
+    }
+    try {
+      if (typeof XLSX === "undefined") { alert("Excel library not loaded."); return; }
+      const wb = XLSX.utils.book_new();
+      const username = (document.getElementById("profile") && document.getElementById("profile").dataset.username) || "profile";
+      const dateStr = new Date().toISOString().slice(0, 10);
 
-        // Reset Flatpickr instances
-        if (startPicker) startPicker.setDate(startDate);
-        if (endPicker) endPicker.setDate(endDate);
+      function toSheet(schools) {
+        const arr = [COLUMNS];
+        (schools || []).forEach((s) => {
+          arr.push([
+            s.name != null ? s.name : "—",
+            s.first_awarded_2025 != null ? s.first_awarded_2025 : "—",
+            s.days_left_until_12 != null ? s.days_left_until_12 : "—",
+            s.asl_mtd != null ? s.asl_mtd : 0,
+            s.al_mtd != null ? s.al_mtd : 0,
+            s.total_mtd != null ? s.total_mtd : 0
+          ]);
+        });
+        return XLSX.utils.aoa_to_sheet(arr);
+      }
 
+      XLSX.utils.book_append_sheet(wb, toSheet(data.truly_active_schools), "Active Scholarship");
+      XLSX.utils.book_append_sheet(wb, toSheet(data.expired_schools), "Expired Scholarship");
+      XLSX.utils.book_append_sheet(wb, toSheet(data.schools_without_scholarship), "Without Scholarship");
+      XLSX.writeFile(wb, "profile_schools_" + username + "_" + dateStr + ".xlsx");
+    } catch (e) {
+      console.error("exportProfileSchoolsToExcel:", e);
+      alert("Failed to export Excel.");
+    }
+  }
+
+  // Initialize on page load
+  document.addEventListener("DOMContentLoaded", () => {
+    loadProfileSchoolTables();
+
+    // Date Range Filter section removed; only run Flatpickr/filter JS if elements exist
+    const startDateEl = document.querySelector("#start-date");
+    if (startDateEl && typeof flatpickr !== 'undefined') {
+      const { startDate, endDate } = getDefaultDates();
+      const flatpickrConfig = {
+        dateFormat: "Y-m-d",
+        allowInput: false,
+        disable: [{ from: "2025-12-04", to: "2026-01-12" }]
+      };
+      const startPicker = flatpickr("#start-date", { ...flatpickrConfig, defaultDate: startDate });
+      const endPicker = flatpickr("#end-date", { ...flatpickrConfig, defaultDate: endDate });
+      fetchStats();
+      const filterForm = document.querySelector("#date-filter-form");
+      if (filterForm) filterForm.addEventListener("submit", (e) => { e.preventDefault(); fetchStats(); });
+      const resetBtn = document.querySelector("#reset-filter");
+      if (resetBtn) resetBtn.addEventListener("click", () => {
+        const d = getDefaultDates();
+        if (startPicker) startPicker.setDate(d.startDate);
+        if (endPicker) endPicker.setDate(d.endDate);
         fetchStats();
       });
+    } else {
+      fetchStats();
     }
+
+    const exportPdfBtn = document.getElementById("export-pdf-btn");
+    const exportExcelBtn = document.getElementById("export-excel-btn");
+    if (exportPdfBtn) exportPdfBtn.addEventListener("click", exportProfileSchoolsToPDF);
+    if (exportExcelBtn) exportExcelBtn.addEventListener("click", exportProfileSchoolsToExcel);
 
     const schoolModal = document.querySelector("#school-detail-modal");
     const modalName = schoolModal?.querySelector("[data-modal-name]");

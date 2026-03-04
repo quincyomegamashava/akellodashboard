@@ -2497,48 +2497,59 @@ def champion_schools_smartlearning_usage_analytics():
 @app.route('/api/champ-library-usage', methods=['GET'])
 @login_required
 def champ_library_usage():
+    """AL MTD: current month with per-institution period (1st to min(end of month, first_awarded+365) from linked ASL school). Ignores date params for count."""
     firstname = request.args.get("firstname")
     lastname = request.args.get("lastname")
 
     if not firstname or not lastname:
         return jsonify({"error": "Missing required parameters: firstname, lastname"}), 400
 
-    # --- Date range (default: this month until today) ---
     today = datetime.today().date()
-    default_start_date = today.replace(day=1)
+    first_of_month, end_of_month = _mtd_month_bounds(today)
 
-    start_date_str = request.args.get("start_date")
-    end_date_str = request.args.get("end_date")
-
-    try:
-        if start_date_str:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-        else:
-            start_date = default_start_date
-
-        if end_date_str:
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-        else:
-            end_date = today
-    except ValueError:
-        return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
-
-    # --- Find champion ---
     champ = ChampionSchool.query.filter_by(firstname=firstname, lastname=lastname).first()
     if not champ:
         return jsonify({"error": "Champion not found"}), 404
 
-    # --- Get associated schools and library IDs ---
-    schools = champ.get_schools()
+    schools = champ.get_schools() or []
     library_ids = [s.get('library_school_id') for s in schools if s.get('library_school_id')]
-
     if not library_ids:
         return jsonify({
             "champion": f"{champ.firstname} {champ.lastname}",
             "library_student_count": 0
         })
 
-    # --- Query Library DB ---
+    asl_school_ids = [s.get('asl_school_id') for s in schools if s.get('asl_school_id')]
+    first_awarded_by_asl = {}
+    if asl_school_ids:
+        try:
+            rconn = get_ruzivo_conn()
+            rc = rconn.cursor()
+            ph = ','.join(['%s'] * len(asl_school_ids))
+            rc.execute(
+                f"SELECT school_id, MIN(awarded_at) FROM tblscholarships_schools WHERE school_id IN ({ph}) AND awarded_at >= %s GROUP BY school_id",
+                (*asl_school_ids, '2025-01-01')
+            )
+            for r in rc.fetchall():
+                first_awarded_by_asl[r[0]] = r[1]
+            rc.close()
+            rconn.close()
+        except Exception as e:
+            logging.error("champ_library_usage Ruzivo first_awarded: %s", e)
+
+    period_end_by_lib_id = {}
+    for s in schools:
+        lib_id = s.get('library_school_id')
+        asl_id = s.get('asl_school_id')
+        if not lib_id:
+            continue
+        try:
+            lib_key = int(lib_id)
+        except (TypeError, ValueError):
+            lib_key = lib_id
+        fa = first_awarded_by_asl.get(asl_id) if asl_id else None
+        period_end_by_lib_id[lib_key] = _mtd_period_end(fa, end_of_month)
+
     library_student_count = 0
     conn = None
     cursor = None
@@ -2547,35 +2558,40 @@ def champ_library_usage():
         if conn:
             import pymysql.cursors
             cursor = conn.cursor(pymysql.cursors.DictCursor)
-
             library_ids_int = [int(sid) for sid in library_ids if sid]
             if library_ids_int:
                 in_placeholders = ', '.join(['%s'] * len(library_ids_int))
+                start_dt = datetime.combine(first_of_month, datetime.min.time())
+                end_dt = datetime.combine(end_of_month, datetime.max.time())
                 query = f"""
-                    SELECT COUNT(DISTINCT la.user_id) AS active_users
+                    SELECT iu.institution_id, la.user_id, la.created_at
                     FROM logins la
                     JOIN institution_user iu ON la.user_id = iu.user_id
                     WHERE iu.institution_id IN ({in_placeholders})
                       AND la.created_at BETWEEN %s AND %s
                 """
-
-                start_dt = datetime.combine(start_date, datetime.min.time())
-                end_dt = datetime.combine(end_date, datetime.max.time())
-                params = library_ids_int + [start_dt, end_dt]
-
-                cursor.execute(query, params)
-                row = cursor.fetchone()
-                library_student_count = row["active_users"] if row else 0
+                cursor.execute(query, library_ids_int + [start_dt, end_dt])
+                rows = cursor.fetchall()
+                counted = defaultdict(set)
+                for row in rows:
+                    iid = row.get("institution_id")
+                    uid = row.get("user_id")
+                    created = row.get("created_at")
+                    created_date = created.date() if hasattr(created, 'date') else created
+                    pe = period_end_by_lib_id.get(iid, end_of_month)
+                    if created_date <= pe:
+                        counted[iid].add(uid)
+                library_student_count = sum(len(s) for s in counted.values())
         else:
             logging.error("Failed to get Library DB connection")
     except Exception as e:
-        logging.error("Library query error for champion %s %s: %s",
-                      champ.firstname, champ.lastname, e)
+        logging.error("Library query error for champion %s %s: %s", champ.firstname, champ.lastname, e)
     finally:
-        if cursor: cursor.close()
-        if conn: conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
-    # --- Response ---
     return jsonify({
         "champion": f"{champ.firstname} {champ.lastname}",
         "province": champ.province,
@@ -11055,6 +11071,396 @@ def upload_csv_confirmed():
         return jsonify({'error': str(e)}), 500
 
 
+def _get_profile_school_tables_data(username):
+    """Compute school tables data for profile API. Returns dict with truly_active_schools, expired_schools, schools_without_scholarship, counts (JSON-serializable)."""
+    user = db.first_or_404(sa.select(User).where(User.username == username))
+    champ = ChampionSchool.query.filter_by(firstname=user.firstname, lastname=user.lastname, province=user.province).first()
+    existing_school_dicts = []
+    if champ and champ.schools:
+        try:
+            existing_school_dicts = json.loads(champ.schools)
+        except Exception:
+            existing_school_dicts = []
+    preselected_asl_ids = [s["asl_school_id"] for s in existing_school_dicts if "asl_school_id" in s]
+    today = datetime.today().date()
+    first_of_month, end_of_month = _mtd_month_bounds(today)
+
+    def normalize_active_flag(value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value != 0
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            return normalized in {"1", "true", "t", "yes", "y"}
+        return False
+
+    duration_map = {}
+    if preselected_asl_ids:
+        try:
+            conn = get_ruzivo_conn()
+            cursor = conn.cursor()
+            placeholders = ','.join(['%s'] * len(preselected_asl_ids))
+            duration_query = f"""
+                SELECT SUM(x.duration) AS total_months, x.school_id, MIN(x.awarded_at) AS first_awarded_at
+                FROM tblscholarships_schools x
+                WHERE x.school_id IN ({placeholders})
+                AND x.awarded_at >= %s
+                GROUP BY x.school_id
+            """
+            cursor.execute(duration_query, (*preselected_asl_ids, '2025-01-01'))
+            duration_rows = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            for duration_row in duration_rows:
+                if isinstance(duration_row, dict):
+                    school_key = duration_row.get("school_id")
+                    total_months = duration_row.get("total_months") or 0
+                    first_awarded = duration_row.get("first_awarded_at")
+                else:
+                    school_key = duration_row[1]
+                    total_months = duration_row[0] or 0
+                    first_awarded = duration_row[2]
+                if school_key:
+                    is_over_12 = False
+                    if first_awarded:
+                        fa_date = first_awarded.date() if hasattr(first_awarded, 'date') else first_awarded
+                        if isinstance(fa_date, date) and fa_date < today - timedelta(days=365):
+                            is_over_12 = True
+                    duration_map[school_key] = {"total_months": total_months, "first_awarded_at": first_awarded, "is_over_12_months": is_over_12}
+        except Exception as e:
+            print(f"Error calculating duration data: {e}")
+            duration_map = {}
+
+    from app.models import AppSetting
+    exclude_12_months = AppSetting.get_value('asl_mtd_exclude_12_months', 'true') == 'true'
+    exclude_1_year_awarded = AppSetting.get_value('asl_mtd_exclude_1_year_awarded', 'true') == 'true'
+    schools_to_exclude_from_mtd = set()
+    for school_id, duration_info in duration_map.items():
+        total_months = duration_info.get("total_months", 0)
+        is_over_12 = duration_info.get("is_over_12_months", False)
+        should_exclude = False
+        if exclude_12_months and total_months > 12:
+            should_exclude = True
+        if exclude_1_year_awarded and is_over_12:
+            should_exclude = True
+        if should_exclude:
+            schools_to_exclude_from_mtd.add(str(school_id))
+    filtered_asl_ids = [sid for sid in preselected_asl_ids if str(sid) not in schools_to_exclude_from_mtd]
+
+    asl_mtd_by_school = {}
+    smartlearning_champ_mtd = 0
+    if filtered_asl_ids:
+        period_end_by_school = {}
+        for sid in filtered_asl_ids:
+            dinfo = duration_map.get(sid, {})
+            fa = dinfo.get("first_awarded_at")
+            period_end_by_school[sid] = _mtd_period_end(fa, end_of_month)
+        conn = get_ruzivo_conn()
+        cursor = conn.cursor()
+        placeholders = ','.join(['%s'] * len(filtered_asl_ids))
+        query = f"""
+            SELECT school_id, student_id, last_login
+            FROM vwstudent
+            WHERE school_id IN ({placeholders})
+            AND last_login BETWEEN %s AND %s
+        """
+        cursor.execute(query, (*filtered_asl_ids, first_of_month, end_of_month))
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        counted = defaultdict(set)
+        for row in rows:
+            sid = row[0] if isinstance(row, (tuple, list)) else row.get("school_id")
+            student_id = row[1] if isinstance(row, (tuple, list)) else row.get("student_id")
+            last_login = row[2] if isinstance(row, (tuple, list)) else row.get("last_login")
+            login_date = last_login.date() if hasattr(last_login, 'date') else last_login
+            pe = period_end_by_school.get(sid, end_of_month)
+            if login_date <= pe:
+                counted[sid].add(student_id)
+        smartlearning_champ_mtd = sum(len(s) for s in counted.values())
+        asl_mtd_by_school = {sid: len(counted[sid]) for sid in counted}
+
+    al_mtd_by_asl_id = {}
+    library_ids = [s.get("library_school_id") for s in existing_school_dicts if s.get("library_school_id")]
+    if library_ids and end_of_month and first_of_month:
+        try:
+            lib_id_by_asl = {}
+            for s in existing_school_dicts:
+                a, lib = s.get("asl_school_id"), s.get("library_school_id")
+                if a is None or lib is None:
+                    continue
+                try:
+                    lib_id_by_asl[int(a)] = int(lib)
+                except (TypeError, ValueError):
+                    pass
+            period_end_by_lib_id = {}
+            for asl_id, lib_id in lib_id_by_asl.items():
+                fa = duration_map.get(asl_id, {}).get("first_awarded_at")
+                period_end_by_lib_id[lib_id] = _mtd_period_end(fa, end_of_month)
+            conn_lib = get_direct_library_conn()
+            if conn_lib:
+                import pymysql.cursors
+                cursor_lib = conn_lib.cursor(pymysql.cursors.DictCursor)
+                library_ids_int = [int(sid) for sid in library_ids if sid]
+                if library_ids_int:
+                    in_ph = ', '.join(['%s'] * len(library_ids_int))
+                    start_dt = datetime.combine(first_of_month, datetime.min.time())
+                    end_dt = datetime.combine(end_of_month, datetime.max.time())
+                    q = f"""
+                        SELECT iu.institution_id, la.user_id, la.created_at
+                        FROM logins la
+                        JOIN institution_user iu ON la.user_id = iu.user_id
+                        WHERE iu.institution_id IN ({in_ph})
+                          AND la.created_at BETWEEN %s AND %s
+                    """
+                    cursor_lib.execute(q, library_ids_int + [start_dt, end_dt])
+                    al_rows = cursor_lib.fetchall()
+                    cursor_lib.close()
+                    conn_lib.close()
+                    al_counted = defaultdict(set)
+                    for row in al_rows:
+                        iid = row.get("institution_id")
+                        uid = row.get("user_id")
+                        created = row.get("created_at")
+                        created_date = created.date() if hasattr(created, 'date') else created
+                        pe = period_end_by_lib_id.get(iid, end_of_month)
+                        if created_date <= pe:
+                            al_counted[iid].add(uid)
+                    al_mtd_by_lib_id = {iid: len(s) for iid, s in al_counted.items()}
+                    for asl_id, lib_id in lib_id_by_asl.items():
+                        al_mtd_by_asl_id[asl_id] = al_mtd_by_lib_id.get(lib_id, 0)
+        except Exception as e:
+            print(f"Profile AL MTD per school: {e}")
+
+    active_scholarship_schools = []
+    inactive_scholarship_schools = []
+    schools_without_scholarship = []
+    school_duration_map = duration_map
+    schools_with_scholarship_ids = set()
+
+    if preselected_asl_ids:
+        try:
+            conn = get_ruzivo_conn()
+            cursor = conn.cursor()
+            placeholders = ','.join(['%s'] * len(preselected_asl_ids))
+            scholarship_query = f"""
+                SELECT ts.school_id, sc.school_name, sc.school_province, sc.school_city,
+                       ts.awarded_at, ts.awarded_by, ts.school_type, ts.scholarship_type,
+                       ts.scholarship_grades, ts.expiry_date, ts.duration, ts.active,
+                       ts.date_modified
+                FROM tblscholarships_schools ts
+                LEFT JOIN tblschools sc ON sc.school_id = ts.school_id
+                WHERE ts.school_id IN ({placeholders})
+            """
+            cursor.execute(scholarship_query, preselected_asl_ids)
+            scholarship_results = cursor.fetchall()
+            cursor.close()
+            conn.close()
+
+            for row in scholarship_results:
+                if isinstance(row, dict):
+                    school_data = {
+                        "id": row.get("school_id"), "name": row.get("school_name"), "province": row.get("school_province"), "city": row.get("school_city"),
+                        "awarded_at": row.get("awarded_at"), "awarded_by": row.get("awarded_by"), "school_type": row.get("school_type"),
+                        "scholarship_type": row.get("scholarship_type"), "scholarship_grades": row.get("scholarship_grades"),
+                        "expiry_date": row.get("expiry_date"), "duration": row.get("duration"), "active": normalize_active_flag(row.get("active")),
+                        "date_modified": row.get("date_modified"),
+                        "total_months": duration_map.get(row.get("school_id"), {}).get("total_months", 0),
+                        "first_awarded_at": duration_map.get(row.get("school_id"), {}).get("first_awarded_at", "N/A")
+                    }
+                    if school_data["expiry_date"]:
+                        if isinstance(school_data["expiry_date"], str):
+                            try:
+                                school_data["expiry_date"] = datetime.strptime(school_data["expiry_date"], "%Y-%m-%d").date()
+                            except Exception:
+                                try:
+                                    school_data["expiry_date"] = datetime.strptime(school_data["expiry_date"], "%Y-%m-%d %H:%M:%S").date()
+                                except Exception:
+                                    pass
+                        elif hasattr(school_data["expiry_date"], 'date'):
+                            school_data["expiry_date"] = school_data["expiry_date"].date()
+                else:
+                    school_active_value = row[11]
+                    school_data = {
+                        "id": row[0], "name": row[1], "province": row[2], "city": row[3],
+                        "awarded_at": row[4], "awarded_by": row[5], "school_type": row[6], "scholarship_type": row[7],
+                        "scholarship_grades": row[8], "expiry_date": row[9], "duration": row[10],
+                        "active": normalize_active_flag(school_active_value), "date_modified": row[12],
+                        "total_months": duration_map.get(row[0], {}).get("total_months", 0),
+                        "first_awarded_at": duration_map.get(row[0], {}).get("first_awarded_at", "N/A")
+                    }
+                duration_info = duration_map.get(school_data["id"], {})
+                school_data["is_over_12_months"] = duration_info.get("is_over_12_months", False)
+                school_data["months_left_until_12"] = None
+                fa_raw = duration_info.get("first_awarded_at")
+                if fa_raw and fa_raw != "N/A":
+                    fa_d = fa_raw.date() if hasattr(fa_raw, 'date') else fa_raw
+                    if isinstance(fa_d, date) and fa_d <= today:
+                        months_elapsed = (today.year - fa_d.year) * 12 + (today.month - fa_d.month)
+                        months_elapsed = max(0, months_elapsed)
+                        if months_elapsed < 12:
+                            school_data["months_left_until_12"] = 12 - months_elapsed
+                if school_data["expiry_date"]:
+                    if isinstance(school_data["expiry_date"], str):
+                        try:
+                            school_data["expiry_date"] = datetime.strptime(school_data["expiry_date"], "%Y-%m-%d").date()
+                        except Exception:
+                            try:
+                                school_data["expiry_date"] = datetime.strptime(school_data["expiry_date"], "%Y-%m-%d %H:%M:%S").date()
+                            except Exception:
+                                pass
+                    elif hasattr(school_data["expiry_date"], 'date'):
+                        school_data["expiry_date"] = school_data["expiry_date"].date()
+                _dur = duration_map.get(school_data["id"], {})
+                _fa = school_data.get("first_awarded_at") or _dur.get("first_awarded_at")
+                school_data["first_awarded_2025"] = "—"
+                school_data["days_left_until_12"] = None
+                if _fa and _fa != "N/A":
+                    _fa_d = _fa.date() if hasattr(_fa, 'date') else _fa
+                    if isinstance(_fa_d, date):
+                        if _fa_d.year >= 2025:
+                            school_data["first_awarded_2025"] = _fa_d.strftime("%Y-%m-%d")
+                        if _fa_d <= today:
+                            _days_elapsed = (today - _fa_d).days
+                            if _days_elapsed < 365:
+                                school_data["days_left_until_12"] = 365 - _days_elapsed
+                _sid = school_data.get("id")
+                school_data["asl_mtd"] = asl_mtd_by_school.get(_sid, 0)
+                school_data["al_mtd"] = al_mtd_by_asl_id.get(_sid, 0)
+                school_data["total_mtd"] = school_data["asl_mtd"] + school_data["al_mtd"]
+                if school_data["active"]:
+                    is_expired = school_data["expiry_date"] and school_data["expiry_date"] < today
+                    if is_expired and school_data["id"]:
+                        try:
+                            first_day_of_month = today.replace(day=1)
+                            first_day_next_month = (today.replace(year=today.year + 1, month=1, day=1) if today.month == 12 else today.replace(month=today.month + 1, day=1))
+                            conn_sub = get_ruzivo_conn()
+                            cursor_sub = conn_sub.cursor()
+                            cursor_sub.execute(
+                                "SELECT COUNT(DISTINCT p.student_id) FROM tblpoints_purchase p JOIN tblstudents s ON p.student_id = s.student_id WHERE s.school_id = %s AND p.expiry_date >= %s AND p.expiry_date < %s",
+                                (school_data["id"], first_day_of_month, first_day_next_month)
+                            )
+                            result = cursor_sub.fetchone()
+                            cursor_sub.close()
+                            conn_sub.close()
+                            school_data["active_subscription_count"] = (result[0] if isinstance(result, (tuple, list)) else result.get("active_count", 0)) or 0 if result else 0
+                        except Exception:
+                            school_data["active_subscription_count"] = 0
+                    else:
+                        school_data["active_subscription_count"] = 0
+                    active_scholarship_schools.append(school_data)
+                else:
+                    school_data["active_subscription_count"] = 0
+                    if school_data["id"]:
+                        try:
+                            first_day_of_month = today.replace(day=1)
+                            first_day_next_month = (today.replace(year=today.year + 1, month=1, day=1) if today.month == 12 else today.replace(month=today.month + 1, day=1))
+                            conn_sub = get_ruzivo_conn()
+                            cursor_sub = conn_sub.cursor()
+                            cursor_sub.execute(
+                                "SELECT COUNT(DISTINCT p.student_id) FROM tblpoints_purchase p JOIN tblstudents s ON p.student_id = s.student_id WHERE s.school_id = %s AND p.expiry_date >= %s AND p.expiry_date < %s",
+                                (school_data["id"], first_day_of_month, first_day_next_month)
+                            )
+                            result = cursor_sub.fetchone()
+                            cursor_sub.close()
+                            conn_sub.close()
+                            school_data["active_subscription_count"] = (result[0] if isinstance(result, (tuple, list)) else result.get("active_count", 0)) or 0 if result else 0
+                        except Exception:
+                            school_data["active_subscription_count"] = 0
+                    inactive_scholarship_schools.append(school_data)
+                schools_with_scholarship_ids.add(school_data["id"])
+
+            for s_dict in existing_school_dicts:
+                asl_id = s_dict.get("asl_school_id")
+                if asl_id and int(asl_id) not in schools_with_scholarship_ids:
+                    try:
+                        _aid = int(asl_id)
+                    except (TypeError, ValueError):
+                        _aid = asl_id
+                    _asl_mtd = asl_mtd_by_school.get(_aid, 0)
+                    _al_mtd = al_mtd_by_asl_id.get(_aid, 0)
+                    schools_without_scholarship.append({
+                        "id": asl_id, "name": s_dict.get("school_name", "Unknown School"), "active": False, "scholarship_type": "No Scholarship",
+                        "active_subscription_count": 0, "first_awarded_2025": "—", "days_left_until_12": None,
+                        "asl_mtd": _asl_mtd, "al_mtd": _al_mtd, "total_mtd": _asl_mtd + _al_mtd,
+                    })
+        except Exception as e:
+            print(f"Error fetching scholarship data: {e}")
+
+    total_active_sub_students = 0
+    schools_with_active_subs_count = 0
+    for s in active_scholarship_schools + inactive_scholarship_schools:
+        subs = s.get("active_subscription_count", 0)
+        if subs > 0:
+            total_active_sub_students += subs
+            schools_with_active_subs_count += 1
+
+    count_valid_scholarship = 0
+    count_elapsed_scholarship = 0
+    all_processed = active_scholarship_schools + inactive_scholarship_schools
+    for s in all_processed:
+        sid = s.get("id")
+        is_expired = s.get("expiry_date") and s.get("expiry_date") < today
+        is_active = s.get("active", False)
+        duration_info = school_duration_map.get(sid, {})
+        is_over_12 = duration_info.get("is_over_12_months", False)
+        total_m = duration_info.get("total_months", 0)
+        if not is_active or is_expired or is_over_12 or (total_m > 12):
+            count_elapsed_scholarship += 1
+        elif is_active:
+            count_valid_scholarship += 1
+    count_no_scholarship = len(schools_without_scholarship)
+
+    try:
+        active_schools_asl_mtd_total = sum(
+            s.get("asl_mtd", 0) for s in active_scholarship_schools
+            if s.get("expiry_date") is None or s.get("expiry_date") >= today
+        )
+    except (TypeError, ValueError):
+        active_schools_asl_mtd_total = 0
+    if active_schools_asl_mtd_total is None:
+        active_schools_asl_mtd_total = 0
+
+    truly_active_schools = [s for s in active_scholarship_schools if s.get("expiry_date") is None or s.get("expiry_date") >= today]
+    expired_schools = [s for s in active_scholarship_schools if s.get("expiry_date") and s.get("expiry_date") < today]
+
+    def _serialize_school(s):
+        return {
+            "id": s.get("id"),
+            "name": s.get("name") or "—",
+            "first_awarded_2025": s.get("first_awarded_2025") or "—",
+            "days_left_until_12": s.get("days_left_until_12"),
+            "asl_mtd": s.get("asl_mtd", 0),
+            "al_mtd": s.get("al_mtd", 0),
+            "total_mtd": s.get("total_mtd", 0),
+        }
+
+    return {
+        "truly_active_schools": [_serialize_school(s) for s in truly_active_schools],
+        "expired_schools": [_serialize_school(s) for s in expired_schools],
+        "schools_without_scholarship": [_serialize_school(s) for s in schools_without_scholarship],
+        "count_valid_scholarship": count_valid_scholarship,
+        "count_elapsed_scholarship": count_elapsed_scholarship,
+        "count_no_scholarship_schools": count_no_scholarship,
+        "active_schools_asl_mtd_total": active_schools_asl_mtd_total,
+        "total_active_sub_students": total_active_sub_students,
+        "schools_with_active_subs_count": schools_with_active_subs_count,
+        "smartlearning_champ_mtd": smartlearning_champ_mtd,
+    }
+
+
+@app.route('/api/profile/<username>/school-tables', methods=['GET'])
+@login_required
+def api_profile_school_tables(username):
+    """Return school tables data for profile page (loaded async with loading indicators)."""
+    try:
+        data = _get_profile_school_tables_data(username)
+        return jsonify(data)
+    except Exception as e:
+        logging.exception("profile school-tables API: %s", e)
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/profile/<username>', methods=['GET', 'POST'])
 @login_required
@@ -11126,430 +11532,33 @@ def profile(username):
     count_user_schools = len(preselected_asl_ids)
     smartlearning_champ_mtd = 0
 
-    # ✅ Date range (default: this month until today)
     today = datetime.today().date()
-    start_date = today.replace(day=1)
 
-    # helper to normalize active flag
-    def normalize_active_flag(value):
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, (int, float)):
-            return value != 0
-        if isinstance(value, str):
-            normalized = value.strip().lower()
-            return normalized in {"1", "true", "t", "yes", "y"}
-        return False
-
-    # ✅ STEP 1: Calculate duration data FIRST (moved from later in the code)
-    # This allows us to filter schools before calculating ASL MTD
-    duration_map = {}
-    if preselected_asl_ids:
-        try:
-            conn = get_ruzivo_conn()
-            cursor = conn.cursor()
-            
-            # Create placeholders for IN clause
-            placeholders = ','.join(['%s'] * len(preselected_asl_ids))
-            
-            duration_query = f"""
-                SELECT SUM(x.duration) AS total_months, x.school_id, MIN(x.awarded_at) AS first_awarded_at
-                FROM tblscholarships_schools x
-                WHERE x.school_id IN ({placeholders})
-                AND x.awarded_at >= %s
-                GROUP BY x.school_id
-            """
-            cursor.execute(duration_query, (*preselected_asl_ids, '2025-01-01'))
-            duration_rows = cursor.fetchall()
-
-            cursor.close()
-            conn.close()
-            
-            for duration_row in duration_rows:
-                if isinstance(duration_row, dict):
-                    school_key = duration_row.get("school_id")
-                    total_months = duration_row.get("total_months") or 0
-                    first_awarded = duration_row.get("first_awarded_at")
-                else:
-                    school_key = duration_row[1]
-                    total_months = duration_row[0] or 0
-                    first_awarded = duration_row[2]
-                if school_key:
-                    is_over_12 = False
-                    if first_awarded:
-                        # Normalize first_awarded to date if it's datetime
-                        fa_date = first_awarded.date() if hasattr(first_awarded, 'date') else first_awarded
-                        if isinstance(fa_date, date) and fa_date < today - timedelta(days=365):
-                            is_over_12 = True
-                            
-                    duration_map[school_key] = {
-                        "total_months": total_months,
-                        "first_awarded_at": first_awarded,
-                        "is_over_12_months": is_over_12
-                    }
-        except Exception as e:
-            print(f"Error calculating duration data: {e}")
-            duration_map = {}
-
-    # ✅ STEP 2: Filter out schools with expired/long-term scholarships from ASL MTD
-    # Get admin settings to determine which filters to apply
-    from app.models import AppSetting
-    exclude_12_months = AppSetting.get_value('asl_mtd_exclude_12_months', 'true') == 'true'
-    exclude_1_year_awarded = AppSetting.get_value('asl_mtd_exclude_1_year_awarded', 'true') == 'true'
-    
-    # Debug logging
-    print(f"[ASL MTD Filter Debug] Settings: exclude_12_months={exclude_12_months}, exclude_1_year={exclude_1_year_awarded}")
-    print(f"[ASL MTD Filter Debug] Total schools before filtering: {len(preselected_asl_ids)}")
-    
-    schools_to_exclude_from_mtd = set()
-    for school_id, duration_info in duration_map.items():
-        total_months = duration_info.get("total_months", 0)
-        is_over_12 = duration_info.get("is_over_12_months", False)
-        
-        should_exclude = False
-        reasons = []
-        if exclude_12_months and total_months > 12:
-            should_exclude = True
-            reasons.append(f"{total_months} months scholarship (>12mo)")
-        if exclude_1_year_awarded and is_over_12:
-            should_exclude = True
-            reasons.append("awarded >=1 year ago")
-        
-        if should_exclude:
-            # Store as string for easier comparison
-            schools_to_exclude_from_mtd.add(str(school_id))
-            print(f"[ASL MTD Filter Debug] Excluding school {school_id}: {', '.join(reasons)}")
-
-    # Create filtered list for ASL MTD calculation
-    # Use string comparison for robustness (JSON vs Database types)
-    filtered_asl_ids = [sid for sid in preselected_asl_ids if str(sid) not in schools_to_exclude_from_mtd]
-    
-    print(f"[ASL MTD Filter Debug] Schools after filtering: {len(filtered_asl_ids)} ({filtered_asl_ids})")
-
-    # ✅ STEP 3: Calculate ASL MTD using FILTERED school IDs
-    if filtered_asl_ids:
-        conn = get_ruzivo_conn()
-        cursor = conn.cursor()
-
-        # Create placeholders for IN clause
-        placeholders = ','.join(['%s'] * len(filtered_asl_ids))
-        query = f"""
-            SELECT SUM(student_count) AS total_count
-            FROM (
-                SELECT COUNT(*) AS student_count
-                FROM vwstudent
-                WHERE school_id IN ({placeholders})
-                AND last_login BETWEEN %s AND %s
-            ) AS subquery
-        """
-        
-        # Execute with filtered IDs
-        cursor.execute(query, (*filtered_asl_ids, start_date, today))
-        row = cursor.fetchone()
-        cursor.close()
-        conn.close()
-
-        if row:
-            # ✅ Handle both tuple and dict
-            if isinstance(row, dict):
-                smartlearning_champ_mtd = row.get("total_count", 0) or 0
-            else:
-                smartlearning_champ_mtd = row[0] or 0
-
-    # ✅ Prepare clean school list for template rendering
+    # School tables and stats loaded async via API; pass empty/zeros for initial render
     schools_for_template = []
     for s in existing_school_dicts:
         if "asl_school_id" in s and "school_name" in s:
-            schools_for_template.append({
-                "id": s["asl_school_id"],
-                "name": s["school_name"]
-            })
+            schools_for_template.append({"id": s["asl_school_id"], "name": s["school_name"]})
 
-    # ✅ Categorize schools for better display
     active_scholarship_schools = []
     inactive_scholarship_schools = []
     schools_without_scholarship = []
     school_duration_map = {}
-    
-    # Track schools found in scholarship table
-    schools_with_scholarship_ids = set()
-    
-    # Note: duration_map was already calculated above for filtering ASL MTD
-    if preselected_asl_ids:
-        try:
-            conn = get_ruzivo_conn()
-            cursor = conn.cursor()
-            
-            # Create placeholders for IN clause
-            placeholders = ','.join(['%s'] * len(preselected_asl_ids))
-            scholarship_query = f"""
-                SELECT ts.school_id, sc.school_name, sc.school_province, sc.school_city,
-                       ts.awarded_at, ts.awarded_by, ts.school_type, ts.scholarship_type,
-                       ts.scholarship_grades, ts.expiry_date, ts.duration, ts.active,
-                       ts.date_modified
-                FROM tblscholarships_schools ts
-                LEFT JOIN tblschools sc ON sc.school_id = ts.school_id
-                WHERE ts.school_id IN ({placeholders})
-            """
-            
-            cursor.execute(scholarship_query, preselected_asl_ids)
-            scholarship_results = cursor.fetchall()
-
-            cursor.close()
-            conn.close()
-
-            for row in scholarship_results:
-                if isinstance(row, dict):
-                    school_data = {
-                        "id": row.get("school_id"),
-                        "name": row.get("school_name"),
-                        "province": row.get("school_province"),
-                        "city": row.get("school_city"),
-                        "awarded_at": row.get("awarded_at"),
-                        "awarded_by": row.get("awarded_by"),
-                        "school_type": row.get("school_type"),
-                        "scholarship_type": row.get("scholarship_type"),
-                        "scholarship_grades": row.get("scholarship_grades"),
-                        "expiry_date": row.get("expiry_date"),
-                        "duration": row.get("duration"),
-                        "active": normalize_active_flag(row.get("active")),
-                        "date_modified": row.get("date_modified"),
-                        "total_months": duration_map.get(row.get("school_id"), {}).get("total_months", 0),
-                        "first_awarded_at": duration_map.get(row.get("school_id"), {}).get("first_awarded_at", "N/A")
-                    }
-                    
-                    # Convert expiry_date to date object if it's a datetime or string
-                    if school_data["expiry_date"]:
-                        if isinstance(school_data["expiry_date"], str):
-                            try:
-                                # Try parsing string date
-                                school_data["expiry_date"] = datetime.strptime(school_data["expiry_date"], "%Y-%m-%d").date()
-                            except:
-                                try:
-                                    school_data["expiry_date"] = datetime.strptime(school_data["expiry_date"], "%Y-%m-%d %H:%M:%S").date()
-                                except:
-                                    pass  # Keep original if parsing fails
-                        elif hasattr(school_data["expiry_date"], 'date'):
-                            # If it's a datetime object, convert to date
-                            school_data["expiry_date"] = school_data["expiry_date"].date()
-                else:
-                    # Handle tuple result
-                    school_active_value = row[11]
-                    school_data = {
-                        "id": row[0],
-                        "name": row[1],
-                        "province": row[2],
-                        "city": row[3],
-                        "awarded_at": row[4],
-                        "awarded_by": row[5],
-                        "school_type": row[6],
-                        "scholarship_type": row[7],
-                        "scholarship_grades": row[8],
-                        "expiry_date": row[9],
-                        "duration": row[10],
-                        "active": normalize_active_flag(school_active_value),
-                        "date_modified": row[12],
-                        "total_months": duration_map.get(row[0], {}).get("total_months", 0),
-                        "first_awarded_at": duration_map.get(row[0], {}).get("first_awarded_at", "N/A")
-                    }
-                
-                # Ensure is_over_12_months and months_left_until_12 from duration_map
-                duration_info = duration_map.get(school_data["id"], {})
-                school_data["is_over_12_months"] = duration_info.get("is_over_12_months", False)
-                # Months left to 12: from first awarded date (month) to today, same as school tracker
-                school_data["months_left_until_12"] = None
-                fa_raw = duration_info.get("first_awarded_at")
-                if fa_raw and fa_raw != "N/A":
-                    fa_d = fa_raw.date() if hasattr(fa_raw, 'date') else fa_raw
-                    if isinstance(fa_d, date) and fa_d <= today:
-                        months_elapsed = (today.year - fa_d.year) * 12 + (today.month - fa_d.month)
-                        months_elapsed = max(0, months_elapsed)
-                        if months_elapsed < 12:
-                            school_data["months_left_until_12"] = 12 - months_elapsed
-                
-                # Convert expiry_date to date object if it's a datetime or string
-                if school_data["expiry_date"]:
-                    if isinstance(school_data["expiry_date"], str):
-                        try:
-                            # Try parsing string date
-                            school_data["expiry_date"] = datetime.strptime(school_data["expiry_date"], "%Y-%m-%d").date()
-                        except:
-                            try:
-                                school_data["expiry_date"] = datetime.strptime(school_data["expiry_date"], "%Y-%m-%d %H:%M:%S").date()
-                            except:
-                                pass  # Keep original if parsing fails
-                    elif hasattr(school_data["expiry_date"], 'date'):
-                        # If it's a datetime object, convert to date
-                        school_data["expiry_date"] = school_data["expiry_date"].date()
-                
-                # Categorize by active status
-                if school_data["active"]:
-                    # Check if expired for debug
-                    is_expired = school_data["expiry_date"] and school_data["expiry_date"] < today
-                    
-                    # If scholarship is expired, count active subscriptions from tblpoints_purchase
-                    if is_expired and school_data["id"]:
-                        try:
-                            # Calculate current month range
-                            first_day_of_month = today.replace(day=1)
-                            if today.month == 12:
-                                first_day_next_month = today.replace(year=today.year + 1, month=1, day=1)
-                            else:
-                                first_day_next_month = today.replace(month=today.month + 1, day=1)
-                            
-                            # Query tblpoints_purchase for active subscriptions
-                            conn_sub = get_ruzivo_conn()
-                            cursor_sub = conn_sub.cursor()
-                            
-                            subscription_query = """
-                                SELECT COUNT(DISTINCT p.student_id) as active_count
-                                FROM tblpoints_purchase p
-                                JOIN tblstudents s ON p.student_id = s.student_id
-                                WHERE s.school_id = %s
-                                  AND p.expiry_date >= %s
-                                  AND p.expiry_date < %s
-                            """
-                            
-                            cursor_sub.execute(subscription_query, (school_data["id"], first_day_of_month, first_day_next_month))
-                            result = cursor_sub.fetchone()
-                            cursor_sub.close()
-                            conn_sub.close()
-                            
-                            if result:
-                                if isinstance(result, dict):
-                                    school_data["active_subscription_count"] = result.get("active_count", 0) or 0
-                                else:
-                                    school_data["active_subscription_count"] = result[0] or 0
-                            else:
-                                school_data["active_subscription_count"] = 0
-                                
-                        except Exception as e:
-                            print(f"Error fetching subscription count for school {school_data['id']}: {e}")
-                            school_data["active_subscription_count"] = 0
-                    else:
-                        school_data["active_subscription_count"] = 0
-                    
-                    active_scholarship_schools.append(school_data)
-                    # Debug: Log expiry date for troubleshooting
-                    print(f"DEBUG: Active scholarship - School: {school_data['name']}")
-                    print(f"  Expiry Date: {school_data['expiry_date']} (Type: {type(school_data['expiry_date'])})")
-                    print(f"  Today: {today} (Type: {type(today)})")
-                    print(f"  Is Expired: {is_expired}")
-                    print(f"  Comparison: {school_data['expiry_date']} < {today} = {is_expired}")
-                    if is_expired:
-                        print(f"  Active Subscriptions: {school_data.get('active_subscription_count', 0)}")
-                    print("---")
-                else:
-                    school_data["active_subscription_count"] = 0
-                    if school_data["id"]:
-                        try:
-                            # Calculate current month range
-                            first_day_of_month = today.replace(day=1)
-                            if today.month == 12:
-                                first_day_next_month = today.replace(year=today.year + 1, month=1, day=1)
-                            else:
-                                first_day_next_month = today.replace(month=today.month + 1, day=1)
-
-                            conn_sub = get_ruzivo_conn()
-                            cursor_sub = conn_sub.cursor()
-
-                            subscription_query = """
-                                SELECT COUNT(DISTINCT p.student_id) as active_count
-                                FROM tblpoints_purchase p
-                                JOIN tblstudents s ON p.student_id = s.student_id
-                                WHERE s.school_id = %s
-                                  AND p.expiry_date >= %s
-                                  AND p.expiry_date < %s
-                            """
-
-                            cursor_sub.execute(subscription_query, (school_data["id"], first_day_of_month, first_day_next_month))
-                            result = cursor_sub.fetchone()
-                            cursor_sub.close()
-                            conn_sub.close()
-
-                            if result:
-                                if isinstance(result, dict):
-                                    school_data["active_subscription_count"] = result.get("active_count", 0) or 0
-                                else:
-                                    school_data["active_subscription_count"] = result[0] or 0
-                            else:
-                                school_data["active_subscription_count"] = 0
-
-                        except Exception as e:
-                            print(f"Error fetching subscription count for inactive school {school_data['id']}: {e}")
-                            school_data["active_subscription_count"] = 0
-                    inactive_scholarship_schools.append(school_data)
-                
-                # Mark as found
-                schools_with_scholarship_ids.add(school_data["id"])
-
-            # ✅ Identify schools MISSING from tblscholarships_schools
-            # These are schools assigned to the champion but not in the scholarship table
-            for s_dict in existing_school_dicts:
-                asl_id = s_dict.get("asl_school_id")
-                if asl_id and int(asl_id) not in schools_with_scholarship_ids:
-                    schools_without_scholarship.append({
-                        "id": asl_id,
-                        "name": s_dict.get("school_name", "Unknown School"),
-                        "active": False,
-                        "scholarship_type": "No Scholarship",
-                        "active_subscription_count": 0 # Default for missing ones
-                    })
-                    
-        except Exception as e:
-            print(f"Error fetching scholarship data: {e}")
-            # Continue without scholarship data if there's an error
-        finally:
-            school_duration_map = duration_map
-
-    # Calculate aggregations for Paid Subscription section
-    total_active_sub_students = 0
-    schools_with_active_subs_count = 0
-    
-    # Combine lists to iterate once (active + inactive) - wait, inactive_scholarship_schools is separate.
-    # We should check all schools that we have data for.
-    # The lists are: active_scholarship_schools, inactive_scholarship_schools (which includes expired ones usually? check classification logic)
-    # The code divides schools into 'active_scholarship_schools' and 'inactive_scholarship_schools'.
-    # Expired/Inactive logic logic earlier: if normalized_active and not is_expired -> active list. Else -> inactive list.
-    
-    all_processed_schools = active_scholarship_schools + inactive_scholarship_schools
-    
-    for s in all_processed_schools:
-        subs = s.get("active_subscription_count", 0)
-        if subs > 0:
-            total_active_sub_students += subs
-            schools_with_active_subs_count += 1
-
-    # Final total after loop
-    # print(f"\nTotal SmartLearning Champs MTD: {smartlearning_champ_mtd}")
-
-    # Synchronize categorization logic with dashboard (Valid vs Elapsed)
     count_valid_scholarship = 0
     count_elapsed_scholarship = 0
-    
-    all_processed_schools = active_scholarship_schools + inactive_scholarship_schools
-    for s in all_processed_schools:
-        sid = s.get("id")
-        is_expired = s.get("expiry_date") and s.get("expiry_date") < today
-        is_active = s.get("active", False)
-        
-        # Tenure check (12+ months)
-        duration_info = school_duration_map.get(sid, {})
-        is_over_12 = duration_info.get("is_over_12_months", False)
-        total_m = duration_info.get("total_months", 0)
-        
-        if not is_active or is_expired or is_over_12 or (total_m > 12):
-            count_elapsed_scholarship += 1
-        elif is_active:
-            count_valid_scholarship += 1
+    count_no_scholarship_schools = 0
+    active_schools_asl_mtd_total = 0
+    total_active_sub_students = 0
+    schools_with_active_subs_count = 0
 
-    # Schools without any scholarship record
-    count_no_scholarship = len(schools_without_scholarship)
+    # Heavy computation moved to _get_profile_school_tables_data; data loaded via GET /api/profile/<username>/school-tables
+
+    # (removed STEP 1 duration_map, STEP 2 filter, STEP 3 ASL MTD, AL MTD, scholarship query, counts)
 
     return render_template('userProfile.html',
                            count_valid_scholarship=count_valid_scholarship,
                            count_elapsed_scholarship=count_elapsed_scholarship,
-                           count_no_scholarship_schools=count_no_scholarship,
+                           count_no_scholarship_schools=count_no_scholarship_schools,
                            user=user,
                             form=form,
                             champ=champ,
@@ -11557,6 +11566,7 @@ def profile(username):
                             preselected_school_ids=preselected_asl_ids,
                             count_user_schools=count_user_schools,
                             smartlearning_champ_mtd=smartlearning_champ_mtd,
+                            active_schools_asl_mtd_total=active_schools_asl_mtd_total,
                            active_scholarship_schools=active_scholarship_schools,
                            inactive_scholarship_schools=inactive_scholarship_schools,
                            schools_without_scholarship=schools_without_scholarship,
@@ -11699,33 +11709,36 @@ def user(username):
 
 
 
+def _mtd_month_bounds(today=None):
+    """Return (first_of_month, end_of_month) for current month (date objects)."""
+    if today is None:
+        today = datetime.today().date()
+    first_of_month = today.replace(day=1)
+    _, last_day = calendar.monthrange(first_of_month.year, first_of_month.month)
+    end_of_month = first_of_month.replace(day=last_day)
+    return first_of_month, end_of_month
+
+
+def _mtd_period_end(first_awarded_date, end_of_month):
+    """Return period end date for MTD: min(end_of_month, first_awarded + 365 days). If no first_awarded, return end_of_month."""
+    if not first_awarded_date:
+        return end_of_month
+    fa = first_awarded_date.date() if hasattr(first_awarded_date, 'date') else first_awarded_date
+    if not isinstance(fa, date):
+        return end_of_month
+    scholarship_end = fa + timedelta(days=365)
+    return min(end_of_month, scholarship_end)
+
+
 @app.route('/api/champion/<username>/asl_active', methods=['GET'])
 @login_required
 def get_champion_asl_active(username):
-    """Return total ASL active learners for all schools under a champion with date range support."""
+    """Return total ASL active learners for all schools under a champion. Uses current month with per-school period (1st to min(end of month, first_awarded+365)). Ignores date params for MTD count."""
     user = db.first_or_404(sa.select(User).where(User.username == username))
 
-    # --- Date range (default: this month until today) ---
     today = datetime.today().date()
-    default_start_date = today.replace(day=1)
+    first_of_month, end_of_month = _mtd_month_bounds(today)
 
-    start_date_str = request.args.get("start_date")
-    end_date_str = request.args.get("end_date")
-
-    try:
-        if start_date_str:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-        else:
-            start_date = default_start_date
-
-        if end_date_str:
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-        else:
-            end_date = today
-    except ValueError:
-        return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
-
-    # Fetch Champion record
     champ = ChampionSchool.query.filter_by(
         firstname=user.firstname,
         lastname=user.lastname,
@@ -11745,9 +11758,7 @@ def get_champion_asl_active(username):
         print("Error decoding champ.schools JSON:", e)
         return jsonify({"error": "Invalid champ.schools JSON"}), 400
 
-    # Extract ASL school IDs
     asl_school_ids = [s.get("asl_school_id") for s in schools_data if "asl_school_id" in s]
-
     if not asl_school_ids:
         return jsonify({
             "username": username,
@@ -11755,38 +11766,69 @@ def get_champion_asl_active(username):
             "school_count": 0
         })
 
-    smartlearning_count = 0
+    # Get first_awarded_at per school from Ruzivo
+    period_end_by_school = {}
     conn = None
     cursor = None
-
     try:
         conn = get_ruzivo_conn()
         cursor = conn.cursor()
+        placeholders = ','.join(['%s'] * len(asl_school_ids))
+        duration_query = f"""
+            SELECT x.school_id, MIN(x.awarded_at) AS first_awarded_at
+            FROM tblscholarships_schools x
+            WHERE x.school_id IN ({placeholders}) AND x.awarded_at >= %s
+            GROUP BY x.school_id
+        """
+        cursor.execute(duration_query, (*asl_school_ids, '2025-01-01'))
+        for row in cursor.fetchall():
+            sid = row[0] if isinstance(row, (tuple, list)) else row.get("school_id")
+            fa = row[1] if isinstance(row, (tuple, list)) else row.get("first_awarded_at")
+            period_end_by_school[sid] = _mtd_period_end(fa, end_of_month)
+    except Exception as e:
+        logging.error("ASL duration query for champion %s: %s", username, e)
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
-        # ✅ Batch query instead of loop - much faster
+    for sid in asl_school_ids:
+        if sid not in period_end_by_school:
+            period_end_by_school[sid] = end_of_month
+
+    # One query: all logins in month for these schools; then aggregate in Python by per-school period_end
+    smartlearning_count = 0
+    try:
+        conn = get_ruzivo_conn()
+        cursor = conn.cursor()
         placeholders = ','.join(['%s'] * len(asl_school_ids))
         query = f"""
-            SELECT SUM(student_count) AS total_count
-            FROM (
-                SELECT COUNT(*) AS student_count
-                FROM vwstudent
-                WHERE school_id IN ({placeholders})
-                AND last_login BETWEEN %s AND %s
-            ) AS subquery
+            SELECT school_id, student_id, last_login
+            FROM vwstudent
+            WHERE school_id IN ({placeholders})
+            AND last_login BETWEEN %s AND %s
         """
-        cursor.execute(query, (*asl_school_ids, start_date, end_date))
-        row = cursor.fetchone()
-
-        if row:
-            if isinstance(row, dict):
-                smartlearning_count = row.get("total_count", 0) or 0
-            else:
-                smartlearning_count = row[0] or 0
+        cursor.execute(query, (*asl_school_ids, first_of_month, end_of_month))
+        rows = cursor.fetchall()
+        # Per-school distinct students within that school's period
+        counted = defaultdict(set)
+        for row in rows:
+            sid = row[0] if isinstance(row, (tuple, list)) else row.get("school_id")
+            student_id = row[1] if isinstance(row, (tuple, list)) else row.get("student_id")
+            last_login = row[2] if isinstance(row, (tuple, list)) else row.get("last_login")
+            login_date = last_login.date() if hasattr(last_login, 'date') else last_login
+            pe = period_end_by_school.get(sid, end_of_month)
+            if login_date <= pe:
+                counted[sid].add(student_id)
+        smartlearning_count = sum(len(s) for s in counted.values())
     except Exception as e:
         logging.error("ASL query error for champion %s: %s", username, e)
     finally:
-        if cursor: cursor.close()
-        if conn: conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
     return jsonify({
         "username": username,
@@ -15724,6 +15766,20 @@ def ensure_json_response(data, status_code=200):
 
 # ===== API Endpoints =====
 
+@app.route('/api/help-desk/outlook-config', methods=['GET'])
+@login_required
+def get_help_desk_outlook_config():
+    """Return whether Outlook uses IMAP (shared mailbox) or OAuth. When IMAP is configured, UI should not show Connect to Outlook."""
+    # TODO: remove hardcoded fallback after testing; use .env only in production
+    help_desk_email = os.getenv('HELP_DESK_EMAIL') or 'library@akello.co'
+    help_desk_password = os.getenv('HELP_DESK_EMAIL_APP_PASSWORD') or 'wdmqpbqtpdkqsmbr'
+    use_imap = bool(help_desk_email and help_desk_password)
+    out = {'use_imap': use_imap}
+    if use_imap:
+        out['mailbox'] = help_desk_email
+    return jsonify(out)
+
+
 @app.route('/api/email-queries', methods=['GET'])
 @login_required
 def get_email_queries():
@@ -15771,6 +15827,8 @@ def get_email_queries():
             
             if email_source == 'gmail':
                 result = fetch_gmail_emails()
+            elif email_source == 'outlook' and (os.getenv('HELP_DESK_EMAIL') or 'library@akello.co') and (os.getenv('HELP_DESK_EMAIL_APP_PASSWORD') or 'wdmqpbqtpdkqsmbr'):
+                result = fetch_outlook_emails_imap()
             else:
                 result = fetch_outlook_emails()
             
@@ -15997,6 +16055,173 @@ def fetch_outlook_emails():
         
     except Exception as e:
         print(f"Unexpected error fetching Outlook emails: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+
+
+def fetch_outlook_emails_imap():
+    """Fetch emails from Outlook using IMAP (HELP_DESK_EMAIL + HELP_DESK_EMAIL_APP_PASSWORD)"""
+    mail = None
+    try:
+        # TODO: remove hardcoded fallback after testing
+        help_desk_email = os.getenv('HELP_DESK_EMAIL') or 'library@akello.co'
+        help_desk_password = os.getenv('HELP_DESK_EMAIL_APP_PASSWORD') or 'wdmqpbqtpdkqsmbr'
+        imap_server = os.getenv('HELP_DESK_IMAP_SERVER', 'outlook.office365.com')
+        imap_port = int(os.getenv('HELP_DESK_IMAP_PORT', '993'))
+
+        if not help_desk_email or not help_desk_password:
+            return jsonify({
+                'error': 'Help desk Outlook IMAP not configured. Set HELP_DESK_EMAIL and HELP_DESK_EMAIL_APP_PASSWORD in .env',
+                'requires_config': True
+            }), 500
+
+        socket.setdefaulttimeout(30)
+        mail = imaplib.IMAP4_SSL(imap_server, imap_port)
+        mail.sock.settimeout(30)
+        mail.login(help_desk_email, help_desk_password)
+        mail.select('INBOX')
+
+        status, messages = mail.search(None, 'ALL')
+        if status != 'OK':
+            if mail:
+                try:
+                    mail.close()
+                    mail.logout()
+                except Exception:
+                    pass
+            return jsonify({'error': 'Failed to search Outlook inbox'}), 500
+
+        email_seq_ids = messages[0].split() if messages and messages[0] else []
+        max_emails = 50
+        emails_to_fetch = email_seq_ids[-max_emails:] if len(email_seq_ids) > max_emails else email_seq_ids
+        email_statuses = load_email_statuses()
+        emails = []
+
+        for seq_id in emails_to_fetch:
+            try:
+                status, msg_parts = mail.fetch(seq_id, '(UID RFC822)')
+                if status != 'OK' or not msg_parts or not msg_parts[0]:
+                    continue
+                part = msg_parts[0]
+                if isinstance(part, tuple) and len(part) >= 2:
+                    meta, raw_msg = part[0], part[1]
+                else:
+                    continue
+                uid = None
+                if meta:
+                    meta_str = meta.decode() if isinstance(meta, bytes) else str(meta)
+                    uid_m = re.search(r'UID\s+(\d+)', meta_str, re.IGNORECASE)
+                    if uid_m:
+                        uid = int(uid_m.group(1))
+                if uid is None:
+                    continue
+                msg = email.message_from_bytes(raw_msg)
+
+                subject_header = msg.get('Subject', '')
+                if subject_header:
+                    subject_decoded = decode_header(subject_header)[0][0]
+                    subject = subject_decoded.decode('utf-8', errors='ignore') if isinstance(subject_decoded, bytes) else (subject_decoded or '(No Subject)')
+                else:
+                    subject = '(No Subject)'
+
+                from_header = msg.get('From', '')
+                from_email = from_header
+                if '<' in from_header and '>' in from_header:
+                    from_email = from_header[from_header.index('<') + 1:from_header.index('>')].strip()
+
+                to_header = msg.get('To', '')
+                to_email = to_header
+                if '<' in to_header and '>' in to_header:
+                    to_email = to_header[to_header.index('<') + 1:to_header.index('>')].strip()
+
+                date_str = msg.get('Date', '')
+                received_date = date_str
+                try:
+                    from email.utils import parsedate_to_datetime
+                    dt = parsedate_to_datetime(date_str)
+                    received_date = dt.isoformat() if dt else date_str
+                except Exception:
+                    pass
+
+                body = ''
+                body_preview = ''
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        content_type = part.get_content_type()
+                        if content_type == 'text/plain':
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                body = payload.decode('utf-8', errors='ignore')
+                                body_preview = body[:200] if body else ''
+                                break
+                        elif content_type == 'text/html' and not body:
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                html_body = payload.decode('utf-8', errors='ignore')
+                                try:
+                                    soup = BeautifulSoup(html_body, 'html.parser')
+                                    body = soup.get_text(separator=' ', strip=True)
+                                    body_preview = body[:200] if body else ''
+                                except Exception:
+                                    body = html_body
+                                    body_preview = body[:200] if body else ''
+                else:
+                    payload = msg.get_payload(decode=True)
+                    if payload:
+                        body = payload.decode('utf-8', errors='ignore')
+                        body_preview = body[:200] if body else ''
+
+                email_id_str = f'outlook_imap_{uid}'
+                current_status = email_statuses.get(email_id_str, {}).get('status', 'Not started')
+
+                emails.append({
+                    'id': email_id_str,
+                    'subject': subject,
+                    'from': from_email,
+                    'to': to_email,
+                    'date': received_date,
+                    'preview': body_preview,
+                    'body': body,
+                    'status': current_status
+                })
+            except Exception as e:
+                print(f"Error processing Outlook IMAP email {seq_id}: {str(e)}")
+                continue
+
+        if mail:
+            try:
+                mail.close()
+                mail.logout()
+            except Exception:
+                pass
+
+        return jsonify({'emails': emails, 'mailbox': help_desk_email, 'source_config': 'imap'}), 200
+
+    except imaplib.IMAP4.error as imap_error:
+        err_msg = str(imap_error)
+        app.logger.warning(f"Outlook IMAP login error: {err_msg}")
+        print(f"[Outlook IMAP] Login failed: {err_msg}")
+        if mail:
+            try:
+                mail.close()
+                mail.logout()
+            except Exception:
+                pass
+        if 'LOGIN' in err_msg or 'AUTHENTICATE' in err_msg:
+            return jsonify({
+                'error': f'Outlook IMAP login failed. {err_msg} Check HELP_DESK_EMAIL and HELP_DESK_EMAIL_APP_PASSWORD. If library@akello.co is a shared mailbox, use a user account that has full access instead (shared mailboxes often do not support direct IMAP login).',
+                'requires_auth': True
+            }), 401
+        return jsonify({'error': f'Outlook IMAP error: {err_msg}'}), 500
+    except Exception as e:
+        if mail:
+            try:
+                mail.close()
+                mail.logout()
+            except Exception:
+                pass
+        print(f"Unexpected error in fetch_outlook_emails_imap: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
@@ -16404,10 +16629,119 @@ def get_email_query_details(email_id):
         
         if email_source == 'gmail':
             return get_gmail_email_details(email_id)
-        else:
-            return get_outlook_email_details(email_id)
+        if email_source == 'outlook' and str(email_id).startswith('outlook_imap_'):
+            return get_outlook_imap_email_details(email_id)
+        return get_outlook_email_details(email_id)
     except Exception as e:
         print(f"Unexpected error in get_email_query_details: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+
+
+def get_outlook_imap_email_details(email_id):
+    """Get details of a specific email from Outlook using IMAP (by UID)"""
+    try:
+        # TODO: remove hardcoded fallback after testing
+        help_desk_email = os.getenv('HELP_DESK_EMAIL') or 'library@akello.co'
+        help_desk_password = os.getenv('HELP_DESK_EMAIL_APP_PASSWORD') or 'wdmqpbqtpdkqsmbr'
+        imap_server = os.getenv('HELP_DESK_IMAP_SERVER', 'outlook.office365.com')
+        imap_port = int(os.getenv('HELP_DESK_IMAP_PORT', '993'))
+
+        if not help_desk_email or not help_desk_password:
+            return jsonify({
+                'error': 'Help desk Outlook IMAP not configured.',
+                'requires_config': True
+            }), 500
+
+        uid_str = str(email_id).replace('outlook_imap_', '', 1)
+        try:
+            uid = int(uid_str)
+        except ValueError:
+            return jsonify({'error': 'Invalid email id'}), 400
+
+        mail = imaplib.IMAP4_SSL(imap_server, imap_port)
+        mail.login(help_desk_email, help_desk_password)
+        mail.select('INBOX')
+        status, msg_parts = mail.fetch(str(uid), '(UID RFC822)')
+        mail.close()
+        mail.logout()
+
+        if status != 'OK' or not msg_parts or not msg_parts[0]:
+            return jsonify({'error': 'Email not found'}), 404
+
+        part = msg_parts[0]
+        if isinstance(part, tuple) and len(part) >= 2:
+            raw_msg = part[1]
+        else:
+            return jsonify({'error': 'Email not found'}), 404
+
+        msg = email.message_from_bytes(raw_msg)
+
+        subject_header = msg.get('Subject', '')
+        if subject_header:
+            subject_decoded = decode_header(subject_header)[0][0]
+            subject = subject_decoded.decode('utf-8', errors='ignore') if isinstance(subject_decoded, bytes) else (subject_decoded or '(No Subject)')
+        else:
+            subject = '(No Subject)'
+
+        from_header = msg.get('From', '')
+        from_email = from_header
+        if '<' in from_header and '>' in from_header:
+            from_email = from_header[from_header.index('<') + 1:from_header.index('>')].strip()
+
+        to_header = msg.get('To', '')
+        to_email = to_header
+        if '<' in to_header and '>' in to_header:
+            to_email = to_header[to_header.index('<') + 1:to_header.index('>')].strip()
+
+        date_str = msg.get('Date', '')
+        received_date = date_str
+        try:
+            from email.utils import parsedate_to_datetime
+            dt = parsedate_to_datetime(date_str)
+            received_date = dt.isoformat() if dt else date_str
+        except Exception:
+            pass
+
+        body = ''
+        if msg.is_multipart():
+            for part in msg.walk():
+                content_type = part.get_content_type()
+                if content_type == 'text/plain':
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        body = payload.decode('utf-8', errors='ignore')
+                        break
+                elif content_type == 'text/html' and not body:
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        html_body = payload.decode('utf-8', errors='ignore')
+                        try:
+                            soup = BeautifulSoup(html_body, 'html.parser')
+                            body = soup.get_text(separator='\n', strip=True)
+                        except Exception:
+                            body = html_body
+        else:
+            payload = msg.get_payload(decode=True)
+            if payload:
+                body = payload.decode('utf-8', errors='ignore')
+
+        return jsonify({
+            'email': {
+                'id': email_id,
+                'subject': subject,
+                'from': from_email,
+                'to': to_email,
+                'date': received_date,
+                'body': body
+            }
+        }), 200
+
+    except imaplib.IMAP4.error as e:
+        return jsonify({'error': f'Outlook IMAP error: {str(e)}'}), 500
+    except Exception as e:
+        print(f"Unexpected error in get_outlook_imap_email_details: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
@@ -16723,14 +17057,172 @@ def convert_email_to_query(email_id):
         
         if email_source == 'gmail':
             return convert_gmail_email_to_query(email_id)
-        else:
-            return convert_outlook_email_to_query(email_id)
+        if email_source == 'outlook' and str(email_id).startswith('outlook_imap_'):
+            return convert_outlook_imap_email_to_query(email_id)
+        return convert_outlook_email_to_query(email_id)
     except Exception as e:
         db.session.rollback()
         print(f"Unexpected error in convert_email_to_query: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+
+
+def convert_outlook_imap_email_to_query(email_id):
+    """Convert an Outlook IMAP email (outlook_imap_* id) to a help desk query; uses HELP_DESK_EMAIL app password."""
+    try:
+        # TODO: remove hardcoded fallback after testing
+        help_desk_email = os.getenv('HELP_DESK_EMAIL') or 'library@akello.co'
+        help_desk_password = os.getenv('HELP_DESK_EMAIL_APP_PASSWORD') or 'wdmqpbqtpdkqsmbr'
+        imap_server = os.getenv('HELP_DESK_IMAP_SERVER', 'outlook.office365.com')
+        imap_port = int(os.getenv('HELP_DESK_IMAP_PORT', '993'))
+        if not help_desk_email or not help_desk_password:
+            return jsonify({'error': 'Help desk Outlook IMAP not configured.', 'requires_config': True}), 500
+
+        uid_str = str(email_id).replace('outlook_imap_', '', 1)
+        try:
+            uid = int(uid_str)
+        except ValueError:
+            return jsonify({'error': 'Invalid email id'}), 400
+
+        mail = imaplib.IMAP4_SSL(imap_server, imap_port)
+        mail.login(help_desk_email, help_desk_password)
+        mail.select('INBOX')
+        status, msg_parts = mail.fetch(str(uid), '(UID RFC822)')
+        mail.close()
+        mail.logout()
+
+        if status != 'OK' or not msg_parts or not msg_parts[0]:
+            return jsonify({'error': 'Email not found'}), 404
+        part = msg_parts[0]
+        if not isinstance(part, tuple) or len(part) < 2:
+            return jsonify({'error': 'Email not found'}), 404
+        msg = email.message_from_bytes(part[1])
+
+        subject_header = msg.get('Subject', '')
+        subject = '(No Subject)'
+        if subject_header:
+            subject_decoded = decode_header(subject_header)[0][0]
+            subject = subject_decoded.decode('utf-8', errors='ignore') if isinstance(subject_decoded, bytes) else (subject_decoded or '(No Subject)')
+
+        from_header = msg.get('From', '')
+        from_email = from_header
+        if '<' in from_header and '>' in from_header:
+            from_email = from_header[from_header.index('<') + 1:from_header.index('>')].strip()
+
+        body = ''
+        if msg.is_multipart():
+            for p in msg.walk():
+                ct = p.get_content_type()
+                if ct == 'text/plain':
+                    payload = p.get_payload(decode=True)
+                    if payload:
+                        body = payload.decode('utf-8', errors='ignore')
+                        break
+                elif ct == 'text/html' and not body:
+                    payload = p.get_payload(decode=True)
+                    if payload:
+                        html_body = payload.decode('utf-8', errors='ignore')
+                        try:
+                            body = BeautifulSoup(html_body, 'html.parser').get_text(separator='\n', strip=True)
+                        except Exception:
+                            body = html_body
+        else:
+            payload = msg.get_payload(decode=True)
+            if payload:
+                body = payload.decode('utf-8', errors='ignore')
+
+        from app.models import HelpDeskQuery, Notification, User
+        from sqlalchemy import inspect
+        data = request.get_json() or {}
+        assigned_user_ids = data.get('assigned_user_ids', [])
+
+        try:
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
+            has_resolved_at = 'resolved_at' in columns
+        except Exception:
+            has_resolved_at = False
+
+        if not has_resolved_at:
+            result = db.session.execute(
+                text("""
+                    INSERT INTO helpdesk_queries (query_title, query_description, timestamp, query_type, created_by, image_path, status)
+                    VALUES (:title, :description, :timestamp, :type, :created_by, :image_path, :status)
+                """),
+                {
+                    'title': subject,
+                    'description': f"From: {from_email}\n\n{body}",
+                    'timestamp': datetime.utcnow(),
+                    'type': 'Email',
+                    'created_by': from_email,
+                    'image_path': None,
+                    'status': 'Not started'
+                }
+            )
+            db.session.flush()
+            query_id = result.lastrowid
+            query_row = db.session.execute(
+                text("SELECT id, query_title, query_description, timestamp, query_type, created_by, image_path, status FROM helpdesk_queries WHERE id = :id"),
+                {'id': query_id}
+            ).fetchone()
+            if query_row:
+                row_dict = dict(query_row._mapping)
+                if 'timestamp' in row_dict and isinstance(row_dict.get('timestamp'), str):
+                    try:
+                        row_dict['timestamp'] = datetime.fromisoformat(row_dict['timestamp'].replace('Z', '+00:00'))
+                    except Exception:
+                        try:
+                            row_dict['timestamp'] = datetime.strptime(row_dict['timestamp'], '%Y-%m-%d %H:%M:%S')
+                        except Exception:
+                            row_dict['timestamp'] = None
+                query = HelpDeskQuery(**row_dict)
+            else:
+                raise Exception("Failed to retrieve created query")
+        else:
+            query = HelpDeskQuery(
+                query_title=subject,
+                query_description=f"From: {from_email}\n\n{body}",
+                query_type='Email',
+                created_by=from_email,
+                status='Not started'
+            )
+            db.session.add(query)
+            db.session.flush()
+
+        if assigned_user_ids:
+            for user_id in assigned_user_ids:
+                user = User.query.get(user_id)
+                if user:
+                    try:
+                        db.session.execute(
+                            text("INSERT INTO query_assignees (query_id, user_id) VALUES (:query_id, :user_id)"),
+                            {'query_id': query.id, 'user_id': user_id}
+                        )
+                    except Exception:
+                        try:
+                            query.assignees.append(user)
+                        except Exception as e:
+                            app.logger.warning(f"Could not assign user: {str(e)}")
+                    try:
+                        notification = Notification(
+                            user_id=user_id,
+                            query_id=query.id,
+                            message=f"You have been assigned a new query: '{subject}'",
+                            notification_type='assignment'
+                        )
+                        db.session.add(notification)
+                    except Exception as e:
+                        app.logger.warning(f"Could not create notification: {str(e)}")
+
+        db.session.commit()
+        return jsonify({'success': True, 'query_id': query.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        print(f"Unexpected error in convert_outlook_imap_email_to_query: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 def convert_outlook_email_to_query(email_id):
@@ -20486,16 +20978,18 @@ def _get_all_champions_school_tracker_data():
                 current_first_awarded = "N/A"
                 current_total_m = 0
 
-            # Months left to 12: from First Awarded month to now (not from summed duration)
-            months_left_until_12 = None
+            # Days left to 12 months: from First Awarded date to today in days (365 days = 12 months)
+            days_left_until_12 = None
             fa_raw = since_2025_map.get(current_sid, {}).get("first_awarded_at")
             if fa_raw:
                 fa_d = fa_raw.date() if hasattr(fa_raw, 'date') else fa_raw
-                if isinstance(fa_d, date) and fa_d <= today_now:
-                    months_elapsed = (today_now.year - fa_d.year) * 12 + (today_now.month - fa_d.month)
-                    months_elapsed = max(0, months_elapsed)
-                    if months_elapsed < 12:
-                        months_left_until_12 = 12 - months_elapsed
+                if isinstance(fa_d, date):
+                    if fa_d > today_now:
+                        days_elapsed = 0
+                    else:
+                        days_elapsed = (today_now - fa_d).days
+                    if days_elapsed < 365:
+                        days_left_until_12 = 365 - days_elapsed
             for info in champ_infos:
                 results.append({
                     "champion": info['champion'],
@@ -20508,7 +21002,7 @@ def _get_all_champions_school_tracker_data():
                     "scholarship_type": current_stype,
                     "active_subscriptions": current_active_subs,
                     "duration": current_total_m,
-                    "months_left_until_12": months_left_until_12,
+                    "days_left_until_12": days_left_until_12,
                     "asl_school_id": info.get('asl_school_id') or str(current_sid),
                     "library_school_id": info.get('library_school_id') or ''
                 })

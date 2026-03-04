@@ -469,7 +469,7 @@
                       <th>First Awarded</th>
                       <th>Expiry</th>
                       <th>Duration</th>
-                      <th>Mo left to 12</th>
+                      <th>Days left to 12</th>
                       <th>Type</th>
                     </tr>
                   </thead>
@@ -818,7 +818,7 @@
           <td class="small text-muted">${s.first_awarded_at || '-'}</td>
           <td class="small text-muted">${s.expiry_date || '-'}</td>
           <td class="small text-muted">${s.duration || '0'} mo</td>
-          <td class="small">${(s.months_left_until_12 != null && s.months_left_until_12 > 0) ? '<span class="months-left-highlight">' + s.months_left_until_12 + '</span>' : '—'}</td>
+          <td class="small">${(s.days_left_until_12 != null && s.days_left_until_12 > 0) ? '<span class="months-left-highlight">' + s.days_left_until_12 + ' days</span>' : '—'}</td>
           <td class="small text-muted">${s.scholarship_type || '-'}</td>
         </tr>`;
       };
@@ -961,7 +961,7 @@
 
         doc.setFontSize(14);
         doc.text("3. School Tracker", 14, nextY);
-        const cols3 = ["Champion", "School", "Province", "Status", "First Awarded", "Expiry", "Duration", "Mo left to 12", "Type"];
+        const cols3 = ["Champion", "School", "Province", "Status", "First Awarded", "Expiry", "Duration", "Days left to 12", "Type"];
         const rows3 = schoolAllRows.map(s => [
           s.champion,
           s.school_name,
@@ -970,7 +970,7 @@
           s.first_awarded_at || '-',
           s.expiry_date || '-',
           s.duration || '0',
-          s.months_left_until_12 != null ? String(s.months_left_until_12) : '-',
+          s.days_left_until_12 != null ? String(s.days_left_until_12) + ' days' : '-',
           s.scholarship_type || '-'
         ]);
 

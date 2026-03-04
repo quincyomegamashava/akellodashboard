@@ -71,13 +71,12 @@ def setup_logging(app):
     # Note: Werkzeug already prints to stdout, so we don't need to add console_handler 
     # if we are not redirecting stdout yet, but adding file_handler ensures it goes to file.
 
-    # --- Redirect stdout and stderr to the logger ---
-    # This captures print() statements and unhandled exceptions printed to stderr
-    # We use sys.__stdout__ for the console handler above to avoid infinite recursion
-    
-    sys.stdout = StreamToLogger(app.logger, logging.INFO)
-    sys.stderr = StreamToLogger(app.logger, logging.ERROR)
-    
+    # --- Do NOT redirect stdout/stderr to the logger ---
+    # Redirecting causes repeated "ERROR:app:..." and "Exception ignored in sys.unraisablehook"
+    # when handlers or unraisablehook write to stderr, which is then logged again.
+    # sys.stdout = StreamToLogger(app.logger, logging.INFO)
+    # sys.stderr = StreamToLogger(app.logger, logging.ERROR)
+
     # Log application startup
     app.logger.info('='*50)
     app.logger.info('Application starting up - Full Terminal Capture Enabled')

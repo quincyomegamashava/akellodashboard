@@ -1512,7 +1512,11 @@
     if (source === 'outlook') {
       microsoftAuthDiv.style.display = 'block';
       gmailConfigDiv.style.display = 'none';
-      checkMicrosoftAuth();
+      var connectBtn = document.getElementById('connectBtn');
+      var disconnectBtn = document.getElementById('disconnectBtn');
+      if (connectBtn) connectBtn.style.display = 'none';
+      if (disconnectBtn) disconnectBtn.style.display = 'none';
+      checkOutlookConfig();
     } else {
       microsoftAuthDiv.style.display = 'none';
       gmailConfigDiv.style.display = 'block';
@@ -1544,7 +1548,45 @@
     switchEmailSource(savedSource);
   }
 
-  // Check Microsoft authentication status
+  // When Outlook is selected: use IMAP config if set, otherwise show Connect/Disconnect (Graph OAuth)
+  async function checkOutlookConfig() {
+    const authStatusDiv = document.getElementById('microsoftAuthStatus');
+    const authStatusMsg = document.getElementById('authStatusMessage');
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    try {
+      const response = await fetch('/api/help-desk/outlook-config');
+      if (!response.ok) {
+        // e.g. 401/302 – don't show Connect so user doesn't hit Graph error; use Sync only
+        authStatusDiv.style.display = 'block';
+        authStatusDiv.className = 'w3-margin-bottom w3-panel w3-blue w3-round';
+        authStatusMsg.innerHTML = '<i class="fa fa-info-circle"></i> Click "Refresh Emails" to load emails from Outlook.';
+        if (connectBtn) connectBtn.style.display = 'none';
+        if (disconnectBtn) disconnectBtn.style.display = 'none';
+        return;
+      }
+      const data = await response.json();
+      if (data.use_imap && data.mailbox) {
+        authStatusDiv.style.display = 'block';
+        authStatusDiv.className = 'w3-margin-bottom w3-panel w3-green w3-round';
+        authStatusMsg.innerHTML = '<i class="fa fa-check-circle"></i> Using configured mailbox (' + (data.mailbox || '') + ')';
+        if (connectBtn) connectBtn.style.display = 'none';
+        if (disconnectBtn) disconnectBtn.style.display = 'none';
+      } else {
+        checkMicrosoftAuth();
+      }
+    } catch (error) {
+      console.error('Error checking Outlook config:', error);
+      // Don't show Connect so user never hits Graph "not configured" – use Sync only
+      authStatusDiv.style.display = 'block';
+      authStatusDiv.className = 'w3-margin-bottom w3-panel w3-blue w3-round';
+      authStatusMsg.innerHTML = '<i class="fa fa-info-circle"></i> Click "Refresh Emails" to load emails from Outlook.';
+      if (connectBtn) connectBtn.style.display = 'none';
+      if (disconnectBtn) disconnectBtn.style.display = 'none';
+    }
+  }
+
+  // Check Microsoft authentication status (OAuth/Graph)
   async function checkMicrosoftAuth() {
     try {
       const response = await fetch('/api/microsoft-auth-status');
@@ -1698,17 +1740,14 @@
       }
 
       if (!response.ok) {
-        // Check if authentication is required (for Outlook)
+        // Outlook uses IMAP when configured – 401 means mailbox login failed, not Graph; do not show Connect to Outlook
         if ((data.requires_auth || response.status === 401) && source === 'outlook') {
           tbody.innerHTML = `<tr><td colspan="6" class="text-center py-12 text-orange-600 bg-orange-50/50">
-            <div class="flex flex-col items-center gap-4">
-              <p class="font-medium inline-flex items-center gap-2"><i class="fa fa-exclamation-triangle"></i> ${data.error || 'Authentication required'}</p>
-              <button class="btn-modern btn-modern-primary py-2 px-6" onclick="connectToMicrosoft()">
-                <i class="fa fa-plug mr-2"></i> Connect to Outlook
-              </button>
+            <div class="flex flex-col items-center gap-2">
+              <p class="font-medium inline-flex items-center gap-2"><i class="fa fa-exclamation-triangle"></i> ${data.error || 'Could not connect to Outlook mailbox.'}</p>
+              <p class="text-xs text-orange-500/80">Check HELP_DESK_EMAIL and HELP_DESK_EMAIL_APP_PASSWORD in .env</p>
             </div>
           </td></tr>`;
-          checkMicrosoftAuth();
           return;
         }
         // Check if configuration is required (for Gmail)
@@ -1949,7 +1988,7 @@
       })
       .then(({ response, data }) => {
         if (data.error) {
-          if (data.requires_auth || response.status === 401) {
+          if ((data.requires_auth || response.status === 401) && !emailId.startsWith('outlook_imap_')) {
             if (confirm('Authentication required. Connect to Outlook?')) {
               connectToMicrosoft();
             }
@@ -2183,7 +2222,7 @@
       const data = await response.json();
 
       if (!response.ok) {
-        if (data.requires_auth || response.status === 401) {
+        if ((data.requires_auth || response.status === 401) && !emailId.startsWith('outlook_imap_')) {
           if (confirm('Authentication required. Connect to Outlook?')) {
             connectToMicrosoft();
           }
