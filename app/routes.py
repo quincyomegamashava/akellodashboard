@@ -884,6 +884,26 @@ def administration():
     )
 
 
+def _ensure_helpdesk_resolved_at_column():
+    """Add helpdesk_queries.resolved_at if missing (e.g. SQLite DB never migrated). Avoids OperationalError when loading User.assigned_queries."""
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        if "helpdesk_queries" not in inspector.get_table_names():
+            return
+        columns = [c["name"] for c in inspector.get_columns("helpdesk_queries")]
+        if "resolved_at" in columns:
+            return
+        # Add missing column (SQLite and most DBs support ADD COLUMN)
+        db.session.execute(text("ALTER TABLE helpdesk_queries ADD COLUMN resolved_at DATETIME"))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        # Ignore "duplicate column" or similar; column may have been added by another request
+        if "duplicate" not in str(e).lower() and "already exists" not in str(e).lower():
+            print(f"ensure helpdesk resolved_at: {e}")
+
+
 @app.route('/admin/users/<int:user_id>', methods=['DELETE'])
 @login_required
 def admin_delete_user(user_id):
@@ -893,6 +913,15 @@ def admin_delete_user(user_id):
     if not user:
         return jsonify({"error": "User not found"}), 404
     try:
+        _ensure_helpdesk_resolved_at_column()
+        # Unlink user from helpdesk assignees via raw SQL so we never load HelpDeskQuery
+        # (avoids resolved_at / schema mismatch when DB is not fully migrated)
+        try:
+            db.session.execute(text("DELETE FROM query_assignees WHERE user_id = :uid"), {"uid": user_id})
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        # Now safe to delete the user (query_assignees already cleared)
         db.session.delete(user)
         db.session.commit()
         return jsonify({"ok": True})
