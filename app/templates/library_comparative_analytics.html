@@ -120,9 +120,9 @@
             </thead>
             <tbody>
                 {% for item in data %}
-                <tr>
+                <tr class="{% if item.is_active %}table-success{% endif %}">
                     <td>
-                        <div class="font-weight-bold text-dark">{{ item.title }}</div>
+                        <div class="font-weight-bold text-dark">{{ item.title }}{% if item.is_active %} <span class="badge badge-success badge-pill" title="Active">Active</span>{% endif %}</div>
                         <div class="small text-muted">{{ item.author }}</div>
                     </td>
                     <td class="text-center">{{ item.sub_count or 0 }}</td>

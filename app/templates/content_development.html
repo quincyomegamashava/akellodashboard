@@ -6,6 +6,8 @@
 <link
   href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@300;400;700&display=swap"
   rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -66,6 +68,9 @@
             </button>
             <button class="cd-tab-btn" onclick="openTab('contentTab')" id="contentTabBtn">
               <i class="fa fa-folder-open"></i> Files
+            </button>
+            <button class="cd-tab-btn" onclick="openTab('docxConverterTab')" id="docxConverterTabBtn">
+              <i class="fa fa-file-text-o"></i> DOCX → HTML
             </button>
           </div>
         </div>
@@ -245,6 +250,14 @@
           </form>
         </div>
 
+        <!-- DOCX CONVERTER TAB -->
+        <div id="docxConverterTab" class="cd-card-body tab-content cd-hidden">
+          <div class="cd-mb-4">
+            <h3 style="margin:0; font-size:1rem;">Production DOCX → HTML</h3>
+            <p class="cd-text-muted cd-text-sm" style="margin:8px 0 0;">Upload DOCX files in bulk, preview and edit the converted HTML, then download single files or all as ZIP. Use the panel on the right.</p>
+          </div>
+        </div>
+
         <!-- FILES TAB -->
         <div id="contentTab" class="cd-card-body tab-content cd-hidden">
           <div class="cd-mb-4">
@@ -312,6 +325,35 @@
         </div>
         <div class="cd-paper cd-paper-container">
           <div id="aqOutput"></div>
+        </div>
+      </div>
+
+      <!-- DOCX → HTML CONVERTER SECTION -->
+      <div id="docxConverterSection" class="cd-hidden cd-docx-converter">
+        <div class="cd-docx-layout">
+          <div class="cd-docx-sidebar">
+            <div class="cd-docx-drop-zone" id="docxDropZone">
+              <input type="file" id="docxFileInput" multiple accept=".docx">
+              <p class="cd-docx-drop-text"><i class="fa fa-cloud-upload fa-2x"></i><br>Drag & drop DOCX files here or click to browse</p>
+              <p class="cd-text-muted cd-text-sm" style="margin-top:8px;">Bulk upload supported</p>
+            </div>
+            <h3 class="cd-docx-sidebar-title">Documents</h3>
+            <div id="docxFileList" class="cd-docx-file-list"></div>
+            <div id="docxConvertProgress" class="cd-hidden cd-docx-progress">
+              <span id="docxProgressText">Converting...</span>
+              <div class="cd-progress-bar"><div id="docxProgressBar" class="cd-progress-fill"></div></div>
+            </div>
+          </div>
+          <div class="cd-docx-main">
+            <div class="cd-docx-toolbar">
+              <button type="button" class="cd-btn cd-btn-primary cd-btn-sm" id="docxDownloadCurrent"><i class="fa fa-download"></i> Download current</button>
+              <button type="button" class="cd-btn cd-btn-ghost cd-btn-sm" id="docxDownloadAll"><i class="fa fa-file-archive-o"></i> Download all (ZIP)</button>
+              <button type="button" class="cd-btn cd-btn-ghost cd-btn-sm" id="docxClearAll"><i class="fa fa-trash-o"></i> Clear all</button>
+            </div>
+            <div id="docxEditor" class="cd-docx-editor" contenteditable="true">
+              Select a file from the list to preview and edit...
+            </div>
+          </div>
         </div>
       </div>
 
@@ -443,12 +485,6 @@
     document.getElementById('lsOutputSection').classList.add('cd-hidden');
     document.getElementById('lsLoading').classList.remove('cd-hidden');
     await originalGenerateLesson.apply(this, arguments);
-    // After generation (handled in JS file), ensure loading is hidden and output shown is mostly handled by JS,
-    // but the JS file uses 'w3-hide'. We need to make sure our CSS handles 'w3-hide' or we patch the specific classes.
-    // The safest way without editing JS is ensuring 'w3-hide' works or mapping it.
-    // In our CSS, we can add .w3-hide { display: none !important; } if not present in base, but base probably has it.
-    // However, our new HTML doesn't use w3-hide for the new structure inputs, but the JS adds/removes it.
-    // We should add a small compatibility script or CSS rule.
   }
 
   const originalGenerateActivity = window.generateActivityQuestions;
@@ -458,15 +494,181 @@
     document.getElementById('aqLoading').classList.remove('cd-hidden');
     await originalGenerateActivity.apply(this, arguments);
   }
+
+  // ----- DOCX → HTML Converter (Production) -----
+  (function() {
+    if (typeof mammoth === 'undefined' || typeof JSZip === 'undefined') return;
+    const files = new Map();
+    let currentFile = null;
+
+    const fileInput = document.getElementById('docxFileInput');
+    const dropZone = document.getElementById('docxDropZone');
+    const fileListEl = document.getElementById('docxFileList');
+    const editor = document.getElementById('docxEditor');
+    const progressWrap = document.getElementById('docxConvertProgress');
+    const progressText = document.getElementById('docxProgressText');
+    const progressBar = document.getElementById('docxProgressBar');
+
+    function transformContent(html) {
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      const allHeadings = temp.querySelectorAll('h1, h2, h3');
+      allHeadings.forEach(h => h.classList.add('bannerG'));
+      let objectivesBlock = null;
+      allHeadings.forEach(heading => {
+        if (/objective/i.test(heading.textContent)) {
+          const next = heading.nextElementSibling;
+          if (next && (next.tagName === 'OL' || next.tagName === 'UL')) {
+            objectivesBlock = document.createElement('div');
+            objectivesBlock.innerHTML = '<div class="col-md-12"><div class="row banner-area"><div class="col-md-6 banner-image"><img class="img-fluid" src="https://asladmin.akello.co/public/uploads/content/Maths%20Grade%206/Objectives%20Icon%20/__54.png" style="width:100%;" /></div><div class="col-md-6"><h2 class="bannerG">Objectives</h2><h4>By the end of this lesson, you should be able to:</h4>' + next.outerHTML + '</div></div></div>';
+            heading.remove();
+            next.remove();
+          }
+        }
+      });
+      if (objectivesBlock && temp.querySelector('h1, h2, h3')) {
+        const first = temp.querySelector('h1, h2, h3');
+        if (first) first.insertAdjacentElement('afterend', objectivesBlock);
+      }
+      temp.querySelectorAll('h1, h2, h3').forEach(heading => {
+        if (/^Activity\s*\d*/i.test(heading.textContent.trim())) {
+          const container = document.createElement('div');
+          container.className = 'col-md-12';
+          container.innerHTML = '<h2 class="primary-activity-banner">Activity</h2>';
+          heading.replaceWith(container);
+        }
+      });
+      return temp.innerHTML;
+    }
+
+    async function convertFile(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.convertToHtml({ arrayBuffer });
+      return transformContent(result.value);
+    }
+
+    async function handleFiles(fileList) {
+      const arr = Array.from(fileList).filter(f => f.name && f.name.toLowerCase().endsWith('.docx'));
+      if (arr.length === 0) return;
+      if (progressWrap) {
+        progressWrap.classList.remove('cd-hidden');
+        progressBar.style.width = '0%';
+      }
+      const total = arr.length;
+      let done = 0;
+      for (const file of arr) {
+        if (progressText) progressText.textContent = 'Converting ' + (done + 1) + '/' + total + ': ' + file.name;
+        try {
+          const html = await convertFile(file);
+          files.set(file.name, { file, html });
+        } catch (e) {
+          console.error(file.name, e);
+        }
+        done++;
+        if (progressBar) progressBar.style.width = (100 * done / total) + '%';
+      }
+      if (progressWrap) progressWrap.classList.add('cd-hidden');
+      renderFileList();
+    }
+
+    function renderFileList() {
+      fileListEl.innerHTML = '';
+      files.forEach((value, name) => {
+        const div = document.createElement('div');
+        div.className = 'cd-docx-file-item';
+        div.textContent = name;
+        div.onclick = function() {
+          currentFile = name;
+          editor.innerHTML = value.html;
+          fileListEl.querySelectorAll('.cd-docx-file-item').forEach(i => i.classList.remove('active'));
+          div.classList.add('active');
+        };
+        fileListEl.appendChild(div);
+      });
+    }
+
+    function downloadCurrent() {
+      if (!currentFile) { alert('Select a file first'); return; }
+      const blob = new Blob([editor.innerHTML], { type: 'text/html' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = currentFile.replace(/\.docx$/i, '.html');
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function downloadAll() {
+      if (files.size === 0) { alert('No files to download'); return; }
+      const zip = new JSZip();
+      files.forEach((v, name) => zip.file(name.replace(/\.docx$/i, '.html'), v.html));
+      zip.generateAsync({ type: 'blob' }).then(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'converted-files.zip';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+    }
+
+    function clearAll() {
+      files.clear();
+      currentFile = null;
+      fileListEl.innerHTML = '';
+      editor.innerHTML = 'Select a file from the list to preview and edit...';
+    }
+
+    editor.addEventListener('input', function() {
+      if (currentFile && files.has(currentFile)) files.get(currentFile).html = editor.innerHTML;
+    });
+
+    if (fileInput) fileInput.addEventListener('change', e => handleFiles(e.target.files));
+    if (dropZone) {
+      dropZone.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
+        dropZone.classList.add('cd-docx-drop-active');
+      });
+      dropZone.addEventListener('dragleave', e => {
+        if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('cd-docx-drop-active');
+      });
+      dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('cd-docx-drop-active');
+        if (e.dataTransfer.files && e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+      });
+      dropZone.addEventListener('click', e => { if (e.target === dropZone || dropZone.contains(e.target)) fileInput && fileInput.click(); });
+    }
+    document.getElementById('docxDownloadCurrent').addEventListener('click', downloadCurrent);
+    document.getElementById('docxDownloadAll').addEventListener('click', downloadAll);
+    document.getElementById('docxClearAll').addEventListener('click', clearAll);
+  })();
 </script>
 <style>
-  /* Compatibility for JS toggling */
-  .w3-hide {
-    display: none !important;
-  }
+  .w3-hide { display: none !important; }
+  .w3-show { display: block !important; }
 
-  .w3-show {
-    display: block !important;
-  }
+  /* DOCX Converter */
+  .cd-docx-converter { min-height: 600px; }
+  .cd-docx-layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; height: 600px; border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden; background: var(--bg-card); }
+  .cd-docx-sidebar { background: #fff; border-right: 1px solid var(--border-color); padding: 12px; overflow-y: auto; display: flex; flex-direction: column; }
+  .cd-docx-drop-zone { border: 2px dashed var(--primary-color); border-radius: var(--radius-md); padding: 16px; text-align: center; background: #eff6ff; cursor: pointer; margin-bottom: 12px; transition: background 0.2s; }
+  .cd-docx-drop-zone:hover, .cd-docx-drop-active { background: #dbeafe; }
+  .cd-docx-drop-zone input[type="file"] { position: absolute; width: 0; height: 0; opacity: 0; }
+  .cd-docx-drop-text { margin: 0; color: var(--text-main); font-size: 0.875rem; }
+  .cd-docx-sidebar-title { font-size: 0.875rem; font-weight: 600; margin: 8px 0; }
+  .cd-docx-file-list { flex: 1; overflow-y: auto; }
+  .cd-docx-file-item { padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 4px; font-size: 0.8125rem; }
+  .cd-docx-file-item:hover { background: #f1f5f9; }
+  .cd-docx-file-item.active { background: var(--primary-color); color: #fff; }
+  .cd-docx-progress { margin-top: 8px; font-size: 0.75rem; }
+  .cd-docx-main { display: flex; flex-direction: column; overflow: hidden; }
+  .cd-docx-toolbar { padding: 10px 12px; border-bottom: 1px solid var(--border-color); display: flex; gap: 8px; flex-wrap: wrap; }
+  .cd-docx-editor { flex: 1; padding: 20px; overflow-y: auto; background: #fff; outline: none; font-size: 0.9375rem; line-height: 1.6; }
+  .bannerG { background: var(--primary-color); color: #fff; padding: 8px 12px; border-radius: var(--radius-sm); }
+  .primary-activity-banner { background: var(--accent-color); color: #fff; padding: 8px 12px; border-radius: var(--radius-sm); }
+  .banner-area { display: flex; align-items: center; margin: 16px 0; }
+  .banner-area .banner-image img { max-width: 100%; }
 </style>
 {% endblock %}

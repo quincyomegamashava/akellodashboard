@@ -209,9 +209,9 @@
             </thead>
             <tbody>
                 {% for p in purchases %}
-                <tr>
+                <tr class="{% if p.is_active %}table-success{% endif %}">
                     <td>
-                        <div class="book-title">{{ p.title }}</div>
+                        <div class="book-title">{{ p.title }}{% if p.is_active %} <span class="badge badge-success badge-pill" title="Active">Active</span>{% endif %}</div>
                         <div class="book-meta">{{ p.author }}</div>
                     </td>
                     <td><code class="text-primary">{{ p.isbn or 'N/A' }}</code></td>

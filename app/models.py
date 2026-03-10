@@ -621,6 +621,21 @@ class HelpDeskQuery(db.Model):
 
 
 # ----------------------
+# Email helpdesk Ticket (from IMAP)
+# ----------------------
+class Ticket(db.Model):
+    __tablename__ = 'tickets'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sender_email = db.Column(db.String(255), nullable=False)
+    subject = db.Column(db.String(500), nullable=True)
+    message = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), nullable=False, default='open')  # 'open' or 'closed'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    message_id = db.Column(db.String(500), unique=True, nullable=True, index=True)  # for deduplication
+
+
+# ----------------------
 # Notification Model
 # ----------------------
 class Notification(db.Model):

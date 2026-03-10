@@ -42,3 +42,7 @@ app.register_blueprint(database_bp)
 
 from app.blueprints.content_dev import bp as content_dev_bp
 app.register_blueprint(content_dev_bp)
+
+# Start helpdesk email fetch scheduler (every 60s)
+from app.scheduler import start_scheduler
+start_scheduler(app)

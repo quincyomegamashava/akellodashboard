@@ -1,5 +1,15 @@
 import os
+from pathlib import Path
+
 basedir = os.path.abspath(os.path.dirname(__file__))
+
+# Load .env so HELP_DESK_* / HELPDESK_* are available when Config is evaluated
+try:
+    from dotenv import load_dotenv
+    env_path = Path(basedir) / '.env'
+    load_dotenv(dotenv_path=env_path)
+except ImportError:
+    pass
 
 
 class Config:
@@ -18,6 +28,13 @@ class Config:
 
     # Token salt for password reset
     SECURITY_PASSWORD_SALT = os.environ.get('SECURITY_PASSWORD_SALT', 'change-this-salt')
+
+    # Helpdesk email tickets: IMAP (Outlook)
+    # Set HELPDESK_EMAIL or HELP_DESK_EMAIL to your Outlook address; HELPDESK_APP_PASSWORD or HELP_DESK_EMAIL_APP_PASSWORD to the app password.
+    HELPDESK_IMAP_SERVER = os.environ.get('HELPDESK_IMAP_SERVER') or os.environ.get('HELP_DESK_IMAP_SERVER') or 'outlook.office365.com'
+    HELPDESK_IMAP_PORT = int(os.environ.get('HELPDESK_IMAP_PORT') or os.environ.get('HELP_DESK_IMAP_PORT') or '993')
+    HELPDESK_EMAIL = os.environ.get('HELPDESK_EMAIL') or os.environ.get('HELP_DESK_EMAIL')
+    HELPDESK_APP_PASSWORD = os.environ.get('HELPDESK_APP_PASSWORD') or os.environ.get('HELP_DESK_EMAIL_APP_PASSWORD')
 
     # Cache configuration
     CACHE_TYPE = os.environ.get('CACHE_TYPE', 'SimpleCache')  # or 'redis' for production

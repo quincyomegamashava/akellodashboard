@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title or 'Email tickets' }}{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+  <h1 class="text-2xl font-bold text-slate-800">Helpdesk – Email tickets</h1>
+  <a href="{{ url_for('check_email') }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+    <i class="fas fa-envelope-open-text"></i> Check email now
+  </a>
+</div>
+
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+  <table class="min-w-full divide-y divide-slate-200 modern-table">
+    <thead>
+      <tr>
+        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Id</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Sender</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Subject</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Status</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ticket in tickets %}
+      <tr class="hover:bg-slate-50">
+        <td class="px-4 py-3 text-sm text-slate-600">{{ ticket.id }}</td>
+        <td class="px-4 py-3 text-sm text-slate-700">{{ ticket.sender_email }}</td>
+        <td class="px-4 py-3 text-sm">
+          <a href="{{ url_for('ticket_detail', id=ticket.id) }}" class="text-indigo-600 hover:underline font-medium">
+            {{ ticket.subject[:60] }}{% if ticket.subject|length > 60 %}...{% endif %}
+          </a>
+        </td>
+        <td class="px-4 py-3">
+          <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-emerald-100 text-emerald-700' if ticket.status == 'closed' else 'bg-amber-100 text-amber-700' }}">
+            {{ ticket.status }}
+          </span>
+        </td>
+        <td class="px-4 py-3 text-sm text-slate-500">
+          {{ ticket.created_at.strftime('%Y-%m-%d %H:%M') if ticket.created_at else '-' }}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="px-4 py-8 text-center text-slate-500">No tickets yet. Use "Check email now" to fetch from Outlook.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

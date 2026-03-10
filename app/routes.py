@@ -15,7 +15,7 @@ from docx import Document
 import re
 from app import app, db
 from app.forms import EventForm, LoginForm, PerfomanceTargetsForm, RegistrationForm, BookAllocationForm, ReportForm, WorkspaceForm, ProjectForm, TaskForm, CSVUploadForm, ChampionCSVUploadForm, ChampionSchoolForm, AkelloSimEventForm
-from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, Event, WeeklyReport, TaskA, ColumnA, ProjectA, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification
+from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, Event, WeeklyReport, TaskA, ColumnA, ProjectA, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket
 from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from collections import defaultdict
@@ -9475,6 +9475,142 @@ def api_institution_analytics():
         return jsonify({"error": str(e)}), 500
 
 
+# ===== Quotation: resolve publisher_id to publisher name (from publishers table) =====
+
+@app.route('/api/quotation/publisher-names', methods=['GET'])
+@login_required
+def quotation_publisher_names():
+    """Resolve publisher IDs to names from the publishers table (for quotation uploads)."""
+    ids_param = request.args.get('ids', '')
+    if not ids_param:
+        return jsonify({}), 200
+    try:
+        ids = [x.strip() for x in ids_param.split(',') if x.strip()]
+        if not ids:
+            return jsonify({}), 200
+        conn = get_direct_library_conn()
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            placeholders = ','.join(['%s'] * len(ids))
+            cursor.execute(
+                "SELECT id, name FROM publishers WHERE id IN ({})".format(placeholders),
+                ids
+            )
+            rows = cursor.fetchall()
+        result = {}
+        for r in rows:
+            key = r['id']
+            result[str(key)] = (r['name'] or '').strip()
+        return jsonify(result), 200
+    except Exception as e:
+        app.logger.error(f"Error resolving publisher names for quotation: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/quotation/lookup-books', methods=['POST'])
+@login_required
+def quotation_lookup_books():
+    """Look up books and prices from the library DB for quotation. Expects JSON: { items: [ { title?, book_id?, publisher_id? }, ... ] }."""
+    try:
+        data = request.get_json() or {}
+        items = data.get('items') or []
+        if not items:
+            return jsonify({"error": "No items provided", "rows": []}), 400
+        conn = get_direct_library_conn()
+        rows = []
+        not_found_count = 0
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            for item in items:
+                book_id = item.get('book_id') or item.get('id')
+                title = (item.get('title') or '').strip() if isinstance(item.get('title'), str) else ''
+                publisher_id = item.get('publisher_id')
+                if publisher_id is not None and publisher_id != '':
+                    try:
+                        publisher_id = int(publisher_id)
+                    except (TypeError, ValueError):
+                        publisher_id = None
+                row_from_file = {
+                    'name': (item.get('name') or '').strip() if isinstance(item.get('name'), str) else '',
+                    'title': title or (item.get('title') or ''),
+                }
+                if book_id is not None and book_id != '':
+                    try:
+                        bid = int(book_id)
+                    except (TypeError, ValueError):
+                        bid = None
+                    if bid is not None:
+                        cursor.execute(
+                            "SELECT b.id, b.title, b.price, p.name AS publisher_name FROM books b "
+                            "LEFT JOIN publishers p ON b.publisher_id = p.id WHERE b.id = %s LIMIT 1",
+                            (bid,)
+                        )
+                        r = cursor.fetchone()
+                        if r:
+                            rows.append({
+                                'name': (r.get('publisher_name') or '').strip(),
+                                'title': (r.get('title') or '').strip(),
+                                'price': float(r.get('price') or 0),
+                                'currency_code': 'USD',
+                                'zwl_price': 0,
+                                'amount': float(r.get('price') or 0),
+                                'zwl_amount': 0,
+                                'not_found': False,
+                            })
+                            continue
+                if title:
+                    if publisher_id is not None:
+                        cursor.execute(
+                            "SELECT b.id, b.title, b.price, p.name AS publisher_name FROM books b "
+                            "LEFT JOIN publishers p ON b.publisher_id = p.id "
+                            "WHERE TRIM(b.title) = %s AND b.publisher_id = %s LIMIT 1",
+                            (title, publisher_id)
+                        )
+                    else:
+                        cursor.execute(
+                            "SELECT b.id, b.title, b.price, p.name AS publisher_name FROM books b "
+                            "LEFT JOIN publishers p ON b.publisher_id = p.id "
+                            "WHERE TRIM(b.title) = %s LIMIT 1",
+                            (title,)
+                        )
+                    r = cursor.fetchone()
+                    if r:
+                        rows.append({
+                            'name': (r.get('publisher_name') or '').strip(),
+                            'title': (r.get('title') or '').strip(),
+                            'price': float(r.get('price') or 0),
+                            'currency_code': 'USD',
+                            'zwl_price': 0,
+                            'amount': float(r.get('price') or 0),
+                            'zwl_amount': 0,
+                            'not_found': False,
+                        })
+                        continue
+                not_found_count += 1
+                rows.append({
+                    'name': row_from_file.get('name') or '—',
+                    'title': row_from_file.get('title') or '—',
+                    'price': 0,
+                    'currency_code': 'USD',
+                    'zwl_price': 0,
+                    'amount': 0,
+                    'zwl_amount': 0,
+                    'not_found': True,
+                })
+        total_price = sum(r['price'] for r in rows)
+        total_zwl = sum(r.get('zwl_price', 0) for r in rows)
+        return jsonify({
+            'rows': rows,
+            'totalPrice': total_price,
+            'totalZwl': total_zwl,
+            'hasZwl': total_zwl != 0,
+            'notFoundCount': not_found_count,
+        }), 200
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        app.logger.error(f"Error in quotation lookup-books: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ===== Book Allocation Request API Endpoints =====
 
 @app.route('/api/book-genres', methods=['GET'])
@@ -9486,8 +9622,10 @@ def get_book_genres():
         
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
             query = """
-                SELECT b.title, g.name 
+                SELECT b.title, g.name AS genre_name, COALESCE(b.is_active, 1) AS is_active,
+                       p.name AS publisher_name
                 FROM books b
+                LEFT JOIN publishers p ON b.publisher_id = p.id
                 JOIN book_genre bg ON b.id = bg.book_id
                 JOIN genres g ON bg.genre_id = g.id
                 WHERE g.name IN ('HBC PlusOne Primary Teacher`s Guides', 'HBC PlusOne Primary')
@@ -9530,8 +9668,11 @@ def book_subscriptions():
                     b.title, 
                     b.author,
                     b.isbn,
+                    COALESCE(b.is_active, 1) AS is_active,
+                    p.name AS publisher_name,
                     COUNT(bu.book_id) as subscription_count
                 FROM books b
+                LEFT JOIN publishers p ON b.publisher_id = p.id
                 JOIN book_user bu ON b.id = bu.book_id
                 LEFT JOIN book_genre bg ON b.id = bg.book_id
                 WHERE 1=1
@@ -9552,7 +9693,7 @@ def book_subscriptions():
                 params.append(f"{end_date} 23:59:59")
                 
             query += """
-                GROUP BY b.id, b.title, b.author, b.isbn
+                GROUP BY b.id, b.title, b.author, b.isbn, b.is_active
                 ORDER BY subscription_count DESC
             """
             
@@ -9613,6 +9754,7 @@ def book_purchases():
                     b.title, 
                     b.author,
                     b.isbn,
+                    COALESCE(b.is_active, 1) AS is_active,
                     SUM(bo.quantity) as purchase_count,
                     SUM(bo.quantity * b.price) as total_revenue
                 FROM books b
@@ -9635,7 +9777,7 @@ def book_purchases():
                 params.append(f"{end_date} 23:59:59")
                 
             query += """
-                GROUP BY b.id, b.title, b.author, b.isbn
+                GROUP BY b.id, b.title, b.author, b.isbn, b.is_active
                 ORDER BY purchase_count DESC
             """
             cursor.execute(query, params)
@@ -9714,6 +9856,7 @@ def library_comparative_analytics():
             query = """
                 SELECT 
                     b.id, b.title, b.author,
+                    COALESCE(b.is_active, 1) AS is_active,
                     sub_q.sub_count,
                     pur_q.pur_count,
                     COALESCE(pur_q.pur_count, 0) / NULLIF(COALESCE(sub_q.sub_count, 0), 0) as conversion_ratio
@@ -15076,6 +15219,50 @@ def helpdesk():
     return render_template('help_desk.html', title='Help desk')
 
 
+# ---------- Email helpdesk tickets (IMAP) ----------
+@app.route('/dashboard')
+@login_required
+def email_tickets_dashboard():
+    """Show all email-derived tickets in a table."""
+    tickets = Ticket.query.order_by(Ticket.created_at.desc()).all()
+    return render_template('dashboard.html', title='Email tickets', tickets=tickets)
+
+
+@app.route('/ticket/<int:id>')
+@login_required
+def ticket_detail(id):
+    """View a single ticket by id."""
+    ticket = Ticket.query.get_or_404(id)
+    return render_template('ticket.html', title=f'Ticket #{ticket.id}', ticket=ticket)
+
+
+@app.route('/check-email', methods=['GET', 'POST'])
+@login_required
+def check_email():
+    """Manually trigger email fetch and create tickets."""
+    from app.email_fetcher import fetch_emails_and_create_tickets
+    count, err = fetch_emails_and_create_tickets(app)
+    if err:
+        flash(f'Email check failed: {err}', 'warning')
+    else:
+        flash(f'Fetched {count} new ticket(s) from email.', 'success')
+    return redirect(url_for('email_tickets_dashboard'))
+
+
+@app.route('/api/tickets')
+@login_required
+def api_tickets():
+    """Return all tickets as JSON."""
+    tickets = Ticket.query.order_by(Ticket.created_at.desc()).all()
+    return jsonify([{
+        'id': t.id,
+        'sender_email': t.sender_email,
+        'subject': t.subject,
+        'message': t.message,
+        'status': t.status,
+        'created_at': t.created_at.isoformat() if t.created_at else None,
+    } for t in tickets])
+
 
 @app.route('/logout')
 def logout():
@@ -18269,6 +18456,7 @@ def search_library_users():
                         books_query = """
                             SELECT 
                                 b.id, b.author, b.title, b.price,
+                                COALESCE(b.is_active, 1) AS is_active,
                                 bo.quantity, bo.total_cost,
                                 o.id as order_id, o.status, o.payment_method, o.total_amount, 
                                 o.created_at as order_created_at, o.updated_at as order_updated_at, o.phone

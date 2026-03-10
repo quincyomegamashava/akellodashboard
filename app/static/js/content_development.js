@@ -183,18 +183,30 @@ function loadWorkspaceLessonsForSelect(ws) {
 
 // Tab switching
 function openTab(tabName) {
-    const tabs = ['lessonTab', 'activityTab', 'contentTab'];
+    const tabs = ['lessonTab', 'activityTab', 'contentTab', 'docxConverterTab'];
     tabs.forEach(tab => {
         const el = document.getElementById(tab);
         const btn = document.getElementById(tab + 'Btn');
         if (tab === tabName) {
-            el.classList.remove('cd-hidden');
+            if (el) el.classList.remove('cd-hidden');
             if (btn) btn.classList.add('active');
         } else {
-            el.classList.add('cd-hidden');
+            if (el) el.classList.add('cd-hidden');
             if (btn) btn.classList.remove('active');
         }
     });
+    // Right column: show DOCX converter section only when DOCX tab is active
+    const docxSection = document.getElementById('docxConverterSection');
+    if (docxSection) {
+        if (tabName === 'docxConverterTab') {
+            docxSection.classList.remove('cd-hidden');
+            document.getElementById('welcomeState').classList.add('cd-hidden');
+            document.getElementById('lsOutputSection').classList.add('cd-hidden');
+            document.getElementById('aqOutputSection').classList.add('cd-hidden');
+        } else {
+            docxSection.classList.add('cd-hidden');
+        }
+    }
 }
 
 // File list

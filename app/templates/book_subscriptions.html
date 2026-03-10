@@ -201,9 +201,9 @@
             </thead>
             <tbody>
                 {% for sub in subscriptions %}
-                <tr>
+                <tr class="{% if sub.is_active %}table-success{% endif %}">
                     <td>
-                        <div class="book-title">{{ sub.title }}</div>
+                        <div class="book-title">{{ sub.title }}{% if sub.is_active %} <span class="badge badge-success badge-pill" title="Active">Active</span>{% endif %}</div>
                         <div class="book-meta">{{ sub.author }}</div>
                     </td>
                     <td><code class="text-primary">{{ sub.isbn or 'N/A' }}</code></td>

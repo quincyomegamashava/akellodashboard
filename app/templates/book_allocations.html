@@ -21,6 +21,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+  <script>window.AKELLO_QUOTATION_LOGO_URL = "{{ url_for('static', filename='smartlearning.webp') }}";</script>
 
 
   <style>
@@ -332,6 +333,10 @@
         <i class="fa fa-tags"></i>
         View Book Genres
       </a>
+      <a href="#" class="btn-chip" onclick="document.getElementById('quotationModal').style.display='block'; resetQuotationModal();">
+        <i class="fa fa-file-text-o"></i>
+        Create Quotation
+      </a>
       <a href="{{ url_for('book_subscriptions') }}" class="btn-chip">
         <i class="fa fa-book-reader"></i>
         Book Subscriptions
@@ -489,9 +494,12 @@
 
         if (data.data && data.data.length > 0) {
           data.data.forEach(row => {
+            const isActive = row.is_active === true || row.is_active === 1;
+            const rowClass = isActive ? ' w3-light-green' : '';
+            const activeBadge = isActive ? ' <span class="w3-tag w3-tiny w3-green" title="Active">Active</span>' : '';
             tbody.innerHTML += `
-              <tr>
-                <td>${row.title || '-'}</td>
+              <tr class="${rowClass}">
+                <td>${(row.title || '-') + activeBadge}</td>
                 <td>${row.name || '-'}</td>
               </tr>
             `;
@@ -792,8 +800,78 @@
   </div>
 </div>
 
-
-
+<!-- Create Quotation Modal -->
+<div id="quotationModal" class="w3-modal" style="z-index:3000;">
+  <div class="w3-modal-content w3-animate-top w3-card-4" style="width: 92vw; max-width: 1000px;">
+    <header class="w3-container w3-padding" style="background:#e6f0ff; color:#00407d; border-bottom:1px solid #d8e7ff;">
+      <span onclick="document.getElementById('quotationModal').style.display='none'"
+        class="w3-button w3-display-topright">&times;</span>
+      <h6 class="w3-margin-0">Create Quotation</h6>
+    </header>
+    <div class="w3-container w3-padding" style="max-height:78vh; overflow:auto;">
+      <p class="w3-small w3-text-gray">Upload an Excel or CSV listing <b>books</b>: <b>title</b> (book title) is required. Optional: <b>book_id</b> or <b>id</b> for exact match, <b>publisher_id</b> to disambiguate. Prices are loaded from the library database for each book.</p>
+      <div class="w3-row-padding" style="margin-bottom:12px;">
+        <div class="w3-half" style="padding:4px;">
+          <label class="w3-text-gray w3-small"><b>File (CSV / Excel)</b></label>
+          <input type="file" id="quotationFileInput" accept=".csv,.xlsx,.xls" class="w3-input w3-border" onchange="parseQuotationFile(this)">
+        </div>
+        <div class="w3-half" style="padding:4px;">
+          <label class="w3-text-gray w3-small"><b>Customer name (optional)</b></label>
+          <input type="text" id="quotationCustomerName" class="w3-input w3-border" placeholder="Customer name">
+        </div>
+      </div>
+      <div class="w3-row-padding" style="margin-bottom:12px;">
+        <div class="w3-half" style="padding:4px;">
+          <label class="w3-text-gray w3-small"><b>Quotation reference (optional)</b></label>
+          <input type="text" id="quotationRef" class="w3-input w3-border" placeholder="e.g. QT-2025-001">
+        </div>
+        <div class="w3-half" style="padding:4px;">
+          <label class="w3-text-gray w3-small"><b>Valid until (optional)</b></label>
+          <input type="date" id="quotationValidUntil" class="w3-input w3-border">
+        </div>
+      </div>
+      <div id="quotationError" class="w3-panel w3-red w3-small" style="display:none; margin-top:8px;"></div>
+      <div id="quotationNotFoundWarning" class="w3-panel w3-amber w3-small" style="display:none; margin-top:8px;"></div>
+      <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button id="quotationExportExcelBtn" onclick="exportQuotationToExcel()" class="w3-button w3-green w3-small w3-round" disabled>
+          <i class="fa fa-file-excel-o"></i> Export to Excel
+        </button>
+        <button id="quotationExportPdfBtn" onclick="exportQuotationToPDF()" class="w3-button w3-red w3-small w3-round" disabled>
+          <i class="fa fa-file-pdf-o"></i> Export to PDF
+        </button>
+      </div>
+      <div style="overflow:auto; max-height:42vh; border:1px solid #e0e0e0; border-radius:6px;">
+        <table class="w3-table-all w3-small w3-striped w3-hoverable" id="quotationPreviewTable" style="margin:0;">
+          <thead>
+            <tr>
+              <th>Publisher</th>
+              <th>Book title</th>
+              <th id="quotationThCurrency">Currency</th>
+              <th class="text-right">Unit price</th>
+              <th id="quotationThZwl" class="text-right" style="display:none;">Price (ZWL)</th>
+              <th class="text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody id="quotationPreviewBody">
+            <tr>
+              <td colspan="6" class="w3-center w3-text-gray">Upload a file to preview</td>
+            </tr>
+          </tbody>
+          <tfoot id="quotationPreviewFoot" style="display:none;">
+            <tr style="background:#00407d; color:#fff; font-weight:700;">
+              <td colspan="4" class="text-right">Total</td>
+              <td id="quotationTotalZwlCell" class="text-right" style="display:none;"></td>
+              <td id="quotationTotalCell" class="text-right"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    <footer class="w3-container w3-padding w3-light-grey">
+      <button class="w3-button w3-teal w3-small" onclick="document.getElementById('quotationModal').style.display='none'">Close</button>
+    </footer>
+  </div>
+</div>
 
 <!-- visuals modal -->
 <div id="provincevisuals" class="w3-modal w3-white w3-card w3-border">
@@ -2012,6 +2090,287 @@
         }
       }
     }
+  }
+
+  // ----- Create Quotation (upload CSV/Excel, preview, export Excel/PDF) -----
+  let quotationData = { rows: [], hasZwl: false, totalPrice: 0, totalZwl: 0, invalidPriceCount: 0 };
+
+  function resetQuotationModal() {
+    document.getElementById('quotationFileInput').value = '';
+    document.getElementById('quotationCustomerName').value = '';
+    document.getElementById('quotationRef').value = '';
+    document.getElementById('quotationValidUntil').value = '';
+    document.getElementById('quotationError').style.display = 'none';
+    document.getElementById('quotationNotFoundWarning').style.display = 'none';
+    document.getElementById('quotationExportExcelBtn').disabled = true;
+    document.getElementById('quotationExportPdfBtn').disabled = true;
+    document.getElementById('quotationThZwl').style.display = 'none';
+    document.getElementById('quotationTotalZwlCell').style.display = 'none';
+    const tbody = document.getElementById('quotationPreviewBody');
+    tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">Upload a file to preview</td></tr>';
+    document.getElementById('quotationPreviewFoot').style.display = 'none';
+    quotationData = { rows: [], hasZwl: false, totalPrice: 0, totalZwl: 0, invalidPriceCount: 0 };
+  }
+
+  function parseQuotationFile(input) {
+    const file = input && input.files && input.files[0];
+    const errEl = document.getElementById('quotationError');
+    const warnEl = document.getElementById('quotationNotFoundWarning');
+    errEl.style.display = 'none';
+    warnEl.style.display = 'none';
+    document.getElementById('quotationExportExcelBtn').disabled = true;
+    document.getElementById('quotationExportPdfBtn').disabled = true;
+    document.getElementById('quotationPreviewFoot').style.display = 'none';
+    const tbody = document.getElementById('quotationPreviewBody');
+
+    if (!file) {
+      tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">Upload a file to preview</td></tr>';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array', cellNF: false });
+        const firstSheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[firstSheetName];
+        const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true });
+        if (!rawRows || rawRows.length === 0) {
+          errEl.textContent = 'File must have a header row and at least one data row.';
+          errEl.style.display = 'block';
+          tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">No valid rows</td></tr>';
+          return;
+        }
+        function normHeader(h) {
+          return String(h || '').replace(/^\uFEFF/, '').trim().toLowerCase().replace(/\s+/g, '_').replace(/^#_?/, '');
+        }
+        function getByNormKey(row, normKey) {
+          if (!row || typeof row !== 'object') return undefined;
+          for (var k in row) if (Object.prototype.hasOwnProperty.call(row, k) && normHeader(k) === normKey) return row[k];
+          return undefined;
+        }
+        var firstRow = rawRows[0];
+        var headerNames = [];
+        for (var h in firstRow) if (Object.prototype.hasOwnProperty.call(firstRow, h)) headerNames.push(normHeader(h));
+        var hasTitle = headerNames.indexOf('title') !== -1;
+        var hasBookId = headerNames.indexOf('book_id') !== -1 || headerNames.indexOf('id') !== -1;
+        var hasPublisherId = headerNames.indexOf('publisher_id') !== -1;
+        var hasName = headerNames.indexOf('name') !== -1;
+        if (!hasTitle) {
+          errEl.textContent = 'Missing required column: title (book title). Detected: ' + headerNames.join(', ') + '.';
+          errEl.style.display = 'block';
+          tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">Invalid columns</td></tr>';
+          return;
+        }
+        var items = [];
+        for (var i = 0; i < rawRows.length; i++) {
+          var row = rawRows[i];
+          var title = String(getByNormKey(row, 'title') != null ? getByNormKey(row, 'title') : '').trim();
+          if (!title) continue;
+          var bookId = getByNormKey(row, 'book_id');
+          if (bookId === undefined || bookId === null || bookId === '') bookId = getByNormKey(row, 'id');
+          var pubId = getByNormKey(row, 'publisher_id');
+          var name = hasName ? String(getByNormKey(row, 'name') != null ? getByNormKey(row, 'name') : '').trim() : '';
+          items.push({
+            title: title,
+            book_id: bookId !== undefined && bookId !== null && bookId !== '' ? bookId : undefined,
+            publisher_id: hasPublisherId && pubId !== undefined && pubId !== null && pubId !== '' ? pubId : undefined,
+            name: name || undefined
+          });
+        }
+        if (items.length === 0) {
+          errEl.textContent = 'No valid rows with a book title found.';
+          errEl.style.display = 'block';
+          tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-gray">No valid rows</td></tr>';
+          return;
+        }
+        tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-padding"><i class="fa fa-spinner fa-spin"></i> Looking up books and prices…</td></tr>';
+        fetch('/api/quotation/lookup-books', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: items })
+        })
+          .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+          .then(function (result) {
+            if (!result.ok) {
+              errEl.textContent = result.data.error || 'Lookup failed';
+              errEl.style.display = 'block';
+              tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-red">Error</td></tr>';
+              return;
+            }
+            var rows = result.data.rows || [];
+            var totalPrice = result.data.totalPrice != null ? result.data.totalPrice : 0;
+            var totalZwl = result.data.totalZwl != null ? result.data.totalZwl : 0;
+            var hasZwl = result.data.hasZwl === true;
+            var notFoundCount = result.data.notFoundCount != null ? result.data.notFoundCount : 0;
+            if (notFoundCount > 0) {
+              warnEl.textContent = 'Some books were not found in the library; they appear with price 0.';
+              warnEl.style.display = 'block';
+            }
+            quotationData = { rows: rows, hasZwl: hasZwl, totalPrice: totalPrice, totalZwl: totalZwl, invalidPriceCount: 0 };
+            document.getElementById('quotationThZwl').style.display = hasZwl ? '' : 'none';
+            document.getElementById('quotationTotalZwlCell').style.display = hasZwl ? '' : 'none';
+            tbody.innerHTML = rows.map(function (r) {
+              var zwlTd = hasZwl ? '<td class="text-right">' + Number(r.zwl_price || 0).toLocaleString() + '</td>' : '';
+              var notFoundMark = r.not_found ? ' <span class="w3-tag w3-tiny w3-orange" title="Not found in library">Not found</span>' : '';
+              return '<tr><td>' + (r.name || '-') + '</td><td>' + (r.title || '-') + notFoundMark + '</td><td>' + (r.currency_code || 'USD') + '</td><td class="text-right">' + Number(r.price || 0).toLocaleString() + '</td>' + zwlTd + '<td class="text-right">' + Number(r.amount != null ? r.amount : r.price || 0).toLocaleString() + '</td></tr>';
+            }).join('');
+            document.getElementById('quotationTotalCell').textContent = totalPrice.toLocaleString();
+            if (hasZwl) document.getElementById('quotationTotalZwlCell').textContent = totalZwl.toLocaleString();
+            document.getElementById('quotationPreviewFoot').style.display = 'block';
+            document.getElementById('quotationExportExcelBtn').disabled = false;
+            document.getElementById('quotationExportPdfBtn').disabled = false;
+          })
+          .catch(function (err) {
+            errEl.textContent = 'Could not look up books: ' + (err.message || 'Request failed');
+            errEl.style.display = 'block';
+            tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-red">Error</td></tr>';
+          });
+      } catch (err) {
+        errEl.textContent = 'Could not read file: ' + (err.message || 'Invalid file');
+        errEl.style.display = 'block';
+        tbody.innerHTML = '<tr><td colspan="6" class="w3-center w3-text-red">Error parsing file</td></tr>';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function exportQuotationToExcel() {
+    if (!quotationData.rows || quotationData.rows.length === 0) { alert('No data to export.'); return; }
+    const wb = XLSX.utils.book_new();
+    const hasZwl = quotationData.hasZwl;
+    const headerRow = ['Publisher', 'Book title', 'Currency', 'Unit price'];
+    if (hasZwl) headerRow.push('Price (ZWL)');
+    headerRow.push('Amount');
+    const aoa = [
+      ['Akello'],
+      ['Quotation'],
+      []
+    ];
+    const customer = document.getElementById('quotationCustomerName').value.trim();
+    const ref = document.getElementById('quotationRef').value.trim();
+    const validUntil = document.getElementById('quotationValidUntil').value;
+    if (customer) aoa[2].push('Customer: ' + customer);
+    if (ref) aoa[2].push('Reference: ' + ref);
+    if (validUntil) aoa[2].push('Valid until: ' + validUntil);
+    aoa.push([]);
+    aoa.push(headerRow);
+    quotationData.rows.forEach(function (r) {
+      const row = [r.name || '', r.title || '', r.currency_code || 'USD', r.price != null ? r.price : 0];
+      if (hasZwl) row.push(r.zwl_price != null ? r.zwl_price : 0);
+      row.push(r.amount != null ? r.amount : 0);
+      aoa.push(row);
+    });
+    const totalRow = ['', '', '', 'Total'];
+    if (hasZwl) totalRow.push(quotationData.totalZwl);
+    totalRow.push(quotationData.totalPrice);
+    aoa.push(totalRow);
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 22 }, { wch: 45 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 12 }].slice(0, hasZwl ? 6 : 5);
+    XLSX.utils.book_append_sheet(wb, ws, 'Quotation');
+    const filename = 'Quotation_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+    XLSX.writeFile(wb, filename);
+  }
+
+  function exportQuotationToPDF() {
+    if (!quotationData.rows || quotationData.rows.length === 0) { alert('No data to export.'); return; }
+    if (typeof window.jspdf === 'undefined') { alert('PDF library not loaded.'); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('portrait', 'pt', 'a4');
+    const pageW = doc.internal.pageSize.getWidth();
+    const logoUrl = window.AKELLO_QUOTATION_LOGO_URL || '';
+    let yPos = 20;
+    function doContent() {
+      addQuotationContent(doc, yPos, pageW);
+    }
+    if (logoUrl) {
+      fetch(logoUrl).then(function (res) { return res.blob(); }).then(function (blob) {
+        return new Promise(function (resolve, reject) {
+          const reader = new FileReader();
+          reader.onloadend = function () { resolve(reader.result); };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }).then(function (dataUrl) {
+        const fmt = (dataUrl.indexOf('image/png') !== -1) ? 'PNG' : (dataUrl.indexOf('image/jpeg') !== -1 || dataUrl.indexOf('image/jpg') !== -1) ? 'JPEG' : 'PNG';
+        try {
+          doc.addImage(dataUrl, fmt, 20, 10, 36, 36);
+          yPos = 52;
+        } catch (imgErr) {
+          doc.setFontSize(18);
+          doc.text('Akello', 20, 22);
+          yPos = 32;
+        }
+        doContent();
+      }).catch(function () {
+        doc.setFontSize(18);
+        doc.text('Akello', 20, 22);
+        yPos = 32;
+        doContent();
+      });
+    } else {
+      doc.setFontSize(18);
+      doc.text('Akello', 20, 22);
+      yPos = 32;
+      doContent();
+    }
+  }
+
+  function addQuotationContent(doc, startY, pageW) {
+    const customer = document.getElementById('quotationCustomerName').value.trim();
+    const ref = document.getElementById('quotationRef').value.trim();
+    const validUntil = document.getElementById('quotationValidUntil').value;
+    doc.setFontSize(16);
+    doc.setTextColor(0, 64, 125);
+    doc.text('Quotation', 20, startY);
+    startY += 14;
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    if (customer) { doc.text('Customer: ' + customer, 20, startY); startY += 12; }
+    if (ref) { doc.text('Reference: ' + ref, 20, startY); startY += 12; }
+    if (validUntil) { doc.text('Valid until: ' + validUntil, 20, startY); startY += 12; }
+    startY += 8;
+    const hasZwl = quotationData.hasZwl;
+    const headers = [['Publisher', 'Book title', 'Currency', 'Unit price']];
+    if (hasZwl) headers[0].push('Price (ZWL)');
+    headers[0].push('Amount');
+    const body = quotationData.rows.map(function (r) {
+      const row = [r.name || '-', r.title || '-', r.currency_code || 'USD', Number(r.price || 0).toFixed(2)];
+      if (hasZwl) row.push(Number(r.zwl_price || 0).toFixed(2));
+      row.push(Number(r.amount || 0).toFixed(2));
+      return row;
+    });
+    doc.autoTable({
+      head: headers,
+      body: body,
+      startY: startY,
+      theme: 'grid',
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [0, 64, 125], textColor: 255, fontStyle: 'bold' },
+      margin: { left: 20, right: 20 },
+      tableWidth: pageW - 40
+    });
+    const finalY = doc.lastAutoTable.finalY || startY;
+    const totalRow = ['', '', 'Total', ''];
+    if (hasZwl) totalRow.push(quotationData.totalZwl.toFixed(2));
+    totalRow.push(quotationData.totalPrice.toFixed(2));
+    doc.autoTable({
+      body: [totalRow],
+      startY: finalY + 4,
+      theme: 'grid',
+      styles: { fontSize: 10, fontStyle: 'bold' },
+      fillColor: [0, 64, 125],
+      textColor: 255,
+      margin: { left: 20, right: 20 },
+      tableWidth: pageW - 40,
+      columnStyles: (function () {
+        const colStyles = { 0: { cellWidth: 35 }, 1: { cellWidth: 70 }, 2: { cellWidth: 22 }, 3: { cellWidth: 28 } };
+        if (hasZwl) { colStyles[4] = { cellWidth: 32 }; colStyles[5] = { cellWidth: 28 }; } else { colStyles[4] = { cellWidth: 28 }; }
+        return colStyles;
+      })()
+    });
+    doc.save('Quotation_' + new Date().toISOString().slice(0, 10) + '.pdf');
   }
 </script>
 
