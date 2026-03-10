@@ -9506,10 +9506,29 @@ def quotation_publisher_names():
         return jsonify({"error": str(e)}), 500
 
 
+def _quotation_price_from_db(val):
+    """Return price as-is from DB (varchar or number). No conversion; string preserved for exact display."""
+    if val is None or val == '':
+        return '0', 0.0
+    if isinstance(val, str):
+        s = val.strip().replace(',', '.')
+        try:
+            n = float(s)
+            return s, n
+        except ValueError:
+            return '0', 0.0
+    try:
+        n = float(val)
+        return str(n), n
+    except (TypeError, ValueError):
+        return '0', 0.0
+
+
 @app.route('/api/quotation/lookup-books', methods=['POST'])
 @login_required
 def quotation_lookup_books():
-    """Look up books and prices from the library DB for quotation. Expects JSON: { items: [ { title?, book_id?, publisher_id? }, ... ] }."""
+    """Look up books and prices from the library DB for quotation. Expects JSON: { items: [ { title?, book_id?, publisher_id? }, ... ] }.
+    Price column is VARCHAR; returned as string so 0.90 stays 0.90 (no conversion)."""
     try:
         data = request.get_json() or {}
         items = data.get('items') or []
@@ -9540,18 +9559,19 @@ def quotation_lookup_books():
                     if bid is not None:
                         cursor.execute(
                             "SELECT b.id, b.title, b.price, p.name AS publisher_name FROM books b "
-                            "LEFT JOIN publishers p ON b.publisher_id = p.id WHERE b.id = %s LIMIT 1",
+                            "LEFT JOIN publishers p ON b.publisher_id = p.id WHERE b.id = %s AND (COALESCE(b.is_active, 1) = 1) ORDER BY b.id LIMIT 1",
                             (bid,)
                         )
                         r = cursor.fetchone()
                         if r:
+                            price_str, price_num = _quotation_price_from_db(r.get('price'))
                             rows.append({
                                 'name': (r.get('publisher_name') or '').strip(),
                                 'title': (r.get('title') or '').strip(),
-                                'price': float(r.get('price') or 0),
+                                'price': price_str,
                                 'currency_code': 'USD',
                                 'zwl_price': 0,
-                                'amount': float(r.get('price') or 0),
+                                'amount': price_str,
                                 'zwl_amount': 0,
                                 'not_found': False,
                             })
@@ -9561,25 +9581,26 @@ def quotation_lookup_books():
                         cursor.execute(
                             "SELECT b.id, b.title, b.price, p.name AS publisher_name FROM books b "
                             "LEFT JOIN publishers p ON b.publisher_id = p.id "
-                            "WHERE TRIM(b.title) = %s AND b.publisher_id = %s LIMIT 1",
+                            "WHERE TRIM(b.title) = %s AND b.publisher_id = %s AND (COALESCE(b.is_active, 1) = 1) ORDER BY b.id LIMIT 1",
                             (title, publisher_id)
                         )
                     else:
                         cursor.execute(
                             "SELECT b.id, b.title, b.price, p.name AS publisher_name FROM books b "
                             "LEFT JOIN publishers p ON b.publisher_id = p.id "
-                            "WHERE TRIM(b.title) = %s LIMIT 1",
+                            "WHERE TRIM(b.title) = %s AND (COALESCE(b.is_active, 1) = 1) ORDER BY b.id LIMIT 1",
                             (title,)
                         )
                     r = cursor.fetchone()
                     if r:
+                        price_str, price_num = _quotation_price_from_db(r.get('price'))
                         rows.append({
                             'name': (r.get('publisher_name') or '').strip(),
                             'title': (r.get('title') or '').strip(),
-                            'price': float(r.get('price') or 0),
+                            'price': price_str,
                             'currency_code': 'USD',
                             'zwl_price': 0,
-                            'amount': float(r.get('price') or 0),
+                            'amount': price_str,
                             'zwl_amount': 0,
                             'not_found': False,
                         })
@@ -9588,14 +9609,18 @@ def quotation_lookup_books():
                 rows.append({
                     'name': row_from_file.get('name') or '—',
                     'title': row_from_file.get('title') or '—',
-                    'price': 0,
+                    'price': '0',
                     'currency_code': 'USD',
                     'zwl_price': 0,
-                    'amount': 0,
+                    'amount': '0',
                     'zwl_amount': 0,
                     'not_found': True,
                 })
-        total_price = sum(r['price'] for r in rows)
+        # Total: parse each row price (string) to number for summing only
+        total_price = 0.0
+        for r in rows:
+            _, n = _quotation_price_from_db(r.get('price', '0'))
+            total_price += n
         total_zwl = sum(r.get('zwl_price', 0) for r in rows)
         return jsonify({
             'rows': rows,
