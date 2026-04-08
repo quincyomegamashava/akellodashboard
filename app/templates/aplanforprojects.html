@@ -2,25 +2,32 @@
 
 {% block head_extra %}
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css">
-  <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
 
   <script>
-    const current_user = { username: "{{current_user.username}}", id: "{{ current_user.id }}" }; 
+    const current_user = { username: "{{current_user.username}}", id: "{{ current_user.id }}" };
+    {% set _pm_manage_any = (current_user.userRole == 'Admin') or (current_user.has_privilege('Super-admin')) %}
+    const PM_USER = {
+      id: {{ current_user.id }},
+      canManageAnyProject: {{ _pm_manage_any|tojson }}
+    };
   </script>
 
   <style>
 
     :root {
       --tl-bg: #ffffff;
+      --pm-surface: #fafafa;
     }
-    body {
-
-    background: linear-gradient(135deg, #dde7fd 0%, #ffffff 100%);
-    background-size: 400% 400%;
-    animation: gradientShift 8s ease infinite;
-
-}
+    /* Neutral canvas for this page only (overrides base body gradient) */
+    .pm-page {
+      min-height: 100vh;
+      background: var(--pm-surface);
+      margin: -1rem;
+      padding: 1rem;
+    }
+    @media (min-width: 1024px) {
+      .pm-page { margin: -1.5rem; padding: 1.5rem; }
+    }
 
 .login-container {
             width: 100%;
@@ -45,13 +52,6 @@
     /* small scrollbar styling fallback */
     .scrollbar-thin::-webkit-scrollbar { height: 8px; width: 8px; }
     .scrollbar-thumb-gray-400::-webkit-scrollbar-thumb { background: #9CA3AF; border-radius: 9999px;}
-
-    /* Custom styles for the Gantt Chart modal */
-    #modalBackdrop.gantt-modal .modal-content {
-      max-width: 90%;
-      height: 90%;
-      width: 100%;
-    }
 
     /* Create Project modal size */
     #modalBackdrop.project-modal #modalContent {
@@ -80,10 +80,89 @@
       overflow: auto;
     }
 
-    #ganttChartContainer {
+    #ganttSheetMount {
       width: 100%;
-      height: calc(100vh - 200px); /* Adjust based on modal header/footer */
-      overflow: auto;
+      min-height: 480px;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      background: #fff;
+    }
+    .gantt-scroll-x {
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: min(78vh, 900px);
+    }
+    .gantt-phase-strip {
+      height: 26px;
+    }
+    .gantt-grid-line {
+      border-right: 1px solid #e7e5e4;
+    }
+    .gantt-grid-line.week {
+      border-right: 1px solid #d6d3d1;
+    }
+    .gantt-bar {
+      top: 50%;
+      transform: translateY(-50%);
+      height: 14px;
+      border-radius: 3px;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    .gantt-pct-cell {
+      position: relative;
+      height: 22px;
+      background: #f4f4f5;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .gantt-pct-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      background: linear-gradient(180deg, #22c55e, #16a34a);
+      opacity: 0.85;
+    }
+    #ganttDescPreview {
+      border-radius: 0.75rem;
+      border: 1px solid #e4e4e7;
+      background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    #ganttDescPreview .gantt-desc-preview__label {
+      font-size: 0.625rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #a1a1aa;
+    }
+    #ganttDescPreviewBody {
+      max-height: 10rem;
+      min-height: 3rem;
+      overflow-y: auto;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .pm-tab[aria-selected="true"] {
+      background: #4f46e5;
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+      border-color: #4f46e5;
+    }
+    .pm-tab[aria-selected="false"] {
+      color: #52525b;
+      background: transparent;
+      border-color: transparent;
+    }
+    .pm-tab[aria-selected="false"]:hover {
+      color: #18181b;
+      background: rgba(244, 244, 245, 0.95);
+    }
+    .pm-tab:focus-visible {
+      outline: 2px solid #4f46e5;
+      outline-offset: 2px;
     }
 
     /* Icon button tooltip styles */
@@ -206,157 +285,221 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-[1800px] mx-auto">
+<div class="pm-page max-w-[1800px] mx-auto">
 
-    <div class="grid grid-cols-1 lg:grid-cols-[280px,1fr] gap-6">
-      <!-- Sidebar: Projects list (desktop) -->
-      <aside id="sidebarPanel" class="hidden lg:block bg-white/80 rounded-2xl p-3 shadow border border-slate-200">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-base font-semibold text-slate-800">Projects</h2>
-          <button id="newProjectBtn2" class="px-2 py-1 text-sm rounded-lg border border-slate-300 hover:bg-slate-50">➕</button>
-        </div>
-        <div id="projectList" class="space-y-1 max-h-[70vh] overflow-auto"></div>
-      </aside>
+  <div class="grid grid-cols-1 gap-3">
+    <!-- Sidebar: projects (hidden — use header project dropdown to switch projects) -->
+    <aside id="sidebarPanel" class="hidden min-w-0 rounded-lg border border-zinc-200/80 bg-white p-2 shadow-sm" aria-hidden="true">
+      <div class="flex items-center justify-between mb-2 gap-1">
+        <h2 class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 truncate">Workspace</h2>
+        <button id="newProjectBtn2" type="button" class="shrink-0 rounded-md border border-zinc-200 p-1 text-zinc-600 hover:bg-zinc-50" title="New project" aria-label="New project">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
+        </button>
+      </div>
+      <div id="projectList" class="flex-1 space-y-0.5 overflow-auto max-h-[calc(100vh-8rem)] pr-0.5 min-w-0"></div>
+    </aside>
 
-      <!-- Main content -->
-      <section class="bg-white/70 rounded-2xl shadow border border-slate-200 p-4">
+    <!-- Main -->
+    <section class="rounded-xl border border-zinc-200/80 bg-white shadow-sm flex flex-col min-h-[calc(100vh-5rem)]">
 
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <h1 class="text-2xl sm:text-3xl font-bold text-slate-800">Project Board</h1>
-
-          <div class="header-actions flex flex-wrap items-center gap-2">
-            <!-- Hidden project select for internal state tracking -->
-            <select 
-              id="projectSelect" 
-              class="hidden"
-              style="display: none;"
-            ></select>
-
-            <!-- Navigation Group -->
-            <div class="icon-btn-group">
-              <a href="{{url_for('overview')}}" 
-                class="icon-btn"
-                data-tooltip="Home"
-                aria-label="Home"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V8.207l1.146 1.147a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.707 1.5ZM13 7.207V13.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V7.207l5-5 5 5Z"/>
-                </svg>
-              </a>
-            </div>
-
-            <!-- Project Actions Group -->
-            <div class="icon-btn-group">
-              <button 
-                id="editProjectBtn" 
-                class="icon-btn"
-                data-tooltip="Edit Project"
-                aria-label="Edit Project"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
-                </svg>
-              </button>
-
-              <button 
-                id="deleteProjectBtn" 
-                class="icon-btn danger"
-                data-tooltip="Delete Project"
-                aria-label="Delete Project"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
-                  <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
-                </svg>
-              </button>
-
-              <button 
-                id="newProjectBtn" 
-                class="icon-btn primary"
-                data-tooltip="New Project"
-                aria-label="New Project"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4Z"/>
-                </svg>
-              </button>
-            </div>
-
-            <!-- View Options Group -->
-            <div class="icon-btn-group">
-              <button 
-                id="showGanttBtn" 
-                class="icon-btn"
-                data-tooltip="Show Gantt Chart"
-                aria-label="Show Gantt Chart"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M0 0h1v15h15v1H0V0Zm14.817 3.113a.5.5 0 0 1 .07.672l-4.5 5.5a.5.5 0 0 1-.79.01l-2.5-3.5a.5.5 0 0 1 .79-.617l2.003 2.803 4.157-5.08a.5.5 0 0 1 .703-.07ZM1 2v12h13V2H1Z"/>
-                </svg>
-              </button>
-
-              <button 
-                id="showMyTasksBtn" 
-                class="icon-btn"
-                data-tooltip="My Tasks"
-                aria-label="My Tasks"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
-                  <path d="M5 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
-                </svg>
-              </button>
-            </div>
-          </div>
+      <!-- Top bar -->
+      <div class="flex flex-col gap-4 border-b border-zinc-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex flex-col gap-1 min-w-0">
+          <p class="text-xs font-medium uppercase tracking-wide text-zinc-400">Projects</p>
+          <h1 class="text-xl font-semibold text-zinc-900 truncate">Tracking</h1>
         </div>
 
-        <div id="board" class="board flex gap-4 overflow-x-auto pb-6 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"></div>
+        <div class="header-actions flex flex-wrap items-center gap-2 justify-end">
+          <select id="projectSelect" class="min-w-[180px] max-w-[min(100%,280px)] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"></select>
 
-        <!-- Project Timeline (moved inside Project Board section) -->
-        <div id="timelineSection" class="mt-8">
-          <h2 class="text-2xl sm:text-3xl tracking-tight font-extrabold text-slate-900 mb-4">PROJECT TIMELINE</h2>
-          <div class="border-y-4 border-amber-400 mb-6"></div>
+          <select id="pmExportSelect" class="hidden min-w-[200px] max-w-[min(100%,300px)] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" title="Export board, timeline, and schedule" aria-label="Export report">
+            <option value="">Export…</option>
+            <optgroup label="Excel">
+              <option value="excel:all">All tabs (one workbook)</option>
+              <option value="excel:board">Board only</option>
+              <option value="excel:timeline">Timeline only</option>
+              <option value="excel:schedule">Schedule only</option>
+            </optgroup>
+            <optgroup label="PDF">
+              <option value="pdf:all">All tabs (one file)</option>
+              <option value="pdf:board">Board only</option>
+              <option value="pdf:timeline">Timeline only</option>
+              <option value="pdf:schedule">Schedule only</option>
+            </optgroup>
+          </select>
 
-          <!-- Timeline axis -->
-          <div class="bg-white/80 rounded-2xl shadow border border-slate-200 p-4 mb-6">
-            <div id="timelineAxis" class="relative w-full overflow-x-auto" style="min-height: 180px;">
-              <svg id="timelineSVG" class="w-full" viewBox="0 0 1200 180" preserveAspectRatio="none"></svg>
-            </div>
+          <div class="icon-btn-group hidden">
+            <a href="{{ url_for('overview') }}" class="icon-btn" data-tooltip="Home" aria-label="Home">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V8.207l1.146 1.147a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.707 1.5ZM13 7.207V13.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V7.207l5-5 5 5Z"/></svg>
+            </a>
           </div>
 
-          <!-- Milestones table and tips -->
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2 bg-white/80 rounded-2xl shadow border border-slate-200">
-              <div class="px-4 py-3 border-b border-slate-200">
-                <h3 class="text-xl font-semibold">Project Milestones</h3>
+          <div class="icon-btn-group">
+            <button id="editProjectBtn" type="button" class="icon-btn" data-tooltip="Edit project" aria-label="Edit project">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/></svg>
+            </button>
+            <button id="deleteProjectBtn" type="button" class="icon-btn danger" data-tooltip="Delete project" aria-label="Delete project">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/></svg>
+            </button>
+            <button id="newProjectBtn" type="button" class="icon-btn primary" data-tooltip="New project" aria-label="New project">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4Z"/></svg>
+            </button>
+          </div>
+
+          <div class="icon-btn-group">
+            <button id="showGanttBtn" type="button" class="icon-btn hidden" data-tooltip="Schedule view" aria-label="Open schedule view">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M0 0h1v15h15v1H0V0Zm14.817 3.113a.5.5 0 0 1 .07.672l-4.5 5.5a.5.5 0 0 1-.79.01l-2.5-3.5a.5.5 0 0 1 .79-.617l2.003 2.803 4.157-5.08a.5.5 0 0 1 .703-.07ZM1 2v12h13V2H1Z"/></svg>
+            </button>
+            <button id="showMyTasksBtn" type="button" class="icon-btn" data-tooltip="My tasks" aria-label="My tasks">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/><path d="M5 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="pmWelcome" class="flex flex-1 flex-col items-center justify-center px-6 py-12 min-h-[min(56vh,28rem)] border-t border-zinc-100/80 bg-gradient-to-b from-zinc-50/40 to-white">
+        <div class="max-w-md w-full rounded-2xl border border-zinc-200/90 bg-white px-8 py-10 text-center shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600/90 mb-2">Project tracking</p>
+          <h2 class="text-2xl font-semibold text-zinc-900 tracking-tight">Welcome</h2>
+          <p class="mt-3 text-sm text-zinc-600 leading-relaxed">Select a project from the dropdown above to open the board, timeline, and schedule for that workspace.</p>
+          <p class="mt-4 text-xs text-zinc-500">No project selected yet — your work area will appear here after you choose one.</p>
+        </div>
+      </div>
+
+      <div id="pmWorkspace" class="hidden flex flex-col flex-1 min-h-0">
+      <!-- Tabs -->
+      <div class="px-4 pt-3 pb-0" role="tablist" aria-label="Project views">
+        <div class="inline-flex rounded-lg border border-zinc-200 bg-zinc-50/80 p-1">
+          <button type="button" id="tab-board" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="true" aria-controls="panel-board">Board</button>
+          <button type="button" id="tab-timeline" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-timeline">Timeline</button>
+          <button type="button" id="tab-gantt" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-gantt">Schedule</button>
+        </div>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-0 px-4 pb-4 pt-4">
+
+        <!-- Board panel -->
+        <div id="panel-board" role="tabpanel" aria-labelledby="tab-board" class="flex flex-col flex-1 min-h-0">
+          <p class="text-sm text-zinc-500 mb-3">Drag columns and cards. Add tasks from each column.</p>
+          <div id="board" class="board flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-zinc-100/50 flex-1 min-h-[280px]"></div>
+        </div>
+
+        <!-- Timeline panel -->
+        <div id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" class="hidden flex-1 flex-col min-h-0 overflow-auto" aria-hidden="true">
+          <div id="timelineSection" class="space-y-5">
+            <div>
+              <h2 class="text-lg font-semibold text-zinc-900">Timeline</h2>
+              <p class="text-sm text-zinc-500 mt-1">Visual timeline and a monthly breakdown of tasks.</p>
+            </div>
+
+            <div class="rounded-xl border border-zinc-200 bg-white overflow-hidden">
+              <div class="px-4 py-3 border-b border-zinc-100 flex flex-wrap items-center justify-between gap-3">
+                <h3 class="text-sm font-semibold text-zinc-800">Items by month</h3>
+                <div class="flex flex-wrap items-center gap-2">
+                  <label for="timelineItemsSort" class="text-xs text-zinc-500">Sort months</label>
+                  <select id="timelineItemsSort" class="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm bg-white">
+                    <option value="asc">Oldest month first</option>
+                    <option value="desc">Newest month first</option>
+                  </select>
+                </div>
               </div>
               <div class="p-4 overflow-auto">
                 <table class="min-w-full text-sm">
-                  <thead class="text-left bg-slate-50">
+                  <thead class="text-left bg-zinc-50 text-zinc-600">
                     <tr>
-                      <th class="py-2 px-3 w-28">DATE</th>
-                      <th class="py-2 px-3">MILESTONE</th>
-                      <th class="py-2 px-3 w-56">ASSIGNED TO</th>
-                      <th class="py-2 px-3 w-24">POSITION</th>
+                      <th class="py-2 px-3 font-medium">Task</th>
+                      <th class="py-2 px-3 font-medium min-w-[8rem] max-w-[14rem]">Description</th>
+                      <th class="py-2 px-3 font-medium align-bottom">
+                        <span class="block mb-1">Column</span>
+                        <label for="timelineFilterColumn" class="sr-only">Filter by column</label>
+                        <select id="timelineFilterColumn" class="mt-0.5 w-full min-w-[7rem] max-w-[11rem] rounded-md border border-zinc-200 px-1.5 py-1 text-xs font-normal text-zinc-800 bg-white">
+                          <option value="">All columns</option>
+                        </select>
+                      </th>
+                      <th class="py-2 px-3 w-32 font-medium">Start</th>
+                      <th class="py-2 px-3 w-32 font-medium">End</th>
+                      <th class="py-2 px-3 w-24 font-medium">Progress</th>
+                      <th class="py-2 px-3 font-medium align-bottom">
+                        <span class="block mb-1">Assignees</span>
+                        <label for="timelineFilterAssignee" class="sr-only">Filter by assignee</label>
+                        <select id="timelineFilterAssignee" class="mt-0.5 w-full min-w-[7rem] max-w-[12rem] rounded-md border border-zinc-200 px-1.5 py-1 text-xs font-normal text-zinc-800 bg-white">
+                          <option value="">All assignees</option>
+                        </select>
+                      </th>
                     </tr>
                   </thead>
-                  <tbody id="milestoneBody"></tbody>
+                  <tbody id="timelineItemsBody"></tbody>
                 </table>
+                <p id="timelineItemsEmpty" class="py-8 text-center text-zinc-500 hidden">No project items available.</p>
               </div>
             </div>
-            <div class="bg-white/80 rounded-2xl shadow border border-slate-200">
-              <div class="px-4 py-3 border-b border-slate-200">
-                <h3 class="text-xl font-semibold">Project Timeline Tip</h3>
+
+            <div class="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
+              <div id="timelineAxis" class="relative w-full overflow-x-auto" style="min-height: 180px;">
+                <svg id="timelineSVG" class="w-full" viewBox="0 0 1200 180" preserveAspectRatio="none"></svg>
               </div>
-              <div class="p-4 text-sm text-slate-700">
-                Use the task Position value to nudge milestone labels above or below the timeline. Positive numbers will place the label above the axis; negative numbers will place it below. You can edit the Position directly in the Milestones table; the timeline will refresh automatically.
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <div class="lg:col-span-2 rounded-2xl border border-zinc-200/90 bg-white shadow-sm overflow-hidden">
+                <div class="px-4 py-3 border-b border-zinc-100 bg-zinc-50/50">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Milestone labels</p>
+                  <h3 class="text-sm font-semibold text-zinc-900">Milestones</h3>
+                </div>
+                <div class="p-4 overflow-auto max-h-[min(28rem,55vh)]">
+                  <div id="milestoneBody" class="space-y-3"></div>
+                </div>
+              </div>
+              <div class="rounded-2xl border border-zinc-200/90 bg-white shadow-sm overflow-hidden">
+                <div class="border-l-4 border-indigo-400 bg-indigo-50/40 p-4 h-full">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600/90 mb-1">Tip</p>
+                  <p class="text-sm text-zinc-700 leading-relaxed">
+                    Use each task’s <strong class="font-medium text-zinc-800">Position</strong> to place milestone labels above or below the axis. Edit values in the cards below; the timeline refreshes when you reload the board.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </section>
-    </div>
-  
+
+        <!-- Schedule: spreadsheet-style Gantt (table + timeline grid) -->
+        <div id="panel-gantt" role="tabpanel" aria-labelledby="tab-gantt" class="hidden flex-1 flex-col min-h-0" aria-hidden="true">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <p class="text-sm text-zinc-500">Tasks with start and end dates. Click a row or bar to edit.</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <label for="ganttFilterOwner" class="text-xs text-zinc-500">Owner</label>
+              <select id="ganttFilterOwner" class="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm bg-white max-w-[10rem]">
+                <option value="">All</option>
+              </select>
+              <label for="ganttFilterDue" class="text-xs text-zinc-500">Due</label>
+              <select id="ganttFilterDue" class="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm bg-white">
+                <option value="all">All</option>
+                <option value="week">This week</option>
+                <option value="month">This month</option>
+              </select>
+              <label for="ganttColorBy" class="text-xs text-zinc-500">Bar color</label>
+              <select id="ganttColorBy" class="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm bg-white">
+                <option value="column">Column</option>
+                <option value="assignee">Assignee</option>
+              </select>
+              <button type="button" id="ganttFitBtn" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50">Scroll to start</button>
+            </div>
+          </div>
+          <div id="ganttDescPreview" class="mb-3 overflow-hidden" aria-live="polite">
+            <div class="px-3 py-2 border-b border-zinc-100 bg-zinc-50/80">
+              <span class="gantt-desc-preview__label">Description preview</span>
+            </div>
+            <div id="ganttDescPreviewBody" class="px-3 py-2.5 text-sm text-zinc-400">Hover a description cell in the table to read the full text.</div>
+          </div>
+          <p id="ganttEmptyState" class="hidden rounded-xl border border-dashed border-zinc-200 bg-zinc-50 py-12 text-center text-sm text-zinc-500"></p>
+          <div id="ganttSheetMount" class="flex-1 min-h-[480px] rounded-xl border border-zinc-200 bg-white"></div>
+        </div>
+
+      </div>
+      </div>
+    </section>
+  </div>
+
 </div>
 
 <div id="modalBackdrop" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
@@ -369,6 +512,7 @@
         <button id="modalConfirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">OK</button>
       </div>
     </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -386,10 +530,12 @@ let timelineZoom = 1; // 1 = full span. >1 zooms in (smaller span), <1 zooms out
 let timelineCenterTs = null; // milliseconds timestamp; defaults to mid of tasks
 let lastTimelineRows = []; // cached rows used by renderTimeline for panning
 let isTimelinePanning = false;
-let canAccessProject = true; // derived from board access; controls timeline/gantt, etc.
 let panStartClientX = 0;
 let panStartCenterTs = null;
 let timelineDraggingTask = false;
+let timelineSortDirection = 'asc';
+let lastTimelineTableItems = []; // full sorted list for Items-by-month filters
+let activePmTab = 'board';
 // Mini-map state
 let isMiniDragging = false;
 let miniDragStartX = 0;
@@ -399,6 +545,8 @@ let miniStartCenterTs = null;
 const COLOR_PALETTE = ['#ef4444','#f59e0b','#10b981','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#84cc16','#f97316','#06b6d4','#f43f5e','#22c55e','#a855f7'];
 let colorMode = 'column'; // 'column' | 'assignee'
 let colorMaps = { column: {}, assignee: {} };
+let ganttFilterOwner = ''; // '' = All
+let ganttDueFilter = 'all'; // all | week | month
 
 /* ---------- Simple helpers ---------- */
 const $ = (id) => document.getElementById(id);
@@ -490,11 +638,449 @@ function closeModal() {
   modalBackdrop.classList.remove('project-modal');
   modalBackdrop.classList.remove('edit-project-modal');
   modalBackdrop.classList.remove('my-tasks-modal');
+  modalBackdrop.classList.remove('gantt-modal');
   modalConfirm.disabled = false;
+  modalConfirm.style.display = '';
   modalConfirm.onclick = null;
   modalCancel.onclick = null;
   // Clean up any modal-specific classes
   modalContent.classList.remove('w3-display-middle');
+}
+
+/* ---------- Tabbed workspace ---------- */
+function setActiveTab(tab) {
+  const next = tab === 'timeline' || tab === 'gantt' ? tab : 'board';
+  activePmTab = next;
+  const panels = {
+    board: $('panel-board'),
+    timeline: $('panel-timeline'),
+    gantt: $('panel-gantt')
+  };
+  const tabs = {
+    board: $('tab-board'),
+    timeline: $('tab-timeline'),
+    gantt: $('tab-gantt')
+  };
+  Object.keys(panels).forEach((key) => {
+    const panel = panels[key];
+    const btn = tabs[key];
+    const on = key === next;
+    if (panel) {
+      panel.classList.toggle('hidden', !on);
+      panel.classList.toggle('flex', on);
+      panel.setAttribute('aria-hidden', on ? 'false' : 'true');
+    }
+    if (btn) {
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    }
+  });
+  if (next === 'gantt') {
+    requestAnimationFrame(() => renderVisGantt(lastBoardData));
+  }
+}
+
+const GANTT_DAY_W = 20;
+const GANTT_LEFT_COLS = 'minmax(0, 1.1fr) minmax(0, 0.88fr) 0.58fr 0.62fr 0.62fr 0.34fr 0.48fr';
+const GANTT_PHASE_COLORS = ['#1e3a5f', '#0d9488', '#c2410c'];
+const GANTT_PHASE_LABELS = ['PHASE ONE', 'PHASE TWO', 'PHASE THREE'];
+
+function ganttStripTime(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function ganttParseLocal(iso) {
+  if (!iso) return null;
+  const s = String(iso).slice(0, 10);
+  const p = s.split('-').map(Number);
+  if (p.length < 3 || !p[0]) return null;
+  return new Date(p[0], p[1] - 1, p[2]);
+}
+
+function ganttEnumerateWorkdays(minD, maxD) {
+  const out = [];
+  let cur = ganttStripTime(minD);
+  const end = ganttStripTime(maxD);
+  while (cur <= end) {
+    const wd = cur.getDay();
+    if (wd !== 0 && wd !== 6) out.push(new Date(cur));
+    cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+  }
+  return out;
+}
+
+function ganttCountBizInclusive(s, e) {
+  let n = 0;
+  let c = ganttStripTime(s);
+  const end = ganttStripTime(e);
+  if (c > end) return 0;
+  while (c <= end) {
+    const wd = c.getDay();
+    if (wd !== 0 && wd !== 6) n++;
+    c = new Date(c.getFullYear(), c.getMonth(), c.getDate() + 1);
+  }
+  return Math.max(n, 0);
+}
+
+function ganttFormatMMDDYY(d) {
+  if (!d || isNaN(d.getTime())) return '—';
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const y = String(d.getFullYear()).slice(-2);
+  return `${m}/${day}/${y}`;
+}
+
+function ganttDayLetter(d) {
+  return ['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getDay()];
+}
+
+function ganttOwnerShort(name) {
+  if (!name || name === 'Unassigned') return '—';
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 12);
+  return `${parts[0].slice(0, 8)} ${parts[parts.length - 1].charAt(0)}`.trim();
+}
+
+function ganttAssigneeLabel(task) {
+  if (Array.isArray(task.assignees) && task.assignees.length) {
+    return (task.assignees[0].name || String(task.assignees[0]));
+  }
+  return 'Unassigned';
+}
+
+function ganttLocalDayStart(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function ganttDueInThisWeek(d) {
+  const today = ganttLocalDayStart(new Date());
+  const dow = today.getDay();
+  const monOffset = dow === 0 ? -6 : 1 - dow;
+  const weekStart = new Date(today);
+  weekStart.setDate(weekStart.getDate() + monOffset);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  const dd = ganttLocalDayStart(d);
+  return dd >= weekStart && dd <= weekEnd;
+}
+
+function ganttDueInThisMonth(d) {
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
+
+function ganttCollectDatedTasks(boardData) {
+  const out = [];
+  (boardData.columns || []).forEach((col) => {
+    (col.tasks || []).forEach((task) => {
+      if (!task.start_date || !task.end_date) return;
+      const a = ganttParseLocal(task.start_date);
+      const b = ganttParseLocal(task.end_date);
+      if (!a || !b || isNaN(a.getTime()) || isNaN(b.getTime())) return;
+      if (b < a) return;
+      out.push({ task, col });
+    });
+  });
+  return out;
+}
+
+function ganttMatchesFilters(task, dueEnd) {
+  if (ganttFilterOwner && ganttAssigneeLabel(task) !== ganttFilterOwner) return false;
+  if (ganttDueFilter === 'week' && !ganttDueInThisWeek(dueEnd)) return false;
+  if (ganttDueFilter === 'month' && !ganttDueInThisMonth(dueEnd)) return false;
+  return true;
+}
+
+function populateGanttOwnerOptions(boardData) {
+  const sel = $('ganttFilterOwner');
+  if (!sel || !boardData) return;
+  const allDated = ganttCollectDatedTasks(boardData);
+  const owners = [...new Set(allDated.map(({ task }) => ganttAssigneeLabel(task)))].sort((a, b) => a.localeCompare(b));
+  const prev = ganttFilterOwner;
+  sel.innerHTML = '<option value="">All</option>'
+    + owners.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+  if (prev && owners.includes(prev)) {
+    sel.value = prev;
+    ganttFilterOwner = prev;
+  } else {
+    sel.value = '';
+    ganttFilterOwner = '';
+  }
+}
+
+function ganttWeekClusters(workDays) {
+  const clusters = [];
+  let cur = [];
+  let curKey = null;
+  workDays.forEach((d, i) => {
+    const mon = new Date(d);
+    const day = mon.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    mon.setDate(mon.getDate() + diff);
+    const key = mon.getTime();
+    if (curKey === null) {
+      curKey = key;
+      cur = [{ d, i }];
+    } else if (key === curKey) {
+      cur.push({ d, i });
+    } else {
+      clusters.push(cur);
+      cur = [{ d, i }];
+      curKey = key;
+    }
+  });
+  if (cur.length) clusters.push(cur);
+  return clusters;
+}
+
+const GANTT_DESC_PREVIEW_PLACEHOLDER = 'Hover a description cell in the table to read the full text.';
+
+function resetGanttDescPreview() {
+  const body = $('ganttDescPreviewBody');
+  if (!body) return;
+  body.textContent = GANTT_DESC_PREVIEW_PLACEHOLDER;
+  body.classList.add('text-zinc-400');
+  body.classList.remove('text-zinc-700');
+}
+
+function ganttDescDecodedFromTrigger(trigger) {
+  const enc = trigger.getAttribute('data-gantt-desc');
+  if (enc == null) return null;
+  try {
+    const raw = decodeURIComponent(enc);
+    return raw.trim() ? raw : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function bindGanttDescPreviewTriggers(container) {
+  if (!container) return;
+  container.querySelectorAll('[data-gantt-desc-trigger]').forEach((el) => {
+    el.addEventListener('mouseenter', () => {
+      const raw = ganttDescDecodedFromTrigger(el);
+      if (raw == null) return;
+      const body = $('ganttDescPreviewBody');
+      if (!body) return;
+      body.textContent = raw;
+      body.classList.remove('text-zinc-400');
+      body.classList.add('text-zinc-700');
+    });
+  });
+}
+
+function destroyVisGantt() {
+  resetGanttDescPreview();
+  const container = $('ganttSheetMount');
+  if (container && container._ganttClickHandler) {
+    container.removeEventListener('click', container._ganttClickHandler);
+    container._ganttClickHandler = null;
+  }
+  if (container) container.innerHTML = '';
+}
+
+function renderVisGantt(boardData) {
+  destroyVisGantt();
+  const container = $('ganttSheetMount');
+  const emptyEl = $('ganttEmptyState');
+  if (!container) return;
+
+  if (!boardData || !boardData.columns) {
+    if (emptyEl) {
+      emptyEl.classList.remove('hidden');
+      emptyEl.textContent = 'Select a project to view the schedule.';
+    }
+    return;
+  }
+
+  const ganttDueEl = $('ganttFilterDue');
+  if (ganttDueEl) ganttDueFilter = ganttDueEl.value || 'all';
+  const ganttOwnerEl = $('ganttFilterOwner');
+  if (ganttOwnerEl) ganttFilterOwner = ganttOwnerEl.value || '';
+  populateGanttOwnerOptions(boardData);
+
+  const allDated = ganttCollectDatedTasks(boardData);
+  if (!allDated.length) {
+    if (emptyEl) {
+      emptyEl.classList.remove('hidden');
+      emptyEl.textContent = 'Add tasks with both start and end dates to see them on the schedule.';
+    }
+    return;
+  }
+
+  const filteredDated = allDated.filter(({ task }) => {
+    const e = ganttParseLocal(task.end_date);
+    return e && ganttMatchesFilters(task, e);
+  });
+  if (!filteredDated.length) {
+    if (emptyEl) {
+      emptyEl.classList.remove('hidden');
+      emptyEl.textContent = 'No tasks match the filters. Try All owners or a different due range.';
+    }
+    return;
+  }
+
+  ensureColorMaps(boardData);
+  const rows = [];
+  let gMin = null;
+  let gMax = null;
+
+  (boardData.columns || []).forEach((col) => {
+    const inCol = filteredDated.filter((x) => x.col.id === col.id);
+    if (!inCol.length) return;
+    rows.push({ type: 'group', title: col.title || `Column ${col.id}`, col });
+    inCol.forEach(({ task }) => {
+      const s = ganttParseLocal(task.start_date);
+      const e = ganttParseLocal(task.end_date);
+      if (!s || !e) return;
+      rows.push({ type: 'task', task, col });
+      const t0 = ganttStripTime(s).getTime();
+      const t1 = ganttStripTime(e).getTime();
+      if (gMin === null || t0 < gMin) gMin = t0;
+      if (gMax === null || t1 > gMax) gMax = t1;
+    });
+  });
+
+  if (!rows.length || gMin === null) {
+    if (emptyEl) {
+      emptyEl.classList.remove('hidden');
+      emptyEl.textContent = 'No tasks match the filters. Try All owners or a different due range.';
+    }
+    return;
+  }
+  if (emptyEl) emptyEl.classList.add('hidden');
+
+  const minD = new Date(gMin);
+  const maxD = new Date(gMax);
+  const workDays = ganttEnumerateWorkdays(minD, maxD);
+  if (!workDays.length) {
+    if (emptyEl) {
+      emptyEl.classList.remove('hidden');
+      emptyEl.textContent = 'No working days in range.';
+    }
+    return;
+  }
+
+  const totalW = workDays.length * GANTT_DAY_W;
+  const idxFor = (date) => {
+    const t = ganttStripTime(date).getTime();
+    for (let i = 0; i < workDays.length; i++) {
+      if (ganttStripTime(workDays[i]).getTime() === t) return i;
+    }
+    for (let i = 0; i < workDays.length; i++) {
+      if (ganttStripTime(workDays[i]).getTime() >= t) return i;
+    }
+    return workDays.length - 1;
+  };
+  const lastIdxOnOrBefore = (date) => {
+    const t = ganttStripTime(date).getTime();
+    let last = -1;
+    for (let i = 0; i < workDays.length; i++) {
+      if (ganttStripTime(workDays[i]).getTime() <= t) last = i;
+      else break;
+    }
+    return Math.max(0, last);
+  };
+
+  const weekClusters = ganttWeekClusters(workDays);
+  let phaseHtml = '';
+  weekClusters.forEach((cl, wi) => {
+    const wPx = cl.length * GANTT_DAY_W;
+    const pi = wi % 3;
+    phaseHtml += `<div class="flex items-center justify-center text-[10px] font-bold text-white shrink-0 border-r border-white/20" style="width:${wPx}px;background:${GANTT_PHASE_COLORS[pi]}">${GANTT_PHASE_LABELS[pi]}</div>`;
+  });
+
+  let weekHtml = '';
+  weekClusters.forEach((cl, wi) => {
+    const wPx = cl.length * GANTT_DAY_W;
+    const label = `WEEK ${wi + 1}`;
+    weekHtml += `<div class="flex items-center justify-center text-[10px] font-semibold text-zinc-600 bg-zinc-100 border-r border-zinc-200 shrink-0" style="width:${wPx}px">${label}</div>`;
+  });
+
+  let dayHtml = '';
+  workDays.forEach((d) => {
+    dayHtml += `<div class="gantt-grid-line flex items-center justify-center text-[10px] text-zinc-500 shrink-0 border-r border-zinc-200/90" style="width:${GANTT_DAY_W}px">${ganttDayLetter(d)}</div>`;
+  });
+
+  const leftW = 520;
+  let bodyHtml = '';
+  rows.forEach((row) => {
+    if (row.type === 'group') {
+      bodyHtml += `<div class="flex items-center min-h-[30px] bg-zinc-300 border-b border-r border-zinc-300 font-semibold text-zinc-900 px-2 text-[11px]">${escapeHtml(row.title)}</div>`;
+      bodyHtml += `<div class="min-h-[30px] bg-zinc-200/70 border-b border-zinc-200" style="width:${totalW}px"></div>`;
+      return;
+    }
+    const task = row.task;
+    const col = row.col;
+    const s = ganttParseLocal(task.start_date);
+    const e = ganttParseLocal(task.end_date);
+    const assName = ganttAssigneeLabel(task);
+    const gk = colorMode === 'assignee' ? assName : (col.title || `Column ${col.id}`);
+    const barColor = colorMode === 'assignee'
+      ? (colorMaps.assignee[gk] || '#2563eb')
+      : (colorMaps.column[gk] || '#2563eb');
+    const dur = ganttCountBizInclusive(s, e);
+    const pct = typeof task.progress === 'number' ? Math.max(0, Math.min(100, task.progress)) : 0;
+    const si = idxFor(s);
+    const ei = lastIdxOnOrBefore(e);
+    const barLeft = si * GANTT_DAY_W;
+    const barW = Math.max(GANTT_DAY_W, (ei - si + 1) * GANTT_DAY_W);
+
+    const gridLines = workDays.map(() => `<div class="gantt-grid-line shrink-0" style="width:${GANTT_DAY_W}px"></div>`).join('');
+
+    const rawDesc = task.description != null ? String(task.description) : '';
+    const descOneLine = rawDesc.replace(/\s+/g, ' ').trim();
+    const descCell = descOneLine
+      ? `<div class="gantt-desc-trigger px-1 py-1.5 border-r border-zinc-100 truncate text-zinc-600 min-w-0 cursor-default" data-gantt-desc-trigger="1" data-gantt-desc="${encodeURIComponent(rawDesc)}">${escapeHtml(descOneLine)}</div>`
+      : `<div class="px-1 py-1.5 border-r border-zinc-100 text-zinc-400 min-w-0">—</div>`;
+
+    bodyHtml += `<div class="grid gap-0 border-b border-r border-zinc-200 bg-white hover:bg-zinc-50/90 cursor-pointer text-[11px] leading-tight" style="grid-template-columns:${GANTT_LEFT_COLS}" data-gantt-task-id="${task.id}">`;
+    bodyHtml += `<div class="px-1.5 py-1.5 border-r border-zinc-100 truncate min-w-0" title="${escapeHtml(task.title || '')}">${escapeHtml(task.title || '')}</div>`;
+    bodyHtml += descCell;
+    bodyHtml += `<div class="px-1 py-1.5 border-r border-zinc-100 truncate text-zinc-700 min-w-0">${escapeHtml(ganttOwnerShort(assName))}</div>`;
+    bodyHtml += `<div class="px-1 py-1.5 border-r border-zinc-100 text-center text-zinc-600">${ganttFormatMMDDYY(s)}</div>`;
+    bodyHtml += `<div class="px-1 py-1.5 border-r border-zinc-100 text-center text-zinc-600">${ganttFormatMMDDYY(e)}</div>`;
+    bodyHtml += `<div class="px-1 py-1.5 border-r border-zinc-100 text-center text-zinc-600">${dur}</div>`;
+    bodyHtml += `<div class="px-1 py-1 flex items-center"><div class="gantt-pct-cell w-full"><div class="gantt-pct-fill" style="width:${pct}%"></div><span class="relative z-[1] flex w-full justify-center text-[10px] font-medium text-zinc-800">${pct}%</span></div></div>`;
+    bodyHtml += `</div>`;
+
+    bodyHtml += `<div class="relative border-b border-zinc-200 bg-white min-h-[34px]" style="width:${totalW}px">`;
+    bodyHtml += `<div class="absolute inset-0 flex pointer-events-none opacity-60">${gridLines}</div>`;
+    bodyHtml += `<div class="gantt-bar absolute bg-blue-600 pointer-events-auto" data-gantt-task-id="${task.id}" style="left:${barLeft}px;width:${barW}px;background:${barColor};border:1px solid rgba(0,0,0,0.12)"></div>`;
+    bodyHtml += `</div>`;
+  });
+
+  const gridStyle = `display:grid;grid-template-columns:${leftW}px ${totalW}px;`;
+  container.innerHTML = `
+    <div class="gantt-scroll-x rounded-lg border border-zinc-200 bg-white" id="ganttRightScroll">
+      <div class="min-w-max" style="${gridStyle}">
+        <div class="bg-zinc-100 border-b border-r border-zinc-200 px-2 py-1.5 text-[11px] font-semibold text-zinc-800">Task details</div>
+        <div class="flex border-b border-zinc-200 min-h-[28px] overflow-hidden">${phaseHtml}</div>
+        <div class="grid gap-0 border-b border-r border-zinc-200 bg-zinc-50 text-[10px] font-semibold text-zinc-700" style="grid-template-columns:${GANTT_LEFT_COLS}">
+          <div class="px-1.5 py-1 border-r border-zinc-200">TASK TITLE</div>
+          <div class="px-1 py-1 border-r border-zinc-200">DESCRIPTION</div>
+          <div class="px-1 py-1 border-r border-zinc-200">TASK OWNER</div>
+          <div class="px-1 py-1 border-r border-zinc-200 text-center">START</div>
+          <div class="px-1 py-1 border-r border-zinc-200 text-center">DUE</div>
+          <div class="px-1 py-1 border-r border-zinc-200 text-center">DAYS</div>
+          <div class="px-1 py-1 text-center">% DONE</div>
+        </div>
+        <div class="flex border-b border-zinc-200 bg-zinc-50/80 min-h-[26px]">${weekHtml}</div>
+        <div class="h-[22px] border-b border-r border-zinc-200 bg-zinc-50"></div>
+        <div class="flex border-b border-zinc-200 bg-white min-h-[22px]">${dayHtml}</div>
+        ${bodyHtml}
+      </div>
+    </div>`;
+
+  const ganttClickHandler = (ev) => {
+    const el = ev.target.closest('[data-gantt-task-id]');
+    if (el) {
+      const id = el.getAttribute('data-gantt-task-id');
+      if (id) openTaskFromTimeline(id);
+    }
+  };
+  container._ganttClickHandler = ganttClickHandler;
+  container.addEventListener('click', ganttClickHandler);
+  bindGanttDescPreviewTriggers(container);
 }
 
 /* ---------- Load users for member selection ---------- */
@@ -542,6 +1128,11 @@ function membersContains(members, username) {
   return normalizeMembers(members).some(m => m.toLowerCase() === low);
 }
 
+function normalizeProjectType(typeValue) {
+  if (typeValue === null || typeValue === undefined) return '';
+  return String(typeValue).trim().toLowerCase();
+}
+
 /* ---------- Project flows ---------- */
 async function renderProjectSidebar(projects) {
   const list = document.getElementById('projectList');
@@ -549,12 +1140,15 @@ async function renderProjectSidebar(projects) {
   list.innerHTML = '';
   projects.forEach(p => {
     const item = document.createElement('button');
-    item.className = 'w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 ' + (String(p.id)===String(currentProjectId) ? 'bg-blue-50 border border-blue-200' : '');
-    item.innerHTML = `<div class="text-sm font-medium text-slate-800">${p.name}</div><div class="text-xs text-slate-500">${p.type||p.project_type||'public'}</div>`;
+    item.type = 'button';
+    item.className = 'w-full min-w-0 text-left rounded-md border px-2 py-1.5 transition ' + (String(p.id)===String(currentProjectId) ? 'border-indigo-200 bg-indigo-50/90 shadow-sm' : 'border-transparent hover:border-zinc-200 hover:bg-zinc-50');
+    item.innerHTML = `<div class="text-xs font-medium text-zinc-900 truncate" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div><div class="text-[10px] text-zinc-500 truncate mt-0.5">${escapeHtml(p.type||p.project_type||'public')}</div>`;
     item.onclick = async () => {
       const sel = document.getElementById('projectSelect');
       if (sel) sel.value = p.id;
       currentProjectId = p.id;
+      updatePmWorkspaceVisibility();
+      updateProjectManageButtons();
       await loadBoard(currentProjectId);
       renderProjectSidebar(projects);
     };
@@ -562,9 +1156,6 @@ async function renderProjectSidebar(projects) {
   });
 }
 
-function slugify(s){
-  return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || 'na';
-}
 function assignColor(map, key){
   if (!map[key]){
     const used = Object.keys(map).length;
@@ -584,6 +1175,64 @@ function ensureColorMaps(board){
   });
 }
 
+function updatePmWorkspaceVisibility() {
+  const welcome = $('pmWelcome');
+  const workspace = $('pmWorkspace');
+  if (!welcome || !workspace) return;
+  const showWorkspace = !!currentProjectId;
+  welcome.classList.toggle('hidden', showWorkspace);
+  workspace.classList.toggle('hidden', !showWorkspace);
+  const pmExportSelect = $('pmExportSelect');
+  if (pmExportSelect) pmExportSelect.classList.toggle('hidden', !currentProjectId);
+}
+
+function clearPmWorkspaceState() {
+  lastBoardData = null;
+  lastTimelineRows = [];
+  lastTimelineTableItems = [];
+  const board = $('board');
+  if (board) board.innerHTML = '<p class="text-sm text-zinc-500">Select a project to load the board.</p>';
+  renderTimeline([]);
+  renderTimelineItemsTable([]);
+  renderMilestonesTable([], []);
+  populateTimelineItemFilters([]);
+  const legend = document.getElementById('timelineLegend');
+  if (legend) legend.innerHTML = '';
+  destroyVisGantt();
+  resetGanttDescPreview();
+  const gsm = $('ganttSheetMount');
+  if (gsm) gsm.innerHTML = '';
+  const ganttEmpty = $('ganttEmptyState');
+  if (ganttEmpty) {
+    ganttEmpty.classList.remove('hidden');
+    ganttEmpty.textContent = 'Select a project to view the schedule.';
+  }
+  setActiveTab('board');
+}
+
+function canManageSelectedProject() {
+  if (!currentProjectId) return false;
+  const p = projectsCache[currentProjectId];
+  if (!p) return false;
+  if (typeof PM_USER !== 'undefined' && PM_USER.canManageAnyProject) return true;
+  const oid = p.owner_id;
+  if (oid != null && Number(oid) === Number(PM_USER.id)) return true;
+  return false;
+}
+
+function updateProjectManageButtons() {
+  const editBtn = $('editProjectBtn');
+  const delBtn = $('deleteProjectBtn');
+  const allow = canManageSelectedProject();
+  [editBtn, delBtn].forEach((btn) => {
+    if (!btn) return;
+    btn.classList.toggle('hidden', !allow);
+    if (!allow) btn.setAttribute('disabled', 'disabled');
+    else btn.removeAttribute('disabled');
+    btn.setAttribute('aria-disabled', allow ? 'false' : 'true');
+  });
+}
+
 async function loadProjects() {
   try {
     const projects = await apiGET(`${API_BASE}/projects`);
@@ -592,37 +1241,52 @@ async function loadProjects() {
     projectsCache = {}; // reset cache and repopulate
     if (!projects.length) {
       sel.appendChild(new Option('— No projects —', ''));
-      $('board').innerHTML = "<p class='text-gray-500'>No projects yet. Create one to get started!</p>";
-      // $('projectMembers').innerHTML = ""; // This element doesn't exist in the new code
       currentProjectId = null;
+      clearPmWorkspaceState();
+      updatePmWorkspaceVisibility();
+      updateProjectManageButtons();
       return;
     }
 
+    sel.appendChild(new Option('Choose a project…', ''));
     projects.forEach((p) => {
-      // normalize and store
       projectsCache[p.id] = p;
       const label = p.name + (p.type || p.project_type ? ` (${p.type||p.project_type})` : '');
       const option = new Option(label, p.id);
       sel.appendChild(option);
     });
 
-    // choose previously selected if still present, otherwise first
-    if (currentProjectId && Array.from(sel.options).some(o => o.value == currentProjectId)) {
-      sel.value = currentProjectId;
+    if (currentProjectId && Array.from(sel.options).some((o) => String(o.value) === String(currentProjectId))) {
+      sel.value = String(currentProjectId);
     } else {
-      sel.selectedIndex = 0;
-      currentProjectId = sel.value;
+      sel.value = '';
+      currentProjectId = null;
     }
+
     sel.onchange = async (e) => {
-      currentProjectId = e.target.value;
-      await loadBoard(currentProjectId);
+      currentProjectId = e.target.value || null;
+      if (currentProjectId) {
+        updatePmWorkspaceVisibility();
+        updateProjectManageButtons();
+        await loadBoard(currentProjectId);
+      } else {
+        clearPmWorkspaceState();
+        updatePmWorkspaceVisibility();
+        updateProjectManageButtons();
+      }
     };
 
-    // render sidebar list
     renderProjectSidebar(projects);
 
-    // load board for selected project
-    if (currentProjectId) await loadBoard(currentProjectId);
+    if (currentProjectId) {
+      updatePmWorkspaceVisibility();
+      updateProjectManageButtons();
+      await loadBoard(currentProjectId);
+    } else {
+      clearPmWorkspaceState();
+      updatePmWorkspaceVisibility();
+      updateProjectManageButtons();
+    }
   } catch (err) {
     console.error('Error loading projects', err);
   }
@@ -646,20 +1310,17 @@ async function resolveProjectInfo(projectId, boardData = {}) {
     type = cached.type || cached.project_type || null;
   }
 
-  // final fallback: try fetching single project if we still have no members/type
-  if ((!members || !members.length) || !type) {
-    try {
-      const single = await apiGET(`${API_BASE}/projects/${projectId}`);
-      if (single) {
-        if (!members.length && single.members) members = normalizeMembers(single.members);
-        if (!type) type = single.type || single.project_type || null;
-        // update cache
-        projectsCache[projectId] = Object.assign({}, projectsCache[projectId] || {}, single);
-      }
-    } catch (err) {
-      // ignore — we already have best-effort data
-      console.warn('Could not fetch single project:', err);
+  // Always refresh from the single-project endpoint so access checks use authoritative values.
+  try {
+    const single = await apiGET(`${API_BASE}/projects/${projectId}`);
+    if (single) {
+      if (single.members) members = normalizeMembers(single.members);
+      type = single.type || single.project_type || type;
+      projectsCache[projectId] = Object.assign({}, projectsCache[projectId] || {}, single);
     }
+  } catch (err) {
+    // keep best-effort values from board/cache if this fails
+    console.warn('Could not refresh single project info:', err);
   }
 
   return { members: members || [], type: type || 'public' };
@@ -667,6 +1328,7 @@ async function resolveProjectInfo(projectId, boardData = {}) {
 
 /* ---------- Board rendering and column/task creation ---------- */
 async function loadBoard(projectId) {
+  if (!projectId) return;
   try {
 const data = await apiGET(`${API_BASE}/projects/${projectId}/board`);
     lastBoardData = data;
@@ -678,6 +1340,8 @@ const data = await apiGET(`${API_BASE}/projects/${projectId}/board`);
     const timelineSection = document.getElementById('timelineSection');
     const timelineAxisEl = document.getElementById('timelineAxis');
     const milestoneBodyEl = document.getElementById('milestoneBody');
+    const timelineItemsBodyEl = document.getElementById('timelineItemsBody');
+    const timelineItemsEmptyEl = document.getElementById('timelineItemsEmpty');
     const ganttBtn = document.getElementById('showGanttBtn');
 
     // Show members list
@@ -692,30 +1356,14 @@ const data = await apiGET(`${API_BASE}/projects/${projectId}/board`);
     //   membersBox.innerHTML = "👥 Members: <span class='italic text-gray-500'>No members assigned</span>";
     // }
 
-    // Check if the project is private and the user is not a member
-    // Use case-insensitive check as a friendly fallback
-    const username = current_user && current_user.username ? current_user.username.toString() : '';
-    const isMember = membersContains(projectInfo.members, username);
-    if ((projectInfo.type === 'private' || (data.project_type === 'private')) && !isMember) {
-      const denyMsg = `⛔ Access Denied: ${username} You are not a member of this private project.`;
-      canAccessProject = false;
-      if (ganttBtn) { ganttBtn.disabled = true; ganttBtn.title = 'Access denied'; }
-      board.innerHTML = `<p class='text-red-500 text-center mt-8'>${denyMsg}</p>`;
-      if (timelineAxisEl) timelineAxisEl.innerHTML = `<div class=\"p-6 text-red-500 text-center\">${denyMsg}</div>`;
-      if (milestoneBodyEl) milestoneBodyEl.innerHTML = `<tr><td colspan=\"4\" class=\"py-4 text-center text-red-500\">${escapeHtml(denyMsg)}</td></tr>`;
-      if (timelineSection) timelineSection.classList.remove('hidden');
-      return; // Stop the function
-    } else {
-      canAccessProject = true;
-      if (ganttBtn) { ganttBtn.disabled = false; ganttBtn.title = ''; }
-    }
+    if (ganttBtn) { ganttBtn.disabled = false; ganttBtn.title = ''; }
 
     
     // render columns (data.columns expected)
     (data.columns || []).forEach(col => {
-const colDiv = el('div', {class:'column flex-none w-72 bg-white/70 backdrop-blur p-4 rounded-2xl border border-slate-200 shadow-lg flex flex-col', id:`column-${col.id}`});
-      const header = el('div', {class:'flex items-center justify-between mb-3'});
-      const title = el('h3', {class:'text-lg font-semibold', text:col.title});
+const colDiv = el('div', {class:'column flex-none w-[272px] flex flex-col rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 shadow-sm', id:`column-${col.id}`});
+      const header = el('div', {class:'flex items-center justify-between mb-2 gap-2'});
+      const title = el('h3', {class:'text-sm font-semibold text-zinc-800 truncate', text:col.title});
       const controls = el('div', {class:'flex items-center space-x-2'});
 
       // Quick add input (hidden by default)
@@ -733,20 +1381,20 @@ const colDiv = el('div', {class:'column flex-none w-72 bg-white/70 backdrop-blur
         }
       });
 
-const addBtn = el('button', {class:'text-sm px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200', text:'+ Task'});
+const addBtn = el('button', {class:'text-xs px-2 py-1 rounded-md bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200', text:'+ Task'});
       addBtn.onclick = () => {
         const qa = document.getElementById(`qa-${col.id}`);
         qa.classList.toggle('hidden');
         if (!qa.classList.contains('hidden')) qa.querySelector('input').focus();
       };
-const renameBtn = el('button', {class:'text-sm px-2 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200', text:'Rename'});
+const renameBtn = el('button', {class:'text-xs px-2 py-1 rounded-md bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200', text:'Rename'});
       renameBtn.onclick = () => promptRenameColumn(projectId, col.id, col.title);
       controls.appendChild(addBtn);
       controls.appendChild(renameBtn);
       header.appendChild(title);
       header.appendChild(controls);
 
-      const taskList = el('div', {class:'task-list flex-1 min-h-[50px] space-y-3 mt-2', id:`col-tasks-${col.id}`});
+      const taskList = el('div', {class:'task-list flex-1 min-h-[48px] space-y-2 mt-2', id:`col-tasks-${col.id}`});
       (col.tasks || []).forEach(task => renderTask(task, taskList));
 
       colDiv.appendChild(header);
@@ -756,7 +1404,7 @@ const renameBtn = el('button', {class:'text-sm px-2 py-1 rounded-lg bg-slate-50 
     });
 
     // Add "Add Column" button
-const addColBtn = el('button', {class:'flex-none h-fit px-4 py-2 bg-gradient-to-r from-indigo-500 to-teal-500 text-white rounded-lg shadow hover:from-indigo-600 hover:to-teal-600 transition-colors', text:'+ Add Column'});
+const addColBtn = el('button', {class:'flex-none h-fit self-start px-4 py-2.5 rounded-xl border border-dashed border-zinc-300 bg-white text-sm font-medium text-zinc-600 hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors', text:'+ Add column'});
     addColBtn.onclick = () => promptAddColumn(projectId);
     board.appendChild(addColBtn);
 
@@ -822,6 +1470,11 @@ const addColBtn = el('button', {class:'flex-none h-fit px-4 py-2 bg-gradient-to-
       });
     });
 
+    if (activePmTab === 'gantt') {
+      requestAnimationFrame(() => renderVisGantt(data));
+    }
+
+    updateProjectManageButtons();
   } catch (err) {
     console.error('Error loading board', err);
     $('board').innerHTML = "<p class='text-red-500'>Failed to load board.</p>";
@@ -899,14 +1552,14 @@ async function promptRenameColumn(projectId, columnId, currentTitle) {
 /* ---------- Task render and flows ---------- */
 function renderTask(task, container) {
   // task: expected to be task_to_dict shape (id, title, description, progress, start_date, end_date, position, assignees)
-  const div = el('div', {class:'task bg-white p-3 rounded-lg shadow-sm border border-gray-200'});
+  const div = el('div', {class:'task rounded-xl border border-zinc-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md'});
   div.dataset.taskId = task.id;
 
-  const title = el('div', {class:'font-bold text-sm mb-1', text: task.title});
-  const desc = el('div', {class:'text-xs text-gray-600 truncate', text: task.description || 'No description'});
+  const title = el('div', {class:'font-semibold text-sm text-zinc-900 mb-1', text: task.title});
+  const desc = el('div', {class:'text-xs text-zinc-500 max-h-9 overflow-hidden', text: task.description || 'No description'});
 
   // dates & progress and assignees
-  const meta = el('div', {class:'text-xs text-gray-500 mt-2'});
+  const meta = el('div', {class:'text-[11px] text-zinc-500 mt-2'});
   const parts = [];
   if (task.start_date) parts.push('Start: ' + formatDate(task.start_date));
   if (task.end_date) parts.push('End: ' + formatDate(task.end_date));
@@ -916,14 +1569,13 @@ function renderTask(task, container) {
   if (assigneesLabel) parts.push(assigneesLabel);
   if (parts.length) meta.textContent = parts.join(' • ');
 
-  const progressWrap = el('div', {class:'w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden'});
-  // Add a background color class to pInner
-  const pInner = el('div', {class:'h-full bg-blue-500 transition-all duration-300', style:`width:${(task.progress||0)}%`});
+  const progressWrap = el('div', {class:'w-full bg-zinc-100 rounded-full h-1.5 mt-2 overflow-hidden'});
+  const pInner = el('div', {class:'h-full rounded-full bg-indigo-500 transition-all duration-300', style:`width:${(task.progress||0)}%`});
   progressWrap.appendChild(pInner);
 
-  const controls = el('div', {class:'flex justify-end space-x-2 mt-3'});
-  const editBtn = el('button',{class:'text-xs text-blue-500 hover:text-blue-700', text:'Edit'});
-  const delBtn = el('button',{class:'text-xs text-red-500 hover:text-red-700', text:'Delete'});
+  const controls = el('div', {class:'flex justify-end gap-2 mt-3 pt-2 border-t border-zinc-100'});
+  const editBtn = el('button',{class:'text-xs font-medium text-indigo-600 hover:text-indigo-800', text:'Edit'});
+  const delBtn = el('button',{class:'text-xs font-medium text-zinc-500 hover:text-red-600', text:'Delete'});
   editBtn.onclick = () => promptEditTask(task);
   delBtn.onclick = () => confirmDeleteTask(task.id);
   controls.appendChild(editBtn);
@@ -1048,7 +1700,7 @@ $('editProjectBtn').onclick = () => {
   const sel = $('projectSelect');
   const projectId = (sel && sel.value) ? sel.value : (currentProjectId || null);
   if (!projectId) {
-    alert('No project selected. Please select a project from the sidebar first.');
+    alert('No project selected. Please choose a project from the dropdown first.');
     return;
   }
   promptEditProject(projectId);
@@ -1057,7 +1709,7 @@ $('deleteProjectBtn').onclick = () => {
   const sel = $('projectSelect');
   const projectId = (sel && sel.value) ? sel.value : (currentProjectId || null);
   if (!projectId) {
-    alert('No project selected. Please select a project from the sidebar first.');
+    alert('No project selected. Please choose a project from the dropdown first.');
     return;
   }
   confirmDeleteProject(projectId);
@@ -1105,6 +1757,7 @@ async function promptCreateProject() {
     if (selected.length) {
       await apiPOST(`${API_BASE}/projects/${created.id}/members`, {user_ids: selected});
     }
+    currentProjectId = created.id;
     await loadProjects();
   });
   // Ensure the create project modal uses 85vw dimensions with scroll
@@ -1196,34 +1849,427 @@ async function confirmDeleteProject(projectId) {
 
 /* ---------- Timeline builder ---------- */
 async function buildTimelineFromBoard(boardData){
-  const tasks = [];
+  const timelineTasks = [];
+  const allItems = [];
   (boardData.columns||[]).forEach(col=>{
     (col.tasks||[]).forEach(t=>{
-      const d = t.start_date || t.end_date;
-      if(!d) return;
-      const dt = new Date(d);
-      if (isNaN(dt)) return;
       const assigneesArr = Array.isArray(t.assignees) ? t.assignees : [];
-      tasks.push({
+      const baseItem = {
         id: t.id,
         title: t.title,
-        date: dt,
+        description: t.description != null && t.description !== '' ? String(t.description) : '',
         start_iso: t.start_date || null,
         end_iso: t.end_date || null,
         progress: typeof t.progress === 'number' ? t.progress : null,
         assigned_names: assigneesArr.map(a => a.name),
         assigned_ids: assigneesArr.map(a => a.id),
         column_title: col.title || `Column ${col.id}`,
-        position: typeof t.position==='number' ? t.position : 0
-      });
+        position: typeof t.position==='number' ? t.position : 0,
+        date: null
+      };
+      const d = t.start_date || t.end_date;
+      if (d) {
+        const dt = new Date(d);
+        if (!isNaN(dt)) {
+          baseItem.date = dt;
+          timelineTasks.push(baseItem);
+        }
+      }
+      allItems.push(baseItem);
     });
   });
-  tasks.sort((a,b)=>a.date-b.date);
-  lastTimelineRows = tasks;
-  renderTimeline(tasks);
+  timelineTasks.sort((a,b)=>a.date-b.date);
+  const sortedAllItems = sortTimelineItemsForTable(allItems, timelineSortDirection);
+  lastTimelineRows = timelineTasks;
+  renderTimeline(timelineTasks);
   const members = await getProjectMembers(currentProjectId);
-  renderMilestonesTable(tasks, members);
-  renderTimelineLegend(tasks);
+  renderMilestonesTable(timelineTasks, members);
+  renderTimelineLegend(timelineTasks);
+  lastTimelineTableItems = sortedAllItems;
+  populateTimelineItemFilters(sortedAllItems);
+  renderTimelineItemsTable(getTimelineTableFilteredItems());
+}
+
+function sortTimelineItemsForTable(items, direction){
+  const dir = direction === 'desc' ? -1 : 1;
+  return [...(items || [])].sort((a, b) => {
+    const aHasDate = !!a.date;
+    const bHasDate = !!b.date;
+    if (aHasDate && bHasDate) {
+      const byDate = (a.date - b.date) * dir;
+      if (byDate !== 0) return byDate;
+      return (a.position - b.position) * dir;
+    }
+    if (aHasDate && !bHasDate) return -1;
+    if (!aHasDate && bHasDate) return 1;
+    return (a.position - b.position) * dir;
+  });
+}
+
+function monthKey(dateObj){
+  if (!dateObj) return 'unscheduled';
+  return `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2, '0')}`;
+}
+
+function monthLabelFromKey(key){
+  if (key === 'unscheduled') return 'Unscheduled';
+  const [yearStr, monthStr] = key.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr) - 1;
+  const d = new Date(year, month, 1);
+  return d.toLocaleDateString(undefined, {month: 'short', year: 'numeric'});
+}
+
+const TIMELINE_FILTER_UNASSIGNED = '__unassigned__';
+
+function populateTimelineItemFilters(items) {
+  const colSel = $('timelineFilterColumn');
+  const asgSel = $('timelineFilterAssignee');
+  if (!colSel || !asgSel) return;
+
+  colSel.innerHTML = '';
+  const colAll = document.createElement('option');
+  colAll.value = '';
+  colAll.textContent = 'All columns';
+  colSel.appendChild(colAll);
+  const cols = [...new Set((items || []).map(i => i.column_title || '').filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  cols.forEach((c) => {
+    const o = document.createElement('option');
+    o.value = c;
+    o.textContent = c;
+    colSel.appendChild(o);
+  });
+
+  asgSel.innerHTML = '';
+  const asgAll = document.createElement('option');
+  asgAll.value = '';
+  asgAll.textContent = 'All assignees';
+  asgSel.appendChild(asgAll);
+  const nameSet = new Set();
+  (items || []).forEach((i) => {
+    (i.assigned_names || []).forEach((n) => { if (n) nameSet.add(n); });
+  });
+  const hasUnassigned = (items || []).some((i) => !i.assigned_names || !i.assigned_names.length);
+  if (hasUnassigned) {
+    const u = document.createElement('option');
+    u.value = TIMELINE_FILTER_UNASSIGNED;
+    u.textContent = 'Unassigned';
+    asgSel.appendChild(u);
+  }
+  [...nameSet].sort((a, b) => a.localeCompare(b)).forEach((n) => {
+    const o = document.createElement('option');
+    o.value = n;
+    o.textContent = n;
+    asgSel.appendChild(o);
+  });
+}
+
+function getTimelineTableFilteredItems() {
+  let items = [...(lastTimelineTableItems || [])];
+  const colSel = $('timelineFilterColumn');
+  const asgSel = $('timelineFilterAssignee');
+  const col = colSel ? colSel.value : '';
+  const asg = asgSel ? asgSel.value : '';
+  if (col) items = items.filter((i) => (i.column_title || '') === col);
+  if (asg) {
+    if (asg === TIMELINE_FILTER_UNASSIGNED) {
+      items = items.filter((i) => !i.assigned_names || !i.assigned_names.length);
+    } else {
+      items = items.filter((i) => Array.isArray(i.assigned_names) && i.assigned_names.includes(asg));
+    }
+  }
+  return items;
+}
+
+function taskAssigneesExportStr(t) {
+  const arr = Array.isArray(t.assignees) ? t.assignees : [];
+  return arr.length ? arr.map((a) => (a && a.name) ? a.name : String(a)).join(', ') : 'Unassigned';
+}
+
+function buildBoardExportRows(boardData) {
+  const header = ['Column', 'Task', 'Description', 'Start', 'End', 'Progress %', 'Assignees'];
+  const rows = [header];
+  if (!boardData || !boardData.columns) return rows;
+  (boardData.columns || []).forEach((col) => {
+    const colTitle = col.title || `Column ${col.id}`;
+    (col.tasks || []).forEach((t) => {
+      const prog = typeof t.progress === 'number' ? `${t.progress}%` : '';
+      const desc = (t.description != null ? String(t.description) : '').replace(/\s+/g, ' ').trim();
+      rows.push([
+        colTitle,
+        t.title || '',
+        desc,
+        t.start_date ? formatDate(t.start_date) : '',
+        t.end_date ? formatDate(t.end_date) : '',
+        prog,
+        taskAssigneesExportStr(t),
+      ]);
+    });
+  });
+  return rows;
+}
+
+function buildTimelineExportRows() {
+  const header = ['Month', 'Task', 'Description', 'Column', 'Start', 'End', 'Progress', 'Assignees'];
+  const rows = [header];
+  const items = getTimelineTableFilteredItems() || [];
+  items.forEach((r) => {
+    const mk = monthKey(r.date);
+    const month = monthLabelFromKey(mk);
+    const assignees = r.assigned_names && r.assigned_names.length ? r.assigned_names.join(', ') : 'Unassigned';
+    const start = r.start_iso ? formatDate(r.start_iso) : '';
+    const end = r.end_iso ? formatDate(r.end_iso) : '';
+    const prog = r.progress === null || r.progress === undefined ? '' : `${r.progress}%`;
+    const desc = (r.description != null ? String(r.description) : '').replace(/\s+/g, ' ').trim();
+    rows.push([month, r.title || '', desc, r.column_title || '', start, end, prog, assignees]);
+  });
+  return rows;
+}
+
+function buildGanttExportRows(boardData) {
+  const header = ['Group/Column', 'Task', 'Description', 'Owner', 'Start', 'Due', 'Days', 'Progress %'];
+  const rows = [header];
+  if (!boardData || !boardData.columns) return rows;
+
+  const ganttDueEl = $('ganttFilterDue');
+  if (ganttDueEl) ganttDueFilter = ganttDueEl.value || 'all';
+  const ganttOwnerEl = $('ganttFilterOwner');
+  if (ganttOwnerEl) ganttFilterOwner = ganttOwnerEl.value || '';
+
+  const allDated = ganttCollectDatedTasks(boardData);
+  if (!allDated.length) return rows;
+
+  const filteredDated = allDated.filter(({ task }) => {
+    const e = ganttParseLocal(task.end_date);
+    return e && ganttMatchesFilters(task, e);
+  });
+  if (!filteredDated.length) return rows;
+
+  (boardData.columns || []).forEach((col) => {
+    const colTitle = col.title || `Column ${col.id}`;
+    const inCol = filteredDated.filter((x) => x.col.id === col.id);
+    if (!inCol.length) return;
+    inCol.forEach(({ task }) => {
+      const s = ganttParseLocal(task.start_date);
+      const e = ganttParseLocal(task.end_date);
+      if (!s || !e) return;
+      const dur = ganttCountBizInclusive(s, e);
+      const pct = typeof task.progress === 'number' ? `${task.progress}%` : '';
+      const desc = (task.description != null ? String(task.description) : '').replace(/\s+/g, ' ').trim();
+      rows.push([
+        colTitle,
+        task.title || '',
+        desc,
+        ganttAssigneeLabel(task),
+        formatDate(task.start_date),
+        formatDate(task.end_date),
+        dur,
+        pct,
+      ]);
+    });
+  });
+  return rows;
+}
+
+function getCurrentProjectExportName() {
+  if (!currentProjectId) return 'Project';
+  const p = projectsCache[currentProjectId];
+  if (p && p.name) return String(p.name);
+  return 'Project';
+}
+
+function sanitizeFilenamePart(name) {
+  const s = String(name || 'Project').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim();
+  return s || 'Project';
+}
+
+function truncateForPdfCell(val, maxLen) {
+  const s = val == null ? '' : String(val);
+  if (s.length <= maxLen) return s;
+  return s.slice(0, maxLen) + '…';
+}
+
+function exportPmReportExcel(scope) {
+  if (!lastBoardData || !lastBoardData.columns) {
+    alert('No project data loaded. Select a project and wait for the board to load.');
+    return;
+  }
+  if (typeof XLSX === 'undefined' || !XLSX.utils) {
+    alert('Excel export library is not available.');
+    return;
+  }
+  const allowed = new Set(['all', 'board', 'timeline', 'schedule']);
+  const s = allowed.has(scope) ? scope : 'all';
+  const projLabel = sanitizeFilenamePart(getCurrentProjectExportName());
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const wb = XLSX.utils.book_new();
+
+  const appendBoard = () => {
+    const boardAoa = buildBoardExportRows(lastBoardData);
+    const wsBoard = XLSX.utils.aoa_to_sheet(boardAoa);
+    wsBoard['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 44 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 28 }];
+    XLSX.utils.book_append_sheet(wb, wsBoard, 'Board');
+  };
+  const appendTimeline = () => {
+    const timelineAoa = buildTimelineExportRows();
+    const wsTimeline = XLSX.utils.aoa_to_sheet(timelineAoa);
+    wsTimeline['!cols'] = [{ wch: 16 }, { wch: 28 }, { wch: 40 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 28 }];
+    XLSX.utils.book_append_sheet(wb, wsTimeline, 'Timeline');
+  };
+  const appendSchedule = () => {
+    const ganttAoa = buildGanttExportRows(lastBoardData);
+    const wsGantt = XLSX.utils.aoa_to_sheet(ganttAoa);
+    wsGantt['!cols'] = [{ wch: 20 }, { wch: 28 }, { wch: 40 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, wsGantt, 'Schedule');
+  };
+
+  if (s === 'all') {
+    appendBoard();
+    appendTimeline();
+    appendSchedule();
+    XLSX.writeFile(wb, `${projLabel}_report_${dateStr}.xlsx`);
+  } else if (s === 'board') {
+    appendBoard();
+    XLSX.writeFile(wb, `${projLabel}_board_${dateStr}.xlsx`);
+  } else if (s === 'timeline') {
+    appendTimeline();
+    XLSX.writeFile(wb, `${projLabel}_timeline_${dateStr}.xlsx`);
+  } else {
+    appendSchedule();
+    XLSX.writeFile(wb, `${projLabel}_schedule_${dateStr}.xlsx`);
+  }
+}
+
+function exportPmReportPdf(scope) {
+  if (!lastBoardData || !lastBoardData.columns) {
+    alert('No project data loaded. Select a project and wait for the board to load.');
+    return;
+  }
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    alert('PDF export library is not available.');
+    return;
+  }
+  const allowed = new Set(['all', 'board', 'timeline', 'schedule']);
+  const s = allowed.has(scope) ? scope : 'all';
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const projName = getCurrentProjectExportName();
+  const projLabel = sanitizeFilenamePart(projName);
+  const dateStr = new Date().toISOString().slice(0, 10);
+
+  const sectionLabel = s === 'board' ? 'Board' : s === 'timeline' ? 'Timeline' : s === 'schedule' ? 'Schedule' : '';
+  doc.setFontSize(16);
+  doc.text(`Project report: ${truncateForPdfCell(projName, 80)}`, 14, 16);
+  doc.setFontSize(10);
+  let cursorY;
+  if (s === 'all') {
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 24);
+    cursorY = 32;
+  } else {
+    doc.text(`Section: ${sectionLabel}`, 14, 22);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+    cursorY = 36;
+  }
+  const PDF_TRUNC = 200;
+
+  function addTableSection(title, aoa) {
+    if (!aoa || aoa.length < 1) return;
+    const head = aoa[0].map((c) => truncateForPdfCell(c, PDF_TRUNC));
+    const body = aoa.slice(1).map((row) => row.map((c) => truncateForPdfCell(c, PDF_TRUNC)));
+    if (cursorY > 250) {
+      doc.addPage();
+      cursorY = 14;
+    }
+    doc.setFontSize(11);
+    doc.text(title, 14, cursorY);
+    cursorY += 4;
+    doc.autoTable({
+      head: [head],
+      body,
+      startY: cursorY,
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      headStyles: { fillColor: [67, 56, 202] },
+      margin: { left: 14, right: 14 },
+    });
+    cursorY = doc.lastAutoTable.finalY + 10;
+  }
+
+  if (s === 'all') {
+    addTableSection('Board', buildBoardExportRows(lastBoardData));
+    addTableSection('Timeline', buildTimelineExportRows());
+    addTableSection('Schedule', buildGanttExportRows(lastBoardData));
+    doc.save(`${projLabel}_report_${dateStr}.pdf`);
+  } else if (s === 'board') {
+    addTableSection('Board', buildBoardExportRows(lastBoardData));
+    doc.save(`${projLabel}_board_${dateStr}.pdf`);
+  } else if (s === 'timeline') {
+    addTableSection('Timeline', buildTimelineExportRows());
+    doc.save(`${projLabel}_timeline_${dateStr}.pdf`);
+  } else {
+    addTableSection('Schedule', buildGanttExportRows(lastBoardData));
+    doc.save(`${projLabel}_schedule_${dateStr}.pdf`);
+  }
+}
+
+function renderTimelineItemsTable(items){
+  const body = document.getElementById('timelineItemsBody');
+  const empty = document.getElementById('timelineItemsEmpty');
+  if (!body || !empty) return;
+  const hasAnyItems = lastTimelineTableItems && lastTimelineTableItems.length > 0;
+  const noMatchFilters = hasAnyItems && (!items || !items.length);
+  if (!items || !items.length) {
+    body.innerHTML = '';
+    empty.textContent = noMatchFilters ? 'No items match the selected filters.' : 'No project items available.';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  const groups = new Map();
+  items.forEach(item => {
+    const key = monthKey(item.date);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
+
+  const keys = Array.from(groups.keys())
+    .sort((a, b) => {
+      if (a === 'unscheduled') return 1;
+      if (b === 'unscheduled') return -1;
+      return timelineSortDirection === 'desc' ? b.localeCompare(a) : a.localeCompare(b);
+    });
+
+  body.innerHTML = keys.map((key) => {
+    const rows = groups.get(key) || [];
+    const headerRow = `
+      <tr class="bg-slate-100 border-y border-slate-200">
+        <td colspan="7" class="px-3 py-2 font-semibold text-slate-700">${escapeHtml(monthLabelFromKey(key))}</td>
+      </tr>
+    `;
+    const taskRows = rows.map((r) => {
+      const assignees = (r.assigned_names && r.assigned_names.length) ? r.assigned_names.join(', ') : 'Unassigned';
+      const start = r.start_iso ? formatDate(r.start_iso) : '—';
+      const end = r.end_iso ? formatDate(r.end_iso) : '—';
+      const progress = (r.progress === null || r.progress === undefined) ? '—' : `${r.progress}%`;
+      const descRaw = r.description || '';
+      const descOne = String(descRaw).replace(/\s+/g, ' ').trim();
+      const descCell = descOne
+        ? `<td class="px-3 py-2 max-w-[14rem] truncate text-zinc-600" title="${escapeHtml(descOne)}">${escapeHtml(descOne)}</td>`
+        : `<td class="px-3 py-2 text-zinc-400">—</td>`;
+      return `
+        <tr class="border-b border-slate-100 hover:bg-slate-50">
+          <td class="px-3 py-2 font-medium">${escapeHtml(r.title || '')}</td>
+          ${descCell}
+          <td class="px-3 py-2">${escapeHtml(r.column_title || '')}</td>
+          <td class="px-3 py-2 whitespace-nowrap">${escapeHtml(start)}</td>
+          <td class="px-3 py-2 whitespace-nowrap">${escapeHtml(end)}</td>
+          <td class="px-3 py-2 whitespace-nowrap">${escapeHtml(progress)}</td>
+          <td class="px-3 py-2">${escapeHtml(assignees)}</td>
+        </tr>
+      `;
+    }).join('');
+    return `${headerRow}${taskRows}`;
+  }).join('');
 }
 
 function fmtDMY(d){ return d.toLocaleDateString(); }
@@ -1231,7 +2277,10 @@ function fmtDMY(d){ return d.toLocaleDateString(); }
 function renderMilestonesTable(rows, members){
   const body = document.getElementById('milestoneBody');
   if(!body) return;
-  if(!rows.length){ body.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-slate-500">No dated tasks available</td></tr>'; return; }
+  if(!rows.length){
+    body.innerHTML = '<p class="py-8 text-center text-sm text-zinc-500">No dated tasks available</p>';
+    return;
+  }
 
   const buildSummary = (names=[]) => {
     const list = names.slice(0, 2);
@@ -1251,26 +2300,31 @@ function renderMilestonesTable(rows, members){
       </label>`;
     }).join('');
 
-    return `<tr class="border-b border-slate-100">
-      <td class="py-2 px-3 whitespace-nowrap">${fmtDMY(r.date)}</td>
-      <td class="py-2 px-3">${escapeHtml(r.title)}</td>
-      <td class="py-2 px-3 relative">
-        <div class="flex items-center gap-2">
-          <div class="text-xs text-slate-700 truncate max-w-[180px]" id="assignee-summary-${r.id}">${escapeHtml(summary)}</div>
-          <button type="button" class="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50" onclick="toggleAssigneePanel(${r.id})">Assign</button>
+    return `<article class="rounded-xl border border-zinc-100 bg-zinc-50/30 p-4 hover:bg-white hover:shadow-md transition-shadow relative z-0">
+      <div class="flex flex-wrap items-start gap-2 mb-3">
+        <span class="inline-flex shrink-0 items-center rounded-full bg-zinc-200/90 px-2.5 py-0.5 text-xs font-medium text-zinc-800 tabular-nums">${fmtDMY(r.date)}</span>
+        <h4 class="text-sm font-semibold text-zinc-900 min-w-0 flex-1 leading-snug">${escapeHtml(r.title)}</h4>
+      </div>
+      <div class="relative mb-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="text-xs text-zinc-700 truncate max-w-[min(180px,100%)]" id="assignee-summary-${r.id}">${escapeHtml(summary)}</div>
+          <button type="button" class="shrink-0 px-2.5 py-1 text-xs font-medium rounded-lg border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50" onclick="toggleAssigneePanel(${r.id})">Assign</button>
         </div>
-        <div id="assignee-panel-${r.id}" class="assignee-panel hidden absolute z-20 top-8 left-3 bg-white border border-slate-200 rounded-lg shadow-lg p-3 w-64">
+        <div id="assignee-panel-${r.id}" class="assignee-panel hidden absolute z-30 left-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl p-3 w-[min(16rem,calc(100vw-2rem))]">
           <div class="max-h-48 overflow-auto space-y-1">
             ${checks}
           </div>
-          <div class="flex justify-end gap-2 mt-2">
-            <button type="button" class="px-2 py-1 text-xs rounded border border-slate-300 bg-white hover:bg-slate-50" onclick="closeAssigneePanel(${r.id})">Cancel</button>
-            <button type="button" class="px-2 py-1 text-xs rounded bg-indigo-600 text-white hover:bg-indigo-700" onclick="saveAssigneePanel(${r.id})">Save</button>
+          <div class="flex justify-end gap-2 mt-2 pt-2 border-t border-zinc-100">
+            <button type="button" class="px-2.5 py-1 text-xs rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50" onclick="closeAssigneePanel(${r.id})">Cancel</button>
+            <button type="button" class="px-2.5 py-1 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700" onclick="saveAssigneePanel(${r.id})">Save</button>
           </div>
         </div>
-      </td>
-      <td class="py-2 px-3 whitespace-nowrap"><input type="number" class="w-20 border rounded p-1" value="${r.position}" onchange="updateMilestonePosition(${r.id}, this.value)" /></td>
-    </tr>`;
+      </div>
+      <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-zinc-100/90">
+        <label class="text-xs font-medium text-zinc-500" for="milestone-pos-${r.id}">Position</label>
+        <input id="milestone-pos-${r.id}" type="number" class="w-20 rounded-lg border border-zinc-200 px-2 py-1 text-sm text-zinc-800" value="${r.position}" onchange="updateMilestonePosition(${r.id}, this.value)" />
+      </div>
+    </article>`;
   }).join('');
 }
 
@@ -1756,144 +2810,18 @@ function openTaskFromTimeline(taskId){
   }catch(e){ console.warn('Failed to open task from timeline', e); }
 }
 
-/* ---------- NEW: Gantt Chart Functionality ---------- */
-async function showGanttChart() {
+/* ---------- Schedule (vis-timeline) – opens Schedule tab ---------- */
+function showGanttChart() {
   if (!currentProjectId) {
     alert('Please select a project first.');
     return;
   }
-
-  if (!canAccessProject) {
-    const username = current_user && current_user.username ? current_user.username.toString() : 'user';
-    alert(`Access Denied: ${username} You are not a member of this private project.`);
-    return;
-  }
-  try {
-    const boardData = await apiGET(`${API_BASE}/projects/${currentProjectId}/board`);
-    ensureColorMaps(boardData);
-    
-    let tasks = [];
-    let legendMap = new Map();
-    if (boardData && boardData.columns) {
-      boardData.columns.forEach(column => {
-        (column.tasks || []).forEach(task => {
-          if (task.start_date && task.end_date) {
-            const assName = (Array.isArray(task.assignees) && task.assignees.length) ? (task.assignees[0].name || task.assignees[0]) : 'Unassigned';
-            const groupKey = (colorMode === 'assignee') ? assName : (column.title || `Column ${column.id}`);
-            const color = (colorMode === 'assignee') ? (colorMaps.assignee[groupKey]||'#3b82f6') : (colorMaps.column[groupKey]||'#3b82f6');
-            const slug = slugify(groupKey);
-            legendMap.set(groupKey, color);
-            tasks.push({
-              id: `Task-${task.id}`,
-              name: task.title,
-              start: task.start_date.slice(0, 10),
-              end: task.end_date.slice(0, 10),
-              progress: task.progress || 0,
-              custom_class: `color-${slug}`
-            });
-          }
-        });
-      });
-    }
-
-    if (tasks.length === 0) {
-      alert('This project has no tasks with start and end dates to display in a Gantt chart.');
-      return;
-    }
-
-    const title = 'Gantt Chart';
-    openModal(title, (c) => {
-      // Legend + controls
-      const topBar = document.createElement('div');
-      topBar.className = 'flex items-center justify-between mb-2';
-      const left = document.createElement('div');
-      left.className = 'flex items-center gap-2 text-sm';
-      left.innerHTML = `<span class="text-slate-600">Color by</span>
-        <select id="ganttColorBy" class="border rounded px-2 py-1 text-sm">
-          <option value="column" ${colorMode==='column'?'selected':''}>Column</option>
-          <option value="assignee" ${colorMode==='assignee'?'selected':''}>Assignee</option>
-        </select>`;
-      const legend = document.createElement('div');
-      legend.id = 'ganttLegend';
-      legend.className = 'flex flex-wrap gap-2';
-      topBar.appendChild(left);
-      topBar.appendChild(legend);
-      c.appendChild(topBar);
-
-      // Create the container for the chart
-      const chartDiv = document.createElement('div');
-      chartDiv.id = 'ganttChartContainer';
-      c.appendChild(chartDiv);
-    }, () => {
-      // The Gantt chart is for viewing, so confirm button has no action
-      closeModal();
-    }, true); // The `true` argument makes the modal wide
-
-    // Hide the confirm button for this modal
-    modalConfirm.style.display = 'none';
-
-    // Inject style rules for colors
-    const styleEl = document.createElement('style');
-    styleEl.type = 'text/css';
-    styleEl.textContent = Array.from(legendMap.entries()).map(([k,c]) => {
-      const slug = slugify(k);
-      return [
-        `.bar.color-${slug} { fill: ${c} !important; stroke: ${c} !important; }`,
-        `.bar-progress.color-${slug} { fill: ${c} !important; }`,
-        `g.color-${slug} .bar { fill: ${c} !important; stroke: ${c} !important; }`,
-        `g.color-${slug} .bar-progress { fill: ${c} !important; }`,
-        `.bar.color-${slug}:hover, g.color-${slug} .bar:hover { opacity: .9; }`
-      ].join('\n');
-    }).join('\n');
-    document.head.appendChild(styleEl);
-
-    // Build legend
-    const legend = document.getElementById('ganttLegend');
-    if (legend){
-      legend.innerHTML = Array.from(legendMap.entries()).slice(0,16).map(([k,c]) => `
-        <span class="flex items-center gap-1 text-xs text-slate-700">
-          <span style="background:${c}" class="inline-block w-3 h-3 rounded-full border border-slate-300"></span>
-          ${escapeHtml(k)}
-        </span>
-      `).join('');
-    }
-
-    // Initialize the Gantt chart after the container is in the DOM
-    let gantt = new Gantt('#ganttChartContainer', tasks, {
-      bar_height: 20,
-      padding: 18,
-      view_modes: ['Day', 'Week', 'Month'],
-      bar_corner_radius: 3,
-      on_click: (task) => {
-        const id = (task.id || '').replace('Task-','');
-        if (id) {
-          // close modal then open edit
-          closeModal();
-          // Find the task in lastBoardData and open
-          openTaskFromTimeline(id);
-        }
-      }
-    });
-
-    const colorBySel = document.getElementById('ganttColorBy');
-    if (colorBySel){
-      colorBySel.onchange = async () => { colorMode = colorBySel.value; await showGanttChart(); };
-    }
-
-  } catch (err) {
-    console.error('Error loading tasks for Gantt chart', err);
-    alert('Failed to load tasks for Gantt chart.');
-  }
+  setActiveTab('gantt');
 }
 
 /* ---------- My Tasks Modal (Assigned to me in current project) ---------- */
 async function showMyTasks(){
   if (!currentProjectId) { alert('Please select a project first.'); return; }
-  if (!canAccessProject) {
-    const uname = current_user && current_user.username ? current_user.username.toString() : 'user';
-    alert(`Access Denied: ${uname} You are not a member of this private project.`);
-    return;
-  }
   try {
     let boardData = lastBoardData;
     if (!boardData || !boardData.columns) {
@@ -1989,6 +2917,74 @@ async function showMyTasks(){
 
 /* ---------- Initial load ---------- */
 window.onload = async () => {
+  const timelineSort = document.getElementById('timelineItemsSort');
+  if (timelineSort){
+    timelineSort.onchange = () => {
+      timelineSortDirection = timelineSort.value === 'desc' ? 'desc' : 'asc';
+      if (lastBoardData) buildTimelineFromBoard(lastBoardData);
+    };
+  }
+  const timelineFilterColumn = $('timelineFilterColumn');
+  const timelineFilterAssignee = $('timelineFilterAssignee');
+  if (timelineFilterColumn) {
+    timelineFilterColumn.addEventListener('change', () => renderTimelineItemsTable(getTimelineTableFilteredItems()));
+  }
+  if (timelineFilterAssignee) {
+    timelineFilterAssignee.addEventListener('change', () => renderTimelineItemsTable(getTimelineTableFilteredItems()));
+  }
+  const tabBoard = $('tab-board');
+  const tabTimeline = $('tab-timeline');
+  const tabGantt = $('tab-gantt');
+  if (tabBoard) tabBoard.onclick = () => setActiveTab('board');
+  if (tabTimeline) tabTimeline.onclick = () => setActiveTab('timeline');
+  if (tabGantt) tabGantt.onclick = () => setActiveTab('gantt');
+
+  const ganttColorBy = $('ganttColorBy');
+  if (ganttColorBy) {
+    ganttColorBy.value = colorMode;
+    ganttColorBy.onchange = () => {
+      colorMode = ganttColorBy.value === 'assignee' ? 'assignee' : 'column';
+      renderVisGantt(lastBoardData);
+    };
+  }
+  const ganttFitBtn = $('ganttFitBtn');
+  if (ganttFitBtn) {
+    ganttFitBtn.onclick = () => {
+      const scrollEl = $('ganttRightScroll');
+      if (scrollEl) scrollEl.scrollLeft = 0;
+    };
+  }
+  const ganttFilterDueSel = $('ganttFilterDue');
+  if (ganttFilterDueSel) {
+    ganttDueFilter = ganttFilterDueSel.value || 'all';
+    ganttFilterDueSel.onchange = () => {
+      ganttDueFilter = ganttFilterDueSel.value || 'all';
+      renderVisGantt(lastBoardData);
+    };
+  }
+  const ganttFilterOwnerSelect = $('ganttFilterOwner');
+  if (ganttFilterOwnerSelect) {
+    ganttFilterOwner = ganttFilterOwnerSelect.value || '';
+    ganttFilterOwnerSelect.onchange = () => {
+      ganttFilterOwner = ganttFilterOwnerSelect.value || '';
+      renderVisGantt(lastBoardData);
+    };
+  }
+
+  const pmExportSelect = $('pmExportSelect');
+  if (pmExportSelect) {
+    pmExportSelect.onchange = () => {
+      const v = pmExportSelect.value;
+      if (!v) return;
+      const parts = v.split(':');
+      const kind = parts[0];
+      const sc = parts[1] || 'all';
+      if (kind === 'excel') exportPmReportExcel(sc);
+      else if (kind === 'pdf') exportPmReportPdf(sc);
+      pmExportSelect.value = '';
+    };
+  }
+
   await loadUsers(); // prefetch users for quick modals
   await loadProjects();
 };

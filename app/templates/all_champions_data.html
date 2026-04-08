@@ -455,8 +455,20 @@
                 </div>
               </div>
               <div class="p-3 border-bottom bg-light">
-                <input type="text" id="searchSchools" placeholder="Search school, champion or province..."
-                  class="form-control search-input bg-white w-100">
+                <div class="d-flex gap-2 align-items-center">
+                  <input type="text" id="searchSchools" placeholder="Search school, champion or province..."
+                    class="form-control search-input bg-white w-100 flex-grow-1">
+                </div>
+                <div class="d-flex gap-2 align-items-center mt-2">
+                  <input type="text" id="schoolAddedDate" placeholder="Added date (YYYY-MM-DD)"
+                    class="form-control form-control-sm shadow-none" style="max-width: 220px;">
+                  <button type="button" class="btn btn-primary btn-sm rounded-3 fw-medium" id="applySchoolAddedDate">
+                    <i class="fa fa-filter me-1"></i> Filter
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm rounded-3" id="clearSchoolAddedDate">
+                    Clear
+                  </button>
+                </div>
               </div>
               <div class="table-responsive" style="max-height: 70vh;">
                 <table class="table-custom" id="schooltracker-table">
@@ -468,6 +480,7 @@
                       <th>Status</th>
                       <th>First Awarded</th>
                       <th>Expiry</th>
+                      <th>Added At</th>
                       <th>Duration</th>
                       <th>Days left to 12</th>
                       <th>Type</th>
@@ -524,12 +537,13 @@
     const TTL_MS = 5 * 60 * 1000; // cache TTL: 5 minutes
     const analyticsCacheKey = 'allChampions_analytics_v1';
     const championsCacheKey = 'allChampions_champions_v1';
-    const schoolTrackerCacheKey = 'allChampions_schooltracker_v1';
+    const schoolTrackerCacheKey = 'allChampions_schooltracker_v5';
 
     // In-memory state for fast filtering and virtualization
     let analyticsVT = null, analyticsAllRows = [], analyticsFilteredRows = [];
     let championsVT = null, championsAllRows = [], championsFilteredRows = [];
     let schoolVT = null, schoolAllRows = [], schoolFilteredRows = [];
+    let schoolExactDateFilterEnabled = false; // only filter by exact added-at date after user applies in School Tracker
     let analyticsController = null, championsLoaded = false, schoolTrackerLoaded = false;
     let lastCompareReport = null, lastCompareSummary = null;
 
@@ -549,6 +563,7 @@
 
     const startPicker = flatpickr("#startDate", { ...fpConfig, defaultDate: startOfMonth });
     const endPicker = flatpickr("#endDate", { ...fpConfig, defaultDate: today });
+    const schoolAddedDatePicker = flatpickr("#schoolAddedDate", { ...fpConfig, defaultDate: null });
 
     function setStatus(id, text) {
       const el = document.getElementById(id);
@@ -785,6 +800,40 @@
       }
     }
 
+    // Apply school-table filters (text + added-at date range) in memory
+    function applySchoolTrackerFilters() {
+      const term = ((document.getElementById('searchSchools') || {}).value || '').toLowerCase().trim();
+      // Prefer when approved onto the champion profile; if missing, fall back to when it was created in the system.
+      const dateFieldPrimary = 'profile_added_at';
+      const dateFieldFallback = 'system_added_at';
+
+      function rowDateToYMD(val) {
+        if (!val) return null;
+        if (typeof val === 'string') return val.split('T')[0];
+        return null;
+      }
+      const exactDateStr = ((document.getElementById('schoolAddedDate') || {}).value || '').trim();
+      const isExactYmd = /^\d{4}-\d{2}-\d{2}$/.test(exactDateStr);
+      const useExactDateFilter = !!(schoolExactDateFilterEnabled && isExactYmd);
+
+      const filtered = schoolAllRows.filter(r => {
+        const textOk = !term
+          || (r.champion || '').toLowerCase().includes(term)
+          || (r.school_name || '').toLowerCase().includes(term)
+          || (r.province || '').toLowerCase().includes(term);
+
+        if (!textOk) return false;
+
+        if (!useExactDateFilter) return true;
+        const pickedVal = r[dateFieldPrimary] || r[dateFieldFallback];
+        const rowYmd = rowDateToYMD(pickedVal);
+        return !!rowYmd && rowYmd === exactDateStr;
+      });
+
+      schoolFilteredRows = filtered;
+      if (schoolVT) schoolVT.update(filtered);
+    }
+
     // Lazy-load School Tracker
     async function loadSchoolTracker(forceReload = false) {
       if (schoolTrackerLoaded && !forceReload) return;
@@ -804,6 +853,9 @@
           statusBadge = '<span class="badge bg-secondary">Inactive</span>';
         }
 
+        const addedVal = s.profile_added_at || s.system_added_at;
+        const addedTxt = addedVal ? (String(addedVal).split('T')[0] || '-') : '-';
+
         return `
         <tr class="${s.is_over_12_months ? 'long-term-row' : ''}">
           <td><div class="fw-medium text-dark">${s.champion || 'U'}</div></td>
@@ -817,6 +869,7 @@
           <td>${statusBadge}</td>
           <td class="small text-muted">${s.first_awarded_at || '-'}</td>
           <td class="small text-muted">${s.expiry_date || '-'}</td>
+          <td class="small text-muted">${addedTxt}</td>
           <td class="small text-muted">${s.duration || '0'} mo</td>
           <td class="small">${(s.days_left_until_12 != null && s.days_left_until_12 > 0) ? '<span class="months-left-highlight">' + s.days_left_until_12 + ' days</span>' : '—'}</td>
           <td class="small text-muted">${s.scholarship_type || '-'}</td>
@@ -828,7 +881,7 @@
         if (cached && Array.isArray(cached.data)) {
           schoolAllRows = cached.data;
           schoolFilteredRows = schoolAllRows;
-          schoolVT = mountVirtualTable('schooltracker-table', schoolAllRows, schoolRenderRow, 9, { rowHeight: 52, buffer: 12 });
+          schoolVT = mountVirtualTable('schooltracker-table', schoolAllRows, schoolRenderRow, 10, { rowHeight: 52, buffer: 12 });
           setStatus('schooltracker-status', 'Loaded from cache');
         }
       }
@@ -860,7 +913,7 @@
         schoolFilteredRows = schools;
 
         if (!schoolVT) {
-          schoolVT = mountVirtualTable('schooltracker-table', schoolAllRows, schoolRenderRow, 9, { rowHeight: 52, buffer: 12 });
+          schoolVT = mountVirtualTable('schooltracker-table', schoolAllRows, schoolRenderRow, 10, { rowHeight: 52, buffer: 12 });
         } else {
           schoolVT.update(schoolAllRows);
         }
@@ -893,7 +946,20 @@
 
         const s1 = XLSX.utils.json_to_sheet(analyticsAllRows);
         const s2 = XLSX.utils.json_to_sheet(championsAllRows);
-        const s3 = XLSX.utils.json_to_sheet(schoolAllRows);
+        const schoolSource = schoolTrackerLoaded ? schoolFilteredRows : schoolAllRows;
+        const schoolExportRows = schoolSource.map(s => ({
+          Champion: s.champion,
+          School: s.school_name,
+          Province: s.province,
+          Status: s.status,
+          "First Awarded": s.first_awarded_at || '-',
+          Expiry: s.expiry_date || '-',
+          "Added At": (s.profile_added_at || s.system_added_at) ? String((s.profile_added_at || s.system_added_at)).split('T')[0] : '-',
+          Duration: `${s.duration || '0'} mo`,
+          "Days left to 12": s.days_left_until_12 != null ? `${s.days_left_until_12} days` : '-',
+          Type: s.scholarship_type || '-'
+        }));
+        const s3 = XLSX.utils.json_to_sheet(schoolExportRows);
 
         XLSX.utils.book_append_sheet(wb, s1, "Analytics Overview");
         XLSX.utils.book_append_sheet(wb, s2, "Ask Akello Engagement");
@@ -961,14 +1027,17 @@
 
         doc.setFontSize(14);
         doc.text("3. School Tracker", 14, nextY);
-        const cols3 = ["Champion", "School", "Province", "Status", "First Awarded", "Expiry", "Duration", "Days left to 12", "Type"];
-        const rows3 = schoolAllRows.map(s => [
+        const schoolSource = schoolTrackerLoaded ? schoolFilteredRows : schoolAllRows;
+
+        const cols3 = ["Champion", "School", "Province", "Status", "First Awarded", "Expiry", "Added At", "Duration", "Days left to 12", "Type"];
+        const rows3 = schoolSource.map(s => [
           s.champion,
           s.school_name,
           s.province,
           s.status,
           s.first_awarded_at || '-',
           s.expiry_date || '-',
+          (s.profile_added_at || s.system_added_at) ? String((s.profile_added_at || s.system_added_at)).split('T')[0] : '-',
           s.duration || '0',
           s.days_left_until_12 != null ? String(s.days_left_until_12) + ' days' : '-',
           s.scholarship_type || '-'
@@ -1047,17 +1116,26 @@
       });
 
       document.getElementById('searchSchools').addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        if (!term) { if (schoolTrackerLoaded) { schoolFilteredRows = schoolAllRows; schoolVT.update(schoolAllRows); } return; }
-
-        const filtered = schoolAllRows.filter(r =>
-          (r.champion || '').toLowerCase().includes(term) ||
-          (r.school_name || '').toLowerCase().includes(term) ||
-          (r.province || '').toLowerCase().includes(term)
-        );
-        schoolFilteredRows = filtered;
-        if (schoolVT) schoolVT.update(filtered);
+        if (schoolTrackerLoaded) applySchoolTrackerFilters();
       });
+
+      const applySchoolAddedDateBtn = document.getElementById('applySchoolAddedDate');
+      if (applySchoolAddedDateBtn) {
+        applySchoolAddedDateBtn.addEventListener('click', () => {
+          schoolExactDateFilterEnabled = true;
+          if (schoolTrackerLoaded) applySchoolTrackerFilters();
+        });
+      }
+
+      const clearSchoolAddedDateBtn = document.getElementById('clearSchoolAddedDate');
+      if (clearSchoolAddedDateBtn) {
+        clearSchoolAddedDateBtn.addEventListener('click', () => {
+          schoolExactDateFilterEnabled = false;
+          const dateEl = document.getElementById('schoolAddedDate');
+          if (dateEl) dateEl.value = '';
+          if (schoolTrackerLoaded) applySchoolTrackerFilters();
+        });
+      }
 
       // Filter Button
       document.getElementById('loadData').addEventListener('click', async () => {
@@ -1080,6 +1158,10 @@
 
         if (championsLoaded) {
           loadChampions(true);
+        }
+
+        if (schoolTrackerLoaded) {
+          applySchoolTrackerFilters();
         }
       });
 

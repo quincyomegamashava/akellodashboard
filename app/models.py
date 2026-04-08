@@ -558,6 +558,7 @@ class ProjectA(db.Model):
     name = db.Column(db.String(140), nullable=False)
     project_type = db.Column(db.String(20), default="private")  # private / public
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
 
     # relationships
     columns = db.relationship(

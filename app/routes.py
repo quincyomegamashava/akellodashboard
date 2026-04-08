@@ -8,7 +8,7 @@ import socket
 import ssl
 from urllib import parse
 from urllib.parse import urlsplit
-from flask import jsonify, render_template, flash, redirect, render_template_string, session, url_for, request, send_file, Response, stream_with_context
+from flask import jsonify, render_template, flash, redirect, render_template_string, session, url_for, request, send_file, Response, stream_with_context, abort
 from flask_login import login_user, logout_user, current_user, login_required
 import sqlalchemy as sa
 from docx import Document
@@ -1345,10 +1345,28 @@ def task_to_dict(t):
     }
 
 
+def can_manage_project_a(p):
+    """Admin / Super-admin privilege, or project owner."""
+    if getattr(current_user, "userRole", None) == "Admin":
+        return True
+    if hasattr(current_user, "has_privilege") and current_user.has_privilege("Super-admin"):
+        return True
+    if p.owner_id is not None and p.owner_id == current_user.id:
+        return True
+    return False
+
 
 @app.before_request
 def create_tables():
     db.create_all()
+    # Best-effort: add owner_id on existing SQLite DBs (ignored if column already exists)
+    try:
+        if db.engine.dialect.name == "sqlite":
+            with db.engine.connect() as _conn:
+                _conn.execute(sa.text("ALTER TABLE projectsa ADD COLUMN owner_id INTEGER"))
+                _conn.commit()
+    except Exception:
+        pass
     # seed sample if empty
     if ProjectA.query.count() == 0:
         p = ProjectA(name="Example Project")
@@ -1363,10 +1381,16 @@ def create_tables():
             db.session.add(t)
         db.session.commit()
 
-@app.route("/projectmanagemnt",  methods=["GET", "POST"])
+@app.route("/projectmanagemnt", methods=["GET", "POST"])
+@login_required
 def projectmanagement():
-
     return render_template("aplanforprojects.html")
+
+
+@app.route("/projectmanagement", methods=["GET", "POST"])
+@login_required
+def projectmanagement_alias():
+    return redirect(url_for("projectmanagement"))
 
 # List + create projects
 @app.route("/api/projects", methods=["GET", "POST"])
@@ -1379,20 +1403,22 @@ def projectsA():
                 "id": p.id,
                 "name": p.name,
                 "type": p.project_type,
+                "owner_id": p.owner_id,
                 "members": [u.username for u in p.members]
             } for p in ps
         ])
     
     data = request.get_json()
     if not data or "name" not in data:
-        return os.abort(400)
+        abort(400)
     p = ProjectA(
         name=data["name"],
-        project_type=data.get("project_type", "private")
+        project_type=data.get("project_type", "private"),
+        owner_id=current_user.id,
     )
     db.session.add(p)
     db.session.commit()
-    return jsonify({"id": p.id, "name": p.name, "type": p.project_type}), 201
+    return jsonify({"id": p.id, "name": p.name, "type": p.project_type, "owner_id": p.owner_id}), 201
 
 
 
@@ -1405,6 +1431,7 @@ def get_projectA(project_id):
         "id": p.id,
         "name": p.name,
         "type": p.project_type,
+        "owner_id": p.owner_id,
         "members": [{"id": u.id, "name": u.username} for u in p.members]
     })
 
@@ -1414,6 +1441,8 @@ def get_projectA(project_id):
 @login_required
 def edit_projectA(project_id):
     p = ProjectA.query.get_or_404(project_id)
+    if not can_manage_project_a(p):
+        return jsonify({"error": "You do not have permission to modify this project."}), 403
     data = request.get_json()
 
     if "name" in data:
@@ -1442,6 +1471,8 @@ def edit_projectA(project_id):
 @login_required
 def delete_projectA(project_id):
     p = ProjectA.query.get_or_404(project_id)
+    if not can_manage_project_a(p):
+        return jsonify({"error": "You do not have permission to delete this project."}), 403
     db.session.delete(p)
     db.session.commit()
     return jsonify({"status": "deleted"})
@@ -1463,7 +1494,7 @@ def add_membersA(project_id):
     data = request.get_json()
     user_ids = data.get("user_ids", [])
     if not isinstance(user_ids, list):
-        return os.abort(400)
+        abort(400)
     for uid in user_ids:
         user = User.query.get(uid)
         if user and user not in p.members:
@@ -1636,7 +1667,7 @@ def reorder_columns(project_id):
     data = request.get_json()
     order = data.get("order", [])  # list of column ids in new order
     if not isinstance(order, list):
-        return os.abort(400)
+        abort(400)
     for idx, cid in enumerate(order):
         c = ColumnA.query.filter_by(id=cid, project_id=project_id).first()
         if c:
@@ -21021,34 +21052,61 @@ def _get_all_champions_school_tracker_data():
     champion_schools = ChampionSchool.query.all()
     app.logger.info(f"DEBUG: Found {len(champion_schools)} ChampionSchool records")
 
+    def normalize_id(value):
+        """Normalize IDs from either numeric or string input while preserving leading zeros."""
+        if value is None:
+            return ''
+        s = str(value).strip()
+        return s
+
+    def normalize_school_name(value):
+        """Normalize school name for matching (trim, collapse whitespace, lowercase)."""
+        if value is None:
+            return ''
+        return ' '.join(str(value).split()).strip().lower()
+
     # 2. Extract unique school_ids and map to champion info
-    school_id_map = {} # school_id -> list of {champion, province, fallback_name}
+    school_id_map = {} # school_id -> list of {champion, province, fallback_name, champion_school_id}
     unique_school_ids = set()
+    champion_school_ids = set()
+    unique_library_school_ids = set()
+    unique_asl_ids_str_raw = set()
 
     for cs in champion_schools:
+        champion_school_ids.add(cs.id)
         current_schools_list = cs.get_schools() or []
         current_champion_name = f"{cs.firstname} {cs.lastname}"
 
         for school_entry in current_schools_list:
             raw_sid = school_entry.get('asl_school_id')
+            raw_sid_str = normalize_id(raw_sid)
             raw_sname = school_entry.get('school_name', 'Unknown School')
+            raw_lid = school_entry.get('library_school_id')
 
-            if raw_sid:
+            if raw_sid_str:
                 try:
-                    sid_val = int(raw_sid)
+                    sid_val = int(raw_sid_str)
                     if sid_val == 0:
                         continue
 
                     unique_school_ids.add(sid_val)
+                    unique_asl_ids_str_raw.add(raw_sid_str)
                     if sid_val not in school_id_map:
                         school_id_map[sid_val] = []
+
+                    # Library IDs are sometimes missing; keep them for timestamp matching.
+                    lib_id = str(raw_lid or '').strip()
+                    if lib_id:
+                        unique_library_school_ids.add(lib_id)
 
                     school_id_map[sid_val].append({
                         'champion': current_champion_name,
                         'province': cs.province,
                         'fallback_name': raw_sname,
-                        'asl_school_id': str(sid_val),
-                        'library_school_id': str(school_entry.get('library_school_id') or '').strip()
+                        'champion_school_id': cs.id,
+                        # Preserve raw string (leading zeros) so it can match ChampionSchoolRequest entries.
+                        'asl_school_id': raw_sid_str,
+                        'library_school_id': normalize_id(raw_lid)
                     })
                 except (ValueError, TypeError):
                     app.logger.warning(f"DEBUG: Invalid school ID found: {raw_sid}")
@@ -21056,6 +21114,133 @@ def _get_all_champions_school_tracker_data():
     app.logger.info(f"DEBUG: Extracted {len(unique_school_ids)} unique school IDs")
     if not unique_school_ids:
         return []
+
+    # 2b. Pre-compute "added" timestamps per champion+school based on approved requests
+    request_added_by_key = {}  # (champion_school_id, asl_school_id, library_school_id) -> datetimes
+    request_added_by_name_key = {}  # (champion_school_id, school_name_lower) -> datetimes
+
+    unique_asl_ids_str = sorted(set([str(sid) for sid in unique_school_ids]) | unique_asl_ids_str_raw)
+    if champion_school_ids:
+        # Fetch all approved requests for these champion profiles.
+        # We intentionally avoid over-filtering by ASL/library IDs because those may differ in formatting (e.g., leading zeros).
+        req_query = ChampionSchoolRequest.query.filter(
+            sa.func.lower(ChampionSchoolRequest.status) == 'approved',
+            ChampionSchoolRequest.champion_school_id.in_(champion_school_ids)
+        )
+        approved_requests = req_query.all()
+    else:
+        approved_requests = []
+
+    for req in approved_requests:
+        cid = req.champion_school_id
+        aid = normalize_id(req.asl_school_id)
+        lid = normalize_id(req.library_school_id)
+        name_lower = normalize_school_name(req.school_name)
+
+        def id_variants(v):
+            v_norm = normalize_id(v)
+            if not v_norm:
+                return ['']
+            # Treat "0"/all-zeros as missing.
+            if set(v_norm) <= {'0'}:
+                return ['']
+            stripped = v_norm.lstrip('0')
+            if stripped and stripped != v_norm:
+                return list({v_norm, stripped})
+            return [v_norm]
+
+        aid_vars = id_variants(aid)
+        lid_vars = id_variants(lid)
+
+        # Store under multiple key variants so resolve() can match either formatting.
+        for aid_v in aid_vars:
+            for lid_v in lid_vars:
+                key = (cid, aid_v, lid_v)
+                existing = request_added_by_key.get(key)
+                if not existing:
+                    existing = {'profile_added_at': None, 'system_added_at': None}
+
+                if req.reviewed_at is not None:
+                    if existing['profile_added_at'] is None or req.reviewed_at < existing['profile_added_at']:
+                        existing['profile_added_at'] = req.reviewed_at
+                if req.created_at is not None:
+                    if existing['system_added_at'] is None or req.created_at < existing['system_added_at']:
+                        existing['system_added_at'] = req.created_at
+                request_added_by_key[key] = existing
+
+        # Also build a name-based lookup for cases where IDs mismatch / are missing.
+        if name_lower:
+            name_key = (cid, name_lower)
+            existing2 = request_added_by_name_key.get(name_key)
+            if not existing2:
+                existing2 = {'profile_added_at': None, 'system_added_at': None}
+            if req.reviewed_at is not None:
+                if existing2['profile_added_at'] is None or req.reviewed_at < existing2['profile_added_at']:
+                    existing2['profile_added_at'] = req.reviewed_at
+            if req.created_at is not None:
+                if existing2['system_added_at'] is None or req.created_at < existing2['system_added_at']:
+                    existing2['system_added_at'] = req.created_at
+            request_added_by_name_key[name_key] = existing2
+
+    def resolve_added_timestamps(info):
+        """
+        Resolve added timestamps using approved champion school requests.
+        Returns (profile_added_at_dt, system_added_at_dt) as datetime objects or (None, None).
+        """
+        cid = info.get('champion_school_id')
+        aid = normalize_id(info.get('asl_school_id'))
+        lid = normalize_id(info.get('library_school_id'))
+        fallback_name = normalize_school_name(info.get('fallback_name'))
+
+        def id_variants(v):
+            v_norm = normalize_id(v)
+            if not v_norm:
+                return ['']
+            if set(v_norm) <= {'0'}:
+                return ['']
+            stripped = v_norm.lstrip('0')
+            if stripped and stripped != v_norm:
+                return list({v_norm, stripped})
+            return [v_norm]
+
+        aid_vars = id_variants(aid)
+        lid_vars = id_variants(lid)
+
+        # Most specific first: (aid,lid), then (aid,'') and ('',lid)
+        for aid_v in aid_vars:
+            for lid_v in lid_vars:
+                key = (cid, aid_v, lid_v)
+                if key in request_added_by_key:
+                    entry = request_added_by_key[key]
+                    pa = entry.get('profile_added_at')
+                    sa = entry.get('system_added_at')
+                    if pa or sa:
+                        return pa, sa
+                key2 = (cid, aid_v, '')
+                if key2 in request_added_by_key:
+                    entry = request_added_by_key[key2]
+                    pa = entry.get('profile_added_at')
+                    sa = entry.get('system_added_at')
+                    if pa or sa:
+                        return pa, sa
+                key3 = (cid, '', lid_v)
+                if key3 in request_added_by_key:
+                    entry = request_added_by_key[key3]
+                    pa = entry.get('profile_added_at')
+                    sa = entry.get('system_added_at')
+                    if pa or sa:
+                        return pa, sa
+
+        if fallback_name:
+            name_key = (cid, fallback_name)
+            if name_key in request_added_by_name_key:
+                entry = request_added_by_name_key[name_key]
+                pa = entry.get('profile_added_at')
+                sa = entry.get('system_added_at')
+                if pa or sa:
+                    return pa, sa
+
+        return None, None
 
     # Convert to list for SQL IN clause
     school_ids_list = list(unique_school_ids)
@@ -21233,6 +21418,7 @@ def _get_all_champions_school_tracker_data():
                     if days_elapsed < 365:
                         days_left_until_12 = 365 - days_elapsed
             for info in champ_infos:
+                profile_added_at_dt, system_added_at_dt = resolve_added_timestamps(info)
                 results.append({
                     "champion": info['champion'],
                     "province": info['province'],
@@ -21240,6 +21426,8 @@ def _get_all_champions_school_tracker_data():
                     "status": current_status,
                     "expiry_date": current_sexpiry.isoformat() if current_sexpiry else None,
                     "first_awarded_at": current_first_awarded,
+                    "profile_added_at": profile_added_at_dt.isoformat() if profile_added_at_dt else None,
+                    "system_added_at": system_added_at_dt.isoformat() if system_added_at_dt else None,
                     "is_over_12_months": current_over_12,
                     "scholarship_type": current_stype,
                     "active_subscriptions": current_active_subs,
