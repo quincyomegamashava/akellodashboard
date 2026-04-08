@@ -729,6 +729,13 @@ function ganttFormatMMDDYY(d) {
   return `${m}/${day}/${y}`;
 }
 
+function ganttProgressColor(pct) {
+  const n = typeof pct === 'number' ? pct : 0;
+  if (n >= 100) return '#16a34a'; // green
+  if (n > 0) return '#f59e0b'; // amber
+  return '#9ca3af'; // grey
+}
+
 function ganttDayLetter(d) {
   return ['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getDay()];
 }
@@ -1014,12 +1021,12 @@ function renderVisGantt(boardData) {
     const s = ganttParseLocal(task.start_date);
     const e = ganttParseLocal(task.end_date);
     const assName = ganttAssigneeLabel(task);
-    const gk = colorMode === 'assignee' ? assName : (col.title || `Column ${col.id}`);
-    const barColor = colorMode === 'assignee'
-      ? (colorMaps.assignee[gk] || '#2563eb')
-      : (colorMaps.column[gk] || '#2563eb');
     const dur = ganttCountBizInclusive(s, e);
     const pct = typeof task.progress === 'number' ? Math.max(0, Math.min(100, task.progress)) : 0;
+    const today0 = ganttLocalDayStart(new Date());
+    const end0 = e ? ganttStripTime(e) : null;
+    const isOverdue = !!(end0 && end0 < today0);
+    const barColor = (isOverdue && pct < 100) ? '#ef4444' : ganttProgressColor(pct);
     const si = idxFor(s);
     const ei = lastIdxOnOrBefore(e);
     const barLeft = si * GANTT_DAY_W;
