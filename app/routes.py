@@ -8,14 +8,14 @@ import socket
 import ssl
 from urllib import parse
 from urllib.parse import urlsplit
-from flask import jsonify, render_template, flash, redirect, render_template_string, session, url_for, request, send_file, Response, stream_with_context, abort
+from flask import jsonify, render_template, flash, redirect, render_template_string, session, url_for, request, send_file, Response, stream_with_context, abort, current_app
 from flask_login import login_user, logout_user, current_user, login_required
 import sqlalchemy as sa
 from docx import Document
 import re
 from app import app, db
 from app.forms import EventForm, LoginForm, PerfomanceTargetsForm, RegistrationForm, BookAllocationForm, ReportForm, WorkspaceForm, ProjectForm, TaskForm, CSVUploadForm, ChampionCSVUploadForm, ChampionSchoolForm, AkelloSimEventForm
-from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, Event, WeeklyReport, TaskA, ColumnA, ProjectA, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket
+from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, Event, WeeklyReport, TaskA, ColumnA, ProjectA, TaskAttachment, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket
 from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from collections import defaultdict
@@ -33,6 +33,7 @@ import csv
 import pandas as pd
 import secrets
 import string
+import uuid
 from dotenv import load_dotenv
 import requests
 from bs4 import BeautifulSoup
@@ -1331,6 +1332,10 @@ def column_to_dict(col):
     }
 
 def task_to_dict(t):
+    atts = sorted(
+        getattr(t, "attachments", []),
+        key=lambda a: (a.uploaded_at or datetime.min, a.id),
+    )
     return {
         "id": t.id,
         "title": t.title,
@@ -1341,7 +1346,8 @@ def task_to_dict(t):
         "end_date": t.end_date.isoformat() if t.end_date else None,
         "column_id": t.column_id,
         "created_at": t.created_at.isoformat(),
-        "assignees": [{"id": u.id, "name": u.username} for u in getattr(t, "assignees", [])]
+        "assignees": [{"id": u.id, "name": u.username} for u in getattr(t, "assignees", [])],
+        "attachments": [attachment_to_dict(a) for a in atts],
     }
 
 
@@ -1354,6 +1360,44 @@ def can_manage_project_a(p):
     if p.owner_id is not None and p.owner_id == current_user.id:
         return True
     return False
+
+
+def user_can_access_project_a(p):
+    """Project member, owner/manager, or public project (logged-in user)."""
+    if can_manage_project_a(p):
+        return True
+    if current_user in p.members:
+        return True
+    if getattr(p, "project_type", None) == "public":
+        return True
+    return False
+
+
+TASK_ATTACHMENTS_FOLDER_REL = os.path.join("static", "uploads", "task_attachments")
+TASK_ATTACHMENTS_MAX_BYTES = 25 * 1024 * 1024
+TASK_ATTACHMENTS_ALLOWED_EXT = frozenset({
+    "pdf", "png", "jpg", "jpeg", "gif", "webp", "txt", "csv",
+    "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+})
+
+
+def _task_attachment_full_path(stored_path):
+    if not stored_path:
+        return None
+    if os.path.isabs(stored_path):
+        return stored_path
+    root = current_app.root_path if current_app else app.root_path
+    return os.path.join(root, stored_path.replace("/", os.sep))
+
+
+def attachment_to_dict(a):
+    return {
+        "id": a.id,
+        "original_name": a.original_name,
+        "content_type": a.content_type,
+        "file_size": a.file_size,
+        "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
+    }
 
 
 @app.before_request
@@ -1659,6 +1703,99 @@ def update_taskA(task_id):
     db.session.commit()
     return jsonify(task_to_dict(t))
 
+
+@app.route("/api/tasks/<int:task_id>/attachments", methods=["POST"])
+@login_required
+def upload_task_attachment(task_id):
+    t = TaskA.query.get_or_404(task_id)
+    p = t.column.project
+    if not user_can_access_project_a(p):
+        return jsonify({"error": "You do not have permission to attach files to this task."}), 403
+
+    upload = request.files.get("file")
+    if not upload or not upload.filename:
+        return jsonify({"error": "No file uploaded."}), 400
+
+    raw_name = secure_filename(upload.filename)
+    if not raw_name or "." not in raw_name:
+        return jsonify({"error": "Invalid file name."}), 400
+    ext = raw_name.rsplit(".", 1)[1].lower()
+    if ext not in TASK_ATTACHMENTS_ALLOWED_EXT:
+        return jsonify({"error": "File type not allowed."}), 400
+
+    upload.seek(0, os.SEEK_END)
+    size = upload.tell()
+    upload.seek(0)
+    if size > TASK_ATTACHMENTS_MAX_BYTES:
+        return jsonify({"error": "File too large."}), 400
+
+    base_root = current_app.root_path
+    folder_abs = os.path.join(base_root, TASK_ATTACHMENTS_FOLDER_REL)
+    os.makedirs(folder_abs, exist_ok=True)
+
+    stored_fname = f"{uuid.uuid4().hex}_{raw_name}"
+    rel_stored = os.path.join(TASK_ATTACHMENTS_FOLDER_REL, stored_fname).replace("\\", "/")
+    dest_abs = os.path.join(folder_abs, stored_fname)
+    upload.save(dest_abs)
+
+    ct = upload.content_type or None
+    att = TaskAttachment(
+        task_id=t.id,
+        original_name=raw_name,
+        stored_path=rel_stored,
+        content_type=ct,
+        file_size=size,
+        uploaded_by=current_user.id,
+    )
+    db.session.add(att)
+    db.session.commit()
+    return jsonify(attachment_to_dict(att)), 201
+
+
+@app.route("/api/task-attachments/<int:attachment_id>", methods=["DELETE"])
+@login_required
+def delete_task_attachment(attachment_id):
+    att = TaskAttachment.query.get_or_404(attachment_id)
+    p = att.task.column.project
+    if not user_can_access_project_a(p):
+        return jsonify({"error": "Forbidden"}), 403
+
+    path = _task_attachment_full_path(att.stored_path)
+    db.session.delete(att)
+    db.session.commit()
+    if path and os.path.isfile(path):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    return jsonify({"status": "deleted"})
+
+
+@app.route("/api/task-attachments/<int:attachment_id>/file", methods=["GET"])
+@login_required
+def task_attachment_file(attachment_id):
+    att = TaskAttachment.query.get_or_404(attachment_id)
+    p = att.task.column.project
+    if not user_can_access_project_a(p):
+        abort(403)
+
+    path = _task_attachment_full_path(att.stored_path)
+    if not path or not os.path.isfile(path):
+        abort(404)
+
+    disposition = (request.args.get("disposition") or "inline").lower()
+    as_attachment = disposition == "attachment"
+    mimetype = att.content_type or None
+    return send_file(
+        path,
+        mimetype=mimetype,
+        as_attachment=as_attachment,
+        download_name=att.original_name if as_attachment else None,
+        conditional=True,
+        max_age=0,
+    )
+
+
 # Reorder columns in a project
 @app.route("/api/projects/<int:project_id>/columns/reorder", methods=["POST"])
 @login_required
@@ -1681,8 +1818,15 @@ def reorder_columns(project_id):
 def delete_taskA(task_id):
     t = TaskA.query.get_or_404(task_id)
     col_id = t.column_id
+    paths = [_task_attachment_full_path(a.stored_path) for a in t.attachments]
     db.session.delete(t)
     db.session.commit()
+    for path in paths:
+        if path and os.path.isfile(path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
     # reindex
     tasks = TaskA.query.filter_by(column_id=col_id).order_by(TaskA.position).all()
     for idx, ot in enumerate(tasks):

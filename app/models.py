@@ -599,6 +599,24 @@ class TaskA(db.Model):
 
     # Many-to-many relationship to users as assignees
     assignees = db.relationship("User", secondary=task_assigneesA, backref="assigned_tasksA")
+    attachments = db.relationship(
+        "TaskAttachment",
+        backref="task",
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
+
+
+class TaskAttachment(db.Model):
+    __tablename__ = "task_attachments"
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey("tasksa.id", ondelete="CASCADE"), nullable=False)
+    original_name = db.Column(db.String(255), nullable=False)
+    stored_path = db.Column(db.String(512), nullable=False)
+    content_type = db.Column(db.String(128), nullable=True)
+    file_size = db.Column(db.Integer, nullable=True)
+    uploaded_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 # ----------------------

@@ -80,6 +80,23 @@
       overflow: auto;
     }
 
+    #attachmentPreviewBackdrop.attachment-preview-open #attachmentPreviewContent {
+      width: min(92vw, 1200px);
+      max-height: 88vh;
+    }
+    .attachment-preview-body iframe {
+      width: 100%;
+      height: 70vh;
+      border: 0;
+      border-radius: 0.5rem;
+    }
+    .attachment-preview-body img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+
     #ganttSheetMount {
       width: 100%;
       min-height: 480px;
@@ -373,6 +390,7 @@
           <button type="button" id="tab-board" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="true" aria-controls="panel-board">Board</button>
           <button type="button" id="tab-timeline" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-timeline">Timeline</button>
           <button type="button" id="tab-gantt" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-gantt">Schedule</button>
+          <button type="button" id="tab-documents" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-documents">Documents</button>
         </div>
       </div>
 
@@ -495,6 +513,16 @@
           <div id="ganttSheetMount" class="flex-1 min-h-[480px] rounded-xl border border-zinc-200 bg-white"></div>
         </div>
 
+        <div id="panel-documents" role="tabpanel" aria-labelledby="tab-documents" class="hidden flex-1 flex-col min-h-0 overflow-auto" aria-hidden="true">
+          <div class="space-y-4">
+            <div>
+              <h2 class="text-lg font-semibold text-zinc-900">Documents</h2>
+              <p class="text-sm text-zinc-500 mt-1">Tasks with attachments in this project.</p>
+            </div>
+            <div id="documentsPanelBody" class="rounded-xl border border-zinc-200 bg-white overflow-hidden"></div>
+          </div>
+        </div>
+
       </div>
       </div>
     </section>
@@ -512,6 +540,19 @@
         <button id="modalConfirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">OK</button>
       </div>
     </div>
+</div>
+
+<div id="attachmentPreviewBackdrop" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
+  <div id="attachmentPreviewContent" class="bg-white rounded-xl shadow-lg w-full flex flex-col overflow-hidden">
+    <div class="flex items-center justify-between gap-2 p-4 border-b border-zinc-200 shrink-0">
+      <h3 id="attachmentPreviewTitle" class="text-lg font-semibold text-zinc-900 truncate pr-4 min-w-0"></h3>
+      <div class="flex items-center gap-2 shrink-0">
+        <a id="attachmentPreviewDownload" href="#" class="px-3 py-1.5 text-sm rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-800">Download</a>
+        <button type="button" id="attachmentPreviewClose" class="px-3 py-1.5 text-sm rounded-lg bg-zinc-800 text-white hover:bg-zinc-900">Close</button>
+      </div>
+    </div>
+    <div id="attachmentPreviewBody" class="attachment-preview-body flex-1 min-h-[50vh] overflow-auto p-4"></div>
+  </div>
 </div>
 {% endblock %}
 
@@ -593,6 +634,128 @@ async function apiDELETE(path) {
   return res.json();
 }
 
+const TEXT_PREVIEW_MAX_BYTES = 512 * 1024;
+
+function taskAttachmentFileUrl(attachmentId, disposition) {
+  const d = disposition === 'attachment' ? 'attachment' : 'inline';
+  return `${API_BASE}/task-attachments/${attachmentId}/file?disposition=${encodeURIComponent(d)}`;
+}
+
+function closeAttachmentPreview() {
+  const bd = $('attachmentPreviewBackdrop');
+  const body = $('attachmentPreviewBody');
+  if (body) body.innerHTML = '';
+  if (bd) {
+    bd.classList.add('hidden');
+    bd.classList.remove('flex');
+    bd.classList.remove('attachment-preview-open');
+  }
+}
+
+function formatAttachmentBytes(n) {
+  if (n == null || n === '') return '';
+  const num = Number(n);
+  if (num < 1024) return `${num} B`;
+  if (num < 1024 * 1024) return `${(num / 1024).toFixed(1)} KB`;
+  return `${(num / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function attachmentPreviewFallbackHtml(att) {
+  const ct = escapeHtml(att.content_type || 'unknown type');
+  return `<p class="text-zinc-600">No in-browser preview for this type. Use Download to open the file.</p>
+    <p class="text-sm text-zinc-500 mt-2">${ct}</p>`;
+}
+
+function openAttachmentPreview(att) {
+  const name = att.original_name || 'Attachment';
+  const ct = (att.content_type || '').toLowerCase();
+  const ext = (String(name).split('.').pop() || '').toLowerCase();
+
+  $('attachmentPreviewTitle').textContent = name;
+  const dl = $('attachmentPreviewDownload');
+  dl.href = taskAttachmentFileUrl(att.id, 'attachment');
+
+  const body = $('attachmentPreviewBody');
+  body.innerHTML = '<p class="text-zinc-500">Loading…</p>';
+
+  const bd = $('attachmentPreviewBackdrop');
+  bd.classList.remove('hidden');
+  bd.classList.add('flex');
+  bd.classList.add('attachment-preview-open');
+
+  const isPdf = ct.includes('pdf') || ext === 'pdf';
+  const isImage = /^image\//.test(ct) || ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext);
+  const isText = ct.startsWith('text/') || ['txt', 'csv'].includes(ext);
+
+  if (isPdf) {
+    body.innerHTML = `<iframe class="rounded border border-zinc-200" title="preview" src="${taskAttachmentFileUrl(att.id, 'inline')}"></iframe>`;
+    return;
+  }
+  if (isImage) {
+    body.innerHTML = `<img alt="" src="${taskAttachmentFileUrl(att.id, 'inline')}" />`;
+    return;
+  }
+  if (isText && att.file_size != null && att.file_size > TEXT_PREVIEW_MAX_BYTES) {
+    body.innerHTML = `<p class="text-zinc-600 mb-3">This file is too large to preview (${formatAttachmentBytes(att.file_size)}). Use Download.</p>`;
+    return;
+  }
+  if (isText) {
+    fetch(taskAttachmentFileUrl(att.id, 'inline'))
+      .then((r) => {
+        if (!r.ok) throw new Error('Failed to load');
+        return r.text();
+      })
+      .then((text) => {
+        body.innerHTML = `<pre class="text-xs whitespace-pre-wrap break-words bg-zinc-50 border border-zinc-200 rounded p-3 max-h-[70vh] overflow-auto">${escapeHtml(text)}</pre>`;
+      })
+      .catch(() => {
+        body.innerHTML = attachmentPreviewFallbackHtml(att);
+      });
+    return;
+  }
+
+  body.innerHTML = attachmentPreviewFallbackHtml(att);
+}
+
+function renderTaskAttachmentList(task) {
+  const ul = $('task_attachment_list');
+  if (!ul) return;
+  const list = task.attachments || [];
+  if (!list.length) {
+    ul.innerHTML = '<li class="text-zinc-400 italic">No attachments yet</li>';
+    return;
+  }
+  ul.innerHTML = list.map((a) => `
+    <li class="flex flex-wrap items-center gap-2 py-1 border-b border-zinc-100">
+      <span class="flex-1 min-w-0 truncate">${escapeHtml(a.original_name)}</span>
+      <button type="button" class="text-indigo-600 hover:underline text-xs shrink-0" data-preview-aid="${a.id}">Preview</button>
+      <button type="button" class="text-red-600 hover:underline text-xs shrink-0" data-remove-aid="${a.id}">Remove</button>
+    </li>
+  `).join('');
+
+  ul.querySelectorAll('[data-preview-aid]').forEach((btn) => {
+    btn.onclick = () => {
+      const id = parseInt(btn.getAttribute('data-preview-aid'), 10);
+      const found = list.find((x) => x.id === id);
+      if (found) openAttachmentPreview(found);
+    };
+  });
+  ul.querySelectorAll('[data-remove-aid]').forEach((btn) => {
+    btn.onclick = async () => {
+      const id = parseInt(btn.getAttribute('data-remove-aid'), 10);
+      if (!confirm('Remove this attachment?')) return;
+      try {
+        await apiDELETE(`${API_BASE}/task-attachments/${id}`);
+        task.attachments = (task.attachments || []).filter((x) => x.id !== id);
+        renderTaskAttachmentList(task);
+        if (currentProjectId) await loadBoard(currentProjectId);
+      } catch (e) {
+        alert(e.message || e);
+      }
+    };
+  });
+}
+
 /* ---------- Modal management (reusable) ---------- */
 const modalBackdrop = $('modalBackdrop');
 const modalContent = $('modalContent');
@@ -648,18 +811,22 @@ function closeModal() {
 }
 
 /* ---------- Tabbed workspace ---------- */
+const PM_TAB_IDS = ['board', 'timeline', 'gantt', 'documents'];
+
 function setActiveTab(tab) {
-  const next = tab === 'timeline' || tab === 'gantt' ? tab : 'board';
+  const next = PM_TAB_IDS.includes(tab) ? tab : 'board';
   activePmTab = next;
   const panels = {
     board: $('panel-board'),
     timeline: $('panel-timeline'),
-    gantt: $('panel-gantt')
+    gantt: $('panel-gantt'),
+    documents: $('panel-documents')
   };
   const tabs = {
     board: $('tab-board'),
     timeline: $('tab-timeline'),
-    gantt: $('tab-gantt')
+    gantt: $('tab-gantt'),
+    documents: $('tab-documents')
   };
   Object.keys(panels).forEach((key) => {
     const panel = panels[key];
@@ -677,6 +844,109 @@ function setActiveTab(tab) {
   if (next === 'gantt') {
     requestAnimationFrame(() => renderVisGantt(lastBoardData));
   }
+  if (next === 'documents') {
+    requestAnimationFrame(() => renderDocumentsPanel(lastBoardData));
+  }
+}
+
+function renderDocumentsPanel(boardData) {
+  const mount = $('documentsPanelBody');
+  if (!mount) return;
+  if (!currentProjectId || !boardData) {
+    mount.innerHTML = '<p class="p-6 text-center text-sm text-zinc-500">Select a project to view documents.</p>';
+    return;
+  }
+  const rows = [];
+  for (const col of boardData.columns || []) {
+    for (const t of col.tasks || []) {
+      if (t.attachments && t.attachments.length) {
+        rows.push({ task: t, columnTitle: col.title || '—' });
+      }
+    }
+  }
+  rows.sort((a, b) => {
+    const ca = String(a.columnTitle).localeCompare(String(b.columnTitle), undefined, { sensitivity: 'base' });
+    if (ca !== 0) return ca;
+    return String(a.task.title || '').localeCompare(String(b.task.title || ''), undefined, { sensitivity: 'base' });
+  });
+  if (!rows.length) {
+    mount.innerHTML = '<p class="p-6 text-center text-sm text-zinc-500">No tasks with documents in this project.</p>';
+    return;
+  }
+
+  const bodyRows = rows.map(({ task: t, columnTitle }) => {
+    const start = t.start_date ? formatDate(t.start_date) : '—';
+    const end = t.end_date ? formatDate(t.end_date) : '—';
+    const files = (t.attachments || []).map((a) => `
+      <span class="inline-flex items-center gap-1 mr-2 mb-1">
+        <button type="button" class="doc-preview-link text-indigo-600 hover:underline text-xs" data-attachment-id="${a.id}">${escapeHtml(a.original_name)}</button>
+      </span>
+    `).join('');
+    return `
+      <tr class="border-b border-zinc-100 hover:bg-zinc-50/80 align-top">
+        <td class="py-3 px-4 font-medium text-zinc-900">${escapeHtml(t.title || '')}</td>
+        <td class="py-3 px-4 text-zinc-600">${escapeHtml(columnTitle)}</td>
+        <td class="py-3 px-4 text-zinc-600 text-xs">${escapeHtml(start)} / ${escapeHtml(end)}</td>
+        <td class="py-3 px-4 text-zinc-600">${typeof t.progress === 'number' ? t.progress : 0}%</td>
+        <td class="py-3 px-4 text-zinc-700">${files}</td>
+        <td class="py-3 px-4">
+          <button type="button" class="doc-edit-task text-xs font-medium text-zinc-600 hover:text-indigo-600" data-task-id="${t.id}">Edit task</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  mount.innerHTML = `
+    <div class="overflow-auto">
+      <table class="min-w-full text-sm">
+        <thead class="text-left bg-zinc-50 text-zinc-600 border-b border-zinc-100">
+          <tr>
+            <th class="py-3 px-4 font-medium">Task</th>
+            <th class="py-3 px-4 font-medium">Column</th>
+            <th class="py-3 px-4 font-medium">Start / End</th>
+            <th class="py-3 px-4 font-medium w-24">Progress</th>
+            <th class="py-3 px-4 font-medium">Files</th>
+            <th class="py-3 px-4 font-medium w-28"></th>
+          </tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+  `;
+
+  mount.querySelectorAll('.doc-preview-link').forEach((btn) => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      const id = parseInt(btn.getAttribute('data-attachment-id'), 10);
+      let att = null;
+      for (const col of boardData.columns || []) {
+        for (const t of col.tasks || []) {
+          const f = (t.attachments || []).find((x) => x.id === id);
+          if (f) {
+            att = f;
+            break;
+          }
+        }
+        if (att) break;
+      }
+      if (att) openAttachmentPreview(att);
+    };
+  });
+  mount.querySelectorAll('.doc-edit-task').forEach((btn) => {
+    btn.onclick = () => {
+      const tid = btn.getAttribute('data-task-id');
+      let found = null;
+      const src = lastBoardData || boardData;
+      for (const col of src.columns || []) {
+        const t = (col.tasks || []).find((x) => String(x.id) === String(tid));
+        if (t) {
+          found = t;
+          break;
+        }
+      }
+      if (found) promptEditTask(found);
+    };
+  });
 }
 
 const GANTT_DAY_W = 20;
@@ -1480,6 +1750,9 @@ const addColBtn = el('button', {class:'flex-none h-fit self-start px-4 py-2.5 ro
     if (activePmTab === 'gantt') {
       requestAnimationFrame(() => renderVisGantt(data));
     }
+    if (activePmTab === 'documents') {
+      requestAnimationFrame(() => renderDocumentsPanel(data));
+    }
 
     updateProjectManageButtons();
   } catch (err) {
@@ -1562,7 +1835,15 @@ function renderTask(task, container) {
   const div = el('div', {class:'task rounded-xl border border-zinc-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md'});
   div.dataset.taskId = task.id;
 
-  const title = el('div', {class:'font-semibold text-sm text-zinc-900 mb-1', text: task.title});
+  const attCount = (task.attachments && task.attachments.length) ? task.attachments.length : 0;
+  const titleRow = el('div', {class:'flex items-start justify-between gap-2 mb-1'});
+  const title = el('div', {class:'font-semibold text-sm text-zinc-900 min-w-0 flex-1', text: task.title});
+  titleRow.appendChild(title);
+  if (attCount) {
+    const clip = el('span', {class:'shrink-0 text-[11px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded', text: `${attCount} file${attCount === 1 ? '' : 's'}`});
+    clip.title = 'Has attachments';
+    titleRow.appendChild(clip);
+  }
   const desc = el('div', {class:'text-xs text-zinc-500 max-h-9 overflow-hidden', text: task.description || 'No description'});
 
   // dates & progress and assignees
@@ -1588,7 +1869,7 @@ function renderTask(task, container) {
   controls.appendChild(editBtn);
   controls.appendChild(delBtn);
 
-  div.appendChild(title);
+  div.appendChild(titleRow);
   div.appendChild(desc);
   div.appendChild(meta);
   div.appendChild(progressWrap);
@@ -1638,6 +1919,7 @@ async function promptAddTask(columnId) {
 
 async function promptEditTask(task) {
   // task argument is the object returned by project board
+  if (!task.attachments) task.attachments = [];
   const members = await getProjectMembers(currentProjectId);
   openModal('Edit Task', (c) => {
     const startVal = task.start_date ? task.start_date.slice(0,10) : '';
@@ -1662,8 +1944,38 @@ async function promptEditTask(task) {
           </select>
           <p class="text-xs text-gray-500">Hold Ctrl/Cmd (or Shift) to select multiple members.</p>
         </div>
+        <div class="grid gap-2 border-t border-zinc-200 pt-3 mt-1">
+          <label class="text-sm text-gray-600">Attachments</label>
+          <input type="file" id="task_attachment_input" class="hidden" />
+          <button type="button" id="task_attachment_pick" class="text-left text-sm px-3 py-2 border border-zinc-200 rounded-lg hover:bg-zinc-50 w-fit">Add file…</button>
+          <ul id="task_attachment_list" class="text-sm space-y-0 list-none pl-0 max-h-40 overflow-y-auto"></ul>
+        </div>
       </div>
     `;
+    const pickBtn = $('task_attachment_pick');
+    const fileInput = $('task_attachment_input');
+    if (pickBtn && fileInput) {
+      pickBtn.onclick = () => fileInput.click();
+      fileInput.onchange = async () => {
+        const f = fileInput.files && fileInput.files[0];
+        if (!f) return;
+        const fd = new FormData();
+        fd.append('file', f);
+        try {
+          const res = await fetch(`${API_BASE}/tasks/${task.id}/attachments`, { method: 'POST', body: fd });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || res.statusText || 'Upload failed');
+          task.attachments = task.attachments || [];
+          task.attachments.push(data);
+          renderTaskAttachmentList(task);
+          fileInput.value = '';
+          if (currentProjectId) await loadBoard(currentProjectId);
+        } catch (e) {
+          alert(e.message || e);
+        }
+      };
+    }
+    renderTaskAttachmentList(task);
   }, async () => {
     const title = $('task_title').value.trim();
     if (!title) throw new Error('Title required');
@@ -2924,6 +3236,15 @@ async function showMyTasks(){
 
 /* ---------- Initial load ---------- */
 window.onload = async () => {
+  const apClose = $('attachmentPreviewClose');
+  if (apClose) apClose.onclick = closeAttachmentPreview;
+  const apBd = $('attachmentPreviewBackdrop');
+  if (apBd) {
+    apBd.addEventListener('click', (e) => {
+      if (e.target === apBd) closeAttachmentPreview();
+    });
+  }
+
   const timelineSort = document.getElementById('timelineItemsSort');
   if (timelineSort){
     timelineSort.onchange = () => {
@@ -2942,9 +3263,11 @@ window.onload = async () => {
   const tabBoard = $('tab-board');
   const tabTimeline = $('tab-timeline');
   const tabGantt = $('tab-gantt');
+  const tabDocuments = $('tab-documents');
   if (tabBoard) tabBoard.onclick = () => setActiveTab('board');
   if (tabTimeline) tabTimeline.onclick = () => setActiveTab('timeline');
   if (tabGantt) tabGantt.onclick = () => setActiveTab('gantt');
+  if (tabDocuments) tabDocuments.onclick = () => setActiveTab('documents');
 
   const ganttColorBy = $('ganttColorBy');
   if (ganttColorBy) {
