@@ -102,7 +102,7 @@ class User(UserMixin, db.Model):
 
     def get_privileges(self):
         """Ensure all expected privileges exist in dict, default False."""
-        all_privs = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access", "Approve Champion Schools"]
+        all_privs = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access", "Approve Champion Schools", "Revenue Reports"]
         if not self.privileges:
             self.privileges = {}
         for p in all_privs:

@@ -194,6 +194,13 @@
       </a>
       {% endif %}
 
+      {% if current_user.userRole == 'Admin' or current_user.has_privilege('Revenue Reports') %}
+      <a href="{{ url_for('revenue_reports') }}"
+        class="nav-item {{ 'active' if title == 'Revenue Reports' else '' }}">
+        <i class="fas fa-money-bill-trend-up"></i> <span class="nav-text">Revenue Reports</span>
+      </a>
+      {% endif %}
+
       <div class="px-3 mt-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider sidebar-text">Settings
       </div>
 

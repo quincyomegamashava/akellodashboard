@@ -1,0 +1,1088 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4">
+  <div class="py-4 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800 mb-1">Revenue Reports</h1>
+      <p class="text-sm text-slate-500 m-0">Section 1 automation based on the existing VTL template logic.</p>
+    </div>
+    <button id="openRevenueSummaryModalBtn" class="px-3 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">
+      Open Revenue Summary
+    </button>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 p-4 mt-4">
+    <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+      <div>
+        <h2 class="text-base font-semibold text-slate-800 m-0">Revenue Data Tables</h2>
+        <p class="text-xs text-slate-500 mt-1 mb-0">Analyst mode: full sheet range, dense view, sticky headers, search.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="text-sm text-slate-600">Table source</label>
+        <select id="tableSourceSelect" class="border border-slate-300 rounded-md px-2 py-1 text-sm">
+          <option value="latest_generated">Latest generated</option>
+          <option value="template">Template files</option>
+        </select>
+        {% if is_admin %}
+        <button id="saveTableSourceBtn" class="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">Save</button>
+        {% endif %}
+      </div>
+    </div>
+
+    <div id="tabButtons" class="flex items-center gap-2 flex-wrap mb-3"></div>
+    <div id="revenueDriversActions" class="hidden mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div class="flex items-center gap-2 flex-wrap">
+        <form id="revenueTemplateUploadForm" class="flex items-center gap-2 flex-wrap">
+          <input id="revenueTemplateFile" type="file" name="file" accept=".xlsx" class="text-sm" required>
+          <button type="submit" class="px-3 py-2 rounded-md bg-white border border-slate-300 text-sm text-slate-700 hover:bg-slate-50">
+            Upload Template
+          </button>
+          <span class="text-xs text-slate-500">Template: <strong id="revenueTemplateName">uploaded_template.xlsx</strong></span>
+        </form>
+        <button id="driversRunNowBtn" class="px-3 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">
+          Run Section 1 Now
+        </button>
+        <button id="driversDownloadLatestBtn" class="px-3 py-2 rounded-md bg-white border border-slate-300 text-sm text-slate-700 hover:bg-slate-50">
+          Download Latest
+        </button>
+      </div>
+      <div id="revenueTemplateMsg" class="mt-2 text-xs text-slate-500"></div>
+      <div class="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+        <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+          <h3 class="text-sm font-semibold text-slate-800 m-0">Daily Actual Trend</h3>
+          <div class="flex items-center gap-2 flex-wrap">
+            <label class="text-xs text-slate-600">View</label>
+            <select id="driversChartType" class="border border-slate-300 rounded-md px-2 py-1 text-xs">
+              <option value="line">Line</option>
+              <option value="bar">Bar</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap mb-2">
+          <label class="text-xs text-slate-600">From</label>
+          <input id="driversChartStartAt" type="text" class="border border-slate-300 rounded-md px-2 py-1 text-xs w-44" placeholder="DD-MM-YYYY HH-MM-SS">
+          <label class="text-xs text-slate-600">To</label>
+          <input id="driversChartEndAt" type="text" class="border border-slate-300 rounded-md px-2 py-1 text-xs w-44" placeholder="DD-MM-YYYY HH-MM-SS">
+          <button id="driversChartApplyBtn" type="button" class="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-xs hover:bg-indigo-700">Apply</button>
+          <button id="driversChartResetBtn" type="button" class="px-3 py-1.5 rounded-md bg-white border border-slate-300 text-xs text-slate-700 hover:bg-slate-50">Reset to Week</button>
+        </div>
+        <div id="driversChartStatus" class="text-xs text-slate-500 mb-2"></div>
+        <div class="h-[280px]">
+          <canvas id="driversDailyActualChart"></canvas>
+        </div>
+      </div>
+    </div>
+    <div id="flashActions" class="hidden mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div class="flex items-center gap-2 flex-wrap">
+        <form id="flashUploadForm" class="flex items-center gap-2 flex-wrap">
+          <input id="flashTemplateFile" type="file" name="file" accept=".xlsx" class="text-sm" required>
+          <button type="submit" class="px-3 py-2 rounded-md bg-white border border-slate-300 text-sm text-slate-700 hover:bg-slate-50">
+            Upload Flash File
+          </button>
+          <span class="text-xs text-slate-500">Template: <strong id="flashTemplateName">uploaded_flash_template.xlsx</strong></span>
+        </form>
+      </div>
+      <div id="flashUploadMsg" class="mt-2 text-xs text-slate-500"></div>
+    </div>
+    <div class="flex items-center justify-between gap-2 flex-wrap mb-3">
+      <div class="flex items-center gap-2 flex-wrap">
+        <div id="sheetButtons" class="flex items-center gap-2 flex-wrap"></div>
+        <span id="sourceBadge" class="px-2 py-1 text-[11px] rounded-md bg-slate-100 text-slate-600 border border-slate-200"></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <input id="tableSearchInput" type="text" placeholder="Search table..." class="border border-slate-300 rounded-md px-2 py-1 text-xs w-56">
+        <label class="flex items-center gap-1 text-xs text-slate-600">
+          <input id="compareModeToggle" type="checkbox" class="h-3 w-3">
+          Compare mode
+        </label>
+        <span id="tableStats" class="text-xs text-slate-500"></span>
+      </div>
+    </div>
+    <div id="mainTableToolbar" class="mb-3 rounded-xl border border-slate-200/90 bg-gradient-to-r from-white to-slate-50 p-3 shadow-sm">
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <div id="mainTableTitle" class="text-sm font-semibold text-slate-800">Active table</div>
+          <div id="mainTableSubtitle" class="text-xs text-slate-500 mt-0.5">Select a tab and sheet to preview data.</div>
+          <div class="mt-2 flex items-center gap-2 flex-wrap">
+            <span id="mainRowsChip" class="px-2 py-1 text-[11px] rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700">Rows: -</span>
+            <span id="mainColsChip" class="px-2 py-1 text-[11px] rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700">Cols: -</span>
+            <span id="mainSourceChip" class="px-2 py-1 text-[11px] rounded-md border border-slate-200 bg-white text-slate-600">Source: -</span>
+          </div>
+        </div>
+        <div class="flex items-end gap-2 flex-wrap">
+          <label class="text-[11px] text-slate-600">Scope
+            <select id="mainExportScope" class="mt-1 block border border-slate-300 rounded-md px-2 py-1 text-xs bg-white">
+              <option value="visible">Visible</option>
+              <option value="full">Full sheet</option>
+            </select>
+          </label>
+          <label class="text-[11px] text-slate-600">Format
+            <select id="mainExportFormat" class="mt-1 block border border-slate-300 rounded-md px-2 py-1 text-xs bg-white">
+              <option value="xlsx">XLSX</option>
+              <option value="csv">CSV</option>
+              <option value="pdf">PDF</option>
+            </select>
+          </label>
+          <button id="exportMainTableBtn" type="button" class="px-3 py-2 rounded-md bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700">
+            Export
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="diagnosticsBanner" class="hidden mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"></div>
+    <div id="tabMeta" class="text-xs text-slate-500 mb-2 break-all"></div>
+    <div id="tableError" class="hidden text-sm text-red-600 mb-2"></div>
+
+    <div class="rounded-xl border border-slate-200/90 overflow-hidden shadow-sm bg-white">
+      <div class="max-h-[620px] overflow-auto">
+        <table id="revenueDataTable" class="min-w-full text-xs border-separate border-spacing-0">
+          <thead class="sticky top-0 bg-slate-100 text-slate-700 z-20"></thead>
+          <tbody class="bg-white"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="compareModePanel" class="hidden mt-3 rounded-xl border border-slate-200/90 overflow-hidden shadow-sm bg-white">
+      <div class="bg-slate-50 border-b border-slate-200 px-3 py-2">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <div class="text-xs font-semibold text-slate-700">Raw Workbook View (for comparison)</div>
+            <div id="compareTableStats" class="text-[11px] text-slate-500 mt-0.5">Rows: - | Cols: -</div>
+          </div>
+          <div class="flex items-end gap-2 flex-wrap">
+            <label class="text-[11px] text-slate-600">Scope
+              <select id="compareExportScope" class="mt-1 block border border-slate-300 rounded-md px-2 py-1 text-xs bg-white">
+                <option value="visible">Visible</option>
+                <option value="full">Full sheet</option>
+              </select>
+            </label>
+            <label class="text-[11px] text-slate-600">Format
+              <select id="compareExportFormat" class="mt-1 block border border-slate-300 rounded-md px-2 py-1 text-xs bg-white">
+                <option value="xlsx">XLSX</option>
+                <option value="csv">CSV</option>
+                <option value="pdf">PDF</option>
+              </select>
+            </label>
+            <button id="exportCompareTableBtn" type="button" class="px-3 py-2 rounded-md bg-slate-800 text-white text-xs font-medium hover:bg-slate-900">
+              Export
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="max-h-[380px] overflow-auto">
+        <table id="compareRawTable" class="min-w-full text-xs border-separate border-spacing-0">
+          <thead class="sticky top-0 bg-slate-100 text-slate-700 z-20"></thead>
+          <tbody class="bg-white"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="revenueSummaryModal" class="hidden fixed inset-0 z-[3000]">
+  <div class="absolute inset-0 bg-black/45" id="revenueSummaryBackdrop"></div>
+  <div class="absolute inset-0 flex items-center justify-center p-4">
+    <div class="w-full max-w-5xl max-h-[90vh] overflow-auto bg-white rounded-2xl border border-slate-200 shadow-2xl p-5">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-slate-800 m-0">Revenue Reports</h2>
+          <p class="text-sm text-slate-500 mt-1 mb-0">Section 1 automation based on the existing VTL template logic.</p>
+        </div>
+        <button id="closeRevenueSummaryModalBtn" class="px-3 py-1.5 rounded-md bg-slate-100 text-slate-700 text-sm hover:bg-slate-200">Close</button>
+      </div>
+
+      <div class="flex items-center gap-2 mt-4">
+        <button id="runNowBtn" class="px-3 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">
+          Run Section 1 Now
+        </button>
+        <button id="downloadLatestBtn" class="px-3 py-2 rounded-md bg-white border border-slate-300 text-sm text-slate-700 hover:bg-slate-50">
+          Download Latest
+        </button>
+        {% if is_admin %}
+        <button id="openRevenueSettingsBtn" class="px-3 py-2 rounded-md bg-white border border-slate-300 text-sm text-slate-700 hover:bg-slate-50">
+          Revenue Settings
+        </button>
+        {% endif %}
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <div class="text-xs text-slate-500 uppercase">Last Status</div>
+          <div id="lastStatus" class="text-lg font-semibold text-slate-800 mt-1">Loading...</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <div class="text-xs text-slate-500 uppercase">Last Total Count</div>
+          <div id="lastCount" class="text-lg font-semibold text-slate-800 mt-1">-</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <div class="text-xs text-slate-500 uppercase">Daily Schedule</div>
+          <div id="scheduleTime" class="text-lg font-semibold text-slate-800 mt-1">-</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <div class="text-xs text-slate-500 uppercase">Source Mode</div>
+          <div id="sourceMode" class="text-lg font-semibold text-slate-800 mt-1">-</div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-4 mt-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-semibold text-slate-800 m-0">Latest Section 1 Output</h3>
+          <a id="downloadLatestLink" class="text-sm text-indigo-600 hover:text-indigo-700 hidden" href="#">Download Latest</a>
+        </div>
+        <div class="mt-3 text-sm text-slate-600">
+          <div><strong>Generated file:</strong> <span id="lastFilename">-</span></div>
+          <div><strong>Run at:</strong> <span id="lastRunAt">-</span></div>
+          <div><strong>Triggered by:</strong> <span id="lastTriggeredBy">-</span></div>
+          <div><strong>Email status:</strong> <span id="lastEmailStatus">-</span></div>
+          <div><strong>Email details:</strong> <span id="lastEmailReason">-</span></div>
+          <div><strong>Email checked at:</strong> <span id="lastEmailAt">-</span></div>
+          <div id="lastErrorWrap" class="mt-2 hidden"><strong>Error:</strong> <span id="lastError" class="text-red-600"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if is_admin %}
+{% include 'revenue_settings_modal.html' %}
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script>
+  let revenueTabsState = {
+    activeTabId: null,
+    activeSheetName: null,
+    tabs: [],
+    tableSource: 'latest_generated',
+    filterText: '',
+    compareMode: false,
+    driversChartType: 'line',
+    driversChartStartAt: '',
+    driversChartEndAt: '',
+    driversChart: null,
+    driversChartLoaded: false,
+    isAdmin: {{ 'true' if is_admin else 'false' }},
+    mainTableSnapshot: null,
+    compareTableSnapshot: null
+  };
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value || '-';
+  }
+
+  async function loadLatestRevenueData() {
+    const res = await fetch('/api/revenue-reports/section1/latest');
+    const payload = await res.json();
+    if (!res.ok || !payload.success) {
+      throw new Error(payload.error || 'Failed to load latest revenue report info');
+    }
+    const data = payload.data || {};
+    setText('lastStatus', data.last_status);
+    setText('lastCount', data.last_total_count);
+    setText('scheduleTime', data.schedule_time);
+    setText('sourceMode', data.source_mode);
+    setText('lastFilename', data.last_filename);
+    setText('lastRunAt', data.last_run_at);
+    setText('lastTriggeredBy', data.last_triggered_by);
+    setText('lastEmailStatus', data.last_email_status);
+    setText('lastEmailReason', data.last_email_reason || 'none');
+    setText('lastEmailAt', data.last_email_at || 'not available');
+
+    const errWrap = document.getElementById('lastErrorWrap');
+    const errEl = document.getElementById('lastError');
+    if (data.last_error) {
+      errWrap.classList.remove('hidden');
+      errEl.textContent = data.last_error;
+    } else {
+      errWrap.classList.add('hidden');
+      errEl.textContent = '';
+    }
+
+    const dl = document.getElementById('downloadLatestLink');
+    if (data.latest_download_url) {
+      dl.href = data.latest_download_url;
+      dl.classList.remove('hidden');
+    } else {
+      dl.href = '#';
+      dl.classList.add('hidden');
+    }
+  }
+
+  function setRevenueTemplateMessage(message, ok = true) {
+    const el = document.getElementById('revenueTemplateMsg');
+    el.textContent = message || '';
+    el.className = ok ? 'mt-2 text-xs text-emerald-600' : 'mt-2 text-xs text-red-600';
+  }
+
+  function setFlashUploadMessage(message, ok = true) {
+    const el = document.getElementById('flashUploadMsg');
+    el.textContent = message || '';
+    el.className = ok ? 'mt-2 text-xs text-emerald-600' : 'mt-2 text-xs text-red-600';
+  }
+
+  function formatDateForRevenueInput(date) {
+    const pad = (v) => String(v).padStart(2, '0');
+    return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()} ${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
+  }
+
+  function getCurrentWeekRange() {
+    const now = new Date();
+    const day = now.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const start = new Date(now);
+    start.setDate(now.getDate() + mondayOffset);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 0);
+    return { start, end };
+  }
+
+  function resetDriversChartRangeToWeek() {
+    const { start, end } = getCurrentWeekRange();
+    revenueTabsState.driversChartStartAt = formatDateForRevenueInput(start);
+    revenueTabsState.driversChartEndAt = formatDateForRevenueInput(end);
+    document.getElementById('driversChartStartAt').value = revenueTabsState.driversChartStartAt;
+    document.getElementById('driversChartEndAt').value = revenueTabsState.driversChartEndAt;
+  }
+
+  function setDriversChartStatus(message, type = 'muted') {
+    const el = document.getElementById('driversChartStatus');
+    if (!el) return;
+    el.textContent = message || '';
+    if (type === 'error') {
+      el.className = 'text-xs text-red-600 mb-2';
+      return;
+    }
+    if (type === 'success') {
+      el.className = 'text-xs text-emerald-600 mb-2';
+      return;
+    }
+    el.className = 'text-xs text-slate-500 mb-2';
+  }
+
+  function renderDriversDailyActualChart(points) {
+    const canvas = document.getElementById('driversDailyActualChart');
+    if (!canvas) return;
+    if (typeof Chart === 'undefined') {
+      setDriversChartStatus('Chart library failed to load. Please refresh the page.', 'error');
+      return;
+    }
+    const labels = (points || []).map((p) => p.timestamp_label || '');
+    const smartlearningValues = (points || []).map((p) => Number(p.smartlearning_value || 0));
+    const libraryValues = (points || []).map((p) => Number(p.library_value || 0));
+    const totalValues = (points || []).map((p) => Number(p.total_value || 0));
+    const chartType = revenueTabsState.driversChartType || 'line';
+
+    if (revenueTabsState.driversChart) {
+      revenueTabsState.driversChart.destroy();
+      revenueTabsState.driversChart = null;
+    }
+
+    if (!labels.length) {
+      setDriversChartStatus('No data in selected range.', 'muted');
+      return;
+    }
+
+    revenueTabsState.driversChart = new Chart(canvas, {
+      type: chartType,
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Smartlearning Daily Actual',
+            data: smartlearningValues,
+            borderColor: '#2563eb',
+            backgroundColor: chartType === 'bar' ? 'rgba(37,99,235,0.45)' : 'rgba(37,99,235,0.2)',
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: chartType === 'line' ? 2 : 0,
+            fill: false
+          },
+          {
+            label: 'Library Daily Actual',
+            data: libraryValues,
+            borderColor: '#16a34a',
+            backgroundColor: chartType === 'bar' ? 'rgba(22,163,74,0.45)' : 'rgba(22,163,74,0.2)',
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: chartType === 'line' ? 2 : 0,
+            fill: false
+          },
+          {
+            label: 'Total Daily Actual',
+            data: totalValues,
+            borderColor: '#7c3aed',
+            backgroundColor: chartType === 'bar' ? 'rgba(124,58,237,0.5)' : 'rgba(124,58,237,0.22)',
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: chartType === 'line' ? 2 : 0,
+            fill: chartType === 'line'
+          }
+        ]
+      },
+      options: {
+        maintainAspectRatio: false,
+        responsive: true,
+        plugins: {
+          legend: { display: true },
+          tooltip: { mode: 'index', intersect: false }
+        },
+        scales: {
+          x: {
+            ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 12 }
+          },
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+    setDriversChartStatus(`Showing ${labels.length} run(s).`, 'success');
+  }
+
+  async function loadDriversDailyActualSeries() {
+    const startAt = (document.getElementById('driversChartStartAt')?.value || '').trim();
+    const endAt = (document.getElementById('driversChartEndAt')?.value || '').trim();
+    revenueTabsState.driversChartStartAt = startAt;
+    revenueTabsState.driversChartEndAt = endAt;
+
+    const params = new URLSearchParams();
+    if (startAt) params.set('start_at', startAt);
+    if (endAt) params.set('end_at', endAt);
+    const query = params.toString();
+    const url = `/api/revenue-reports/drivers/daily-actual-series${query ? `?${query}` : ''}`;
+
+    setDriversChartStatus('Loading chart data...', 'muted');
+    const res = await fetch(url);
+    const payload = await res.json();
+    if (!res.ok || !payload.success) {
+      throw new Error(payload.error || 'Failed to load chart data');
+    }
+    if (payload.start_at) {
+      revenueTabsState.driversChartStartAt = payload.start_at;
+      document.getElementById('driversChartStartAt').value = payload.start_at;
+    }
+    if (payload.end_at) {
+      revenueTabsState.driversChartEndAt = payload.end_at;
+      document.getElementById('driversChartEndAt').value = payload.end_at;
+    }
+    renderDriversDailyActualChart(payload.points || []);
+    const activeTab = revenueTabsState.tabs.find(t => t.id === revenueTabsState.activeTabId);
+    if (activeTab && activeTab.id === 'akello_flash') {
+      renderSheetButtons(activeTab);
+    }
+  }
+
+  async function refreshDriversChartWithFeedback() {
+    try {
+      await loadDriversDailyActualSeries();
+    } catch (err) {
+      if (revenueTabsState.driversChart) {
+        revenueTabsState.driversChart.destroy();
+        revenueTabsState.driversChart = null;
+      }
+      setDriversChartStatus(err.message || 'Failed to load chart data', 'error');
+    }
+  }
+
+  async function runNow() {
+    const btn = document.getElementById('runNowBtn');
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+    try {
+      const res = await fetch('/api/revenue-reports/run', { method: 'POST' });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Failed to run report');
+      await loadLatestRevenueData();
+      await loadRevenueTables();
+      alert('Revenue report run completed successfully.');
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Run Section 1 Now';
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
+
+  function slugifyText(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'table';
+  }
+
+  function toExportString(value) {
+    if (value === null || value === undefined) return '';
+    return String(value);
+  }
+
+  function buildExportFileName(dataset, format) {
+    const now = new Date();
+    const pad = (v) => String(v).padStart(2, '0');
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const tabSlug = slugifyText(dataset?.tabTitle || dataset?.tabId || 'table');
+    const sheetSlug = slugifyText(dataset?.sheetName || 'sheet');
+    return `${tabSlug}_${sheetSlug}_${stamp}.${format}`;
+  }
+
+  function downloadBlob(blob, fileName) {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportAsCsv(dataset) {
+    const rows = [dataset.headers || [], ...(dataset.rows || [])];
+    const csv = rows.map((row) => row.map((cell) => {
+      const cellText = toExportString(cell).replaceAll('"', '""');
+      return `"${cellText}"`;
+    }).join(',')).join('\r\n');
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), buildExportFileName(dataset, 'csv'));
+  }
+
+  function exportAsXlsx(dataset) {
+    if (typeof XLSX === 'undefined') {
+      throw new Error('XLSX library unavailable. Please refresh and try again.');
+    }
+    const data = [dataset.headers || [], ...(dataset.rows || [])];
+    const sheet = XLSX.utils.aoa_to_sheet(data);
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, sheet, (dataset.sheetName || 'Sheet1').slice(0, 31));
+    XLSX.writeFile(book, buildExportFileName(dataset, 'xlsx'));
+  }
+
+  function exportAsPdf(dataset) {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error('PDF library unavailable. Please refresh and try again.');
+    }
+    const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    doc.setFontSize(10);
+    doc.text(`${dataset.tabTitle || dataset.tabId || 'Revenue Report'} - ${dataset.sheetName || 'Sheet'}`, 24, 24);
+    doc.autoTable({
+      startY: 34,
+      head: [dataset.headers || []],
+      body: dataset.rows || [],
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 3, overflow: 'linebreak' },
+      headStyles: { fillColor: [15, 23, 42], textColor: 255 }
+    });
+    doc.save(buildExportFileName(dataset, 'pdf'));
+  }
+
+  function getMainExportDataset(scope) {
+    const snapshot = revenueTabsState.mainTableSnapshot;
+    if (!snapshot) return null;
+    if (scope === 'full') {
+      return {
+        ...snapshot,
+        headers: snapshot.headersAll || [],
+        rows: snapshot.rowsAll || []
+      };
+    }
+    return {
+      ...snapshot,
+      headers: snapshot.headersVisible || [],
+      rows: snapshot.rowsVisible || []
+    };
+  }
+
+  function getCompareExportDataset(scope) {
+    const snapshot = revenueTabsState.compareTableSnapshot;
+    if (!snapshot) return null;
+    if (scope === 'full') {
+      return {
+        ...snapshot,
+        headers: snapshot.headersAll || [],
+        rows: snapshot.rowsAll || []
+      };
+    }
+    return {
+      ...snapshot,
+      headers: snapshot.headersVisible || [],
+      rows: snapshot.rowsVisible || []
+    };
+  }
+
+  function exportDataset(dataset, format) {
+    if (!dataset || !(dataset.headers || []).length) {
+      throw new Error('No data available to export.');
+    }
+    if (format === 'csv') {
+      exportAsCsv(dataset);
+      return;
+    }
+    if (format === 'pdf') {
+      exportAsPdf(dataset);
+      return;
+    }
+    exportAsXlsx(dataset);
+  }
+
+  function updateMainToolbarContent(tab, sheet, filteredRows, visibleColumnIndexes, visibleHeaders) {
+    const title = document.getElementById('mainTableTitle');
+    const subtitle = document.getElementById('mainTableSubtitle');
+    const rowsChip = document.getElementById('mainRowsChip');
+    const colsChip = document.getElementById('mainColsChip');
+    const sourceChip = document.getElementById('mainSourceChip');
+    if (!title || !subtitle || !rowsChip || !colsChip || !sourceChip) return;
+    const tabTitle = tab?.title || 'Table';
+    const sheetName = sheet?.sheet_name || 'Sheet';
+    title.textContent = `${tabTitle} / ${sheetName}`;
+    subtitle.textContent = tab?.id === 'akello_flash'
+      ? 'Akello Flash revenue view with modernized styling and exports.'
+      : 'Revenue data table with modernized styling and exports.';
+    rowsChip.textContent = `Rows: ${filteredRows.length}`;
+    colsChip.textContent = `Cols: ${visibleColumnIndexes.length}`;
+    sourceChip.textContent = `Source: ${tab?.source_type || '-'}`;
+  }
+
+  function resetMainToolbarContent() {
+    const title = document.getElementById('mainTableTitle');
+    const subtitle = document.getElementById('mainTableSubtitle');
+    const rowsChip = document.getElementById('mainRowsChip');
+    const colsChip = document.getElementById('mainColsChip');
+    const sourceChip = document.getElementById('mainSourceChip');
+    if (title) title.textContent = 'Active table';
+    if (subtitle) subtitle.textContent = 'Select a tab and sheet to preview data.';
+    if (rowsChip) rowsChip.textContent = 'Rows: -';
+    if (colsChip) colsChip.textContent = 'Cols: -';
+    if (sourceChip) sourceChip.textContent = 'Source: -';
+  }
+
+  function renderTabButtons() {
+    const wrap = document.getElementById('tabButtons');
+    wrap.innerHTML = '';
+    revenueTabsState.tabs.forEach((tab) => {
+      const active = tab.id === revenueTabsState.activeTabId;
+      const btn = document.createElement('button');
+      btn.className = `px-3 py-1.5 rounded-md text-sm border ${active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-300'}`;
+      btn.textContent = tab.title;
+      btn.addEventListener('click', () => {
+        revenueTabsState.activeTabId = tab.id;
+        revenueTabsState.activeSheetName = null;
+        renderActiveTabTable();
+        renderTabButtons();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function formatFlashSheetLabel(rangeStart, rangeEnd, sheetName) {
+    const rawName = String(sheetName || '');
+    const lowered = rawName.toLowerCase();
+    let currency = '';
+    if (lowered.includes('usd')) currency = 'USD';
+    else if (lowered.includes('zig')) currency = 'ZiG';
+    else return rawName;
+
+    const startText = String(rangeStart || '').trim();
+    const endText = String(rangeEnd || '').trim();
+    if (!startText || !endText) return rawName;
+    return `${startText} - ${endText} ${currency}`;
+  }
+
+  function getSheetButtonLabel(tab, sheet) {
+    if (!tab || tab.id !== 'akello_flash') return sheet.sheet_name;
+    return formatFlashSheetLabel(
+      revenueTabsState.driversChartStartAt,
+      revenueTabsState.driversChartEndAt,
+      sheet.sheet_name
+    );
+  }
+
+  function renderSheetButtons(tab) {
+    const wrap = document.getElementById('sheetButtons');
+    wrap.innerHTML = '';
+    if (!tab || !tab.sheets || !tab.sheets.length) return;
+
+    if (!revenueTabsState.activeSheetName) {
+      revenueTabsState.activeSheetName = tab.sheets[0].sheet_name;
+    }
+    tab.sheets.forEach((sheet) => {
+      const active = sheet.sheet_name === revenueTabsState.activeSheetName;
+      const btn = document.createElement('button');
+      btn.className = `px-2 py-1 rounded-md text-[11px] border ${active ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-700 border-slate-300'}`;
+      btn.textContent = getSheetButtonLabel(tab, sheet);
+      btn.addEventListener('click', () => {
+        revenueTabsState.activeSheetName = sheet.sheet_name;
+        renderActiveTabTable();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function applyRowFilter(rows) {
+    const filter = (revenueTabsState.filterText || '').trim().toLowerCase();
+    if (!filter) return rows;
+    return rows.filter((row) => row.some((cell) => String(cell || '').toLowerCase().includes(filter)));
+  }
+
+  function stripTotalRows(rows) {
+    return (rows || []).filter((row) => {
+      const firstCell = String((row && row[0]) || '').trim().toLowerCase();
+      return firstCell !== 'total';
+    });
+  }
+
+  function renderActiveTabTable() {
+    const tab = revenueTabsState.tabs.find(t => t.id === revenueTabsState.activeTabId);
+    const meta = document.getElementById('tabMeta');
+    const err = document.getElementById('tableError');
+    const diag = document.getElementById('diagnosticsBanner');
+    const sourceBadge = document.getElementById('sourceBadge');
+    const stats = document.getElementById('tableStats');
+    const compareStats = document.getElementById('compareTableStats');
+    const driversActions = document.getElementById('revenueDriversActions');
+    const flashActions = document.getElementById('flashActions');
+    const compareToggle = document.getElementById('compareModeToggle');
+    const comparePanel = document.getElementById('compareModePanel');
+    const exportMainBtn = document.getElementById('exportMainTableBtn');
+    const exportCompareBtn = document.getElementById('exportCompareTableBtn');
+    const thead = document.querySelector('#revenueDataTable thead');
+    const tbody = document.querySelector('#revenueDataTable tbody');
+
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+    err.classList.add('hidden');
+    err.textContent = '';
+    diag.classList.add('hidden');
+    diag.textContent = '';
+    sourceBadge.textContent = '';
+    stats.textContent = '';
+    if (compareStats) compareStats.textContent = 'Rows: - | Cols: -';
+    resetMainToolbarContent();
+    revenueTabsState.mainTableSnapshot = null;
+    revenueTabsState.compareTableSnapshot = null;
+    if (exportMainBtn) exportMainBtn.disabled = true;
+    if (exportCompareBtn) exportCompareBtn.disabled = true;
+
+    if (!tab) {
+      meta.textContent = 'No tab data available.';
+      driversActions.classList.add('hidden');
+      flashActions.classList.add('hidden');
+      comparePanel.classList.add('hidden');
+      return;
+    }
+
+    if (tab.id === 'revenue_drivers') {
+      driversActions.classList.remove('hidden');
+      flashActions.classList.add('hidden');
+      compareToggle.disabled = false;
+      if (!revenueTabsState.driversChartLoaded) {
+        refreshDriversChartWithFeedback();
+        revenueTabsState.driversChartLoaded = true;
+      }
+    } else if (tab.id === 'akello_flash') {
+      driversActions.classList.add('hidden');
+      flashActions.classList.remove('hidden');
+      compareToggle.disabled = true;
+      compareToggle.checked = false;
+      revenueTabsState.compareMode = false;
+      comparePanel.classList.add('hidden');
+    } else {
+      driversActions.classList.add('hidden');
+      flashActions.classList.add('hidden');
+      compareToggle.checked = false;
+      compareToggle.disabled = true;
+      revenueTabsState.compareMode = false;
+      comparePanel.classList.add('hidden');
+    }
+
+    renderSheetButtons(tab);
+
+    sourceBadge.textContent = `Source: ${tab.source_type}`;
+    meta.textContent = `File: ${tab.selected_path || '-'} | Last refresh: ${new Date().toLocaleString()}`;
+    if (tab.error) {
+      err.classList.remove('hidden');
+      err.textContent = tab.error;
+      return;
+    }
+
+    if (!tab.sheets || !tab.sheets.length) {
+      err.classList.remove('hidden');
+      err.textContent = 'No sheet data found for this workbook.';
+      return;
+    }
+
+    const sheet = tab.sheets.find(s => s.sheet_name === revenueTabsState.activeSheetName) || tab.sheets[0];
+    if (sheet && !revenueTabsState.activeSheetName) {
+      revenueTabsState.activeSheetName = sheet.sheet_name;
+    }
+
+    if (tab.id === 'revenue_drivers') {
+      const mismatches = tab?.diagnostics?.mismatches || [];
+      if (mismatches.length) {
+        const labels = mismatches.slice(0, 5).map(c => `${escapeHtml(c.cell)} (wb:${escapeHtml(c.workbook)} vs calc:${escapeHtml(c.computed)})`).join(', ');
+        diag.classList.remove('hidden');
+        diag.innerHTML = `<strong>Heads up:</strong> ${mismatches.length} consistency differences detected. ${labels}${mismatches.length > 5 ? ' ...' : ''}`;
+      }
+    }
+
+    const allRows = stripTotalRows(sheet.rows || []);
+    const visibleColumnIndexes = [];
+    if (tab.id === 'revenue_drivers') {
+      for (let c = 0; c < (sheet.headers || []).length; c++) visibleColumnIndexes.push(c);
+    } else {
+      for (let c = 0; c < (sheet.headers || []).length; c++) {
+        let hasValue = false;
+        for (let r = 0; r < allRows.length; r++) {
+          const val = String((allRows[r] && allRows[r][c]) || '').trim();
+          if (val !== '') {
+            hasValue = true;
+            break;
+          }
+        }
+        if (hasValue) visibleColumnIndexes.push(c);
+      }
+    }
+
+    const visibleHeaders = visibleColumnIndexes.map(idx => (sheet.headers || [])[idx]);
+    const headerCells = visibleHeaders.map((h, i) => `<th class="px-3 py-2.5 border-b border-r border-slate-200 text-left whitespace-nowrap font-semibold tracking-wide uppercase text-[11px] ${i === 0 ? 'sticky left-0 z-30 bg-slate-100 border-r-2 border-r-slate-300 shadow-[2px_0_0_0_rgba(203,213,225,0.8)]' : 'bg-slate-100'}">${escapeHtml(h)}</th>`).join('');
+    thead.innerHTML = `<tr>${headerCells}</tr>`;
+
+    const filteredRows = applyRowFilter(allRows);
+    updateMainToolbarContent(tab, sheet, filteredRows, visibleColumnIndexes, visibleHeaders);
+    const rowHtml = filteredRows.map((row, rIdx) => {
+      const isEven = rIdx % 2 === 0;
+      const rowBg = isEven ? 'bg-white' : 'bg-slate-50/70';
+      const stickyBg = isEven ? 'bg-white' : 'bg-slate-50/70';
+      const cells = visibleColumnIndexes.map((originalIdx, cIdx) => {
+        const cell = (row && row[originalIdx] !== undefined && row[originalIdx] !== null && String(row[originalIdx]).trim() !== '') ? row[originalIdx] : (tab.id === 'revenue_drivers' ? '' : '—');
+        return `<td class="px-3 py-2 border-b border-r border-slate-200 whitespace-nowrap text-slate-700 ${cIdx === 0 ? `sticky left-0 z-20 ${stickyBg} font-semibold border-r-2 border-r-slate-300 shadow-[2px_0_0_0_rgba(203,213,225,0.8)]` : ''}">${escapeHtml(cell)}</td>`;
+      }).join('');
+      return `<tr class="${rowBg} hover:bg-indigo-50/80 transition-colors">${cells}</tr>`;
+    }).join('');
+    tbody.innerHTML = rowHtml || `<tr><td class="px-3 py-3 text-slate-500" colspan="${Math.max(1, visibleColumnIndexes.length)}">No rows available.</td></tr>`;
+    stats.textContent = `${filteredRows.length}/${sheet.row_count || filteredRows.length} rows | ${visibleColumnIndexes.length} cols`;
+    revenueTabsState.mainTableSnapshot = {
+      tabId: tab.id,
+      tabTitle: tab.title,
+      sheetName: sheet.sheet_name,
+      headersVisible: visibleHeaders,
+      rowsVisible: filteredRows.map((row) => visibleColumnIndexes.map((idx) => toExportString(row[idx]))),
+      headersAll: (sheet.headers || []).map((h) => toExportString(h)),
+      rowsAll: allRows.map((row) => (sheet.headers || []).map((_, idx) => toExportString(row[idx]))),
+      sourceType: tab.source_type
+    };
+    if (exportMainBtn) exportMainBtn.disabled = false;
+
+    if (tab.id === 'revenue_drivers' && revenueTabsState.compareMode) {
+      const rawSheet = tab?.diagnostics?.raw_sheet;
+      const rawThead = document.querySelector('#compareRawTable thead');
+      const rawTbody = document.querySelector('#compareRawTable tbody');
+      if (!rawSheet || !rawSheet.headers || !rawSheet.rows) {
+        comparePanel.classList.add('hidden');
+      } else {
+        comparePanel.classList.remove('hidden');
+        const rawHeaders = (rawSheet.headers || []).map((h) => `<th class="px-3 py-2.5 border-b border-r border-slate-200 text-left whitespace-nowrap font-semibold tracking-wide uppercase text-[11px] bg-slate-100">${escapeHtml(h)}</th>`).join('');
+        rawThead.innerHTML = `<tr>${rawHeaders}</tr>`;
+        const rawRows = stripTotalRows(rawSheet.rows || []);
+        const visibleRawRows = applyRowFilter(rawRows);
+        rawTbody.innerHTML = visibleRawRows.map((row, rIdx) => {
+          const isEven = rIdx % 2 === 0;
+          const rowBg = isEven ? 'bg-white' : 'bg-slate-50/70';
+          const cells = row.map((cell) => `<td class="px-3 py-2 border-b border-r border-slate-200 whitespace-nowrap text-slate-700">${escapeHtml(cell || '')}</td>`).join('');
+          return `<tr class="${rowBg}">${cells}</tr>`;
+        }).join('');
+        if (compareStats) {
+          compareStats.textContent = `Rows: ${visibleRawRows.length}/${rawRows.length} | Cols: ${(rawSheet.headers || []).length}`;
+        }
+        revenueTabsState.compareTableSnapshot = {
+          tabId: `${tab.id}_compare`,
+          tabTitle: `${tab.title} Raw`,
+          sheetName: rawSheet.sheet_name || sheet.sheet_name || 'Raw',
+          headersVisible: (rawSheet.headers || []).map((h) => toExportString(h)),
+          rowsVisible: visibleRawRows.map((row) => row.map((cell) => toExportString(cell))),
+          headersAll: (rawSheet.headers || []).map((h) => toExportString(h)),
+          rowsAll: rawRows.map((row) => row.map((cell) => toExportString(cell))),
+          sourceType: tab.source_type
+        };
+        if (exportCompareBtn) exportCompareBtn.disabled = false;
+      }
+    } else {
+      comparePanel.classList.add('hidden');
+    }
+  }
+
+  async function loadRevenueTables() {
+    const response = await fetch('/api/revenue-reports/tables');
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || 'Failed to load revenue tables');
+    }
+
+    revenueTabsState.tabs = payload.tabs || [];
+    revenueTabsState.tableSource = payload.table_source || 'latest_generated';
+    revenueTabsState.driversChartLoaded = false;
+    if (!revenueTabsState.activeTabId && revenueTabsState.tabs.length) {
+      revenueTabsState.activeTabId = revenueTabsState.tabs[0].id;
+    }
+    const sourceSelect = document.getElementById('tableSourceSelect');
+    sourceSelect.value = revenueTabsState.tableSource;
+    sourceSelect.disabled = !revenueTabsState.isAdmin;
+
+    renderTabButtons();
+    renderActiveTabTable();
+  }
+
+  function exportMainTable() {
+    try {
+      const scope = document.getElementById('mainExportScope')?.value || 'visible';
+      const format = document.getElementById('mainExportFormat')?.value || 'xlsx';
+      const dataset = getMainExportDataset(scope);
+      exportDataset(dataset, format);
+    } catch (err) {
+      alert(err.message || 'Failed to export table');
+    }
+  }
+
+  function exportCompareTable() {
+    try {
+      const scope = document.getElementById('compareExportScope')?.value || 'visible';
+      const format = document.getElementById('compareExportFormat')?.value || 'xlsx';
+      const dataset = getCompareExportDataset(scope);
+      exportDataset(dataset, format);
+    } catch (err) {
+      alert(err.message || 'Failed to export compare table');
+    }
+  }
+
+  async function saveTableSource() {
+    const sourceMode = document.getElementById('revenue_source_mode')?.value || 'db_template';
+    const scheduleTime = document.getElementById('revenue_schedule_time')?.value || document.getElementById('scheduleTime')?.textContent || '06:00';
+    const tableSource = document.getElementById('tableSourceSelect').value;
+
+    const response = await fetch('/api/settings/revenue-reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source_mode: sourceMode,
+        schedule_time: scheduleTime,
+        table_source: tableSource
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || 'Failed to save table source');
+    }
+    await loadLatestRevenueData();
+    await loadRevenueTables();
+  }
+
+  document.getElementById('runNowBtn').addEventListener('click', runNow);
+  document.getElementById('driversRunNowBtn').addEventListener('click', runNow);
+  document.getElementById('downloadLatestBtn').addEventListener('click', () => {
+    window.location.href = '/api/download-latest';
+  });
+  document.getElementById('driversDownloadLatestBtn').addEventListener('click', () => {
+    window.location.href = '/api/download-latest';
+  });
+  document.getElementById('revenueTemplateUploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setRevenueTemplateMessage('Uploading template...', true);
+    try {
+      const formData = new FormData();
+      const fileInput = document.getElementById('revenueTemplateFile');
+      if (!fileInput.files || !fileInput.files[0]) {
+        throw new Error('Please choose an .xlsx file');
+      }
+      formData.append('file', fileInput.files[0]);
+      const res = await fetch('/vtl_template', { method: 'POST', body: formData });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Upload failed');
+      document.getElementById('revenueTemplateName').textContent = payload.stored_as || 'uploaded_template.xlsx';
+      setRevenueTemplateMessage(`Template uploaded: ${payload.stored_as || 'uploaded_template.xlsx'}`, true);
+    } catch (err) {
+      setRevenueTemplateMessage(err.message || 'Failed to upload template', false);
+    }
+  });
+  document.getElementById('openRevenueSummaryModalBtn').addEventListener('click', () => {
+    document.getElementById('revenueSummaryModal').classList.remove('hidden');
+  });
+  document.getElementById('closeRevenueSummaryModalBtn').addEventListener('click', () => {
+    document.getElementById('revenueSummaryModal').classList.add('hidden');
+  });
+  document.getElementById('revenueSummaryBackdrop').addEventListener('click', () => {
+    document.getElementById('revenueSummaryModal').classList.add('hidden');
+  });
+  document.getElementById('tableSearchInput').addEventListener('input', (e) => {
+    revenueTabsState.filterText = e.target.value || '';
+    renderActiveTabTable();
+  });
+  document.getElementById('compareModeToggle').addEventListener('change', (e) => {
+    revenueTabsState.compareMode = !!e.target.checked;
+    renderActiveTabTable();
+  });
+  document.getElementById('exportMainTableBtn').addEventListener('click', exportMainTable);
+  document.getElementById('exportCompareTableBtn').addEventListener('click', exportCompareTable);
+  document.getElementById('flashUploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setFlashUploadMessage('Uploading flash workbook...', true);
+    try {
+      const fileInput = document.getElementById('flashTemplateFile');
+      if (!fileInput.files || !fileInput.files[0]) {
+        throw new Error('Please choose an .xlsx file');
+      }
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      const res = await fetch('/api/revenue-reports/flash/upload', { method: 'POST', body: formData });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) throw new Error(payload.error || 'Upload failed');
+      document.getElementById('flashTemplateName').textContent = payload.stored_as || 'uploaded_flash_template.xlsx';
+      setFlashUploadMessage('Flash workbook uploaded successfully', true);
+      await loadRevenueTables();
+    } catch (err) {
+      setFlashUploadMessage(err.message || 'Failed to upload flash workbook', false);
+    }
+  });
+  document.getElementById('driversChartType').addEventListener('change', async (e) => {
+    revenueTabsState.driversChartType = e.target.value || 'line';
+    await refreshDriversChartWithFeedback();
+  });
+  document.getElementById('driversChartApplyBtn').addEventListener('click', async () => {
+    await refreshDriversChartWithFeedback();
+  });
+  document.getElementById('driversChartResetBtn').addEventListener('click', async () => {
+    resetDriversChartRangeToWeek();
+    await refreshDriversChartWithFeedback();
+  });
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      resetDriversChartRangeToWeek();
+      await loadLatestRevenueData();
+      await loadRevenueTables();
+    } catch (err) {
+      alert(err.message || 'Failed to initialize revenue reports');
+    }
+  });
+
+  {% if is_admin %}
+  document.getElementById('saveTableSourceBtn').addEventListener('click', async () => {
+    try {
+      await saveTableSource();
+      alert('Table source updated.');
+    } catch (err) {
+      alert(err.message || 'Failed to save table source');
+    }
+  });
+  {% endif %}
+</script>
+{% endblock %}

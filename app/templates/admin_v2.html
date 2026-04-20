@@ -211,6 +211,13 @@
         <div class="text-2xl font-black text-slate-800">ASL MTD</div>
         <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Filter Settings</div>
       </div>
+      <div class="minimal-card p-6" style="cursor: pointer;" onclick="document.getElementById('revenueSettingsModal').style.display='block';">
+        <div class="kpi-icon-minimal bg-emerald-50 text-emerald-600 mb-4">
+          <i class="fas fa-money-bill-trend-up"></i>
+        </div>
+        <div class="text-2xl font-black text-slate-800">Revenue</div>
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Schedule & Source</div>
+      </div>
     </div>
 
     <!-- Upload Forms -->
@@ -946,7 +953,7 @@
     setTitle('Manage Access Keys');
     let privs = {};
     try { privs = JSON.parse(privJson || '{}'); } catch (e) { privs = {}; }
-    const items = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access"];
+    const items = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access", "Revenue Reports"];
     const html = `
     <div class="space-y-6">
       <p class="text-sm text-slate-600">Adjusting access levels for <span class="font-bold text-slate-800">${username}</span>.</p>
@@ -1931,5 +1938,6 @@
 </script>
 
 {% include 'asl_settings_modal.html' %}
+{% include 'revenue_settings_modal.html' %}
 
 {% endblock %}

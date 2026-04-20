@@ -4,6 +4,7 @@ Runs fetch_emails_and_create_tickets every 60 seconds inside Flask app context.
 """
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 _scheduler = None
@@ -23,6 +24,51 @@ def _scheduled_fetch(app):
             logger.exception("Helpdesk scheduler job failed: %s", e)
 
 
+def _read_revenue_schedule():
+    from app.models import AppSetting
+
+    raw = (AppSetting.get_value('revenue_reports_schedule_time', '06:00') or '06:00').strip()
+    try:
+        hour_s, minute_s = raw.split(':', 1)
+        hour, minute = int(hour_s), int(minute_s)
+        if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+            raise ValueError("out of range")
+    except Exception:
+        logger.warning("Invalid revenue schedule '%s'. Falling back to 06:00.", raw)
+        hour, minute = 6, 0
+    return hour, minute
+
+
+def _scheduled_revenue_report(app):
+    with app.app_context():
+        try:
+            from app.routes import run_revenue_report_job
+            as_of = datetime.today() - timedelta(days=1)
+            logger.info("Revenue scheduler run starting for as_of=%s", as_of.strftime("%Y-%m-%d"))
+            run_revenue_report_job(triggered_by="scheduler", as_of=as_of)
+        except Exception as e:
+            logger.exception("Revenue reports scheduler job failed: %s", e)
+
+
+def refresh_revenue_report_schedule(app):
+    """Create/update the daily revenue report job from AppSetting time."""
+    global _scheduler
+    if _scheduler is None:
+        return
+
+    hour, minute = _read_revenue_schedule()
+    _scheduler.add_job(
+        func=_scheduled_revenue_report,
+        args=[app],
+        trigger="cron",
+        hour=hour,
+        minute=minute,
+        id="revenue_reports_daily_job",
+        replace_existing=True,
+    )
+    logger.info("Revenue report scheduler set to daily %02d:%02d", hour, minute)
+
+
 def start_scheduler(app):
     """
     Start the background scheduler with a 60-second email fetch job.
@@ -39,5 +85,7 @@ def start_scheduler(app):
         seconds=60,
         id="helpdesk_email_fetch",
     )
+    with app.app_context():
+        refresh_revenue_report_schedule(app)
     _scheduler.start()
     logger.info("Helpdesk email scheduler started (interval 60s)")

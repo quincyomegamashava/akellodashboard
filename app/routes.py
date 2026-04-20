@@ -5811,6 +5811,18 @@ def can_approve_champion_schools():
     return False
 
 
+def can_view_revenue_reports():
+    """Check if user can access Revenue Reports (Admin or Revenue Reports privilege)."""
+    try:
+        if getattr(current_user, 'userRole', None) == 'Admin':
+            return True
+        if hasattr(current_user, 'has_privilege'):
+            return current_user.has_privilege('Revenue Reports')
+    except Exception:
+        pass
+    return False
+
+
 def get_champion_school_approvers():
     """Return list of User ids who can approve champion school requests (Admin role; privilege holders can still approve via UI)."""
     return [u.id for u in User.query.filter(User.userRole == 'Admin').all()]
@@ -15529,8 +15541,6 @@ from datetime import datetime
 import re
 
 today = datetime.today()
-# report_date = today.replace(day=1).date()
-report_date = (today - timedelta(days=1)).strftime('%d')
 
 # ---------- Excel Update ----------
 # def update_excel(data, template_path="report_template.xlsx", reports_dir="reports"):
@@ -15572,7 +15582,7 @@ report_date = (today - timedelta(days=1)).strftime('%d')
 #     return output_filename, output_path
 
 
-def update_excel(data, template_path="report_template.xlsx", reports_dir="reports"):
+def update_excel(data, template_path="report_template.xlsx", reports_dir="reports", report_day=None):
     wb = load_workbook(template_path)
     ws = wb.worksheets[0]   # or ws["SheetName"]
 
@@ -15582,9 +15592,10 @@ def update_excel(data, template_path="report_template.xlsx", reports_dir="report
 
     # Extract numeric safely
     value = pd.to_numeric(data['total_count'], errors="coerce").fillna(0).astype(int).iloc[0]
+    day_of_month = int(report_day or (datetime.today() - timedelta(days=1)).day)
     ws["C7"].value = value
-    ws["M7"].value = f'=(H7*31)/{report_date}'
-    ws["I7"].value = f'=D7*{report_date}'
+    ws["M7"].value = f'=(H7*31)/{day_of_month}'
+    ws["I7"].value = f'=D7*{day_of_month}'
 
     # Handle H7 formula
     if ws["H7"].value:
@@ -15644,7 +15655,14 @@ from datetime import datetime
 from flask import send_file, jsonify
 
 # ---------- DB Fetch ----------
-def fetch_data():
+def fetch_data(as_of=None):
+    if as_of is None:
+        as_of = datetime.today() - timedelta(days=1)
+
+    target_day_start = as_of.replace(hour=0, minute=0, second=0, microsecond=0)
+    target_day_end = as_of.replace(hour=23, minute=59, second=59, microsecond=0)
+    month_start = as_of.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
     conn = get_ruzivo_conn()
     cursor = conn.cursor()
     cursor.execute("""
@@ -15658,10 +15676,10 @@ def fetch_data():
         AND sl.student_id NOT IN (
             SELECT DISTINCT sl2.student_id
             FROM tblstudents_login sl2
-            WHERE sl2.login_date BETWEEN '2025-08-01 00:00:00' AND '2025-08-20 23:59:59'
+            WHERE sl2.login_date BETWEEN %s AND %s
         )
-        AND sl.login_date BETWEEN '2025-08-21 00:00:00' AND '2025-08-21 23:59:59';
-    """)
+        AND sl.login_date BETWEEN %s AND %s;
+    """, (month_start, target_day_end, target_day_start, target_day_end))
     rows = cursor.fetchall()
     df = pd.DataFrame(rows, columns=[desc[0] for desc in cursor.description])
     cursor.close()
@@ -15671,21 +15689,894 @@ def fetch_data():
 
 
 
-def generate_and_send_report(template_path):
+def generate_and_send_report(template_path, as_of=None):
     """
     Run fetch_data(), update the Excel template at C7,
     and save the result into /app/reports.
     """
-    df = fetch_data()
+    df = fetch_data(as_of=as_of)
 
     # ✅ Always use absolute /app/reports directory
     reports_dir = os.path.join(os.getcwd(), "app", "reports")
     os.makedirs(reports_dir, exist_ok=True)
 
     # ✅ update_excel already handles saving
-    filename, path = update_excel(df, template_path, reports_dir=reports_dir)
+    report_day = int((as_of or (datetime.today() - timedelta(days=1))).day)
+    filename, path = update_excel(df, template_path, reports_dir=reports_dir, report_day=report_day)
 
-    return filename, path
+    return filename, path, df
+
+
+def _send_revenue_report_email(*, report_path, filename, total_count, as_of, triggered_by):
+    """Send revenue report attachment plus KPI summary, if configured."""
+    from app.models import AppSetting
+
+    auto_email_enabled = AppSetting.get_value('revenue_reports_auto_email_enabled', 'false') == 'true'
+    if not auto_email_enabled:
+        return {"status": "skipped", "reason": "auto_email_disabled"}
+
+    recipient_mode = AppSetting.get_value('revenue_reports_email_recipient_mode', 'custom_group_later')
+    if recipient_mode == 'custom_group_later':
+        return {"status": "skipped", "reason": "recipients_pending_configuration"}
+
+    # Future recipient strategies can be added here.
+    return {"status": "skipped", "reason": f"unsupported_recipient_mode:{recipient_mode}"}
+
+
+def _send_revenue_report_email_with_attachment(*, recipients, report_path, filename, total_count, as_of, triggered_by):
+    """SMTP send helper for revenue report with attachment and KPI summary body."""
+    if app.config.get('MAIL_SUPPRESS_SEND'):
+        app.logger.info("[MAIL_SUPPRESS_SEND] Revenue report email suppressed for %s", recipients)
+        return True, ""
+
+    smtp_host = app.config.get('MAIL_SERVER', 'smtp.gmail.com')
+    smtp_port = app.config.get('MAIL_PORT', 587)
+    use_tls = app.config.get('MAIL_USE_TLS', True)
+    username = app.config.get('MAIL_USERNAME')
+    password = app.config.get('MAIL_PASSWORD')
+    sender = app.config.get('MAIL_DEFAULT_SENDER', username)
+    if not (username and password and sender):
+        return False, 'MAIL_USERNAME/PASSWORD/SENDER not fully configured'
+
+    run_day = (as_of or (datetime.today() - timedelta(days=1))).strftime('%Y-%m-%d')
+    subject = f"Revenue Report - {run_day}"
+    text_body = (
+        f"Revenue report generated successfully.\n\n"
+        f"Run date (as_of): {run_day}\n"
+        f"C7 total_count: {total_count}\n"
+        f"File: {filename}\n"
+        f"Triggered by: {triggered_by}\n"
+    )
+    html_body = f"""
+    <p>Revenue report generated successfully.</p>
+    <ul>
+      <li><strong>Run date (as_of):</strong> {run_day}</li>
+      <li><strong>C7 total_count:</strong> {total_count}</li>
+      <li><strong>File:</strong> {filename}</li>
+      <li><strong>Triggered by:</strong> {triggered_by}</li>
+    </ul>
+    """
+
+    msg = EmailMessage()
+    msg['Subject'] = subject
+    msg['From'] = sender
+    msg['To'] = ', '.join(recipients)
+    msg.set_content(text_body)
+    msg.add_alternative(html_body, subtype='html')
+    with open(report_path, 'rb') as f:
+        payload = f.read()
+        msg.add_attachment(
+            payload,
+            maintype='application',
+            subtype='vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            filename=filename
+        )
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            if use_tls:
+                server.starttls()
+            server.login(username, password)
+            server.send_message(msg)
+        return True, ""
+    except Exception as exc:
+        return False, str(exc)
+
+
+def run_revenue_report_job(triggered_by="manual", as_of=None):
+    """Run section-1 revenue report and persist latest status metadata."""
+    from app.models import AppSetting
+
+    source_mode = AppSetting.get_value('revenue_reports_source_mode', 'db_template')
+    active_mode = source_mode if source_mode in ('db_template', 'hybrid') else 'db_template'
+
+    template_path = os.path.join("instance", "uploaded_template.xlsx")
+    if not os.path.exists(template_path):
+        error_msg = "No template uploaded yet (instance/uploaded_template.xlsx)"
+        AppSetting.set_value('revenue_reports_last_status', 'failed')
+        AppSetting.set_value('revenue_reports_last_error', error_msg)
+        raise FileNotFoundError(error_msg)
+
+    filename, path, df = generate_and_send_report(template_path, as_of=as_of)
+    total_count = int(pd.to_numeric(df['total_count'], errors="coerce").fillna(0).astype(int).iloc[0])
+
+    AppSetting.set_value('revenue_reports_last_status', 'success')
+    AppSetting.set_value('revenue_reports_last_error', '')
+    AppSetting.set_value('revenue_reports_last_filename', filename)
+    AppSetting.set_value('revenue_reports_last_total_count', str(total_count))
+    AppSetting.set_value('revenue_reports_last_run_at', datetime.now(timezone.utc).isoformat())
+    AppSetting.set_value('revenue_reports_last_triggered_by', triggered_by)
+    AppSetting.set_value('revenue_reports_last_source_mode', source_mode)
+    AppSetting.set_value('revenue_reports_last_active_mode', active_mode)
+
+    # Email delivery is non-blocking for report success.
+    email_result = {"status": "skipped", "reason": "not_attempted"}
+    try:
+        app.logger.info("Revenue report email step starting for as_of=%s", (as_of or (datetime.today() - timedelta(days=1))).strftime('%Y-%m-%d'))
+        email_result = _send_revenue_report_email(
+            report_path=path,
+            filename=filename,
+            total_count=total_count,
+            as_of=as_of,
+            triggered_by=triggered_by,
+        )
+    except Exception as email_exc:
+        email_result = {"status": "failed", "reason": str(email_exc)}
+
+    AppSetting.set_value('revenue_reports_last_email_status', email_result.get("status", "skipped"))
+    AppSetting.set_value('revenue_reports_last_email_reason', email_result.get("reason", ""))
+    AppSetting.set_value('revenue_reports_last_email_at', datetime.now(timezone.utc).isoformat())
+
+    return {
+        "filename": filename,
+        "path": path,
+        "total_count": total_count,
+        "source_mode": source_mode,
+        "active_mode": active_mode,
+        "triggered_by": triggered_by,
+        "email_status": email_result.get("status", "skipped"),
+        "email_reason": email_result.get("reason", ""),
+    }
+
+
+def _normalize_table_value(value):
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _parse_workbook_used_ranges(workbook_path):
+    wb_formula = load_workbook(workbook_path, data_only=False)
+    wb_cached = load_workbook(workbook_path, data_only=True)
+    sheets_payload = []
+    for ws_idx, ws in enumerate(wb_formula.worksheets):
+        ws_cached = wb_cached.worksheets[ws_idx] if ws_idx < len(wb_cached.worksheets) else None
+        min_row, min_col, max_row, max_col = 1, 1, 1, 1
+        if ws.max_row and ws.max_column:
+            min_row, min_col, max_row, max_col = (
+                ws.min_row or 1,
+                ws.min_column or 1,
+                ws.max_row or 1,
+                ws.max_column or 1,
+            )
+
+        matrix = []
+        for row in ws.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
+            parsed_row = []
+            for cell in row:
+                formula_or_value = cell.value
+                if isinstance(formula_or_value, str) and formula_or_value.startswith('='):
+                    cached_value = None
+                    if ws_cached is not None:
+                        cached_value = ws_cached[cell.coordinate].value
+                    # Prefer cached/computed workbook value. If unavailable, leave empty.
+                    parsed_row.append(_normalize_table_value(cached_value))
+                else:
+                    parsed_row.append(_normalize_table_value(formula_or_value))
+            matrix.append(parsed_row)
+
+        if not matrix:
+            matrix = [[]]
+
+        col_count = len(matrix[0]) if matrix and matrix[0] else max_col - min_col + 1
+
+        # Pick the best header row from the first few rows.
+        # Prefer rows containing known header words (e.g., Daily Actual) over dense numeric data rows.
+        header_scan_limit = min(len(matrix), 12)
+        header_row_idx = 0
+        best_score = -1
+        header_keywords = (
+            "daily actual", "daily forecast", "budget variance", "prior day",
+            "mtd", "runrate", "run rate", "ytd", "forecast"
+        )
+        for idx in range(header_scan_limit):
+            row_values = [str(v).strip() for v in matrix[idx]]
+            non_empty_score = sum(1 for v in row_values if v != "")
+            keyword_score = 0
+            for v in row_values:
+                lowered = v.lower()
+                if any(k in lowered for k in header_keywords):
+                    keyword_score += 5
+            score = non_empty_score + keyword_score
+            if score > best_score:
+                best_score = score
+                header_row_idx = idx
+
+        candidate_headers = matrix[header_row_idx] if matrix else []
+        headers = []
+        for i in range(col_count):
+            raw = candidate_headers[i] if i < len(candidate_headers) else ""
+            label = str(raw).strip()
+            headers.append(label if label else f"Col {i + 1}")
+
+        blank_columns = []
+        for col_idx in range(col_count):
+            col_values = [str(row[col_idx]).strip() if col_idx < len(row) else "" for row in matrix]
+            if all(v == "" for v in col_values):
+                blank_columns.append({
+                    "index": col_idx,
+                    "name": headers[col_idx] if col_idx < len(headers) else f"Col {col_idx + 1}",
+                })
+
+        sheets_payload.append({
+            "sheet_name": ws.title,
+            "headers": headers,
+            "rows": matrix,
+            "row_count": len(matrix),
+            "column_count": col_count,
+            "blank_columns": blank_columns,
+        })
+    wb_formula.close()
+    wb_cached.close()
+    return sheets_payload
+
+
+def _as_float(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip().replace(",", "")
+    if text == "":
+        return None
+    try:
+        return float(text)
+    except Exception:
+        return None
+
+
+def _format_num(value):
+    if value is None:
+        return "—"
+    try:
+        num = float(value)
+    except Exception:
+        return str(value)
+    if abs(num - round(num)) < 1e-9:
+        return f"{int(round(num)):,}"
+    return f"{num:,.2f}"
+
+
+def _format_pct(value):
+    if value is None:
+        return "—"
+    try:
+        num = float(value) * 100.0
+        return f"{num:.0f}%"
+    except Exception:
+        return "—"
+
+
+def _eval_add_formula(formula, ws):
+    """Evaluate simple '=a+b+C7+...' formulas used in revenue drivers sheet."""
+    if not isinstance(formula, str) or not formula.startswith('='):
+        return _as_float(formula)
+    expr = formula[1:].strip()
+    parts = [p.strip() for p in expr.split('+')]
+    total = 0.0
+    for token in parts:
+        if re.match(r"^[A-Z]+[0-9]+$", token):
+            v = _as_float(ws[token].value)
+            total += (v or 0.0)
+        else:
+            total += (_as_float(token) or 0.0)
+    return total
+
+
+def _extract_multiplier_from_formula(formula, default_value):
+    if isinstance(formula, str):
+        m = re.search(r"\*([0-9]+(?:\.[0-9]+)?)", formula.replace(" ", ""))
+        if m:
+            return _as_float(m.group(1)) or default_value
+    return default_value
+
+
+def _extract_divisor_from_formula(formula, default_value):
+    if isinstance(formula, str):
+        m = re.search(r"/([0-9]+(?:\.[0-9]+)?)", formula.replace(" ", ""))
+        if m:
+            return _as_float(m.group(1)) or default_value
+    return default_value
+
+
+def _build_revenue_drivers_sheet(workbook_path, prev_day_values=None):
+    wb = load_workbook(workbook_path, data_only=False)
+    ws = wb.worksheets[0]
+
+    # Fixed layout (B:R) that matches the Revenue Drivers report block.
+    headers = [
+        "Category",
+        "Daily Actual",
+        "Daily Forecast",
+        "% Budget Variance",
+        "Prior day Actual",
+        "Prior day Variance%",
+        "Aug FY26 Actual",
+        "MTD FY26 Forecast (Budget)",
+        "% Budget Variance",
+        "Prior Month MTD FY26",
+        "% Prior Month Variance",
+        "MTD Runrate",
+        "Aug Forecast FY26 (Budget)",
+        "Run rate % Variance",
+        "YTD FY26 ACTUAL",
+        "YTD Forecast FY26",
+        "FY26 %Budget Variance",
+    ]
+
+    month_days = _extract_divisor_from_formula(ws["D7"].value, 31.0)
+    report_day = _extract_multiplier_from_formula(ws["I7"].value, float((datetime.today() - timedelta(days=1)).day))
+    if report_day == 0:
+        report_day = 1.0
+
+    prev_smartlearning = _as_float((prev_day_values or {}).get("smartlearning_value")) or 0.0
+    prev_library = _as_float((prev_day_values or {}).get("library_value")) or 0.0
+
+    def row_values(row_num):
+        if row_num == 7:
+            c = prev_smartlearning
+        elif row_num == 8:
+            c = prev_library
+        else:
+            c = _as_float(ws[f"C{row_num}"].value) or 0.0
+        f = _as_float(ws[f"F{row_num}"].value) or 0.0
+        k = _as_float(ws[f"K{row_num}"].value) or 0.0
+        n = _as_float(ws[f"N{row_num}"].value) or 0.0
+
+        d = n / month_days if month_days else 0.0
+        e = ((c - d) / d) if d else None
+        g = ((c - f) / f) if f else None
+
+        h = _eval_add_formula(ws[f"H{row_num}"].value, ws)
+        if h is None:
+            h = _as_float(ws[f"H{row_num}"].value) or 0.0
+
+        i = d * report_day
+        j = ((h - i) / i) if i else None
+        l = ((h - k) / k) if k else None
+        m = (h * month_days) / report_day if report_day else 0.0
+        o = ((m - n) / n) if n else None
+
+        p_base = 0.0
+        q_base = 0.0
+        p_formula = ws[f"P{row_num}"].value
+        q_formula = ws[f"Q{row_num}"].value
+        if isinstance(p_formula, str) and "+" in p_formula:
+            p_base = _as_float(p_formula[1:].split("+")[0]) or 0.0
+        if isinstance(q_formula, str) and "+" in q_formula:
+            q_base = _as_float(q_formula[1:].split("+")[0]) or 0.0
+        p = p_base + h
+        q = q_base + i
+        r = ((p - q) / q) if q else None
+
+        return {
+            "C": c, "D": d, "E": e, "F": f, "G": g, "H": h, "I": i, "J": j,
+            "K": k, "L": l, "M": m, "N": n, "O": o, "P": p, "Q": q, "R": r
+        }
+
+    r7 = row_values(7)
+    r8 = row_values(8)
+    r9 = {k: (r7[k] + r8[k]) if k not in ("E", "G", "J", "L", "O", "R") else None for k in r7.keys()}
+    r9["E"] = ((r9["C"] - r9["D"]) / r9["D"]) if r9["D"] else None
+    r9["G"] = ((r9["C"] - r9["F"]) / r9["F"]) if r9["F"] else None
+    r9["J"] = ((r9["H"] - r9["I"]) / r9["I"]) if r9["I"] else None
+    r9["L"] = ((r9["H"] - r9["K"]) / r9["K"]) if r9["K"] else None
+    r9["O"] = ((r9["M"] - r9["N"]) / r9["N"]) if r9["N"] else None
+    r9["R"] = ((r9["P"] - r9["Q"]) / r9["Q"]) if r9["Q"] else None
+
+    rows = [
+        ["Smart learning", _format_num(r7["C"]), _format_num(r7["D"]), _format_pct(r7["E"]), _format_num(r7["F"]), _format_pct(r7["G"]),
+         _format_num(r7["H"]), _format_num(r7["I"]), _format_pct(r7["J"]), _format_num(r7["K"]), _format_pct(r7["L"]),
+         _format_num(r7["M"]), _format_num(r7["N"]), _format_pct(r7["O"]), _format_num(r7["P"]), _format_num(r7["Q"]), _format_pct(r7["R"])],
+        ["Library", _format_num(r8["C"]), _format_num(r8["D"]), _format_pct(r8["E"]), _format_num(r8["F"]), _format_pct(r8["G"]),
+         _format_num(r8["H"]), _format_num(r8["I"]), _format_pct(r8["J"]), _format_num(r8["K"]), _format_pct(r8["L"]),
+         _format_num(r8["M"]), _format_num(r8["N"]), _format_pct(r8["O"]), _format_num(r8["P"]), _format_num(r8["Q"]), _format_pct(r8["R"])],
+        ["Total", _format_num(r9["C"]), _format_num(r9["D"]), _format_pct(r9["E"]), _format_num(r9["F"]), _format_pct(r9["G"]),
+         _format_num(r9["H"]), _format_num(r9["I"]), _format_pct(r9["J"]), _format_num(r9["K"]), _format_pct(r9["L"]),
+         _format_num(r9["M"]), _format_num(r9["N"]), _format_pct(r9["O"]), _format_num(r9["P"]), _format_num(r9["Q"]), _format_pct(r9["R"])],
+    ]
+
+    # Compare a couple of key values against workbook values (if cached) for diagnostics.
+    diagnostics = {"mismatch_count": 0, "mismatches": []}
+    checks = [
+        ("H7", r7["H"]), ("I7", r7["I"]), ("R7", r7["R"]),
+        ("H8", r8["H"]), ("I8", r8["I"]), ("R8", r8["R"]),
+    ]
+    for addr, computed in checks:
+        workbook_val = _as_float(ws[addr].value)
+        if workbook_val is None:
+            continue
+        if abs(workbook_val - (computed or 0.0)) > 0.51:
+            diagnostics["mismatch_count"] += 1
+            diagnostics["mismatches"].append({
+                "cell": addr,
+                "workbook": workbook_val,
+                "computed": round(computed or 0.0, 4),
+            })
+
+    wb.close()
+    sheet_payload = {
+        "sheet_name": ws.title,
+        "headers": headers,
+        "rows": rows,
+        "row_count": len(rows),
+        "column_count": len(headers),
+        "blank_columns": [],
+    }
+    return sheet_payload, diagnostics
+
+
+def _latest_report_file_by_tokens(tokens):
+    reports_dir = os.path.join(os.getcwd(), "app", "reports")
+    if not os.path.exists(reports_dir):
+        return None
+    candidates = []
+    for name in os.listdir(reports_dir):
+        lowered = name.lower()
+        if name.lower().endswith(".xlsx") and any(token in lowered for token in tokens):
+            candidates.append(os.path.join(reports_dir, name))
+    if not candidates:
+        return None
+    return max(candidates, key=os.path.getctime)
+
+
+def _resolve_revenue_tab_file(tab_id, table_source, drivers_template_path, flash_template_path):
+    if tab_id == "revenue_drivers":
+        template_path = drivers_template_path
+        generated_tokens = ["daily_report", "revenue_drivers"]
+    else:
+        template_path = flash_template_path
+        generated_tokens = ["akello_flash", "flash_revenue", "flash_report"]
+
+    if table_source == "latest_generated":
+        generated_path = _latest_report_file_by_tokens(generated_tokens)
+        if generated_path:
+            return "latest_generated", generated_path
+        return "template_fallback", template_path
+    return "template", template_path
+
+
+def _parse_revenue_series_datetime(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%d-%m-%Y %H-%M-%S")
+    except Exception as exc:
+        raise ValueError("Invalid datetime format. Use DD-MM-YYYY HH-MM-SS.") from exc
+
+
+def _current_week_bounds(now_dt=None):
+    current = now_dt or datetime.now()
+    week_start = datetime(current.year, current.month, current.day) - timedelta(days=current.weekday())
+    week_end = week_start + timedelta(days=6, hours=23, minutes=59, seconds=59)
+    return week_start, week_end
+
+
+def _fetch_daily_actuals_by_day(start_dt, end_dt):
+    start_day = datetime(start_dt.year, start_dt.month, start_dt.day)
+    end_day = datetime(end_dt.year, end_dt.month, end_dt.day, 23, 59, 59)
+    series_by_date = {}
+
+    ruzivo_conn = get_ruzivo_conn()
+    with ruzivo_conn.cursor() as cursor:
+        try:
+            cursor.execute(
+                """
+                SELECT DATE(last_login) AS login_date, COUNT(*) AS login_count
+                FROM tblstudents_info
+                WHERE last_login BETWEEN %s AND %s
+                GROUP BY DATE(last_login)
+                ORDER BY login_date ASC
+                """,
+                (start_day, end_day),
+            )
+            for row in cursor.fetchall():
+                day = row.get("login_date")
+                if day is None:
+                    continue
+                key = day.isoformat() if hasattr(day, "isoformat") else str(day)
+                bucket = series_by_date.setdefault(key, {"smartlearning": 0.0, "library": 0.0})
+                bucket["smartlearning"] = float(row.get("login_count") or 0.0)
+        finally:
+            try:
+                ruzivo_conn.close()
+            except Exception:
+                pass
+
+    library_conn_local = get_direct_library_conn()
+    with library_conn_local.cursor(pymysql.cursors.DictCursor) as cursor:
+        try:
+            cursor.execute(
+                """
+                SELECT DATE(o.created_at) AS login_date, COUNT(DISTINCT o.user_id) AS user_count
+                FROM orders o
+                WHERE o.created_at BETWEEN %s AND %s
+                AND o.status = 'Completed'
+                GROUP BY DATE(o.created_at)
+                ORDER BY login_date ASC
+                """,
+                (start_day, end_day),
+            )
+            for row in cursor.fetchall():
+                day = row.get("login_date")
+                if day is None:
+                    continue
+                key = day.isoformat() if hasattr(day, "isoformat") else str(day)
+                bucket = series_by_date.setdefault(key, {"smartlearning": 0.0, "library": 0.0})
+                bucket["library"] = float(row.get("user_count") or 0.0)
+        finally:
+            try:
+                library_conn_local.close()
+            except Exception:
+                pass
+
+    return series_by_date
+
+
+def _get_previous_day_daily_actual_values(reference_dt=None):
+    base = reference_dt or datetime.now()
+    target_day = (base - timedelta(days=1)).date()
+    target_start = datetime(target_day.year, target_day.month, target_day.day, 0, 0, 0)
+    target_end = datetime(target_day.year, target_day.month, target_day.day, 23, 59, 59)
+    series_by_date = _fetch_daily_actuals_by_day(target_start, target_end)
+    bucket = series_by_date.get(target_day.isoformat(), {"smartlearning": 0.0, "library": 0.0})
+    smartlearning_value = float(bucket.get("smartlearning", 0.0))
+    library_value = float(bucket.get("library", 0.0))
+    return {
+        "date": target_day.isoformat(),
+        "smartlearning_value": smartlearning_value,
+        "library_value": library_value,
+        "total_value": smartlearning_value + library_value,
+    }
+
+
+def _build_drivers_daily_actual_series(start_at, end_at):
+    series_by_date = _fetch_daily_actuals_by_day(start_at, end_at)
+
+    points = []
+    for key in sorted(series_by_date.keys()):
+        day_start_dt = datetime.strptime(key, "%Y-%m-%d")
+        day_end_dt = day_start_dt + timedelta(hours=23, minutes=59, seconds=59)
+        if day_end_dt < start_at or day_start_dt > end_at:
+            continue
+        smartlearning_value = float(series_by_date[key]["smartlearning"])
+        library_value = float(series_by_date[key]["library"])
+        total_value = smartlearning_value + library_value
+        points.append({
+            "timestamp_iso": day_start_dt.isoformat(),
+            "timestamp_label": day_start_dt.strftime("%d-%m-%Y %H-%M-%S"),
+            "smartlearning_value": smartlearning_value,
+            "library_value": library_value,
+            "total_value": total_value,
+        })
+
+    return points
+
+
+def _normalize_match_text(value):
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").strip().lower())
+
+
+def _apply_flash_daily_actual_overrides(sheets, prev_day_values, zig_exchange):
+    diagnostics = {
+        "usd_sheet_found": False,
+        "zig_sheet_found": False,
+        "usd_daily_actual_col_found": False,
+        "zig_daily_actual_col_found": False,
+        "usd_smartlearning_row_found": False,
+        "usd_library_row_found": False,
+        "zig_smartlearning_row_found": False,
+        "warnings": [],
+    }
+    if not sheets:
+        diagnostics["warnings"].append("No flash sheets available to map.")
+        return sheets, diagnostics
+
+    smartlearning_base = float((prev_day_values or {}).get("smartlearning_value") or 0.0)
+    library_base = float((prev_day_values or {}).get("library_value") or 0.0)
+    smartlearning_zig = smartlearning_base * float(zig_exchange or 37.0)
+
+    def is_daily_actual_header(text):
+        normalized = _normalize_match_text(text)
+        return normalized == "dailyactual" or "dailyactual" in normalized
+
+    def find_daily_idx(headers, rows):
+        for idx, header in enumerate(headers or []):
+            if is_daily_actual_header(header):
+                return idx
+        scan_rows = rows[:20] if rows else []
+        for row in scan_rows:
+            for idx, cell in enumerate(row):
+                if is_daily_actual_header(cell):
+                    return idx
+        return -1
+
+    def row_kind(row):
+        if not row:
+            return ""
+        probe = " ".join(str(cell or "") for cell in row[:3]).lower()
+        normalized = _normalize_match_text(probe)
+        if "smartlearning" in normalized:
+            return "smartlearning"
+        if "library" in normalized:
+            return "library"
+        return ""
+
+    def sheet_kind(normalized_sheet, headers, rows):
+        if "usd" in normalized_sheet:
+            return "usd"
+        if "zig" in normalized_sheet:
+            return "zig"
+        header_blob = " ".join(str(h or "") for h in (headers or [])).lower()
+        if "usd" in header_blob:
+            return "usd"
+        if "zig" in header_blob:
+            return "zig"
+        sample_blob = " ".join(
+            " ".join(str(c or "") for c in row[:8]) for row in (rows[:20] if rows else [])
+        ).lower()
+        if " usd " in f" {sample_blob} ":
+            return "usd"
+        if " zig " in f" {sample_blob} ":
+            return "zig"
+        return ""
+
+    inferred_usd_assigned = False
+    inferred_zig_assigned = False
+    for sheet in sheets:
+        sheet_name = str(sheet.get("sheet_name", ""))
+        normalized_sheet = _normalize_match_text(sheet_name)
+        headers = sheet.get("headers") or []
+        rows = sheet.get("rows") or []
+
+        daily_idx = find_daily_idx(headers, rows)
+        if daily_idx < 0:
+            continue
+
+        kind = sheet_kind(normalized_sheet, headers, rows)
+        if not kind and not inferred_usd_assigned:
+            kind = "usd"
+            inferred_usd_assigned = True
+        elif not kind and not inferred_zig_assigned:
+            kind = "zig"
+            inferred_zig_assigned = True
+
+        if kind == "usd":
+            diagnostics["usd_sheet_found"] = True
+            diagnostics["usd_daily_actual_col_found"] = True
+            for row in rows:
+                kind = row_kind(row)
+                if not kind:
+                    continue
+                while len(row) <= daily_idx:
+                    row.append("")
+                if kind == "smartlearning":
+                    row[daily_idx] = _format_num(smartlearning_base)
+                    diagnostics["usd_smartlearning_row_found"] = True
+                elif kind == "library":
+                    row[daily_idx] = _format_num(library_base)
+                    diagnostics["usd_library_row_found"] = True
+
+        if kind == "zig":
+            diagnostics["zig_sheet_found"] = True
+            diagnostics["zig_daily_actual_col_found"] = True
+            for row in rows:
+                kind = row_kind(row)
+                if kind != "smartlearning":
+                    continue
+                while len(row) <= daily_idx:
+                    row.append("")
+                row[daily_idx] = _format_num(smartlearning_zig)
+                diagnostics["zig_smartlearning_row_found"] = True
+
+    if diagnostics["usd_sheet_found"] and not diagnostics["usd_smartlearning_row_found"]:
+        diagnostics["warnings"].append("USD Smartlearning row not found for Daily Actual mapping.")
+    if diagnostics["usd_sheet_found"] and not diagnostics["usd_library_row_found"]:
+        diagnostics["warnings"].append("USD Library row not found for Daily Actual mapping.")
+    if diagnostics["zig_sheet_found"] and not diagnostics["zig_smartlearning_row_found"]:
+        diagnostics["warnings"].append("ZiG Smartlearning row not found for Daily Actual mapping.")
+    if not diagnostics["usd_sheet_found"]:
+        diagnostics["warnings"].append("USD sheet not found for Flash mapping.")
+    if not diagnostics["zig_sheet_found"]:
+        diagnostics["warnings"].append("ZiG sheet not found for Flash mapping.")
+
+    return sheets, diagnostics
+
+
+@app.route('/api/revenue-reports/tables', methods=['GET'])
+@login_required
+def api_revenue_reports_tables():
+    if not can_view_revenue_reports():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    from app.models import AppSetting
+
+    table_source = AppSetting.get_value('revenue_reports_table_source', 'latest_generated')
+    if table_source not in ('latest_generated', 'template'):
+        table_source = 'latest_generated'
+    zig_exchange = _as_float(AppSetting.get_value('revenue_reports_zig_exchange', '37')) or 37.0
+    prev_day_values = _get_previous_day_daily_actual_values()
+
+    drivers_template_path = AppSetting.get_value(
+        'revenue_reports_template_path_1',
+        os.path.join("instance", "uploaded_template.xlsx"),
+    )
+    flash_template_path = AppSetting.get_value(
+        'revenue_reports_template_path_2',
+        r"C:\Users\quincy.mashava\Downloads\Akello Flash Revenue Report as at  18 August 2025.xlsx",
+    )
+
+    tabs = [
+        {"id": "revenue_drivers", "title": "Revenue Drivers Report"},
+        {"id": "akello_flash", "title": "Akello Flash Revenue Report"},
+    ]
+
+    payload_tabs = []
+    for tab in tabs:
+        resolved_source, resolved_path = _resolve_revenue_tab_file(
+            tab["id"], table_source, drivers_template_path, flash_template_path
+        )
+
+        tab_payload = {
+            "id": tab["id"],
+            "title": tab["title"],
+            "source_type": resolved_source,
+            "selected_path": resolved_path,
+            "file_exists": bool(resolved_path and os.path.exists(resolved_path)),
+            "error": "",
+            "sheets": [],
+            "diagnostics": {"blank_columns": []},
+        }
+
+        if not tab_payload["file_exists"]:
+            tab_payload["error"] = f"Workbook not found: {resolved_path}"
+        else:
+            try:
+                if tab["id"] == "revenue_drivers":
+                    drivers_sheet, drivers_diag = _build_revenue_drivers_sheet(resolved_path, prev_day_values=prev_day_values)
+                    tab_payload["sheets"] = [drivers_sheet]
+                    tab_payload["diagnostics"]["mismatch_count"] = drivers_diag.get("mismatch_count", 0)
+                    tab_payload["diagnostics"]["mismatches"] = drivers_diag.get("mismatches", [])
+                    tab_payload["diagnostics"]["previous_day_source"] = prev_day_values
+                    try:
+                        raw_sheets = _parse_workbook_used_ranges(resolved_path)
+                        tab_payload["diagnostics"]["raw_sheet"] = raw_sheets[0] if raw_sheets else None
+                    except Exception:
+                        tab_payload["diagnostics"]["raw_sheet"] = None
+                else:
+                    tab_payload["sheets"] = _parse_workbook_used_ranges(resolved_path)
+                    tab_payload["sheets"], flash_mapping_diag = _apply_flash_daily_actual_overrides(
+                        tab_payload["sheets"],
+                        prev_day_values=prev_day_values,
+                        zig_exchange=zig_exchange
+                    )
+                    tab_payload["diagnostics"]["daily_actual_mapping"] = flash_mapping_diag
+                    tab_payload["diagnostics"]["previous_day_source"] = prev_day_values
+                    tab_payload["diagnostics"]["zig_exchange"] = zig_exchange
+                all_blank_columns = []
+                for sheet in tab_payload["sheets"]:
+                    for col in sheet.get("blank_columns", []):
+                        all_blank_columns.append({
+                            "sheet_name": sheet.get("sheet_name", ""),
+                            "index": col.get("index", 0),
+                            "name": col.get("name", ""),
+                        })
+                tab_payload["diagnostics"]["blank_columns"] = all_blank_columns
+            except Exception as exc:
+                tab_payload["error"] = f"Failed to parse workbook: {exc}"
+
+        payload_tabs.append(tab_payload)
+
+    return jsonify({
+        "success": True,
+        "table_source": table_source,
+        "tabs": payload_tabs,
+    })
+
+
+@app.route('/api/revenue-reports/drivers/daily-actual-series', methods=['GET'])
+@login_required
+def api_revenue_drivers_daily_actual_series():
+    if not can_view_revenue_reports():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    start_raw = request.args.get("start_at", "").strip()
+    end_raw = request.args.get("end_at", "").strip()
+
+    try:
+        start_at = _parse_revenue_series_datetime(start_raw) if start_raw else None
+        end_at = _parse_revenue_series_datetime(end_raw) if end_raw else None
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    if start_at is None and end_at is None:
+        start_at, end_at = _current_week_bounds()
+    elif start_at is None:
+        start_at, _ = _current_week_bounds(end_at)
+    elif end_at is None:
+        _, end_at = _current_week_bounds(start_at)
+
+    if start_at > end_at:
+        return jsonify({"error": "Invalid range: start_at must be earlier than or equal to end_at."}), 400
+
+    points = _build_drivers_daily_actual_series(start_at, end_at)
+    return jsonify({
+        "success": True,
+        "start_at": start_at.strftime("%d-%m-%Y %H-%M-%S"),
+        "end_at": end_at.strftime("%d-%m-%Y %H-%M-%S"),
+        "point_count": len(points),
+        "points": points,
+    })
+
+
+@app.route('/api/revenue-reports/flash/upload', methods=['POST'])
+@login_required
+def api_revenue_flash_upload():
+    if not can_view_revenue_reports():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    file = request.files['file']
+    if not file or file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    if not file.filename.lower().endswith('.xlsx'):
+        return jsonify({"error": "Only .xlsx files are supported"}), 400
+
+    from app.models import AppSetting
+    os.makedirs("instance", exist_ok=True)
+    stored_path = os.path.join("instance", "uploaded_flash_template.xlsx")
+    file.save(stored_path)
+
+    AppSetting.set_value(
+        'revenue_reports_template_path_2',
+        stored_path,
+        getattr(current_user, 'id', None),
+        'Active uploaded template path for Akello Flash report tab'
+    )
+
+    # Ensure future renders use the uploaded workbook directly.
+    AppSetting.set_value(
+        'revenue_reports_table_source',
+        'template',
+        getattr(current_user, 'id', None),
+        'Data source for revenue report tables: latest_generated or template'
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Flash template uploaded successfully",
+        "stored_as": "uploaded_flash_template.xlsx",
+        "stored_path": stored_path
+    })
+
+
+@app.route('/revenue_reports', methods=['GET'])
+@login_required
+def revenue_reports():
+    if not can_view_revenue_reports():
+        return "Unauthorized", 403
+    return render_template('revenue_reports.html', title='Revenue Reports', is_admin=(current_user.userRole == 'Admin'))
 
 
 
@@ -15698,12 +16589,59 @@ def api_run_report():
     if not os.path.exists(template_path):
         return jsonify({"error": "No template uploaded yet"}), 400
 
-    filename, path = generate_and_send_report(template_path)
+    filename, path, _ = generate_and_send_report(template_path)
 
     if not os.path.exists(path):
         return jsonify({"error": "Report not generated"}), 500
 
     return send_file(path, as_attachment=True, download_name=filename)
+
+
+@app.route('/api/revenue-reports/run', methods=['POST'])
+@login_required
+def api_revenue_reports_run():
+    if not can_view_revenue_reports():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    try:
+        result = run_revenue_report_job(triggered_by=f"user:{current_user.username}")
+        return jsonify({"success": True, **result})
+    except Exception as e:
+        from app.models import AppSetting
+        AppSetting.set_value('revenue_reports_last_status', 'failed')
+        AppSetting.set_value('revenue_reports_last_error', str(e))
+        AppSetting.set_value('revenue_reports_last_run_at', datetime.now(timezone.utc).isoformat())
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/revenue-reports/section1/latest', methods=['GET'])
+@login_required
+def api_revenue_reports_latest():
+    if not can_view_revenue_reports():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    from app.models import AppSetting
+
+    reports_dir = os.path.join(os.getcwd(), "app", "reports")
+    latest_download_url = None
+    if os.path.exists(reports_dir) and os.listdir(reports_dir):
+        latest_download_url = url_for('api_download_latest')
+
+    payload = {
+        "last_status": AppSetting.get_value('revenue_reports_last_status', 'not_run'),
+        "last_error": AppSetting.get_value('revenue_reports_last_error', ''),
+        "last_filename": AppSetting.get_value('revenue_reports_last_filename', ''),
+        "last_total_count": AppSetting.get_value('revenue_reports_last_total_count', '0'),
+        "last_run_at": AppSetting.get_value('revenue_reports_last_run_at', ''),
+        "last_triggered_by": AppSetting.get_value('revenue_reports_last_triggered_by', ''),
+        "source_mode": AppSetting.get_value('revenue_reports_source_mode', 'db_template'),
+        "schedule_time": AppSetting.get_value('revenue_reports_schedule_time', '06:00'),
+        "last_email_status": AppSetting.get_value('revenue_reports_last_email_status', 'not_sent'),
+        "last_email_reason": AppSetting.get_value('revenue_reports_last_email_reason', ''),
+        "last_email_at": AppSetting.get_value('revenue_reports_last_email_at', ''),
+        "latest_download_url": latest_download_url,
+    }
+    return jsonify({"success": True, "data": payload})
 
 
 
@@ -18094,10 +19032,10 @@ def sim_calendar_delete(event_id):
     return jsonify({'status': 'deleted'})
 
 
-# @app.route('/akello_monitor', methods=['GET'])
-# @login_required
-# def akello_monitor():
-#     return render_template('akello_monitor.html', title='Analytics')
+@app.route('/akello_monitoring', methods=['GET'])
+@login_required
+def akello_monitoring():
+    return render_template('akello_monitor.html', title='Analytics')
 
 @app.route('/akello_monitor', methods=['GET'])
 @login_required

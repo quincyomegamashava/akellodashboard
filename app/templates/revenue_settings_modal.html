@@ -1,0 +1,161 @@
+<div id="revenueSettingsModal" class="w3-modal modal-minimal" style="z-index:2950;">
+  <div class="w3-modal-content w3-animate-top shadow-2xl bg-white" style="max-width: 640px; margin-top: 80px;">
+    <header class="p-6 bg-white border-b border-slate-100 flex justify-between items-center">
+      <h2 class="text-xl font-bold text-slate-800 m-0">Revenue Report Settings</h2>
+      <button type="button" onclick="document.getElementById('revenueSettingsModal').style.display='none'"
+        class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors">
+        <i class="fas fa-times text-slate-400"></i>
+      </button>
+    </header>
+    <div class="p-6">
+      <form id="revenue-settings-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Source mode</label>
+          <select id="revenue_source_mode" class="w-full border border-slate-300 rounded-md px-3 py-2 bg-white">
+            <option value="db_template">DB + Template (section 1)</option>
+            <option value="excel_ingest_folder">Excel Ingest Folder (reserved)</option>
+            <option value="hybrid">Hybrid (reserved)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Daily run time (server time)</label>
+          <input id="revenue_schedule_time" type="time" class="w-full border border-slate-300 rounded-md px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Data table source</label>
+          <select id="revenue_table_source" class="w-full border border-slate-300 rounded-md px-3 py-2 bg-white">
+            <option value="latest_generated">Latest generated files</option>
+            <option value="template">Template files</option>
+          </select>
+        </div>
+        <div class="flex items-center justify-between p-3 rounded-md border border-slate-200 bg-slate-50">
+          <div>
+            <div class="text-sm font-semibold text-slate-700">Auto Email Delivery</div>
+            <div class="text-xs text-slate-500">Send daily generated report by email.</div>
+          </div>
+          <input id="revenue_auto_email_enabled" type="checkbox" class="h-4 w-4">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Email delivery mode</label>
+          <select id="revenue_email_delivery_mode" class="w-full border border-slate-300 rounded-md px-3 py-2 bg-white">
+            <option value="attach_plus_summary">Attach Excel + KPI summary</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Email recipients mode</label>
+          <select id="revenue_email_recipient_mode" class="w-full border border-slate-300 rounded-md px-3 py-2 bg-white">
+            <option value="custom_group_later">Custom group later (pending)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">ZiG exchange multiplier</label>
+          <input id="revenue_zig_exchange" type="number" step="0.0001" min="0.0001" class="w-full border border-slate-300 rounded-md px-3 py-2" placeholder="37">
+          <div class="text-xs text-slate-500 mt-1">Used for Flash ZiG Smartlearning Daily Actual = zig_exchange x Drivers Smartlearning Daily Actual.</div>
+        </div>
+        <div class="text-xs text-slate-500">
+          For section 1, unsupported source modes automatically fall back to DB + Template until section 2 is added.
+        </div>
+        <div class="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+          <div><strong>Last email status:</strong> <span id="settings_last_email_status">-</span></div>
+          <div><strong>Last email details:</strong> <span id="settings_last_email_reason">-</span></div>
+          <div><strong>Last email at:</strong> <span id="settings_last_email_at">-</span></div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="px-4 py-2 rounded-md border border-slate-300 text-slate-700"
+            onclick="document.getElementById('revenueSettingsModal').style.display='none'">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  function revenueNotify(message, type = 'success') {
+    if (typeof showToast === 'function') {
+      showToast(message, type);
+      return;
+    }
+    alert(message);
+  }
+
+  async function loadRevenueSettings() {
+    try {
+      const response = await fetch('/api/settings/revenue-reports');
+      const result = await response.json();
+      if (result.success && result.settings) {
+        document.getElementById('revenue_source_mode').value = result.settings.source_mode || 'db_template';
+        document.getElementById('revenue_schedule_time').value = result.settings.schedule_time || '06:00';
+        document.getElementById('revenue_table_source').value = result.settings.table_source || 'latest_generated';
+        document.getElementById('revenue_auto_email_enabled').checked = !!result.settings.auto_email_enabled;
+        document.getElementById('revenue_email_delivery_mode').value = result.settings.email_delivery_mode || 'attach_plus_summary';
+        document.getElementById('revenue_email_recipient_mode').value = result.settings.email_recipient_mode || 'custom_group_later';
+        document.getElementById('revenue_zig_exchange').value = result.settings.zig_exchange || 37;
+      }
+
+      const latestRes = await fetch('/api/revenue-reports/section1/latest');
+      const latestPayload = await latestRes.json();
+      if (latestRes.ok && latestPayload.success) {
+        const d = latestPayload.data || {};
+        document.getElementById('settings_last_email_status').textContent = d.last_email_status || 'not_sent';
+        document.getElementById('settings_last_email_reason').textContent = d.last_email_reason || 'none';
+        document.getElementById('settings_last_email_at').textContent = d.last_email_at || 'not available';
+      }
+    } catch (error) {
+      console.error('Failed to load revenue settings', error);
+    }
+  }
+
+  async function saveRevenueSettings(event) {
+    event.preventDefault();
+    const sourceMode = document.getElementById('revenue_source_mode').value;
+    const scheduleTime = document.getElementById('revenue_schedule_time').value || '06:00';
+    const tableSource = document.getElementById('revenue_table_source').value || 'latest_generated';
+    const autoEmailEnabled = document.getElementById('revenue_auto_email_enabled').checked;
+    const emailDeliveryMode = document.getElementById('revenue_email_delivery_mode').value || 'attach_plus_summary';
+    const emailRecipientMode = document.getElementById('revenue_email_recipient_mode').value || 'custom_group_later';
+    const zigExchange = document.getElementById('revenue_zig_exchange').value || 37;
+
+    try {
+      const response = await fetch('/api/settings/revenue-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_mode: sourceMode,
+          schedule_time: scheduleTime,
+          table_source: tableSource,
+          auto_email_enabled: autoEmailEnabled,
+          email_delivery_mode: emailDeliveryMode,
+          email_recipient_mode: emailRecipientMode,
+          zig_exchange: zigExchange
+        })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to save settings');
+      }
+      revenueNotify('Revenue report settings updated', 'success');
+      document.getElementById('revenueSettingsModal').style.display = 'none';
+      if (typeof loadLatestRevenueData === 'function') {
+        loadLatestRevenueData();
+      }
+      if (typeof loadRevenueTables === 'function') {
+        loadRevenueTables();
+      }
+    } catch (error) {
+      revenueNotify(error.message, 'error');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const openBtn = document.getElementById('openRevenueSettingsBtn');
+    if (openBtn) {
+      openBtn.addEventListener('click', () => {
+        document.getElementById('revenueSettingsModal').style.display = 'block';
+        loadRevenueSettings();
+      });
+    }
+    const form = document.getElementById('revenue-settings-form');
+    if (form) form.addEventListener('submit', saveRevenueSettings);
+  });
+</script>
