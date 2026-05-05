@@ -48,6 +48,9 @@ env/
 instance/
 .webassets-cache
 
+# Task attachments (legacy disk location, kept for back-compat)
+app/static/uploads/task_attachments/
+
 # Logs
 *.log
 logs/*

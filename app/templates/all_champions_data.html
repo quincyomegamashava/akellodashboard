@@ -234,6 +234,10 @@
               data-bs-target="#content-schooltracker" type="button" role="tab">
               <i class="fa fa-university opacity-50"></i> School Tracker
             </button>
+            <button class="nav-link" id="tab-checkins" data-bs-toggle="pill"
+              data-bs-target="#content-checkins" type="button" role="tab">
+              <i class="fa fa-map-marker-alt opacity-50"></i> Check-ins
+            </button>
           </div>
         </div>
       </div>
@@ -493,6 +497,41 @@
           </div>
 
         </div>
+
+        <!-- Check-ins Tab -->
+        <div class="tab-pane fade" id="content-checkins" role="tabpanel">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center bg-white py-3">
+              <div>
+                <span class="fw-bold text-dark">Champion Check-in & Check-out Activity</span>
+                <div id="checkins-status" class="text-muted small fw-normal mt-1">Load tab to fetch data</div>
+              </div>
+            </div>
+            <div class="p-3 border-bottom bg-light">
+              <input type="text" id="searchCheckins" placeholder="Search champion, school, province or status..."
+                class="form-control search-input bg-white w-100">
+            </div>
+            <div class="table-responsive" style="max-height: 70vh;">
+              <table class="table-custom" id="checkins-table">
+                <thead>
+                  <tr>
+                    <th>Champion</th>
+                    <th>School</th>
+                    <th>Province</th>
+                    <th>Status</th>
+                    <th>Check-in</th>
+                    <th>Check-out</th>
+                    <th>Duration (min)</th>
+                    <th>ASL School ID</th>
+                    <th>Library ID</th>
+                    <th>Location</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -543,8 +582,9 @@
     let analyticsVT = null, analyticsAllRows = [], analyticsFilteredRows = [];
     let championsVT = null, championsAllRows = [], championsFilteredRows = [];
     let schoolVT = null, schoolAllRows = [], schoolFilteredRows = [];
+    let checkinsVT = null, checkinsAllRows = [], checkinsFilteredRows = [];
     let schoolExactDateFilterEnabled = false; // only filter by exact added-at date after user applies in School Tracker
-    let analyticsController = null, championsLoaded = false, schoolTrackerLoaded = false;
+    let analyticsController = null, championsLoaded = false, schoolTrackerLoaded = false, checkinsLoaded = false;
     let lastCompareReport = null, lastCompareSummary = null;
 
     // Initialize Date Objects
@@ -926,6 +966,82 @@
       }
     }
 
+    function applyCheckinsFilters() {
+      const term = ((document.getElementById('searchCheckins') || {}).value || '').toLowerCase().trim();
+      const filtered = checkinsAllRows.filter(r => {
+        if (!term) return true;
+        return (
+          (r.champion || '').toLowerCase().includes(term) ||
+          (r.username || '').toLowerCase().includes(term) ||
+          (r.school_name || '').toLowerCase().includes(term) ||
+          (r.province || '').toLowerCase().includes(term) ||
+          (r.status || '').toLowerCase().includes(term)
+        );
+      });
+      checkinsFilteredRows = filtered;
+      if (checkinsVT) checkinsVT.update(filtered);
+    }
+
+    async function loadCheckins(forceReload = false) {
+      if (checkinsLoaded && !forceReload) return;
+      checkinsLoaded = true;
+      setStatus('checkins-status', 'Loading...');
+
+      const checkinRenderRow = (r) => {
+        const statusBadge = r.status === 'checked_in'
+          ? '<span class="badge bg-primary">Checked In</span>'
+          : '<span class="badge bg-success">Checked Out</span>';
+        const locationParts = [];
+        if (r.location_text) locationParts.push(r.location_text);
+        if (r.checkin_latitude != null && r.checkin_longitude != null) {
+          locationParts.push(`${r.checkin_latitude}, ${r.checkin_longitude}`);
+        }
+        if (r.location_source) locationParts.push(`[${r.location_source}]`);
+        const locationText = locationParts.length ? locationParts.join(' ') : '-';
+        return `
+        <tr>
+          <td>
+            <div class="fw-medium text-dark">${r.champion || r.username || '-'}</div>
+            <div class="small text-muted"><a href="/profile/${r.username || ''}" class="text-decoration-none text-muted">${r.username || ''}</a></div>
+          </td>
+          <td class="small text-muted">${r.school_name || '-'}</td>
+          <td><span class="badge bg-light text-dark border">${r.province || '-'}</span></td>
+          <td>${statusBadge}</td>
+          <td class="small text-muted">${r.checkin_at ? String(r.checkin_at).replace('T', ' ').slice(0, 19) : '-'}</td>
+          <td class="small text-muted">${r.checkout_at ? String(r.checkout_at).replace('T', ' ').slice(0, 19) : '-'}</td>
+          <td class="small text-muted">${r.duration_minutes != null ? r.duration_minutes : '-'}</td>
+          <td class="small text-muted">${r.asl_school_id || '-'}</td>
+          <td class="small text-muted">${r.library_id || '-'}</td>
+          <td class="small text-muted">${locationText}</td>
+        </tr>`;
+      };
+
+      try {
+        const startDate = document.querySelector("#startDate").value;
+        const endDate = document.querySelector("#endDate").value;
+        let url = "/api/all-champions-checkins";
+        if (startDate && endDate) {
+          url += `?start_date=${startDate}&end_date=${endDate}`;
+        }
+
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`API error ${resp.status}`);
+        const rows = await resp.json();
+
+        checkinsAllRows = Array.isArray(rows) ? rows : [];
+        checkinsFilteredRows = checkinsAllRows;
+        if (!checkinsVT) {
+          checkinsVT = mountVirtualTable('checkins-table', checkinsAllRows, checkinRenderRow, 10, { rowHeight: 54, buffer: 12 });
+        } else {
+          checkinsVT.update(checkinsAllRows);
+        }
+        setStatus('checkins-status', `Updated just now (${checkinsAllRows.length} rows)`);
+      } catch (e) {
+        console.error(e);
+        setStatus('checkins-status', 'Failed to load check-in data.');
+      }
+    }
+
     // Export helpers
     function buildRangeLabel() {
       const s = (document.getElementById('startDate') || {}).value || '';
@@ -1073,6 +1189,8 @@
             loadChampions();
           } else if (event.target.id === 'tab-schooltracker') {
             loadSchoolTracker();
+          } else if (event.target.id === 'tab-checkins') {
+            loadCheckins();
           }
         })
       });
@@ -1118,6 +1236,9 @@
       document.getElementById('searchSchools').addEventListener('input', (e) => {
         if (schoolTrackerLoaded) applySchoolTrackerFilters();
       });
+      document.getElementById('searchCheckins').addEventListener('input', (e) => {
+        if (checkinsLoaded) applyCheckinsFilters();
+      });
 
       const applySchoolAddedDateBtn = document.getElementById('applySchoolAddedDate');
       if (applySchoolAddedDateBtn) {
@@ -1162,6 +1283,10 @@
 
         if (schoolTrackerLoaded) {
           applySchoolTrackerFilters();
+        }
+
+        if (checkinsLoaded) {
+          loadCheckins(true);
         }
       });
 

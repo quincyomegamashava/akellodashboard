@@ -517,6 +517,64 @@ class ChampionSchoolRequest(db.Model):
         }
 
 
+class SchoolVisitLog(db.Model):
+    __tablename__ = 'school_visit_logs'
+    __table_args__ = (
+        db.Index('ix_school_visit_logs_user_status', 'user_id', 'status'),
+        db.Index('ix_school_visit_logs_user_checkin_desc', 'user_id', 'checkin_at'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    username = db.Column(db.String(100), nullable=False, index=True)
+
+    asl_school_id = db.Column(db.String(50), nullable=False)
+    library_id = db.Column(db.String(50), nullable=False)
+    school_name = db.Column(db.String(255), nullable=False)
+
+    status = db.Column(db.String(20), nullable=False, default='checked_in', index=True)
+    checkin_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    checkout_at = db.Column(db.DateTime, nullable=True)
+    duration_minutes = db.Column(db.Integer, nullable=True)
+
+    checkin_latitude = db.Column(db.Float, nullable=True)
+    checkin_longitude = db.Column(db.Float, nullable=True)
+    location_text = db.Column(db.String(255), nullable=True)
+    location_source = db.Column(db.String(20), nullable=False, default='unknown')
+
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('school_visit_logs', lazy='dynamic'))
+
+    @staticmethod
+    def _to_iso_utc(value):
+        if not value:
+            return None
+        return value.replace(microsecond=0).isoformat() + 'Z'
+
+    def to_dict(self):
+        return {
+            'visit_id': self.id,
+            'username': self.username,
+            'asl_school_id': self.asl_school_id,
+            'library_id': self.library_id,
+            'school_name': self.school_name,
+            'status': self.status,
+            'checkin_at': self._to_iso_utc(self.checkin_at),
+            'checkout_at': self._to_iso_utc(self.checkout_at),
+            'duration_minutes': self.duration_minutes,
+            'location': {
+                'latitude': self.checkin_latitude,
+                'longitude': self.checkin_longitude,
+                'location_text': self.location_text,
+                'source': self.location_source,
+            },
+            'notes': self.notes,
+        }
+
+
 class PerfomanceTargets(db.Model):
     __tablename__ = 'perfomancetargets'
 
@@ -596,9 +654,11 @@ class TaskA(db.Model):
     start_date = db.Column(db.DateTime, nullable=True)  # NEW
     end_date = db.Column(db.DateTime, nullable=True)    # NEW
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
 
     # Many-to-many relationship to users as assignees
     assignees = db.relationship("User", secondary=task_assigneesA, backref="assigned_tasksA")
+    creator = db.relationship("User", foreign_keys=[created_by])
     attachments = db.relationship(
         "TaskAttachment",
         backref="task",
@@ -617,6 +677,28 @@ class TaskAttachment(db.Model):
     file_size = db.Column(db.Integer, nullable=True)
     uploaded_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ----------------------
+# Audit Log (global deletion audit trail)
+# ----------------------
+class AuditLog(db.Model):
+    __tablename__ = "audit_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    occurred_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    action = db.Column(db.String(20), nullable=False, default="delete")
+    entity_type = db.Column(db.String(80), nullable=False, index=True)
+    entity_id = db.Column(db.String(80), nullable=False)
+    entity_label = db.Column(db.String(255), nullable=True)
+    snapshot = db.Column(db.JSON, nullable=True)
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
+    actor_username = db.Column(db.String(80), nullable=True)
+    ip_address = db.Column(db.String(45), nullable=True)
+    endpoint = db.Column(db.String(160), nullable=True)
+    http_method = db.Column(db.String(10), nullable=True)
+    url_path = db.Column(db.String(500), nullable=True)
+    user_agent = db.Column(db.String(500), nullable=True)
 
 
 # ----------------------

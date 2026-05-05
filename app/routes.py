@@ -15,7 +15,7 @@ from docx import Document
 import re
 from app import app, db
 from app.forms import EventForm, LoginForm, PerfomanceTargetsForm, RegistrationForm, BookAllocationForm, ReportForm, WorkspaceForm, ProjectForm, TaskForm, CSVUploadForm, ChampionCSVUploadForm, ChampionSchoolForm, AkelloSimEventForm
-from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, Event, WeeklyReport, TaskA, ColumnA, ProjectA, TaskAttachment, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket
+from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, SchoolVisitLog, Event, WeeklyReport, TaskA, ColumnA, ProjectA, TaskAttachment, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket, AuditLog
 from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from collections import defaultdict
@@ -939,7 +939,7 @@ def admin_reset_password(user_id):
     user = db.session.get(User, user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     new_password = data.get('password')
     if not new_password:
         # Generate a secure random password if not provided
@@ -959,7 +959,7 @@ def admin_update_user(user_id):
     user = db.session.get(User, user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     # Allowed updatable fields
     for field in ['username','email','firstname','lastname','userRole','department','province']:
         if field in data and data[field] is not None:
@@ -1346,8 +1346,10 @@ def task_to_dict(t):
         "end_date": t.end_date.isoformat() if t.end_date else None,
         "column_id": t.column_id,
         "created_at": t.created_at.isoformat(),
+        "created_by": t.created_by,
         "assignees": [{"id": u.id, "name": u.username} for u in getattr(t, "assignees", [])],
         "attachments": [attachment_to_dict(a) for a in atts],
+        "can_delete": can_delete_task_a(t),
     }
 
 
@@ -1362,6 +1364,24 @@ def can_manage_project_a(p):
     return False
 
 
+def can_delete_task_a(t):
+    """Only the task creator or an admin / super-admin can delete a task."""
+    if getattr(current_user, "userRole", None) == "Admin":
+        return True
+    if hasattr(current_user, "has_privilege") and current_user.has_privilege("Super-admin"):
+        return True
+    creator_id = getattr(t, "created_by", None)
+    return creator_id is not None and creator_id == current_user.id
+
+
+def can_delete_task_attachment_a(att):
+    """Admin / Super-admin, the task creator, or the user who uploaded the file."""
+    if can_delete_task_a(att.task):
+        return True
+    uploader_id = getattr(att, "uploaded_by", None)
+    return uploader_id is not None and uploader_id == current_user.id
+
+
 def user_can_access_project_a(p):
     """Project member, owner/manager, or public project (logged-in user)."""
     if can_manage_project_a(p):
@@ -1373,7 +1393,8 @@ def user_can_access_project_a(p):
     return False
 
 
-TASK_ATTACHMENTS_FOLDER_REL = os.path.join("static", "uploads", "task_attachments")
+TASK_ATTACHMENTS_FOLDER_REL = os.path.join("uploads", "task_attachments")
+TASK_ATTACHMENTS_LEGACY_FOLDER_REL = os.path.join("static", "uploads", "task_attachments")
 TASK_ATTACHMENTS_MAX_BYTES = 25 * 1024 * 1024
 TASK_ATTACHMENTS_ALLOWED_EXT = frozenset({
     "pdf", "png", "jpg", "jpeg", "gif", "webp", "txt", "csv",
@@ -1381,13 +1402,27 @@ TASK_ATTACHMENTS_ALLOWED_EXT = frozenset({
 })
 
 
+def _task_attachments_instance_dir():
+    base = current_app.instance_path if current_app else app.instance_path
+    return os.path.join(base, TASK_ATTACHMENTS_FOLDER_REL)
+
+
 def _task_attachment_full_path(stored_path):
     if not stored_path:
         return None
     if os.path.isabs(stored_path):
         return stored_path
-    root = current_app.root_path if current_app else app.root_path
-    return os.path.join(root, stored_path.replace("/", os.sep))
+
+    normalized = stored_path.replace("/", os.sep)
+
+    # Legacy rows stored under app/static/uploads/task_attachments/ keep working.
+    legacy_prefix = TASK_ATTACHMENTS_LEGACY_FOLDER_REL + os.sep
+    if normalized.startswith(legacy_prefix) or normalized == TASK_ATTACHMENTS_LEGACY_FOLDER_REL:
+        root = current_app.root_path if current_app else app.root_path
+        return os.path.join(root, normalized)
+
+    instance_root = current_app.instance_path if current_app else app.instance_path
+    return os.path.join(instance_root, normalized)
 
 
 def attachment_to_dict(a):
@@ -1409,6 +1444,19 @@ def create_tables():
             with db.engine.connect() as _conn:
                 _conn.execute(sa.text("ALTER TABLE projectsa ADD COLUMN owner_id INTEGER"))
                 _conn.commit()
+    except Exception:
+        pass
+    # Best-effort: add created_by on tasksa for existing SQLite DBs
+    try:
+        if db.engine.dialect.name == "sqlite":
+            with db.engine.connect() as _conn:
+                _conn.execute(sa.text("ALTER TABLE tasksa ADD COLUMN created_by INTEGER"))
+                _conn.commit()
+    except Exception:
+        pass
+    # Ensure the task-attachments folder exists under instance/ so uploads survive deploys
+    try:
+        os.makedirs(_task_attachments_instance_dir(), exist_ok=True)
     except Exception:
         pass
     # seed sample if empty
@@ -1636,7 +1684,8 @@ def create_taskA(column_id):
         description=desc,
         position=pos,
         start_date=start_dt,
-        end_date=end_dt
+        end_date=end_dt,
+        created_by=current_user.id,
     )
     # set initial assignees if provided
     if isinstance(assignees_ids, list) and len(assignees_ids) > 0:
@@ -1729,8 +1778,7 @@ def upload_task_attachment(task_id):
     if size > TASK_ATTACHMENTS_MAX_BYTES:
         return jsonify({"error": "File too large."}), 400
 
-    base_root = current_app.root_path
-    folder_abs = os.path.join(base_root, TASK_ATTACHMENTS_FOLDER_REL)
+    folder_abs = _task_attachments_instance_dir()
     os.makedirs(folder_abs, exist_ok=True)
 
     stored_fname = f"{uuid.uuid4().hex}_{raw_name}"
@@ -1759,6 +1807,8 @@ def delete_task_attachment(attachment_id):
     p = att.task.column.project
     if not user_can_access_project_a(p):
         return jsonify({"error": "Forbidden"}), 403
+    if not can_delete_task_attachment_a(att):
+        return jsonify({"error": "Only the task creator, the uploader, or an admin can delete this attachment."}), 403
 
     path = _task_attachment_full_path(att.stored_path)
     db.session.delete(att)
@@ -1817,6 +1867,11 @@ def reorder_columns(project_id):
 @login_required
 def delete_taskA(task_id):
     t = TaskA.query.get_or_404(task_id)
+    p = t.column.project
+    if not user_can_access_project_a(p):
+        return jsonify({"error": "Forbidden"}), 403
+    if not can_delete_task_a(t):
+        return jsonify({"error": "Only the task creator or an admin can delete this task."}), 403
     col_id = t.column_id
     paths = [_task_attachment_full_path(a.stored_path) for a in t.attachments]
     db.session.delete(t)
@@ -1837,6 +1892,53 @@ def delete_taskA(task_id):
 
 
 #new project planning ends here
+
+
+# ---------- Audit log viewer (admin-only) ----------
+@app.route("/admin/audit-log", methods=["GET"])
+@login_required
+def admin_audit_log():
+    if getattr(current_user, "userRole", None) != "Admin":
+        flash("Only admins can view the audit log.", "error")
+        return redirect(url_for("overview"))
+
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 50, type=int)
+    per_page = max(10, min(per_page, 200))
+
+    entity_type = (request.args.get("entity_type") or "").strip()
+    actor_username = (request.args.get("actor") or "").strip()
+    action_filter = (request.args.get("action") or "").strip()
+
+    q = AuditLog.query
+    if entity_type:
+        q = q.filter(AuditLog.entity_type == entity_type)
+    if actor_username:
+        q = q.filter(AuditLog.actor_username.ilike(f"%{actor_username}%"))
+    if action_filter:
+        q = q.filter(AuditLog.action == action_filter)
+
+    pagination = q.order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+
+    distinct_types = [
+        row[0]
+        for row in db.session.query(AuditLog.entity_type).distinct().order_by(AuditLog.entity_type).all()
+        if row and row[0]
+    ]
+
+    return render_template(
+        "admin/audit_log.html",
+        pagination=pagination,
+        entries=pagination.items,
+        entity_type=entity_type,
+        actor_username=actor_username,
+        action_filter=action_filter,
+        distinct_types=distinct_types,
+        title="Audit Log",
+    )
+
 
 # ---------- New Dashboard Layout ----------
 @app.route('/new_dash', methods=['GET'])
@@ -2098,6 +2200,75 @@ def all_champions_ask_data():
         })
 
     return jsonify(results)
+
+
+@app.route('/api/all-champions-checkins', methods=['GET'])
+@login_required
+def all_champions_checkins():
+    """Return school check-in/check-out activity for champions."""
+    today = datetime.now()
+    default_start_date = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    start_date_str = request.args.get("start_date")
+    end_date_str = request.args.get("end_date")
+
+    try:
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+        else:
+            start_date = default_start_date
+
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+        else:
+            end_date = today
+    except ValueError:
+        return jsonify({"error": "Invalid date format. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS."}), 400
+
+    user_lookup = {
+        u.username: u
+        for u in User.query.filter(User.userRole == 'Brand Ambassador').all()
+    }
+
+    logs = SchoolVisitLog.query.filter(
+        SchoolVisitLog.checkin_at >= start_date,
+        SchoolVisitLog.checkin_at <= end_date
+    ).order_by(SchoolVisitLog.checkin_at.desc()).all()
+
+    output = []
+    for log in logs:
+        champion_user = user_lookup.get(log.username)
+        champion_name = log.username
+        champion_province = None
+        if champion_user:
+            champion_name = f"{champion_user.firstname} {champion_user.lastname}".strip() or champion_user.username
+            champion_province = champion_user.province
+
+        output.append({
+            "visit_id": log.id,
+            "champion": champion_name,
+            "username": log.username,
+            "province": champion_province,
+            "school_name": log.school_name,
+            "asl_school_id": log.asl_school_id,
+            "library_id": log.library_id,
+            "status": log.status,
+            "checkin_at": log.checkin_at.isoformat() if log.checkin_at else None,
+            "checkout_at": log.checkout_at.isoformat() if log.checkout_at else None,
+            "duration_minutes": log.duration_minutes,
+            "location_source": log.location_source,
+            "location_text": log.location_text,
+            "checkin_latitude": log.checkin_latitude,
+            "checkin_longitude": log.checkin_longitude,
+        })
+
+    return jsonify(output)
 
 
 
@@ -11809,9 +11980,21 @@ def _get_profile_school_tables_data(username):
     truly_active_schools = [s for s in active_scholarship_schools if s.get("expiry_date") is None or s.get("expiry_date") >= today]
     expired_schools = [s for s in active_scholarship_schools if s.get("expiry_date") and s.get("expiry_date") < today]
 
+    library_id_by_asl_id = {}
+    for _school in existing_school_dicts:
+        asl_value = _school.get("asl_school_id")
+        lib_value = _school.get("library_school_id")
+        if asl_value is None:
+            continue
+        library_id_by_asl_id[str(asl_value)] = lib_value
+
     def _serialize_school(s):
+        school_id = s.get("id")
+        library_id = library_id_by_asl_id.get(str(school_id))
         return {
-            "id": s.get("id"),
+            "id": school_id,
+            "asl_school_id": school_id,
+            "library_id": library_id,
             "name": s.get("name") or "—",
             "first_awarded_2025": s.get("first_awarded_2025") or "—",
             "days_left_until_12": s.get("days_left_until_12"),
@@ -11844,6 +12027,184 @@ def api_profile_school_tables(username):
     except Exception as e:
         logging.exception("profile school-tables API: %s", e)
         return jsonify({"error": str(e)}), 500
+
+
+def _visit_api_error(error_code, message, status_code=400, data=None):
+    payload = {
+        "success": False,
+        "error": error_code,
+        "message": message,
+    }
+    if data is not None:
+        payload["data"] = data
+    return jsonify(payload), status_code
+
+
+def _visit_api_iso_utc(value):
+    if not value:
+        return None
+    return value.replace(microsecond=0).isoformat() + 'Z'
+
+
+def _require_json_request():
+    if not request.is_json:
+        return _visit_api_error(
+            'ValidationError',
+            'Content-Type must be application/json',
+            400
+        )
+    return None
+
+
+def _validate_location_payload(location):
+    if not isinstance(location, dict):
+        return None, None, None, None, "location object is required"
+
+    latitude_raw = location.get("latitude")
+    longitude_raw = location.get("longitude")
+    location_text = (location.get("location_text") or "").strip() or None
+    location_source = (location.get("source") or "unknown").strip().lower() or "unknown"
+
+    lat = None
+    lng = None
+
+    if latitude_raw is not None or longitude_raw is not None:
+        try:
+            lat = float(latitude_raw)
+            lng = float(longitude_raw)
+        except (TypeError, ValueError):
+            return None, None, None, None, "location.latitude and location.longitude must be numeric values"
+        if lat < -90 or lat > 90:
+            return None, None, None, None, "location.latitude must be between -90 and 90"
+        if lng < -180 or lng > 180:
+            return None, None, None, None, "location.longitude must be between -180 and 180"
+
+    if lat is None and lng is None and not location_text:
+        return None, None, None, None, "location must include either latitude/longitude or location_text"
+
+    return lat, lng, location_text, location_source, None
+
+
+@app.route('/api/profile/school-visit/checkin', methods=['POST'])
+@login_required
+def api_profile_school_visit_checkin():
+    json_error = _require_json_request()
+    if json_error:
+        return json_error
+
+    data = request.get_json() or {}
+    asl_school_id = str((data.get('asl_school_id') or '')).strip()
+    library_id = str((data.get('library_id') or '')).strip()
+    school_name = str((data.get('school_name') or '')).strip()
+
+    if not asl_school_id or not library_id or not school_name:
+        return _visit_api_error('ValidationError', 'asl_school_id, library_id and school_name are required', 400)
+
+    lat, lng, location_text, location_source, location_error = _validate_location_payload(data.get('location'))
+    if location_error:
+        return _visit_api_error('ValidationError', location_error, 400)
+
+    active_visit = SchoolVisitLog.query.filter_by(
+        user_id=current_user.id,
+        status='checked_in'
+    ).order_by(SchoolVisitLog.checkin_at.desc()).first()
+    if active_visit:
+        return _visit_api_error(
+            'ActiveSessionExists',
+            'User already checked in at another school.',
+            409,
+            {
+                'active_visit_id': active_visit.id,
+                'school_name': active_visit.school_name,
+                'checkin_at': _visit_api_iso_utc(active_visit.checkin_at),
+            }
+        )
+
+    visit = SchoolVisitLog(
+        user_id=current_user.id,
+        username=current_user.username,
+        asl_school_id=asl_school_id,
+        library_id=library_id,
+        school_name=school_name,
+        status='checked_in',
+        checkin_at=datetime.utcnow(),
+        checkin_latitude=lat,
+        checkin_longitude=lng,
+        location_text=location_text,
+        location_source=location_source,
+    )
+    db.session.add(visit)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Checked in successfully.',
+        'data': visit.to_dict()
+    }), 201
+
+
+@app.route('/api/profile/school-visit/checkout', methods=['POST'])
+@login_required
+def api_profile_school_visit_checkout():
+    json_error = _require_json_request()
+    if json_error:
+        return json_error
+
+    data = request.get_json() or {}
+    notes = (data.get('notes') or '').strip() or None
+
+    active_visit = SchoolVisitLog.query.filter_by(
+        user_id=current_user.id,
+        status='checked_in'
+    ).order_by(SchoolVisitLog.checkin_at.desc()).first()
+    if not active_visit:
+        return _visit_api_error('NoActiveSession', 'No active check-in found for this user.', 404)
+
+    now = datetime.utcnow()
+    duration_minutes = None
+    if active_visit.checkin_at:
+        duration_minutes = int(max(0, (now - active_visit.checkin_at).total_seconds() // 60))
+
+    active_visit.checkout_at = now
+    active_visit.duration_minutes = duration_minutes
+    active_visit.status = 'checked_out'
+    active_visit.notes = notes
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Checked out successfully.',
+        'data': active_visit.to_dict()
+    }), 200
+
+
+@app.route('/api/profile/<username>/school-visit/status', methods=['GET'])
+@login_required
+def api_profile_school_visit_status(username):
+    target_user = User.query.filter_by(username=username).first()
+    if not target_user:
+        return _visit_api_error('NotFound', 'User not found', 404)
+
+    if current_user.username != username and current_user.userRole != 'Admin':
+        return _visit_api_error('Unauthorized', 'Unauthorized', 403)
+
+    active_visit = SchoolVisitLog.query.filter_by(
+        user_id=target_user.id,
+        status='checked_in'
+    ).order_by(SchoolVisitLog.checkin_at.desc()).first()
+
+    last_visit = SchoolVisitLog.query.filter_by(
+        user_id=target_user.id,
+        status='checked_out'
+    ).order_by(SchoolVisitLog.checkout_at.desc(), SchoolVisitLog.id.desc()).first()
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'active_visit': active_visit.to_dict() if active_visit else None,
+            'last_visit': last_visit.to_dict() if last_visit else None,
+        }
+    }), 200
 
 
 @app.route('/profile/<username>', methods=['GET', 'POST'])
@@ -12813,9 +13174,9 @@ def contracting():
     if current_user.userRole == 'Brand Ambassador':
         return redirect(url_for('index'))
     else:
-        username = current_user.username
+        username = (current_user.username or '').strip()
         role = current_user.userRole
-        scorecards = Scorecard.query.filter_by(employee_name=username).all()
+        scorecards = Scorecard.query.filter(Scorecard.employee_name.ilike(username)).all()
     return render_template('contracting.html', username=username, role=role, title='Contracting', scorecards=scorecards)
 
 
@@ -12829,7 +13190,26 @@ def save_scorecard_row():
         
     try:
         row_id = data.get('id')
-        weight = float(data.get('weight', 0))
+        current_username = (current_user.username or '').strip()
+        required_fields = {
+            'keyFocusArea': 'Key focus area is required',
+            'strategicObjective': 'Strategic objective is required',
+            'performanceMeasure': 'Performance measure is required',
+            'unitOfMeasure': 'Unit of measure is required',
+            'target': 'Target is required',
+            'weight': 'Weight is required'
+        }
+        for key, message in required_fields.items():
+            value = data.get(key)
+            if value is None or str(value).strip() == '':
+                return jsonify({'error': message}), 400
+
+        try:
+            weight = float(data.get('weight'))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Weight must be a numeric value'}), 400
+        if weight < 0:
+            return jsonify({'error': 'Weight must be greater than or equal to 0'}), 400
         
         if row_id:
             # Update existing row
@@ -12838,11 +13218,12 @@ def save_scorecard_row():
                 return jsonify({'error': 'Row not found'}), 404
             
             # Authorization check: only the owner or an admin can update
-            if row.employee_name != current_user.username and current_user.userRole != 'Admin':
+            row_owner = (row.employee_name or '').strip().lower()
+            if row_owner != current_username.lower() and current_user.userRole != 'Admin':
                 return jsonify({'error': 'Unauthorized'}), 403
         else:
             # Create new row
-            row = Scorecard(employee_name=current_user.username)
+            row = Scorecard(employee_name=current_username)
             db.session.add(row)
             
         # Update fields
@@ -12850,11 +13231,23 @@ def save_scorecard_row():
         row.strategic_objective = data.get('strategicObjective')
         row.performance_measure = data.get('performanceMeasure')
         row.unit_of_measure = data.get('unitOfMeasure')
-        row.target = data.get('target')
+        row.target = str(data.get('target')).strip()
         row.weight = weight
         
         db.session.commit()
-        return jsonify({'message': 'Row saved successfully', 'new_id': row.id})
+        return jsonify({
+            'message': 'Row saved successfully',
+            'id': row.id,
+            'new_id': row.id,
+            'row': {
+                'keyFocusArea': row.key_focus_area,
+                'strategicObjective': row.strategic_objective,
+                'performanceMeasure': row.performance_measure,
+                'unitOfMeasure': row.unit_of_measure,
+                'target': row.target,
+                'weight': row.weight
+            }
+        })
         
     except Exception as e:
         db.session.rollback()
@@ -12871,7 +13264,9 @@ def delete_scorecard_row(id):
             return jsonify({'error': 'Row not found'}), 404
             
         # Authorization check
-        if row.employee_name != current_user.username and current_user.userRole != 'Admin':
+        row_owner = (row.employee_name or '').strip().lower()
+        current_username = (current_user.username or '').strip().lower()
+        if row_owner != current_username and current_user.userRole != 'Admin':
             return jsonify({'error': 'Unauthorized'}), 403
             
         db.session.delete(row)
@@ -12880,6 +13275,32 @@ def delete_scorecard_row(id):
         
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scorecards/me', methods=['GET'])
+@login_required
+def my_scorecards():
+    username = (current_user.username or '').strip()
+    try:
+        rows = (
+            Scorecard.query
+            .filter(Scorecard.employee_name.ilike(username))
+            .order_by(Scorecard.id.asc())
+            .all()
+        )
+        return jsonify({
+            'rows': [{
+                'id': row.id,
+                'keyFocusArea': row.key_focus_area,
+                'strategicObjective': row.strategic_objective,
+                'performanceMeasure': row.performance_measure,
+                'unitOfMeasure': row.unit_of_measure,
+                'target': row.target,
+                'weight': row.weight
+            } for row in rows]
+        })
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 

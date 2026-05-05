@@ -39,3 +39,29 @@ class Config:
     # Cache configuration
     CACHE_TYPE = os.environ.get('CACHE_TYPE', 'SimpleCache')  # or 'redis' for production
     CACHE_DEFAULT_TIMEOUT = 300  # 5 minutes default
+
+    # AI generation (do not hardcode secrets in source code)
+    # Default provider: ollama | gemini | openai (UI may override per request)
+    GENERATION_PROVIDER = os.environ.get('GENERATION_PROVIDER', 'ollama').lower()
+    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+    OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4.1-mini')
+
+    # Google Gemini (Generative Language API). AI Studio often exports GOOGLE_API_KEY.
+    GEMINI_API_KEY = (
+        os.environ.get('GEMINI_API_KEY')
+        or os.environ.get('GOOGLE_API_KEY')
+        or os.environ.get('GOOGLE_GENERATIVE_AI_API_KEY')
+    )
+    GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')
+    GEMINI_TEMPERATURE = float(os.environ.get('GEMINI_TEMPERATURE', '0.2'))
+    GEMINI_MAX_OUTPUT_TOKENS = int(os.environ.get('GEMINI_MAX_OUTPUT_TOKENS', '8192'))
+
+    # Ollama integration
+    OLLAMA_BASE_URL = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
+    OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3.1')
+    OLLAMA_CONTENT_MODEL = os.environ.get('OLLAMA_CONTENT_MODEL')
+    OLLAMA_AUTHORIZATION = os.environ.get('OLLAMA_AUTHORIZATION')
+    OLLAMA_API_KEY = os.environ.get('OLLAMA_API_KEY')
+    OLLAMA_TEMPERATURE = float(os.environ.get('OLLAMA_TEMPERATURE', '0.2'))
+    OLLAMA_NUM_PREDICT = int(os.environ.get('OLLAMA_NUM_PREDICT', '900'))
+    GENERATION_PROGRESS_TARGET_CHARS = int(os.environ.get('GENERATION_PROGRESS_TARGET_CHARS', '2600'))

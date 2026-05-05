@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ curriculum.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+  <div>
+    <a href="{{ url_for('new_creations.index') }}" class="text-sm text-indigo-600 hover:underline">Back to curriculums</a>
+    <h1 class="text-2xl font-bold text-slate-800 mt-1">{{ curriculum.name }}</h1>
+    <p class="text-slate-500">{{ curriculum.description or "No description provided." }}</p>
+  </div>
+
+  {% if current_user.userRole == 'Admin' %}
+  <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+    <h2 class="text-lg font-semibold mb-3">Add Grade</h2>
+    <form method="POST" action="{{ url_for('new_creations.create_grade') }}" class="grid md:grid-cols-3 gap-3">
+      <input type="hidden" name="curriculum_id" value="{{ curriculum.id }}">
+      <input type="text" name="name" placeholder="Grade name" class="form-control" required>
+      <div></div>
+      <button type="submit" class="btn btn-primary md:col-span-1">Create Grade</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+    <h2 class="text-lg font-semibold mb-3">Grades</h2>
+    {% if grades %}
+    <div class="space-y-2">
+      {% for grade in grades %}
+      <div class="border border-slate-200 rounded-lg p-3">
+        <a class="text-indigo-700 font-semibold hover:underline" href="{{ url_for('new_creations.grade_detail', grade_id=grade.id) }}">{{ grade.name }}</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-slate-500">No grades available yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

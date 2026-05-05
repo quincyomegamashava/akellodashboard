@@ -309,13 +309,17 @@
     <div class="card-body">
       <div class="toolbar">
         <div class="toolbar-left">
-          <button type="button" id="addRow" class="btn-chip">
+          <button type="button" id="addRow" class="btn-chip" onclick="if (window.addScorecardRow) { window.addScorecardRow(); }">
             <i class="fas fa-plus-circle"></i> Add Row
           </button>
+          <input type="text" id="scorecardSearch" placeholder="Search scorecard rows..." style="min-width: 260px;">
           <span id="totalWeight" class="badge">Total Weight: 0</span>
           <span id="weightWarning" class="small text-danger ml-2" style="display:none;">Weight should total 100</span>
         </div>
         <div class="toolbar-right">
+          <button type="button" id="saveTable" class="btn-primary-modern btn-modern">
+            <i class="fas fa-check-circle"></i> Save Table
+          </button>
           <button type="button" id="exportExcel" class="btn-success-modern btn-modern">
             <i class="fas fa-file-excel"></i> Export Excel
           </button>
@@ -324,6 +328,7 @@
           </button>
         </div>
       </div>
+      <div id="formErrorBanner" class="error" style="display:none;"></div>
       <div class="table-container" style="max-height: 65vh; overflow: auto;">
         <table class="table table-striped" id="scorecardTable">
           <thead>
@@ -337,7 +342,7 @@
               <th>Action</th>
             </tr>
           </thead>
-          <tbody class="w3-small">
+          <tbody class="w3-small" id="scorecardTbody">
             {% for scorecard in scorecards %}
             <tr class="w3-border" data-id="{{ scorecard.id }}">
               <td data-label="Key Focus Area">
@@ -385,12 +390,113 @@
           </tbody>
         </table>
       </div>
-      <p id="errorMsg" class="error"></p>
+      <p id="errorMsg" class="error" style="display:none;"></p>
     </div>
   </div>
 </div>
 
 <script>
+  function showToast(message, type) {
+    const existing = document.getElementById('scorecard-toast');
+    if (existing) {
+      existing.remove();
+    }
+    const toast = document.createElement('div');
+    toast.id = 'scorecard-toast';
+    toast.textContent = message;
+    toast.style.position = 'fixed';
+    toast.style.bottom = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.style.padding = '10px 14px';
+    toast.style.borderRadius = '10px';
+    toast.style.fontSize = '0.85rem';
+    toast.style.fontWeight = '600';
+    toast.style.color = '#fff';
+    toast.style.boxShadow = '0 6px 18px rgba(0,0,0,0.2)';
+    toast.style.background = type === 'error' ? '#dc2626' : '#059669';
+    document.body.appendChild(toast);
+    setTimeout(function () {
+      toast.remove();
+    }, 2200);
+  }
+
+  function getRowData(row) {
+    return {
+      id: row.data('id') === 'new' ? null : row.data('id'),
+      keyFocusArea: row.find('.key-focus-area').val(),
+      strategicObjective: row.find('.strategic-objective').val().trim(),
+      performanceMeasure: row.find('.performance-measure').val().trim(),
+      unitOfMeasure: row.find('.unit-of-measure').val(),
+      target: row.find('.target').val().trim(),
+      weight: row.find('.weight').val().trim()
+    };
+  }
+
+  function showError(msg) {
+    const error = $('#errorMsg');
+    error.text(msg).show();
+  }
+
+  function clearError() {
+    $('#errorMsg').hide().text('');
+  }
+
+  function showBanner(msg) {
+    $('#formErrorBanner').text(msg).show();
+  }
+
+  function clearBanner() {
+    $('#formErrorBanner').hide().text('');
+  }
+
+  function setRowInvalid(row, selector, message) {
+    const input = row.find(selector);
+    input.addClass('is-invalid');
+    input.attr('title', message);
+  }
+
+  function clearRowValidation(row) {
+    row.find('.is-invalid').removeClass('is-invalid').attr('title', '');
+  }
+
+  function validateRow(row) {
+    clearRowValidation(row);
+    clearBanner();
+    const data = getRowData(row);
+    let valid = true;
+
+    if (!data.keyFocusArea) {
+      setRowInvalid(row, '.key-focus-area', 'Key focus area is required.');
+      valid = false;
+    }
+    if (!data.strategicObjective) {
+      setRowInvalid(row, '.strategic-objective', 'Strategic objective is required.');
+      valid = false;
+    }
+    if (!data.performanceMeasure) {
+      setRowInvalid(row, '.performance-measure', 'Performance measure is required.');
+      valid = false;
+    }
+    if (!data.unitOfMeasure) {
+      setRowInvalid(row, '.unit-of-measure', 'Unit of measure is required.');
+      valid = false;
+    }
+    if (!data.target) {
+      setRowInvalid(row, '.target', 'Target is required.');
+      valid = false;
+    }
+    if (!data.weight || Number.isNaN(Number(data.weight))) {
+      setRowInvalid(row, '.weight', 'Weight is required and must be numeric.');
+      valid = false;
+    }
+
+    if (!valid) {
+      showBanner('Please correct highlighted fields before saving.');
+    }
+    return valid;
+  }
+
   function calculateTotalWeight() {
     let total = 0;
     document.querySelectorAll('.weight').forEach(input => {
@@ -408,170 +514,36 @@
     }
   }
 
-  document.addEventListener('input', function (event) {
-    if (event.target.classList.contains('weight')) {
-      calculateTotalWeight();
-    }
-  });
-
-  window.addEventListener('DOMContentLoaded', function () {
-    calculateTotalWeight();
-
-    // Export to Excel
-    const exportExcelBtn = document.getElementById('exportExcel');
-    if (exportExcelBtn) {
-      exportExcelBtn.addEventListener('click', function () {
-        const table = document.getElementById('scorecardTable');
-        const wb = XLSX.utils.book_new();
-
-        // Get table data
-        const data = [];
-        const headers = [];
-
-        // Get headers
-        table.querySelectorAll('thead th').forEach(th => {
-          if (th.textContent.trim() !== 'Action') {
-            headers.push(th.textContent.trim());
-          }
-        });
-        data.push(headers);
-
-        // Get rows data (excluding Action column)
-        table.querySelectorAll('tbody tr').forEach(tr => {
-          const row = [];
-          tr.querySelectorAll('td').forEach((td, index) => {
-            if (index < 6) { // Exclude Action column (index 6)
-              const input = td.querySelector('input, select');
-              if (input) {
-                row.push(input.value || '');
-              } else {
-                row.push(td.textContent.trim());
-              }
-            }
-          });
-          data.push(row);
-        });
-
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, 'Scorecard');
-
-        // Generate filename with current date
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
-        const filename = `Scorecard_${dateStr}.xlsx`;
-
-        XLSX.writeFile(wb, filename);
-      });
-    }
-
-    // Export to PDF
-    const exportPDFBtn = document.getElementById('exportPDF');
-    if (exportPDFBtn) {
-      exportPDFBtn.addEventListener('click', function () {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-
-        // Get table data
-        const headers = [];
-        const rows = [];
-
-        // Get headers (excluding Action)
-        document.querySelectorAll('#scorecardTable thead th').forEach(th => {
-          if (th.textContent.trim() !== 'Action') {
-            headers.push(th.textContent.trim());
-          }
-        });
-
-        // Get rows data (excluding Action column)
-        document.querySelectorAll('#scorecardTable tbody tr').forEach(tr => {
-          const row = [];
-          tr.querySelectorAll('td').forEach((td, index) => {
-            if (index < 6) { // Exclude Action column
-              const input = td.querySelector('input, select');
-              if (input) {
-                row.push(input.value || '');
-              } else {
-                row.push(td.textContent.trim());
-              }
-            }
-          });
-          rows.push(row);
-        });
-
-        // Add title
-        doc.setFontSize(18);
-        doc.text('Scorecard Report', 14, 20);
-
-        // Add date
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Generated on: ${dateStr}`, 14, 28);
-
-        // Add total weight
-        const totalWeight = document.getElementById('totalWeight').textContent;
-        doc.text(totalWeight, 14, 35);
-
-        // Add table
-        doc.autoTable({
-          head: [headers],
-          body: rows,
-          startY: 42,
-          styles: {
-            fontSize: 8,
-            cellPadding: 3,
-          },
-          headStyles: {
-            fillColor: [99, 102, 241],
-            textColor: 255,
-            fontStyle: 'bold',
-          },
-          alternateRowStyles: {
-            fillColor: [245, 247, 250],
-          },
-          margin: { top: 42, left: 14, right: 14 },
-        });
-
-        // Generate filename with current date
-        const dateStrFile = now.toISOString().split('T')[0];
-        const filename = `Scorecard_${dateStrFile}.pdf`;
-
-        doc.save(filename);
-      });
-    }
-  });
-</script>
-
-<script>
-  $(document).ready(function () {
-    // Add new row
-    $('#addRow').click(function () {
-      let newRow = `<tr data-id="new">
+  function buildRowMarkup(rowData) {
+    const data = rowData || {};
+    const rowId = data.id || 'new';
+    const keyFocusArea = data.keyFocusArea || 'Strategy';
+    const strategicObjective = data.strategicObjective || '';
+    const performanceMeasure = data.performanceMeasure || '';
+    const unitOfMeasure = data.unitOfMeasure || 'Yes / No';
+    const target = data.target || '';
+    const weight = data.weight || '';
+    return `<tr data-id="${rowId}">
           <td data-label="Key Focus Area">
             <select name="keyFocusArea" class="key-focus-area">
-              <option value="Strategy">Strategy</option>
-              <option value="Customer">Customer</option>
-              <option value="Innovation">Innovation</option>
-              <option value="Operations">Operations</option>
-              <option value="Functional">Functional</option>
+              <option value="Strategy" ${keyFocusArea === 'Strategy' ? 'selected' : ''}>Strategy</option>
+              <option value="Customer" ${keyFocusArea === 'Customer' ? 'selected' : ''}>Customer</option>
+              <option value="Innovation" ${keyFocusArea === 'Innovation' ? 'selected' : ''}>Innovation</option>
+              <option value="Operations" ${keyFocusArea === 'Operations' ? 'selected' : ''}>Operations</option>
+              <option value="Functional" ${keyFocusArea === 'Functional' ? 'selected' : ''}>Functional</option>
             </select>
           </td>
-          <td data-label="Strategic Objective"><input type="text" name="strategicObjective" class="strategic-objective"></td>
-          <td data-label="Performance Measure"><input type="text" name="performanceMeasure" class="performance-measure"></td>
+          <td data-label="Strategic Objective"><input type="text" name="strategicObjective" class="strategic-objective" value="${strategicObjective}"></td>
+          <td data-label="Performance Measure"><input type="text" name="performanceMeasure" class="performance-measure" value="${performanceMeasure}"></td>
           <td data-label="Unit Of Measure">
             <select name="unitOfMeasure" class="unit-of-measure">
-              <option value="Yes / No">Yes / No</option>
-              <option value="Percentage">Percentage</option>
-              <option value="Numeric">Numeric</option>
+              <option value="Yes / No" ${unitOfMeasure === 'Yes / No' ? 'selected' : ''}>Yes / No</option>
+              <option value="Percentage" ${unitOfMeasure === 'Percentage' ? 'selected' : ''}>Percentage</option>
+              <option value="Numeric" ${unitOfMeasure === 'Numeric' ? 'selected' : ''}>Numeric</option>
             </select>
           </td>
-          <td data-label="Target"><input type="text" name="target" class="target"></td>
-          <td data-label="Weight"><input type="text" name="weight" class="weight"></td>
+          <td data-label="Target"><input type="text" name="target" class="target" value="${target}"></td>
+          <td data-label="Weight"><input type="text" name="weight" class="weight" value="${weight}"></td>
           <td data-label="Action">
             <div class="w3-flex" style="display: flex; gap: 8px;">
               <button type="button" class="save-row btn-chip" title="Save Row"><i class="fas fa-save"></i> Save</button>
@@ -579,49 +551,152 @@
             </div>
           </td>
         </tr>`;
-      $('#scorecardTable tbody').append(newRow);
+  }
+
+  window.addScorecardRow = function () {
+    $('#scorecardTbody').append(buildRowMarkup());
+    calculateTotalWeight();
+    filterTable();
+  };
+
+  function renderRows(rows) {
+    const tbody = $('#scorecardTbody');
+    tbody.empty();
+    (rows || []).forEach(function (row) {
+      tbody.append(buildRowMarkup(row));
     });
+    calculateTotalWeight();
+    filterTable();
+  }
 
-    // Save row to database
-    $(document).on('click', '.save-row', function () {
-      let row = $(this).closest('tr');
-      let data = {
-        id: row.data('id') === 'new' ? null : row.data('id'),
-        keyFocusArea: row.find('.key-focus-area').val(),
-        strategicObjective: row.find('.strategic-objective').val(),
-        performanceMeasure: row.find('.performance-measure').val(),
-        unitOfMeasure: row.find('.unit-of-measure').val(),
-        target: row.find('.target').val(),
-        weight: row.find('.weight').val()
-      };
+  function loadRowsFromDb() {
+    return $.ajax({
+      url: '/api/scorecards/me',
+      method: 'GET',
+      dataType: 'json',
+      headers: { Accept: 'application/json' }
+    }).then(function (response) {
+      renderRows(response && response.rows ? response.rows : []);
+      return response;
+    }).catch(function (xhr) {
+      const msg = xhr && xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Failed to load scorecards';
+      showError(msg);
+      showToast('Could not load saved rows', 'error');
+      throw xhr;
+    });
+  }
 
-      $.ajax({
-        url: "{{ url_for('save_scorecard_row') }}",
-        method: "POST",
-        contentType: "application/json",
-        data: JSON.stringify(data),
-        success: function (response) {
-          alert(response.message);
-          if (response.new_id) {
-            row.attr('data-id', response.new_id);
-            row.data('id', response.new_id);
-          }
-          calculateTotalWeight();
-        },
-        error: function (xhr) {
-          alert('Error saving row: ' + (xhr.responseJSON?.error || 'Unknown error'));
+  function saveRow(row, options) {
+    const opts = options || {};
+    clearError();
+    if (!validateRow(row)) {
+      return Promise.reject(new Error('validation'));
+    }
+    const data = getRowData(row);
+    const button = opts.button || null;
+    if (button) {
+      button.prop('disabled', true).text('Saving...');
+    }
+
+    return $.ajax({
+      url: "{{ url_for('save_scorecard_row') }}",
+      method: "POST",
+      contentType: "application/json",
+      dataType: "json",
+      headers: { Accept: 'application/json' },
+      data: JSON.stringify(data)
+    }).then(function (response) {
+      const savedId = response && (response.id || response.new_id);
+      if (!savedId) {
+        throw new Error('Unexpected response from server. Please log in again and retry.');
+      }
+      return loadRowsFromDb().then(function () {
+        clearBanner();
+        if (!opts.silent) {
+          showToast('Row saved successfully', 'success');
+        }
+        return response;
+      });
+    }).catch(function (xhrOrErr) {
+      let errorMessage = 'Unknown error';
+      if (xhrOrErr && xhrOrErr.responseJSON && xhrOrErr.responseJSON.error) {
+        errorMessage = xhrOrErr.responseJSON.error;
+      } else if (xhrOrErr && xhrOrErr.responseText && typeof xhrOrErr.responseText === 'string') {
+        errorMessage = xhrOrErr.responseText.slice(0, 160);
+      } else if (xhrOrErr && xhrOrErr.message) {
+        errorMessage = xhrOrErr.message;
+      }
+      showError('Error saving row: ' + errorMessage);
+      showToast('Save failed', 'error');
+      throw xhrOrErr;
+    }).always(function () {
+      if (button) {
+        button.prop('disabled', false).html('<i class="fas fa-save"></i> Save');
+      }
+    });
+  }
+
+  function filterTable() {
+    const term = ($('#scorecardSearch').val() || '').toLowerCase().trim();
+    $('#scorecardTable tbody tr').each(function () {
+      const row = $(this);
+      const data = [
+        row.find('.key-focus-area').val(),
+        row.find('.strategic-objective').val(),
+        row.find('.performance-measure').val(),
+        row.find('.unit-of-measure').val()
+      ].join(' ').toLowerCase();
+      row.toggle(data.includes(term));
+    });
+  }
+
+  function getExportRows() {
+    const rows = [];
+    $('#scorecardTable tbody tr:visible').each(function () {
+      const row = [];
+      $(this).find('td').each(function (index) {
+        if (index < 6) {
+          const input = $(this).find('input, select').first();
+          row.push(input.length ? input.val() || '' : $(this).text().trim());
         }
       });
+      rows.push(row);
+    });
+    return rows;
+  }
+
+  $(document).ready(function () {
+    loadRowsFromDb();
+    clearError();
+
+    $('#scorecardSearch').on('input', filterTable);
+    $(document).on('input', '.weight', calculateTotalWeight);
+    $(document).on('input', 'input, select', function () {
+      if ($(this).hasClass('is-invalid')) {
+        $(this).removeClass('is-invalid').attr('title', '');
+      }
+      clearBanner();
     });
 
-    // Delete row
+    $('#addRow').click(function () {
+      window.addScorecardRow();
+    });
+
+    $(document).on('click', '.save-row', function () {
+      const row = $(this).closest('tr');
+      const button = $(this);
+      saveRow(row, { button: button });
+    });
+
     $(document).on('click', '.delete-row', function () {
-      let row = $(this).closest('tr');
-      let id = row.data('id');
+      clearError();
+      const row = $(this).closest('tr');
+      const id = row.data('id');
 
       if (id === 'new') {
         row.remove();
         calculateTotalWeight();
+        filterTable();
         return;
       }
 
@@ -629,15 +704,83 @@
         $.ajax({
           url: "{{ url_for('delete_scorecard_row', id=0) }}".replace('/0', '/' + id),
           method: "POST",
-          success: function (response) {
-            alert(response.message);
+          success: function () {
             row.remove();
             calculateTotalWeight();
+            filterTable();
           },
           error: function (xhr) {
-            alert('Error deleting row: ' + (xhr.responseJSON?.error || 'Unknown error'));
+            const apiError = xhr && xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Unknown error';
+            showError('Error deleting row: ' + apiError);
           }
         });
+      }
+    });
+
+    $('#exportExcel').on('click', function () {
+      const table = document.getElementById('scorecardTable');
+      const wb = XLSX.utils.book_new();
+      const data = [];
+      const headers = [];
+      table.querySelectorAll('thead th').forEach(th => {
+        if (th.textContent.trim() !== 'Action') {
+          headers.push(th.textContent.trim());
+        }
+      });
+      data.push(headers);
+      getExportRows().forEach(row => data.push(row));
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, 'Scorecard');
+      const filename = `Scorecard_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, filename);
+    });
+
+    $('#exportPDF').on('click', function () {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const headers = [];
+      document.querySelectorAll('#scorecardTable thead th').forEach(th => {
+        if (th.textContent.trim() !== 'Action') {
+          headers.push(th.textContent.trim());
+        }
+      });
+      const rows = getExportRows();
+      const now = new Date();
+      doc.setFontSize(18);
+      doc.text('Scorecard Report', 14, 20);
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Generated on: ${now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 28);
+      doc.text(document.getElementById('totalWeight').textContent, 14, 35);
+      doc.autoTable({
+        head: [headers],
+        body: rows,
+        startY: 42,
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [99, 102, 241], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+        margin: { top: 42, left: 14, right: 14 }
+      });
+      doc.save(`Scorecard_${now.toISOString().split('T')[0]}.pdf`);
+    });
+
+    $('#saveTable').on('click', async function () {
+      clearError();
+      const btn = $(this);
+      btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+      const rows = $('#scorecardTable tbody tr');
+      let savedCount = 0;
+      try {
+        for (let i = 0; i < rows.length; i += 1) {
+          const row = $(rows[i]);
+          await saveRow(row, { silent: true });
+          savedCount += 1;
+        }
+        showToast(`Table saved (${savedCount} row${savedCount === 1 ? '' : 's'})`, 'success');
+      } catch (e) {
+        showToast(`Table save interrupted at row ${savedCount + 1}`, 'error');
+      } finally {
+        btn.prop('disabled', false).html('<i class="fas fa-check-circle"></i> Save Table');
       }
     });
   });

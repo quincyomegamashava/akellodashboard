@@ -187,6 +187,11 @@
       </a>
       {% endif %}
 
+      <a href="{{ url_for('new_creations.index') }}"
+        class="nav-item {{ 'active' if title == 'New Creations' else '' }}">
+        <i class="fas fa-lightbulb"></i> <span class="nav-text">New Creations</span>
+      </a>
+
       {% if current_user.userRole == 'Admin' or current_user.has_privilege('Akello Events') %}
       <a href="{{ url_for('akello_game_events') }}"
         class="nav-item {{ 'active' if title == 'Game Events Management' else '' }}">

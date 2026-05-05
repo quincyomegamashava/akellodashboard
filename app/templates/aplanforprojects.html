@@ -1863,11 +1863,13 @@ function renderTask(task, container) {
 
   const controls = el('div', {class:'flex justify-end gap-2 mt-3 pt-2 border-t border-zinc-100'});
   const editBtn = el('button',{class:'text-xs font-medium text-indigo-600 hover:text-indigo-800', text:'Edit'});
-  const delBtn = el('button',{class:'text-xs font-medium text-zinc-500 hover:text-red-600', text:'Delete'});
   editBtn.onclick = () => promptEditTask(task);
-  delBtn.onclick = () => confirmDeleteTask(task.id);
   controls.appendChild(editBtn);
-  controls.appendChild(delBtn);
+  if (task.can_delete) {
+    const delBtn = el('button',{class:'text-xs font-medium text-zinc-500 hover:text-red-600', text:'Delete'});
+    delBtn.onclick = () => confirmDeleteTask(task.id);
+    controls.appendChild(delBtn);
+  }
 
   div.appendChild(titleRow);
   div.appendChild(desc);

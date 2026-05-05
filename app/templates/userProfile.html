@@ -129,6 +129,59 @@
     margin-right: 8px;
   }
 
+  .visit-status-card {
+    margin: 24px;
+    border: 1px solid rgba(15, 34, 82, 0.08);
+    border-radius: 14px;
+    background: #f8fafc;
+    padding: 16px 18px;
+  }
+
+  .visit-status-title {
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted-color);
+    margin-bottom: 8px;
+  }
+
+  .visit-status-main {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--heading-color);
+    margin-bottom: 8px;
+  }
+
+  .visit-status-sub {
+    font-size: 0.85rem;
+    color: var(--muted-color);
+  }
+
+  .visit-action-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .visit-action-btn.checkin {
+    background: var(--accent-secondary);
+    color: #fff;
+  }
+
+  .visit-action-btn.checkout {
+    background: #d14343;
+    color: #fff;
+  }
+
+  .visit-action-btn.disabled {
+    background: #e5e7eb;
+    color: #6b7280;
+    cursor: not-allowed;
+  }
+
   .profile-wrapper {
     padding: 52px 16px 72px;
     background: var(--page-bg);
@@ -723,8 +776,12 @@
             </div>
           </div>
         </div>
-
         {# School tables loaded async via /api/profile/<username>/school-tables; loading state shown until data arrives #}
+        <div class="visit-status-card" id="visit-status-card">
+          <div class="visit-status-title">School Visit Status</div>
+          <div class="visit-status-main" id="visit-status-main">No active check-in</div>
+          <div class="visit-status-sub" id="visit-status-sub">Last visit summary will appear here after checkout.</div>
+        </div>
 
         <section class="section-group">
           <div class="section-header">Schools with Active Scholarship</div>
@@ -738,11 +795,12 @@
                   <th>ASL MTD</th>
                   <th>AL MTD</th>
                   <th>Total MTD</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody id="profile-schools-active-tbody">
                 <tr>
-                  <td colspan="6" class="profile-table-loading">
+                  <td colspan="7" class="profile-table-loading">
                     <i class="fa fa-spinner fa-spin"></i> Loading school data...
                   </td>
                 </tr>
@@ -763,11 +821,12 @@
                   <th>ASL MTD</th>
                   <th>AL MTD</th>
                   <th>Total MTD</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody id="profile-schools-expired-tbody">
                 <tr>
-                  <td colspan="6" class="profile-table-loading">
+                  <td colspan="7" class="profile-table-loading">
                     <i class="fa fa-spinner fa-spin"></i> Loading school data...
                   </td>
                 </tr>
@@ -818,11 +877,12 @@
                     <th>ASL MTD</th>
                     <th>AL MTD</th>
                     <th>Total MTD</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody id="profile-schools-without-tbody">
                   <tr>
-                    <td colspan="6" class="profile-table-loading">
+                    <td colspan="7" class="profile-table-loading">
                       <i class="fa fa-spinner fa-spin"></i> Loading school data...
                     </td>
                   </tr>
@@ -1022,9 +1082,34 @@
       if (!res.ok) {
         const errMsg = data.error || "Failed to load school data.";
         [tbodyActive, tbodyExpired, tbodyWithout].forEach((tb) => {
-          if (tb) tb.innerHTML = '<tr><td colspan="6" class="profile-table-loading">' + errMsg + ' Try refreshing.</td></tr>';
+          if (tb) tb.innerHTML = '<tr><td colspan="7" class="profile-table-loading">' + errMsg + ' Try refreshing.</td></tr>';
         });
         return;
+      }
+
+      const activeVisit = window.__profileVisitState?.active_visit || null;
+
+      function buildActionCell(school) {
+        const schoolAslId = school.asl_school_id != null ? String(school.asl_school_id) : (school.id != null ? String(school.id) : "");
+        const schoolLibId = school.library_id != null ? String(school.library_id) : "";
+        if (!schoolAslId || !schoolLibId || !school.name) {
+          return '<span class="stat-subtle">N/A</span>';
+        }
+
+        const activeAslId = activeVisit && activeVisit.asl_school_id != null ? String(activeVisit.asl_school_id) : null;
+        const isCurrentSchoolActive = !!activeVisit && activeAslId === schoolAslId;
+        const activeOtherSchool = !!activeVisit && !isCurrentSchoolActive;
+
+        if (isCurrentSchoolActive) {
+          return `<button type="button" class="visit-action-btn checkout js-school-checkout-btn" data-asl-school-id="${schoolAslId}" data-library-id="${schoolLibId}" data-school-name="${(school.name || '').replace(/"/g, '&quot;')}">Check out</button>`;
+        }
+
+        if (activeOtherSchool) {
+          const activeName = activeVisit.school_name || "another school";
+          return `<button type="button" class="visit-action-btn disabled" disabled title="You are currently checked in at ${activeName}">Check in</button>`;
+        }
+
+        return `<button type="button" class="visit-action-btn checkin js-school-checkin-btn" data-asl-school-id="${schoolAslId}" data-library-id="${schoolLibId}" data-school-name="${(school.name || '').replace(/"/g, '&quot;')}">Check in</button>`;
       }
 
       function renderRow(school) {
@@ -1035,13 +1120,14 @@
         const asl = school.asl_mtd != null ? school.asl_mtd : 0;
         const al = school.al_mtd != null ? school.al_mtd : 0;
         const total = school.total_mtd != null ? school.total_mtd : 0;
-        return "<tr><td><a href=\"" + url + "\"><i class=\"fa fa-university\"></i> " + name + "</a></td><td>" + fa + "</td><td>" + days + "</td><td>" + asl + "</td><td>" + al + "</td><td>" + total + "</td></tr>";
+        const action = buildActionCell(school);
+        return "<tr><td><a href=\"" + url + "\"><i class=\"fa fa-university\"></i> " + name + "</a></td><td>" + fa + "</td><td>" + days + "</td><td>" + asl + "</td><td>" + al + "</td><td>" + total + "</td><td>" + action + "</td></tr>";
       }
 
       function fillBody(tbody, schools) {
         if (!tbody) return;
         if (!schools || schools.length === 0) {
-          tbody.innerHTML = "<tr><td colspan=\"6\">No schools</td></tr>";
+          tbody.innerHTML = "<tr><td colspan=\"7\">No schools</td></tr>";
           return;
         }
         tbody.innerHTML = schools.map(renderRow).join("");
@@ -1068,8 +1154,180 @@
     } catch (err) {
       console.error("loadProfileSchoolTables:", err);
       [tbodyActive, tbodyExpired, tbodyWithout].forEach((tb) => {
-        if (tb) tb.innerHTML = '<tr><td colspan="6" class="profile-table-loading">Failed to load school data. Try refreshing.</td></tr>';
+        if (tb) tb.innerHTML = '<tr><td colspan="7" class="profile-table-loading">Failed to load school data. Try refreshing.</td></tr>';
       });
+    }
+  }
+
+  let visitElapsedTimer = null;
+
+  function formatVisitDate(isoString) {
+    if (!isoString) return "N/A";
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return isoString;
+    return date.toLocaleString();
+  }
+
+  function formatElapsedMinutes(startIso) {
+    if (!startIso) return "0 min elapsed";
+    const start = new Date(startIso);
+    if (Number.isNaN(start.getTime())) return "0 min elapsed";
+    const diffMs = Math.max(0, Date.now() - start.getTime());
+    const mins = Math.floor(diffMs / 60000);
+    return mins + " min elapsed";
+  }
+
+  function renderVisitStatusCard(errorMessage) {
+    const mainEl = document.getElementById("visit-status-main");
+    const subEl = document.getElementById("visit-status-sub");
+    if (!mainEl || !subEl) return;
+
+    if (visitElapsedTimer) {
+      clearInterval(visitElapsedTimer);
+      visitElapsedTimer = null;
+    }
+
+    if (errorMessage) {
+      mainEl.textContent = "Unable to load visit status";
+      subEl.textContent = errorMessage;
+      return;
+    }
+
+    const state = window.__profileVisitState || {};
+    const activeVisit = state.active_visit || null;
+    const lastVisit = state.last_visit || null;
+
+    if (activeVisit) {
+      mainEl.textContent = "Checked in at " + (activeVisit.school_name || "school");
+      const updateElapsed = () => {
+        subEl.textContent = "Checked in: " + formatVisitDate(activeVisit.checkin_at) + " | " + formatElapsedMinutes(activeVisit.checkin_at);
+      };
+      updateElapsed();
+      visitElapsedTimer = setInterval(updateElapsed, 60000);
+      return;
+    }
+
+    if (lastVisit) {
+      const duration = lastVisit.duration_minutes != null ? String(lastVisit.duration_minutes) : "0";
+      mainEl.textContent = "No active check-in";
+      subEl.textContent = "Last checkout: " + formatVisitDate(lastVisit.checkout_at) + " (" + duration + " min) at " + (lastVisit.school_name || "school");
+      return;
+    }
+
+    mainEl.textContent = "No active check-in";
+    subEl.textContent = "Last visit summary will appear here after checkout.";
+  }
+
+  async function loadVisitStatus() {
+    const profileEl = document.getElementById("profile");
+    const username = (profileEl && profileEl.dataset.username) || (window.location.pathname.split("/").filter(Boolean).pop());
+    if (!username) return;
+    try {
+      const res = await fetch("/api/profile/" + encodeURIComponent(username) + "/school-visit/status");
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.message || payload.error || "Failed to load visit status");
+      }
+      window.__profileVisitState = payload.data || { active_visit: null, last_visit: null };
+      renderVisitStatusCard();
+    } catch (err) {
+      console.error("loadVisitStatus:", err);
+      window.__profileVisitState = { active_visit: null, last_visit: null };
+      renderVisitStatusCard(err.message || "Failed to load visit status");
+    }
+  }
+
+  function getBrowserLocation() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Location services are not available in this browser."));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            source: "web"
+          });
+        },
+        (err) => {
+          reject(new Error("Unable to capture location: " + (err.message || "Permission denied or unavailable.")));
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      );
+    });
+  }
+
+  async function handleSchoolCheckin(button) {
+    const aslSchoolId = button.dataset.aslSchoolId;
+    const libraryId = button.dataset.libraryId;
+    const schoolName = button.dataset.schoolName;
+    if (!aslSchoolId || !libraryId || !schoolName) {
+      alert("School identifiers are missing for this row.");
+      return;
+    }
+    button.disabled = true;
+    const oldLabel = button.textContent;
+    button.textContent = "Checking in...";
+    try {
+      let location = null;
+      try {
+        location = await getBrowserLocation();
+      } catch (geoErr) {
+        const manualLocation = (window.prompt("Location access failed. Enter your current location text to continue check-in:", "") || "").trim();
+        if (!manualLocation) {
+          throw geoErr;
+        }
+        location = { location_text: manualLocation, source: "web" };
+      }
+      const res = await fetch("/api/profile/school-visit/checkin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          asl_school_id: aslSchoolId,
+          library_id: libraryId,
+          school_name: schoolName,
+          location: location
+        })
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.message || payload.error || "Check-in failed");
+      }
+      await loadVisitStatus();
+      await loadProfileSchoolTables();
+      alert("Checked in successfully.");
+    } catch (err) {
+      alert(err.message || "Failed to check in.");
+    } finally {
+      button.disabled = false;
+      button.textContent = oldLabel;
+    }
+  }
+
+  async function handleSchoolCheckout(button) {
+    button.disabled = true;
+    const oldLabel = button.textContent;
+    button.textContent = "Checking out...";
+    try {
+      const res = await fetch("/api/profile/school-visit/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.message || payload.error || "Check-out failed");
+      }
+      await loadVisitStatus();
+      await loadProfileSchoolTables();
+      alert("Checked out successfully.");
+    } catch (err) {
+      alert(err.message || "Failed to check out.");
+    } finally {
+      button.disabled = false;
+      button.textContent = oldLabel;
     }
   }
 
@@ -1161,7 +1419,7 @@
 
   // Initialize on page load
   document.addEventListener("DOMContentLoaded", () => {
-    loadProfileSchoolTables();
+    loadVisitStatus().then(() => loadProfileSchoolTables());
 
     // Date Range Filter section removed; only run Flatpickr/filter JS if elements exist
     const startDateEl = document.querySelector("#start-date");
@@ -1192,6 +1450,20 @@
     const exportExcelBtn = document.getElementById("export-excel-btn");
     if (exportPdfBtn) exportPdfBtn.addEventListener("click", exportProfileSchoolsToPDF);
     if (exportExcelBtn) exportExcelBtn.addEventListener("click", exportProfileSchoolsToExcel);
+
+    document.addEventListener("click", async (event) => {
+      const checkinBtn = event.target.closest(".js-school-checkin-btn");
+      if (checkinBtn) {
+        event.preventDefault();
+        await handleSchoolCheckin(checkinBtn);
+        return;
+      }
+      const checkoutBtn = event.target.closest(".js-school-checkout-btn");
+      if (checkoutBtn) {
+        event.preventDefault();
+        await handleSchoolCheckout(checkoutBtn);
+      }
+    });
 
     const schoolModal = document.querySelector("#school-detail-modal");
     const modalName = schoolModal?.querySelector("[data-modal-name]");

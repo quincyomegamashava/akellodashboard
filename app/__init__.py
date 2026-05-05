@@ -33,6 +33,10 @@ logger = setup_logging(app)
 
 from app import routes, models, monitoring_routes
 
+# Register the global deletion-audit listener (after models are loaded).
+from app.audit import init_audit
+init_audit(app, db)
+
 # Import ASL MTD settings routes
 from app import routes_asl_settings
 
@@ -42,6 +46,10 @@ app.register_blueprint(database_bp)
 
 from app.blueprints.content_dev import bp as content_dev_bp
 app.register_blueprint(content_dev_bp)
+
+from app.blueprints.new_creations import bp as new_creations_bp
+from app.blueprints.new_creations import models as new_creations_models  # noqa: F401
+app.register_blueprint(new_creations_bp)
 
 # Start helpdesk email fetch scheduler (every 60s)
 from app.scheduler import start_scheduler
