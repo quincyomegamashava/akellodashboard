@@ -1995,6 +1995,7 @@ async function openTaskDetails(task) {
               ${escapeHtml(a.original_name || 'Attachment')}
             </button>
             <a class="text-xs text-zinc-500 hover:text-zinc-900 underline underline-offset-2" href="${taskAttachmentFileUrl(a.id, 'attachment')}" target="_blank" rel="noopener">Download</a>
+            <button type="button" class="text-xs text-red-600 hover:text-red-700 underline underline-offset-2" data-details-remove-aid="${a.id}">Remove</button>
           </li>
         `).join('')}
       </ul>`
@@ -2047,6 +2048,22 @@ async function openTaskDetails(task) {
         const id = parseInt(btn.getAttribute('data-details-preview-aid'), 10);
         const found = (task.attachments || []).find((x) => x.id === id);
         if (found) openAttachmentPreview(found);
+      };
+    });
+    c.querySelectorAll('[data-details-remove-aid]').forEach((btn) => {
+      btn.onclick = async () => {
+        const id = parseInt(btn.getAttribute('data-details-remove-aid'), 10);
+        if (!id) return;
+        if (!confirm('Remove this attachment?')) return;
+        try {
+          await apiDELETE(`${API_BASE}/task-attachments/${id}`);
+          task.attachments = (task.attachments || []).filter((x) => x.id !== id);
+          // Re-open to refresh the details attachment list UI.
+          openTaskDetails(task);
+          if (currentProjectId) await loadBoard(currentProjectId);
+        } catch (e) {
+          alert(e.message || e);
+        }
       };
     });
 

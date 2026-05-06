@@ -1410,18 +1410,37 @@ def _task_attachments_instance_dir():
 def _task_attachment_full_path(stored_path):
     if not stored_path:
         return None
-    if os.path.isabs(stored_path):
-        return stored_path
+    raw = str(stored_path).strip()
+    if os.path.isabs(raw):
+        return raw
 
-    normalized = stored_path.replace("/", os.sep)
+    # Normalize both slash styles so records created on Windows still resolve on Linux.
+    unified = raw.replace("\\", "/").lstrip("./")
+    normalized = unified.replace("/", os.sep)
+    legacy_unified = TASK_ATTACHMENTS_LEGACY_FOLDER_REL.replace("\\", "/")
+    current_unified = TASK_ATTACHMENTS_FOLDER_REL.replace("\\", "/")
+
+    root = current_app.root_path if current_app else app.root_path
+    instance_root = current_app.instance_path if current_app else app.instance_path
 
     # Legacy rows stored under app/static/uploads/task_attachments/ keep working.
-    legacy_prefix = TASK_ATTACHMENTS_LEGACY_FOLDER_REL + os.sep
-    if normalized.startswith(legacy_prefix) or normalized == TASK_ATTACHMENTS_LEGACY_FOLDER_REL:
-        root = current_app.root_path if current_app else app.root_path
+    if unified == legacy_unified or unified.startswith(legacy_unified + "/"):
         return os.path.join(root, normalized)
 
-    instance_root = current_app.instance_path if current_app else app.instance_path
+    # Current rows stored under instance/uploads/task_attachments/
+    if unified == current_unified or unified.startswith(current_unified + "/"):
+        return os.path.join(instance_root, normalized)
+
+    # Best-effort fallback for older inconsistent rows that only have a filename.
+    base_name = os.path.basename(unified)
+    if base_name:
+        candidate_instance = os.path.join(_task_attachments_instance_dir(), base_name)
+        if os.path.isfile(candidate_instance):
+            return candidate_instance
+        candidate_legacy = os.path.join(root, TASK_ATTACHMENTS_LEGACY_FOLDER_REL, base_name)
+        if os.path.isfile(candidate_legacy):
+            return candidate_legacy
+
     return os.path.join(instance_root, normalized)
 
 
