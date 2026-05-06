@@ -483,7 +483,7 @@
         <!-- Schedule: spreadsheet-style Gantt (table + timeline grid) -->
         <div id="panel-gantt" role="tabpanel" aria-labelledby="tab-gantt" class="hidden flex-1 flex-col min-h-0" aria-hidden="true">
           <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-            <p class="text-sm text-zinc-500">Tasks with start and end dates. Click a row or bar to edit.</p>
+            <p class="text-sm text-zinc-500">Tasks with start and end dates. Click a row or bar to view task details.</p>
             <div class="flex flex-wrap items-center gap-2">
               <label for="ganttFilterOwner" class="text-xs text-zinc-500">Owner</label>
               <select id="ganttFilterOwner" class="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm bg-white max-w-[10rem]">
@@ -781,16 +781,26 @@ function openModal(title, buildBodyFn, onConfirm, wide = false) {
     modalContent.classList.remove('max-w-full');
   }
 
-  modalConfirm.onclick = async () => {
-    try {
-      modalConfirm.disabled = true;
-      await onConfirm();
-      closeModal();
-    } catch (err) {
-      modalConfirm.disabled = false;
-      alert('Error: ' + (err.message || err));
-    }
-  };
+  if (typeof onConfirm === 'function') {
+    modalConfirm.classList.remove('hidden');
+    modalConfirm.style.display = '';
+    modalConfirm.disabled = false;
+    modalConfirm.onclick = async () => {
+      try {
+        modalConfirm.disabled = true;
+        await onConfirm();
+        closeModal();
+      } catch (err) {
+        modalConfirm.disabled = false;
+        alert('Error: ' + (err.message || err));
+      }
+    };
+    modalCancel.textContent = 'Cancel';
+  } else {
+    modalConfirm.classList.add('hidden');
+    modalConfirm.onclick = null;
+    modalCancel.textContent = 'Close';
+  }
 
   modalCancel.onclick = closeModal;
 }
@@ -804,10 +814,13 @@ function closeModal() {
   modalBackdrop.classList.remove('gantt-modal');
   modalConfirm.disabled = false;
   modalConfirm.style.display = '';
+  modalConfirm.classList.remove('hidden');
   modalConfirm.onclick = null;
   modalCancel.onclick = null;
+  modalCancel.textContent = 'Cancel';
   // Clean up any modal-specific classes
   modalContent.classList.remove('w3-display-middle');
+  modalContent.style.maxWidth = '';
 }
 
 /* ---------- Tabbed workspace ---------- */
@@ -890,7 +903,7 @@ function renderDocumentsPanel(boardData) {
         <td class="py-3 px-4 text-zinc-600">${typeof t.progress === 'number' ? t.progress : 0}%</td>
         <td class="py-3 px-4 text-zinc-700">${files}</td>
         <td class="py-3 px-4">
-          <button type="button" class="doc-edit-task text-xs font-medium text-zinc-600 hover:text-indigo-600" data-task-id="${t.id}">Edit task</button>
+          <button type="button" class="doc-edit-task text-xs font-medium text-zinc-600 hover:text-indigo-600" data-task-id="${t.id}">View task</button>
         </td>
       </tr>
     `;
@@ -944,15 +957,13 @@ function renderDocumentsPanel(boardData) {
           break;
         }
       }
-      if (found) promptEditTask(found);
+      if (found) openTaskDetails(found);
     };
   });
 }
 
 const GANTT_DAY_W = 20;
 const GANTT_LEFT_COLS = 'minmax(0, 1.1fr) minmax(0, 0.88fr) 0.58fr 0.62fr 0.62fr 0.34fr 0.48fr';
-const GANTT_PHASE_COLORS = ['#1e3a5f', '#0d9488', '#c2410c'];
-const GANTT_PHASE_LABELS = ['PHASE ONE', 'PHASE TWO', 'PHASE THREE'];
 
 function ganttStripTime(d) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -1109,6 +1120,30 @@ function ganttWeekClusters(workDays) {
   return clusters;
 }
 
+const GANTT_MONTH_COLORS = ['#1e3a5f', '#0d9488'];
+
+function ganttMonthClusters(workDays) {
+  const clusters = [];
+  let cur = [];
+  let curKey = null;
+  workDays.forEach((d) => {
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (key !== curKey) {
+      if (cur.length) clusters.push(cur);
+      cur = [];
+      curKey = key;
+    }
+    cur.push(d);
+  });
+  if (cur.length) clusters.push(cur);
+  return clusters;
+}
+
+function ganttMonthLabel(d) {
+  const name = d.toLocaleString('en-US', { month: 'long' }).toUpperCase();
+  return `${name} ${d.getFullYear()}`;
+}
+
 const GANTT_DESC_PREVIEW_PLACEHOLDER = 'Hover a description cell in the table to read the full text.';
 
 function resetGanttDescPreview() {
@@ -1259,11 +1294,13 @@ function renderVisGantt(boardData) {
   };
 
   const weekClusters = ganttWeekClusters(workDays);
+  const monthClusters = ganttMonthClusters(workDays);
   let phaseHtml = '';
-  weekClusters.forEach((cl, wi) => {
+  monthClusters.forEach((cl, mi) => {
     const wPx = cl.length * GANTT_DAY_W;
-    const pi = wi % 3;
-    phaseHtml += `<div class="flex items-center justify-center text-[10px] font-bold text-white shrink-0 border-r border-white/20" style="width:${wPx}px;background:${GANTT_PHASE_COLORS[pi]}">${GANTT_PHASE_LABELS[pi]}</div>`;
+    const color = GANTT_MONTH_COLORS[mi % GANTT_MONTH_COLORS.length];
+    const label = ganttMonthLabel(cl[0]);
+    phaseHtml += `<div class="flex items-center justify-center text-[10px] font-bold text-white shrink-0 border-r border-white/20" style="width:${wPx}px;background:${color}">${label}</div>`;
   });
 
   let weekHtml = '';
@@ -1834,6 +1871,7 @@ function renderTask(task, container) {
   // task: expected to be task_to_dict shape (id, title, description, progress, start_date, end_date, position, assignees)
   const div = el('div', {class:'task rounded-xl border border-zinc-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md'});
   div.dataset.taskId = task.id;
+  div.onclick = () => openTaskDetails(task);
 
   const attCount = (task.attachments && task.attachments.length) ? task.attachments.length : 0;
   const titleRow = el('div', {class:'flex items-start justify-between gap-2 mb-1'});
@@ -1862,12 +1900,18 @@ function renderTask(task, container) {
   progressWrap.appendChild(pInner);
 
   const controls = el('div', {class:'flex justify-end gap-2 mt-3 pt-2 border-t border-zinc-100'});
-  const editBtn = el('button',{class:'text-xs font-medium text-indigo-600 hover:text-indigo-800', text:'Edit'});
-  editBtn.onclick = () => promptEditTask(task);
+  const editBtn = el('button',{class:'text-xs font-medium text-indigo-600 hover:text-indigo-800', text:'View'});
+  editBtn.onclick = (e) => {
+    e.stopPropagation();
+    openTaskDetails(task);
+  };
   controls.appendChild(editBtn);
   if (task.can_delete) {
     const delBtn = el('button',{class:'text-xs font-medium text-zinc-500 hover:text-red-600', text:'Delete'});
-    delBtn.onclick = () => confirmDeleteTask(task.id);
+    delBtn.onclick = (e) => {
+      e.stopPropagation();
+      confirmDeleteTask(task.id);
+    };
     controls.appendChild(delBtn);
   }
 
@@ -1917,6 +1961,116 @@ async function promptAddTask(columnId) {
     });
     await loadBoard(currentProjectId);
   });
+}
+
+async function openTaskDetails(task) {
+  if (!task) return;
+  task.attachments = task.attachments || [];
+  const users = await loadUsers();
+  const userMap = new Map((users || []).map((u) => [String(u.id), u.name]));
+  const createdByName = task.created_by != null
+    ? (userMap.get(String(task.created_by)) || `User #${task.created_by}`)
+    : '';
+  const assigneesLabel = (Array.isArray(task.assignees) && task.assignees.length)
+    ? task.assignees.map((a) => a.name).join(', ')
+    : 'Unassigned';
+  const startFmt = task.start_date ? formatDate(task.start_date) : '—';
+  const endFmt = task.end_date ? formatDate(task.end_date) : '—';
+  const progress = typeof task.progress === 'number' ? Math.max(0, Math.min(100, task.progress)) : 0;
+  const s = ganttParseLocal(task.start_date);
+  const e = ganttParseLocal(task.end_date);
+  const duration = (s && e) ? ganttCountBizInclusive(s, e) : null;
+  const columnTitle = (() => {
+    const src = lastBoardData || boardData;
+    for (const col of (src?.columns || [])) {
+      if (String(col.id) === String(task.column_id)) return col.title || '';
+    }
+    return '';
+  })();
+  const attachmentsHtml = task.attachments.length
+    ? `<ul class="divide-y divide-zinc-100 border border-zinc-200/80 rounded-xl bg-white/80 backdrop-blur-sm">
+        ${task.attachments.map((a) => `
+          <li class="px-3.5 py-2.5 flex flex-wrap items-center gap-2">
+            <button type="button" class="text-left text-indigo-700 hover:text-indigo-900 hover:underline text-sm min-w-0 truncate flex-1 transition-colors" data-details-preview-aid="${a.id}">
+              ${escapeHtml(a.original_name || 'Attachment')}
+            </button>
+            <a class="text-xs text-zinc-500 hover:text-zinc-900 underline underline-offset-2" href="${taskAttachmentFileUrl(a.id, 'attachment')}" target="_blank" rel="noopener">Download</a>
+          </li>
+        `).join('')}
+      </ul>`
+    : '<div class="text-sm text-zinc-500 italic border border-dashed border-zinc-300 rounded-xl px-3 py-3 bg-zinc-50/70">No attachments</div>';
+
+  openModal('Task details', (c) => {
+    c.innerHTML = `
+      <div class="grid gap-4">
+        <div class="rounded-2xl border border-zinc-200 bg-white/90 backdrop-blur-sm p-4 shadow-sm">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h3 class="text-xl font-semibold tracking-tight text-zinc-900 break-words">${escapeHtml(task.title || 'Untitled task')}</h3>
+            ${columnTitle ? `<div class="mt-2 inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100/70 px-2.5 py-1 text-[11px] font-medium text-zinc-600">Column: <span class="ml-1 text-zinc-800">${escapeHtml(columnTitle)}</span></div>` : ''}
+          </div>
+          <div class="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1.5 rounded-full shrink-0">${progress}% complete</div>
+        </div>
+        <div class="mt-3">
+          <div class="h-2 bg-zinc-100 rounded-full overflow-hidden">
+            <div class="h-full bg-indigo-500 rounded-full transition-all duration-300" style="width:${progress}%"></div>
+          </div>
+        </div>
+        </div>
+
+        <div class="text-sm text-zinc-700 bg-white border border-zinc-200 rounded-xl p-3.5 whitespace-pre-wrap break-words leading-relaxed">${escapeHtml(task.description || 'No description')}</div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-sm">
+          <div class="border border-zinc-200 bg-white rounded-xl p-2.5"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Start</div><div class="mt-0.5 font-semibold text-zinc-800">${escapeHtml(startFmt)}</div></div>
+          <div class="border border-zinc-200 bg-white rounded-xl p-2.5"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Due</div><div class="mt-0.5 font-semibold text-zinc-800">${escapeHtml(endFmt)}</div></div>
+          <div class="border border-zinc-200 bg-white rounded-xl p-2.5"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Duration</div><div class="mt-0.5 font-semibold text-zinc-800">${duration != null ? `${duration} day${duration === 1 ? '' : 's'}` : '—'}</div></div>
+          <div class="border border-zinc-200 bg-white rounded-xl p-2.5"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Assignees</div><div class="mt-0.5 font-semibold text-zinc-800 break-words">${escapeHtml(assigneesLabel)}</div></div>
+        </div>
+
+        ${createdByName ? `<div class="text-xs text-zinc-500">Created by <span class="font-medium text-zinc-700">${escapeHtml(createdByName)}</span></div>` : ''}
+
+        <div class="space-y-2.5">
+          <div class="text-sm font-semibold text-zinc-800">Attachments</div>
+          ${attachmentsHtml}
+        </div>
+
+        <div class="pt-3 border-t border-zinc-200 flex flex-wrap items-center justify-end gap-2">
+          <button type="button" class="px-3.5 py-2 rounded-lg border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 transition-colors" data-details-act="close">Close</button>
+          <button type="button" class="px-3.5 py-2 rounded-lg border border-indigo-200 bg-indigo-600 text-white hover:bg-indigo-700 transition-colors" data-details-act="edit">Edit</button>
+          ${task.can_delete ? '<button type="button" class="px-3.5 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors" data-details-act="delete">Delete</button>' : ''}
+        </div>
+      </div>
+    `;
+
+    c.querySelectorAll('[data-details-preview-aid]').forEach((btn) => {
+      btn.onclick = () => {
+        const id = parseInt(btn.getAttribute('data-details-preview-aid'), 10);
+        const found = (task.attachments || []).find((x) => x.id === id);
+        if (found) openAttachmentPreview(found);
+      };
+    });
+
+    const closeBtn = c.querySelector('[data-details-act="close"]');
+    if (closeBtn) closeBtn.onclick = closeModal;
+
+    const editBtn = c.querySelector('[data-details-act="edit"]');
+    if (editBtn) {
+      editBtn.onclick = () => {
+        closeModal();
+        promptEditTask(task);
+      };
+    }
+
+    const delBtn = c.querySelector('[data-details-act="delete"]');
+    if (delBtn) {
+      delBtn.onclick = () => {
+        closeModal();
+        confirmDeleteTask(task.id);
+      };
+    }
+  }, null, true);
+  // Keep details modal wide, but ~20% narrower than full-width mode.
+  modalContent.style.maxWidth = '80vw';
 }
 
 async function promptEditTask(task) {
@@ -3126,7 +3280,7 @@ function openTaskFromTimeline(taskId){
       return false;
     });
     if (found){
-      promptEditTask(found);
+      openTaskDetails(found);
     }
   }catch(e){ console.warn('Failed to open task from timeline', e); }
 }
