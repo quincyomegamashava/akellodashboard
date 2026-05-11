@@ -236,7 +236,7 @@
             </button>
             <button class="nav-link" id="tab-checkins" data-bs-toggle="pill"
               data-bs-target="#content-checkins" type="button" role="tab">
-              <i class="fa fa-map-marker-alt opacity-50"></i> Check-ins
+              <i class="fa fa-map-marker-alt opacity-50"></i> Check-in monitoring
             </button>
           </div>
         </div>
@@ -503,13 +503,31 @@
           <div class="card border-0 shadow-sm">
             <div class="card-header d-flex justify-content-between align-items-center bg-white py-3">
               <div>
-                <span class="fw-bold text-dark">Champion Check-in & Check-out Activity</span>
-                <div id="checkins-status" class="text-muted small fw-normal mt-1">Load tab to fetch data</div>
+                <span class="fw-bold text-dark">Check-in monitoring</span>
+                <div id="checkins-status" class="text-muted small fw-normal mt-1">Load tab to fetch weekly check-in activity.</div>
               </div>
             </div>
             <div class="p-3 border-bottom bg-light">
-              <input type="text" id="searchCheckins" placeholder="Search champion, school, province or status..."
-                class="form-control search-input bg-white w-100">
+              <div class="row g-2 align-items-center">
+                <div class="col-lg-5">
+                  <input type="text" id="searchCheckins" placeholder="Search champion, school, province or status..."
+                    class="form-control search-input bg-white w-100">
+                </div>
+                <div class="col-lg-3">
+                  <input type="date" id="checkinReportWeekEnding" class="form-control bg-white" title="Week ending Friday">
+                </div>
+                <div class="col-lg-4 d-flex gap-2 justify-content-lg-end">
+                  <button type="button" class="btn btn-outline-primary btn-sm rounded-3" id="loadWeeklyCheckinsBtn">
+                    Load Weekly Report
+                  </button>
+                  <button type="button" class="btn btn-outline-success btn-sm rounded-3" id="downloadWeeklyCheckinsCsvBtn">
+                    CSV
+                  </button>
+                  <button type="button" class="btn btn-outline-danger btn-sm rounded-3" id="downloadWeeklyCheckinsPdfBtn">
+                    PDF
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="table-responsive" style="max-height: 70vh;">
               <table class="table-custom" id="checkins-table">
@@ -524,7 +542,9 @@
                     <th>Duration (min)</th>
                     <th>ASL School ID</th>
                     <th>Library ID</th>
-                    <th>Location</th>
+                    <th>Check-in location</th>
+                    <th>Check-out location</th>
+                    <th>Device ID</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -604,6 +624,22 @@
     const startPicker = flatpickr("#startDate", { ...fpConfig, defaultDate: startOfMonth });
     const endPicker = flatpickr("#endDate", { ...fpConfig, defaultDate: today });
     const schoolAddedDatePicker = flatpickr("#schoolAddedDate", { ...fpConfig, defaultDate: null });
+    const checkinReportWeekEndingPicker = flatpickr("#checkinReportWeekEnding", { ...fpConfig, defaultDate: null });
+
+    function getLatestFridayDateString() {
+      const now = new Date();
+      const diff = (now.getDay() + 2) % 7; // Friday = 5
+      const friday = new Date(now);
+      friday.setDate(now.getDate() - diff);
+      return friday.toISOString().slice(0, 10);
+    }
+
+    function getWeeklyReportDateParam() {
+      const input = document.getElementById('checkinReportWeekEnding');
+      const value = (input && input.value) ? input.value : getLatestFridayDateString();
+      if (input && !input.value) input.value = value;
+      return value;
+    }
 
     function setStatus(id, text) {
       const el = document.getElementById(id);
@@ -966,6 +1002,51 @@
       }
     }
 
+    const CHECKINS_TABLE_COLS = 13;
+
+    function formatVisitLocation(text, lat, lng, source) {
+      const parts = [];
+      if (text) parts.push(text);
+      if (lat != null && lng != null) parts.push(`${lat}, ${lng}`);
+      if (source) parts.push(`[${source}]`);
+      return parts.length ? parts.join(' ') : '-';
+    }
+
+    function formatCheckinDeviceId(row) {
+      const checkinId = row.checkin_device_install_id;
+      const checkoutId = row.checkout_device_install_id;
+      if (checkinId && checkoutId && checkoutId !== checkinId) {
+        return `${checkinId} -> ${checkoutId}`;
+      }
+      return checkinId || checkoutId || '-';
+    }
+
+    function renderCheckinMonitoringRow(r) {
+      const statusBadge = r.status === 'checked_in'
+        ? '<span class="badge bg-primary">Checked In</span>'
+        : '<span class="badge bg-success">Checked Out</span>';
+      const checkinLocation = formatVisitLocation(r.location_text, r.checkin_latitude, r.checkin_longitude, r.location_source);
+      const checkoutLocation = formatVisitLocation(r.checkout_location_text, r.checkout_latitude, r.checkout_longitude, r.checkout_location_source);
+      return `
+        <tr>
+          <td>
+            <div class="fw-medium text-dark">${r.champion || r.username || '-'}</div>
+            <div class="small text-muted"><a href="/profile/${r.username || ''}" class="text-decoration-none text-muted">${r.username || ''}</a></div>
+          </td>
+          <td class="small text-muted">${r.school_name || '-'}</td>
+          <td><span class="badge bg-light text-dark border">${r.province || '-'}</span></td>
+          <td>${statusBadge}</td>
+          <td class="small text-muted">${r.checkin_at ? String(r.checkin_at).replace('T', ' ').slice(0, 19) : '-'}</td>
+          <td class="small text-muted">${r.checkout_at ? String(r.checkout_at).replace('T', ' ').slice(0, 19) : '-'}</td>
+          <td class="small text-muted">${r.duration_minutes != null ? r.duration_minutes : '-'}</td>
+          <td class="small text-muted">${r.asl_school_id || '-'}</td>
+          <td class="small text-muted">${r.library_id || '-'}</td>
+          <td class="small text-muted">${checkinLocation}</td>
+          <td class="small text-muted">${checkoutLocation}</td>
+          <td class="small text-muted">${formatCheckinDeviceId(r)}</td>
+        </tr>`;
+    }
+
     function applyCheckinsFilters() {
       const term = ((document.getElementById('searchCheckins') || {}).value || '').toLowerCase().trim();
       const filtered = checkinsAllRows.filter(r => {
@@ -987,35 +1068,6 @@
       checkinsLoaded = true;
       setStatus('checkins-status', 'Loading...');
 
-      const checkinRenderRow = (r) => {
-        const statusBadge = r.status === 'checked_in'
-          ? '<span class="badge bg-primary">Checked In</span>'
-          : '<span class="badge bg-success">Checked Out</span>';
-        const locationParts = [];
-        if (r.location_text) locationParts.push(r.location_text);
-        if (r.checkin_latitude != null && r.checkin_longitude != null) {
-          locationParts.push(`${r.checkin_latitude}, ${r.checkin_longitude}`);
-        }
-        if (r.location_source) locationParts.push(`[${r.location_source}]`);
-        const locationText = locationParts.length ? locationParts.join(' ') : '-';
-        return `
-        <tr>
-          <td>
-            <div class="fw-medium text-dark">${r.champion || r.username || '-'}</div>
-            <div class="small text-muted"><a href="/profile/${r.username || ''}" class="text-decoration-none text-muted">${r.username || ''}</a></div>
-          </td>
-          <td class="small text-muted">${r.school_name || '-'}</td>
-          <td><span class="badge bg-light text-dark border">${r.province || '-'}</span></td>
-          <td>${statusBadge}</td>
-          <td class="small text-muted">${r.checkin_at ? String(r.checkin_at).replace('T', ' ').slice(0, 19) : '-'}</td>
-          <td class="small text-muted">${r.checkout_at ? String(r.checkout_at).replace('T', ' ').slice(0, 19) : '-'}</td>
-          <td class="small text-muted">${r.duration_minutes != null ? r.duration_minutes : '-'}</td>
-          <td class="small text-muted">${r.asl_school_id || '-'}</td>
-          <td class="small text-muted">${r.library_id || '-'}</td>
-          <td class="small text-muted">${locationText}</td>
-        </tr>`;
-      };
-
       try {
         const startDate = document.querySelector("#startDate").value;
         const endDate = document.querySelector("#endDate").value;
@@ -1031,15 +1083,56 @@
         checkinsAllRows = Array.isArray(rows) ? rows : [];
         checkinsFilteredRows = checkinsAllRows;
         if (!checkinsVT) {
-          checkinsVT = mountVirtualTable('checkins-table', checkinsAllRows, checkinRenderRow, 10, { rowHeight: 54, buffer: 12 });
+          checkinsVT = mountVirtualTable('checkins-table', checkinsAllRows, renderCheckinMonitoringRow, CHECKINS_TABLE_COLS, { rowHeight: 54, buffer: 12 });
         } else {
           checkinsVT.update(checkinsAllRows);
         }
-        setStatus('checkins-status', `Updated just now (${checkinsAllRows.length} rows)`);
+        setStatus(
+          'checkins-status',
+          checkinsAllRows.length
+            ? `Updated just now (${checkinsAllRows.length} rows)`
+            : 'No check-ins found for the selected date range.'
+        );
       } catch (e) {
         console.error(e);
         setStatus('checkins-status', 'Failed to load check-in data.');
       }
+    }
+
+    async function loadWeeklyCheckinsByFriday() {
+      const weekEnding = getWeeklyReportDateParam();
+      setStatus('checkins-status', `Loading weekly report for ${weekEnding}...`);
+      try {
+        const resp = await fetch(`/api/checkin-reports/weekly?week_ending=${encodeURIComponent(weekEnding)}`);
+        const payload = await resp.json();
+        if (!resp.ok || !payload.success) {
+          throw new Error(payload.error || payload.message || 'Failed to load weekly report');
+        }
+        checkinsLoaded = true;
+        checkinsAllRows = Array.isArray(payload.rows) ? payload.rows : [];
+        checkinsFilteredRows = checkinsAllRows;
+        if (!checkinsVT) {
+          checkinsVT = mountVirtualTable('checkins-table', checkinsAllRows, renderCheckinMonitoringRow, CHECKINS_TABLE_COLS, { rowHeight: 54, buffer: 12 });
+        } else {
+          checkinsVT.update(checkinsAllRows);
+        }
+        setStatus(
+          'checkins-status',
+          checkinsAllRows.length
+            ? `Weekly report loaded (${payload.total_rows || checkinsAllRows.length} rows, week ending ${payload.week_ending}, ${payload.timezone})`
+            : `No check-ins found for week ending ${payload.week_ending}.`
+        );
+      } catch (e) {
+        console.error(e);
+        setStatus('checkins-status', `Failed to load weekly report: ${e.message || 'Unknown error'}`);
+      }
+    }
+
+    function downloadWeeklyCheckins(format) {
+      const weekEnding = getWeeklyReportDateParam();
+      const ext = format === 'pdf' ? 'pdf' : 'csv';
+      const url = `/api/checkin-reports/weekly.${ext}?week_ending=${encodeURIComponent(weekEnding)}`;
+      window.open(url, '_blank');
     }
 
     // Export helpers
@@ -1190,7 +1283,7 @@
           } else if (event.target.id === 'tab-schooltracker') {
             loadSchoolTracker();
           } else if (event.target.id === 'tab-checkins') {
-            loadCheckins();
+            loadWeeklyCheckinsByFriday();
           }
         })
       });
@@ -1239,6 +1332,20 @@
       document.getElementById('searchCheckins').addEventListener('input', (e) => {
         if (checkinsLoaded) applyCheckinsFilters();
       });
+      const weeklyBtn = document.getElementById('loadWeeklyCheckinsBtn');
+      if (weeklyBtn) {
+        weeklyBtn.addEventListener('click', async () => {
+          await loadWeeklyCheckinsByFriday();
+        });
+      }
+      const weeklyCsvBtn = document.getElementById('downloadWeeklyCheckinsCsvBtn');
+      if (weeklyCsvBtn) {
+        weeklyCsvBtn.addEventListener('click', () => downloadWeeklyCheckins('csv'));
+      }
+      const weeklyPdfBtn = document.getElementById('downloadWeeklyCheckinsPdfBtn');
+      if (weeklyPdfBtn) {
+        weeklyPdfBtn.addEventListener('click', () => downloadWeeklyCheckins('pdf'));
+      }
 
       const applySchoolAddedDateBtn = document.getElementById('applySchoolAddedDate');
       if (applySchoolAddedDateBtn) {

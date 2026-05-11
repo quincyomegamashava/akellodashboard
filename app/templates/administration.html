@@ -217,6 +217,13 @@
         <div class="text-2xl font-black text-slate-800">Revenue</div>
         <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Schedule & Source</div>
       </div>
+      <div class="minimal-card p-6" style="cursor: pointer;" onclick="openCheckinsResetModal()">
+        <div class="kpi-icon-minimal bg-rose-50 text-rose-600 mb-4">
+          <i class="fas fa-map-marker-alt"></i>
+        </div>
+        <div class="text-2xl font-black text-slate-800">Check-ins</div>
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Reset by date range</div>
+      </div>
     </div>
 
     <!-- Upload Forms -->
@@ -446,6 +453,64 @@
           {% endfor %}
         </tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- Check-ins reset modal -->
+<div id="checkinsResetModal" class="w3-modal modal-minimal" style="z-index:2900;">
+  <div class="w3-modal-content w3-animate-top shadow-2xl bg-white"
+    style="width: 92vw; max-width: 640px; display: flex; flex-direction: column;">
+    <header class="p-6 bg-white border-b border-slate-100 flex justify-between items-center shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center">
+          <i class="fas fa-map-marker-alt text-xl"></i>
+        </div>
+        <div>
+          <h2 class="text-xl font-bold text-slate-800 m-0">Reset check-ins</h2>
+          <p class="text-xs text-slate-500 m-0 mt-1">Delete all school visit check-ins in a date range.</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeCheckinsResetModal()"
+        class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors">
+        <i class="fas fa-times text-slate-400"></i>
+      </button>
+    </header>
+
+    <div class="p-6 space-y-6 bg-slate-50">
+      <p class="text-sm text-slate-600 leading-relaxed m-0">
+        Dates use the same timezone as weekly check-in reports. This permanently removes matching records,
+        including active check-ins and audit fields. It cannot be undone.
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label class="block">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Start date</span>
+          <input type="date" id="checkinsResetStartDate"
+            class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 bg-white">
+        </label>
+        <label class="block">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">End date</span>
+          <input type="date" id="checkinsResetEndDate"
+            class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 bg-white">
+        </label>
+      </div>
+
+      <div id="checkinsResetPreviewSummary"
+        class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+        Choose dates and run Preview before deleting.
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button type="button" id="checkinsResetPreviewBtn" onclick="previewCheckinsReset()"
+          class="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-2xl transition-all active:scale-95">
+          Preview count
+        </button>
+        <button type="button" id="checkinsResetPurgeBtn" onclick="purgeCheckinsInRange()" disabled
+          class="flex-1 px-4 py-3 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
+          Delete check-ins
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -1933,6 +1998,152 @@
         alert('Error analyzing CSV: ' + error);
       });
   };
+
+  let checkinsResetPreview = null;
+
+  function closeCheckinsResetModal() {
+    document.getElementById('checkinsResetModal').style.display = 'none';
+  }
+
+  function resetCheckinsResetPreviewState() {
+    checkinsResetPreview = null;
+    const purgeBtn = document.getElementById('checkinsResetPurgeBtn');
+    if (purgeBtn) {
+      purgeBtn.disabled = true;
+    }
+    const summary = document.getElementById('checkinsResetPreviewSummary');
+    if (summary) {
+      summary.textContent = 'Choose dates and run Preview before deleting.';
+    }
+  }
+
+  function openCheckinsResetModal() {
+    const modal = document.getElementById('checkinsResetModal');
+    if (!modal) {
+      return;
+    }
+    modal.style.display = 'block';
+    resetCheckinsResetPreviewState();
+  }
+
+  function previewCheckinsReset() {
+    const startDate = document.getElementById('checkinsResetStartDate').value;
+    const endDate = document.getElementById('checkinsResetEndDate').value;
+    const summary = document.getElementById('checkinsResetPreviewSummary');
+    const previewBtn = document.getElementById('checkinsResetPreviewBtn');
+    const purgeBtn = document.getElementById('checkinsResetPurgeBtn');
+
+    if (!startDate || !endDate) {
+      alert('Select both a start date and an end date.');
+      return;
+    }
+    if (startDate > endDate) {
+      alert('Start date must be on or before end date.');
+      return;
+    }
+
+    const originalText = previewBtn.textContent;
+    previewBtn.disabled = true;
+    previewBtn.textContent = 'Loading...';
+    purgeBtn.disabled = true;
+    summary.textContent = 'Loading preview...';
+
+    const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+    fetch('/api/admin/school-visits/checkins/preview?' + params.toString(), {
+      credentials: 'same-origin'
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, data: data };
+        });
+      })
+      .then(function (result) {
+        previewBtn.disabled = false;
+        previewBtn.textContent = originalText;
+
+        if (!result.ok || !result.data.success) {
+          checkinsResetPreview = null;
+          purgeBtn.disabled = true;
+          summary.textContent = result.data.error || 'Could not load preview.';
+          return;
+        }
+
+        checkinsResetPreview = result.data;
+        summary.innerHTML =
+          '<strong>' + result.data.total + '</strong> check-in record(s) from ' +
+          result.data.start_date + ' to ' + result.data.end_date +
+          ' (' + result.data.timezone + '). ' +
+          result.data.checked_in + ' still checked in, ' +
+          result.data.checked_out + ' checked out.';
+        purgeBtn.disabled = result.data.total === 0;
+      })
+      .catch(function (error) {
+        previewBtn.disabled = false;
+        previewBtn.textContent = originalText;
+        checkinsResetPreview = null;
+        purgeBtn.disabled = true;
+        summary.textContent = 'Could not load preview: ' + error;
+      });
+  }
+
+  function purgeCheckinsInRange() {
+    if (!checkinsResetPreview || !checkinsResetPreview.total) {
+      alert('Run Preview first.');
+      return;
+    }
+
+    const phrase = window.prompt(
+      'Type DELETE CHECKINS to permanently remove ' +
+      checkinsResetPreview.total +
+      ' check-in record(s) from ' +
+      checkinsResetPreview.start_date +
+      ' to ' +
+      checkinsResetPreview.end_date +
+      '.'
+    );
+    if (phrase !== 'DELETE CHECKINS') {
+      return;
+    }
+
+    const purgeBtn = document.getElementById('checkinsResetPurgeBtn');
+    const originalText = purgeBtn.textContent;
+    purgeBtn.disabled = true;
+    purgeBtn.textContent = 'Deleting...';
+
+    fetch('/api/admin/school-visits/checkins/purge', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_date: checkinsResetPreview.start_date,
+        end_date: checkinsResetPreview.end_date,
+        confirm_phrase: 'DELETE CHECKINS'
+      })
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, data: data };
+        });
+      })
+      .then(function (result) {
+        purgeBtn.textContent = originalText;
+
+        if (!result.ok || !result.data.success) {
+          purgeBtn.disabled = false;
+          alert(result.data.error || 'Delete failed.');
+          return;
+        }
+
+        alert('Deleted ' + result.data.deleted_count + ' check-in record(s).');
+        closeCheckinsResetModal();
+        resetCheckinsResetPreviewState();
+      })
+      .catch(function (error) {
+        purgeBtn.disabled = false;
+        purgeBtn.textContent = originalText;
+        alert('Delete failed: ' + error);
+      });
+  }
 
 </script>
 

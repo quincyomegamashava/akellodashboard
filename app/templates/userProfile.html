@@ -137,6 +137,48 @@
     padding: 16px 18px;
   }
 
+  .visit-status-card--active {
+    border-color: rgba(20, 161, 153, 0.45);
+    background: #ecfdf8;
+    box-shadow: 0 0 0 1px rgba(20, 161, 153, 0.12);
+  }
+
+  .visit-status-actions {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .profile-school-table tbody tr.profile-school-row--active td {
+    background: #ecfdf8;
+    border-top: 1px solid rgba(20, 161, 153, 0.25);
+    border-bottom: 1px solid rgba(20, 161, 153, 0.25);
+  }
+
+  .profile-school-table tbody tr.profile-school-row--active:hover td {
+    background: #d9f7f1;
+  }
+
+  .profile-school-table tbody tr.profile-school-row--active td:first-child {
+    box-shadow: inset 4px 0 0 #14a199;
+  }
+
+  .profile-school-active-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #14a199;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    vertical-align: middle;
+  }
+
   .visit-status-title {
     font-size: 0.75rem;
     letter-spacing: 0.2em;
@@ -781,7 +823,19 @@
           <div class="visit-status-title">School Visit Status</div>
           <div class="visit-status-main" id="visit-status-main">No active check-in</div>
           <div class="visit-status-sub" id="visit-status-sub">Last visit summary will appear here after checkout.</div>
+          <div class="visit-status-actions" id="visit-status-actions" hidden></div>
         </div>
+        {% if current_user.userRole == 'Brand Ambassador' or current_user.userRole == 'Admin' %}
+        <div class="visit-status-card" id="weekly-checkin-report-card">
+          <div class="visit-status-title">Weekly Check-in Report</div>
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <input type="date" id="weekly-checkin-week-ending" class="form-control form-control-sm" style="max-width: 220px;" />
+            <button type="button" class="visit-action-btn checkin" id="download-weekly-checkin-csv">Download CSV</button>
+            <button type="button" class="visit-action-btn checkout" id="download-weekly-checkin-pdf">Download PDF</button>
+          </div>
+          <div class="visit-status-sub" id="weekly-checkin-report-status">Select a Friday week ending date to download your weekly report.</div>
+        </div>
+        {% endif %}
 
         <section class="section-group">
           <div class="section-header">Schools with Active Scholarship</div>
@@ -1064,6 +1118,75 @@
     }
   }
 
+  const DEVICE_INSTALL_STORAGE_KEY = "akello_checkin_device_install_id";
+
+  function getDeviceInstallId() {
+    try {
+      let installId = localStorage.getItem(DEVICE_INSTALL_STORAGE_KEY);
+      if (!installId) {
+        installId = (window.crypto && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : ("web-" + Date.now() + "-" + Math.random().toString(16).slice(2));
+        localStorage.setItem(DEVICE_INSTALL_STORAGE_KEY, installId);
+      }
+      return installId;
+    } catch (err) {
+      console.warn("getDeviceInstallId:", err);
+      return "web-fallback-" + Date.now();
+    }
+  }
+
+  async function resolveVisitLocation(promptMessage) {
+    try {
+      return await getBrowserLocation();
+    } catch (geoErr) {
+      const manualLocation = (window.prompt(promptMessage, "") || "").trim();
+      if (!manualLocation) {
+        throw geoErr;
+      }
+      return { location_text: manualLocation, source: "web" };
+    }
+  }
+
+  function scrollActiveVisitRowIntoView() {
+    if (window.__activeVisitRowScrolled) return;
+    const activeRow = document.querySelector(".profile-school-row--active");
+    if (!activeRow) return;
+    window.__activeVisitRowScrolled = true;
+    activeRow.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function normalizeVisitKey(value) {
+    if (value === null || value === undefined) return null;
+    const text = String(value).trim();
+    return text ? text : null;
+  }
+
+  function schoolMatchesActiveVisit(school, activeVisit) {
+    if (!school || !activeVisit) return false;
+    const schoolAslId = normalizeVisitKey(school.asl_school_id) || normalizeVisitKey(school.id);
+    const schoolLibId = normalizeVisitKey(school.library_id);
+    const visitAslId = normalizeVisitKey(activeVisit.asl_school_id);
+    const visitLibId = normalizeVisitKey(activeVisit.library_id);
+    if (schoolAslId && visitAslId && schoolAslId === visitAslId) return true;
+    if (schoolLibId && visitLibId && schoolLibId === visitLibId) return true;
+    const schoolName = (school.name || "").trim().toLowerCase();
+    const visitName = (activeVisit.school_name || "").trim().toLowerCase();
+    return !!(schoolName && visitName && schoolName === visitName);
+  }
+
+  function syncProfileVisitStateFromPayload(payload) {
+    if (!payload || typeof payload !== "object") return;
+    const nextState = window.__profileVisitState || {};
+    if (Object.prototype.hasOwnProperty.call(payload, "active_visit")) {
+      nextState.active_visit = payload.active_visit || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, "last_visit")) {
+      nextState.last_visit = payload.last_visit || null;
+    }
+    window.__profileVisitState = nextState;
+  }
+
   // Load school tables and hero stats from API (replaces loading indicators)
   async function loadProfileSchoolTables() {
     const tbodyActive = document.getElementById("profile-schools-active-tbody");
@@ -1076,7 +1199,9 @@
     if (!username) return;
 
     try {
-      const res = await fetch("/api/profile/" + encodeURIComponent(username) + "/school-tables");
+      const res = await fetch("/api/profile/" + encodeURIComponent(username) + "/school-tables", {
+        credentials: "same-origin"
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -1087,21 +1212,28 @@
         return;
       }
 
+      if (Object.prototype.hasOwnProperty.call(data, "active_visit")) {
+        syncProfileVisitStateFromPayload({ active_visit: data.active_visit });
+        renderVisitStatusCard();
+      }
+
       const activeVisit = window.__profileVisitState?.active_visit || null;
 
       function buildActionCell(school) {
-        const schoolAslId = school.asl_school_id != null ? String(school.asl_school_id) : (school.id != null ? String(school.id) : "");
-        const schoolLibId = school.library_id != null ? String(school.library_id) : "";
-        if (!schoolAslId || !schoolLibId || !school.name) {
+        const schoolAslId = normalizeVisitKey(school.asl_school_id) || normalizeVisitKey(school.id);
+        const schoolLibId = normalizeVisitKey(school.library_id);
+        const schoolName = (school.name || "").trim();
+        if (!schoolAslId || !schoolName) {
           return '<span class="stat-subtle">N/A</span>';
         }
 
-        const activeAslId = activeVisit && activeVisit.asl_school_id != null ? String(activeVisit.asl_school_id) : null;
-        const isCurrentSchoolActive = !!activeVisit && activeAslId === schoolAslId;
+        const isCurrentSchoolActive = schoolMatchesActiveVisit(school, activeVisit);
         const activeOtherSchool = !!activeVisit && !isCurrentSchoolActive;
 
         if (isCurrentSchoolActive) {
-          return `<button type="button" class="visit-action-btn checkout js-school-checkout-btn" data-asl-school-id="${schoolAslId}" data-library-id="${schoolLibId}" data-school-name="${(school.name || '').replace(/"/g, '&quot;')}">Check out</button>`;
+          const checkoutLibId = schoolLibId || normalizeVisitKey(activeVisit.library_id) || "";
+          const checkoutName = schoolName.replace(/"/g, "&quot;");
+          return `<button type="button" class="visit-action-btn checkout js-school-checkout-btn" data-asl-school-id="${schoolAslId}" data-library-id="${checkoutLibId}" data-school-name="${checkoutName}">Check out</button>`;
         }
 
         if (activeOtherSchool) {
@@ -1109,19 +1241,26 @@
           return `<button type="button" class="visit-action-btn disabled" disabled title="You are currently checked in at ${activeName}">Check in</button>`;
         }
 
-        return `<button type="button" class="visit-action-btn checkin js-school-checkin-btn" data-asl-school-id="${schoolAslId}" data-library-id="${schoolLibId}" data-school-name="${(school.name || '').replace(/"/g, '&quot;')}">Check in</button>`;
+        if (!schoolLibId) {
+          return '<span class="stat-subtle">N/A</span>';
+        }
+
+        return `<button type="button" class="visit-action-btn checkin js-school-checkin-btn" data-asl-school-id="${schoolAslId}" data-library-id="${schoolLibId}" data-school-name="${schoolName.replace(/"/g, '&quot;')}">Check in</button>`;
       }
 
       function renderRow(school) {
         const url = "/school_profile_usage/" + (school.id || "");
+        const isCurrentSchoolActive = schoolMatchesActiveVisit(school, activeVisit);
         const name = (school.name || "—").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const activeBadge = isCurrentSchoolActive ? '<span class="profile-school-active-badge">Checked in here</span>' : "";
         const fa = school.first_awarded_2025 != null ? school.first_awarded_2025 : "—";
         const days = school.days_left_until_12 != null ? school.days_left_until_12 : "—";
         const asl = school.asl_mtd != null ? school.asl_mtd : 0;
         const al = school.al_mtd != null ? school.al_mtd : 0;
         const total = school.total_mtd != null ? school.total_mtd : 0;
         const action = buildActionCell(school);
-        return "<tr><td><a href=\"" + url + "\"><i class=\"fa fa-university\"></i> " + name + "</a></td><td>" + fa + "</td><td>" + days + "</td><td>" + asl + "</td><td>" + al + "</td><td>" + total + "</td><td>" + action + "</td></tr>";
+        const rowClass = isCurrentSchoolActive ? ' class="profile-school-row--active" data-active-visit-row="1"' : "";
+        return "<tr" + rowClass + "><td><a href=\"" + url + "\"><i class=\"fa fa-university\"></i> " + name + activeBadge + "</a></td><td>" + fa + "</td><td>" + days + "</td><td>" + asl + "</td><td>" + al + "</td><td>" + total + "</td><td>" + action + "</td></tr>";
       }
 
       function fillBody(tbody, schools) {
@@ -1136,6 +1275,7 @@
       fillBody(tbodyActive, data.truly_active_schools);
       fillBody(tbodyExpired, data.expired_schools);
       fillBody(tbodyWithout, data.schools_without_scholarship);
+      scrollActiveVisitRowIntoView();
 
       const heroValid = document.getElementById("hero-count-valid-schol");
       const heroElapsed = document.getElementById("hero-count-elapsed-schol");
@@ -1178,13 +1318,21 @@
   }
 
   function renderVisitStatusCard(errorMessage) {
+    const cardEl = document.getElementById("visit-status-card");
     const mainEl = document.getElementById("visit-status-main");
     const subEl = document.getElementById("visit-status-sub");
+    const actionsEl = document.getElementById("visit-status-actions");
     if (!mainEl || !subEl) return;
 
     if (visitElapsedTimer) {
       clearInterval(visitElapsedTimer);
       visitElapsedTimer = null;
+    }
+
+    if (cardEl) cardEl.classList.remove("visit-status-card--active");
+    if (actionsEl) {
+      actionsEl.setAttribute("hidden", "");
+      actionsEl.innerHTML = "";
     }
 
     if (errorMessage) {
@@ -1198,12 +1346,20 @@
     const lastVisit = state.last_visit || null;
 
     if (activeVisit) {
+      if (cardEl) cardEl.classList.add("visit-status-card--active");
       mainEl.textContent = "Checked in at " + (activeVisit.school_name || "school");
       const updateElapsed = () => {
-        subEl.textContent = "Checked in: " + formatVisitDate(activeVisit.checkin_at) + " | " + formatElapsedMinutes(activeVisit.checkin_at);
+        subEl.textContent = "Checked in: " + formatVisitDate(activeVisit.checkin_at) + " | " + formatElapsedMinutes(activeVisit.checkin_at) + ". Check out here before checking in at another school.";
       };
       updateElapsed();
       visitElapsedTimer = setInterval(updateElapsed, 60000);
+      if (actionsEl) {
+        const aslId = activeVisit.asl_school_id != null ? String(activeVisit.asl_school_id) : "";
+        const libId = activeVisit.library_id != null ? String(activeVisit.library_id) : "";
+        const schoolName = (activeVisit.school_name || "").replace(/"/g, "&quot;");
+        actionsEl.removeAttribute("hidden");
+        actionsEl.innerHTML = `<button type="button" class="visit-action-btn checkout js-school-checkout-btn" data-asl-school-id="${aslId}" data-library-id="${libId}" data-school-name="${schoolName}">Check out now</button>`;
+      }
       return;
     }
 
@@ -1223,12 +1379,14 @@
     const username = (profileEl && profileEl.dataset.username) || (window.location.pathname.split("/").filter(Boolean).pop());
     if (!username) return;
     try {
-      const res = await fetch("/api/profile/" + encodeURIComponent(username) + "/school-visit/status");
+      const res = await fetch("/api/profile/" + encodeURIComponent(username) + "/school-visit/status", {
+        credentials: "same-origin"
+      });
       const payload = await res.json();
       if (!res.ok || !payload.success) {
         throw new Error(payload.message || payload.error || "Failed to load visit status");
       }
-      window.__profileVisitState = payload.data || { active_visit: null, last_visit: null };
+      syncProfileVisitStateFromPayload(payload.data || { active_visit: null, last_visit: null });
       renderVisitStatusCard();
     } catch (err) {
       console.error("loadVisitStatus:", err);
@@ -1271,29 +1429,27 @@
     const oldLabel = button.textContent;
     button.textContent = "Checking in...";
     try {
-      let location = null;
-      try {
-        location = await getBrowserLocation();
-      } catch (geoErr) {
-        const manualLocation = (window.prompt("Location access failed. Enter your current location text to continue check-in:", "") || "").trim();
-        if (!manualLocation) {
-          throw geoErr;
-        }
-        location = { location_text: manualLocation, source: "web" };
-      }
+      const location = await resolveVisitLocation("Location access failed. Enter your current location text to continue check-in:");
       const res = await fetch("/api/profile/school-visit/checkin", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           asl_school_id: aslSchoolId,
           library_id: libraryId,
           school_name: schoolName,
-          location: location
+          location: location,
+          device: { install_id: getDeviceInstallId(), platform: "web" }
         })
       });
       const payload = await res.json();
       if (!res.ok || !payload.success) {
         throw new Error(payload.message || payload.error || "Check-in failed");
+      }
+      window.__activeVisitRowScrolled = false;
+      if (payload.data) {
+        syncProfileVisitStateFromPayload({ active_visit: payload.data });
+        renderVisitStatusCard();
       }
       await loadVisitStatus();
       await loadProfileSchoolTables();
@@ -1311,14 +1467,24 @@
     const oldLabel = button.textContent;
     button.textContent = "Checking out...";
     try {
+      const location = await resolveVisitLocation("Location access failed. Enter your current location text to continue check-out:");
       const res = await fetch("/api/profile/school-visit/checkout", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({})
+        body: JSON.stringify({
+          location: location,
+          device: { install_id: getDeviceInstallId(), platform: "web" }
+        })
       });
       const payload = await res.json();
       if (!res.ok || !payload.success) {
         throw new Error(payload.message || payload.error || "Check-out failed");
+      }
+      window.__activeVisitRowScrolled = false;
+      if (payload.data) {
+        syncProfileVisitStateFromPayload({ active_visit: null, last_visit: payload.data });
+        renderVisitStatusCard();
       }
       await loadVisitStatus();
       await loadProfileSchoolTables();
@@ -1329,6 +1495,45 @@
       button.disabled = false;
       button.textContent = oldLabel;
     }
+  }
+
+  function latestFridayDateString() {
+    const now = new Date();
+    const diff = (now.getDay() + 2) % 7;
+    const friday = new Date(now);
+    friday.setDate(now.getDate() - diff);
+    return friday.toISOString().slice(0, 10);
+  }
+
+  async function refreshWeeklyReportStatus() {
+    const statusEl = document.getElementById("weekly-checkin-report-status");
+    const weekInput = document.getElementById("weekly-checkin-week-ending");
+    if (!statusEl || !weekInput) return;
+    const weekEnding = weekInput.value || latestFridayDateString();
+    weekInput.value = weekEnding;
+    statusEl.textContent = "Loading weekly report summary...";
+    try {
+      const res = await fetch(`/api/checkin-reports/weekly?week_ending=${encodeURIComponent(weekEnding)}`);
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.error || payload.message || "Failed to load weekly report");
+      }
+      statusEl.textContent = `Week ending ${payload.week_ending}: ${payload.total_rows} record(s), timezone ${payload.timezone}.`;
+    } catch (err) {
+      statusEl.textContent = err.message || "Failed to load weekly report summary.";
+    }
+  }
+
+  function downloadWeeklyCheckinReport(format) {
+    const statusEl = document.getElementById("weekly-checkin-report-status");
+    const weekInput = document.getElementById("weekly-checkin-week-ending");
+    if (!weekInput) return;
+    const weekEnding = weekInput.value || latestFridayDateString();
+    weekInput.value = weekEnding;
+    const ext = format === "pdf" ? "pdf" : "csv";
+    const url = `/api/checkin-reports/weekly.${ext}?week_ending=${encodeURIComponent(weekEnding)}`;
+    if (statusEl) statusEl.textContent = `Preparing ${ext.toUpperCase()} report for week ending ${weekEnding}...`;
+    window.open(url, "_blank");
   }
 
   const COLUMNS = ["School name", "First Awarded (2025+)", "Days left until 12 months", "ASL MTD", "AL MTD", "Total MTD"];
@@ -1420,6 +1625,7 @@
   // Initialize on page load
   document.addEventListener("DOMContentLoaded", () => {
     loadVisitStatus().then(() => loadProfileSchoolTables());
+    refreshWeeklyReportStatus();
 
     // Date Range Filter section removed; only run Flatpickr/filter JS if elements exist
     const startDateEl = document.querySelector("#start-date");
@@ -1448,8 +1654,17 @@
 
     const exportPdfBtn = document.getElementById("export-pdf-btn");
     const exportExcelBtn = document.getElementById("export-excel-btn");
+    const weeklyWeekEndingInput = document.getElementById("weekly-checkin-week-ending");
+    const weeklyCsvBtn = document.getElementById("download-weekly-checkin-csv");
+    const weeklyPdfBtn = document.getElementById("download-weekly-checkin-pdf");
     if (exportPdfBtn) exportPdfBtn.addEventListener("click", exportProfileSchoolsToPDF);
     if (exportExcelBtn) exportExcelBtn.addEventListener("click", exportProfileSchoolsToExcel);
+    if (weeklyWeekEndingInput) {
+      weeklyWeekEndingInput.value = latestFridayDateString();
+      weeklyWeekEndingInput.addEventListener("change", refreshWeeklyReportStatus);
+    }
+    if (weeklyCsvBtn) weeklyCsvBtn.addEventListener("click", () => downloadWeeklyCheckinReport("csv"));
+    if (weeklyPdfBtn) weeklyPdfBtn.addEventListener("click", () => downloadWeeklyCheckinReport("pdf"));
 
     document.addEventListener("click", async (event) => {
       const checkinBtn = event.target.closest(".js-school-checkin-btn");

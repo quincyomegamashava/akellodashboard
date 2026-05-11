@@ -15,7 +15,7 @@ from docx import Document
 import re
 from app import app, db
 from app.forms import EventForm, LoginForm, PerfomanceTargetsForm, RegistrationForm, BookAllocationForm, ReportForm, WorkspaceForm, ProjectForm, TaskForm, CSVUploadForm, ChampionCSVUploadForm, ChampionSchoolForm, AkelloSimEventForm
-from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, SchoolVisitLog, Event, WeeklyReport, TaskA, ColumnA, ProjectA, TaskAttachment, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket, AuditLog
+from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, SchoolVisitLog, Event, WeeklyReport, TaskA, ColumnA, ProjectA, TaskAttachment, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket, AuditLog, AppSetting
 from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from collections import defaultdict
@@ -62,6 +62,11 @@ import smtplib
 from email.message import EmailMessage
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import uuid
+from zoneinfo import ZoneInfo
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 
 from openai import OpenAI
 
@@ -885,6 +890,119 @@ def administration():
     )
 
 
+def _require_admin_user():
+    if getattr(current_user, 'userRole', None) != 'Admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    return None
+
+
+def _parse_school_visit_admin_date_range(start_date_str, end_date_str):
+    if not start_date_str or not end_date_str:
+        raise ValueError('start_date and end_date are required (YYYY-MM-DD).')
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        raise ValueError('Invalid date format. Use YYYY-MM-DD.')
+    if start_date > end_date:
+        raise ValueError('start_date must be on or before end_date.')
+
+    tzinfo, tz_name = _get_checkin_reports_timezone()
+    start_local = datetime.combine(start_date, datetime.min.time(), tzinfo)
+    end_local = datetime.combine(end_date, datetime.max.time(), tzinfo)
+    start_utc = start_local.astimezone(timezone.utc).replace(tzinfo=None)
+    end_utc = end_local.astimezone(timezone.utc).replace(tzinfo=None)
+    return {
+        'start_utc': start_utc,
+        'end_utc': end_utc,
+        'timezone': tz_name,
+        'start_date': start_date.isoformat(),
+        'end_date': end_date.isoformat(),
+    }
+
+
+def _school_visit_logs_in_range_query(start_utc, end_utc):
+    return SchoolVisitLog.query.filter(
+        SchoolVisitLog.checkin_at >= start_utc,
+        SchoolVisitLog.checkin_at <= end_utc,
+    )
+
+
+@app.route('/api/admin/school-visits/checkins/preview', methods=['GET'])
+@login_required
+def api_admin_school_visits_checkins_preview():
+    auth_error = _require_admin_user()
+    if auth_error:
+        return auth_error
+
+    try:
+        window = _parse_school_visit_admin_date_range(
+            request.args.get('start_date'),
+            request.args.get('end_date'),
+        )
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    logs_query = _school_visit_logs_in_range_query(window['start_utc'], window['end_utc'])
+    total = logs_query.count()
+    checked_in = logs_query.filter(SchoolVisitLog.status == 'checked_in').count()
+    checked_out = logs_query.filter(SchoolVisitLog.status == 'checked_out').count()
+
+    return jsonify({
+        'success': True,
+        'timezone': window['timezone'],
+        'start_date': window['start_date'],
+        'end_date': window['end_date'],
+        'total': total,
+        'checked_in': checked_in,
+        'checked_out': checked_out,
+    })
+
+
+@app.route('/api/admin/school-visits/checkins/purge', methods=['POST'])
+@login_required
+def api_admin_school_visits_checkins_purge():
+    auth_error = _require_admin_user()
+    if auth_error:
+        return auth_error
+
+    data = request.get_json(silent=True) or {}
+    confirm_phrase = (data.get('confirm_phrase') or '').strip()
+    if confirm_phrase != 'DELETE CHECKINS':
+        return jsonify({'error': 'confirm_phrase must be DELETE CHECKINS'}), 400
+
+    try:
+        window = _parse_school_visit_admin_date_range(
+            data.get('start_date'),
+            data.get('end_date'),
+        )
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    logs_query = _school_visit_logs_in_range_query(window['start_utc'], window['end_utc'])
+    deleted_count = logs_query.count()
+    if deleted_count:
+        logs_query.delete(synchronize_session=False)
+        db.session.commit()
+
+    app.logger.info(
+        "Admin %s purged %d school visit check-ins from %s to %s (%s)",
+        current_user.username,
+        deleted_count,
+        window['start_date'],
+        window['end_date'],
+        window['timezone'],
+    )
+
+    return jsonify({
+        'success': True,
+        'deleted_count': deleted_count,
+        'start_date': window['start_date'],
+        'end_date': window['end_date'],
+        'timezone': window['timezone'],
+    })
+
+
 def _ensure_helpdesk_resolved_at_column():
     """Add helpdesk_queries.resolved_at if missing (e.g. SQLite DB never migrated). Avoids OperationalError when loading User.assigned_queries."""
     try:
@@ -1219,6 +1337,176 @@ def api_admin_champion_school_requests_decline(request_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+
+# -------- Mobile-friendly champion request wrappers --------
+# These shape the existing ChampionSchoolRequest data into the envelope the
+# Flutter mobile client expects (`{data: {items, pagination}}` with lowercase
+# status, `request_id`, `library_id`, etc.) without changing the canonical
+# admin API used by the web dashboard.
+_MOBILE_CHAMPION_REQUEST_STATUS_MAP = {
+    'pending': 'Pending',
+    'approved': 'Approved',
+    'rejected': 'Declined',
+    'declined': 'Declined',
+    'all': None,
+}
+
+
+def _mobile_champion_request_status_to_backend(status_param):
+    if status_param is None:
+        return 'Pending'
+    key = str(status_param).strip().lower()
+    if key in _MOBILE_CHAMPION_REQUEST_STATUS_MAP:
+        return _MOBILE_CHAMPION_REQUEST_STATUS_MAP[key]
+    return 'Pending'
+
+
+def _mobile_champion_request_status_to_mobile(backend_status):
+    s = (backend_status or '').strip().lower()
+    if s == 'declined':
+        return 'rejected'
+    if s == 'approved':
+        return 'approved'
+    return 'pending'
+
+
+def _to_mobile_champion_request(req):
+    champ = req.champion_school
+    champion_name = ''
+    if champ is not None:
+        champion_name = f"{champ.firstname or ''} {champ.lastname or ''}".strip()
+    reviewer = None
+    if req.reviewed_by is not None:
+        reviewer = req.reviewed_by.username
+    return {
+        'request_id': str(req.id),
+        'champion_name': champion_name,
+        'school_name': req.school_name or '',
+        'asl_school_id': req.asl_school_id or '',
+        'library_id': req.library_school_id or '',
+        'request_type': 'add_school',
+        'created_at': req.created_at.isoformat() if req.created_at else None,
+        'status': _mobile_champion_request_status_to_mobile(req.status),
+        'reviewer': reviewer,
+        'notes': req.decline_reason,
+    }
+
+
+@app.route('/api/mobile/champion-requests', methods=['GET'])
+@login_required
+def api_mobile_champion_requests_list():
+    """Mobile-shaped champion school requests list. Reuses the existing
+    admin gate and ChampionSchoolRequest model."""
+    if not can_approve_champion_schools():
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    from sqlalchemy import or_
+    backend_status = _mobile_champion_request_status_to_backend(
+        request.args.get('status')
+    )
+    try:
+        page = max(int(request.args.get('page') or 1), 1)
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        per_page = int(request.args.get('per_page') or 20)
+    except (TypeError, ValueError):
+        per_page = 20
+    per_page = max(min(per_page, 100), 1)
+
+    q = ChampionSchoolRequest.query
+    if backend_status is not None:
+        q = q.filter(ChampionSchoolRequest.status == backend_status)
+    text_q = (request.args.get('q') or '').strip()
+    if text_q:
+        like = f"%{text_q}%"
+        q = q.filter(or_(
+            ChampionSchoolRequest.school_name.ilike(like),
+            ChampionSchoolRequest.province.ilike(like),
+        ))
+
+    total = q.count()
+    rows = (
+        q.order_by(ChampionSchoolRequest.created_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+    items = [_to_mobile_champion_request(r) for r in rows]
+    return jsonify({
+        'data': {
+            'items': items,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+            },
+        }
+    })
+
+
+@app.route('/api/mobile/champion-requests/<int:request_id>', methods=['GET'])
+@login_required
+def api_mobile_champion_request_detail(request_id):
+    if not can_approve_champion_schools():
+        return jsonify({'error': 'Unauthorized'}), 403
+    req = ChampionSchoolRequest.query.get_or_404(request_id)
+    return jsonify({'data': _to_mobile_champion_request(req)})
+
+
+@app.route('/api/mobile/champion-requests/<int:request_id>/approve', methods=['POST'])
+@login_required
+def api_mobile_champion_request_approve(request_id):
+    if not can_approve_champion_schools():
+        return jsonify({'error': 'Unauthorized'}), 403
+    req = ChampionSchoolRequest.query.get_or_404(request_id)
+    if req.status != 'Pending':
+        return jsonify({'error': f'Request is already {req.status}'}), 400
+    champ = req.champion_school
+    if not champ:
+        return jsonify({'error': 'Champion not found'}), 404
+    champ.add_school(
+        asl_id=req.asl_school_id or '',
+        library_id=req.library_school_id or '',
+        school_name=req.school_name,
+    )
+    req.status = 'Approved'
+    req.reviewed_by_user_id = current_user.id
+    req.reviewed_at = datetime.utcnow()
+    try:
+        db.session.commit()
+        return jsonify({'data': _to_mobile_champion_request(req)})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/mobile/champion-requests/<int:request_id>/reject', methods=['POST'])
+@login_required
+def api_mobile_champion_request_reject(request_id):
+    if not can_approve_champion_schools():
+        return jsonify({'error': 'Unauthorized'}), 403
+    req = ChampionSchoolRequest.query.get_or_404(request_id)
+    if req.status != 'Pending':
+        return jsonify({'error': f'Request is already {req.status}'}), 400
+    data = request.get_json(silent=True) or {}
+    reason = (
+        data.get('reason')
+        or data.get('decline_reason')
+        or data.get('notes')
+        or ''
+    ).strip() or None
+    req.status = 'Declined'
+    req.reviewed_by_user_id = current_user.id
+    req.reviewed_at = datetime.utcnow()
+    req.decline_reason = reason
+    try:
+        db.session.commit()
+        return jsonify({'data': _to_mobile_champion_request(req)})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
 # @app.route('/home', methods=['GET', 'POST'])
@@ -2225,7 +2513,8 @@ def all_champions_ask_data():
 @login_required
 def all_champions_checkins():
     """Return school check-in/check-out activity for champions."""
-    today = datetime.now()
+    tzinfo, _ = _get_checkin_reports_timezone()
+    today = datetime.now(tzinfo).replace(tzinfo=None)
     default_start_date = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     start_date_str = request.args.get("start_date")
@@ -2250,45 +2539,160 @@ def all_champions_checkins():
     except ValueError:
         return jsonify({"error": "Invalid date format. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS."}), 400
 
-    user_lookup = {
-        u.username: u
-        for u in User.query.filter(User.userRole == 'Brand Ambassador').all()
+    return jsonify(
+        _build_weekly_checkin_report_rows(
+            start_date,
+            end_date,
+            include_admin_fields=_is_visit_admin_viewer(),
+        )
+    )
+
+
+@app.route('/api/checkin-reports/weekly', methods=['GET'])
+@login_required
+def api_checkin_reports_weekly():
+    if not can_view_checkin_reports():
+        return jsonify({'error': 'Unauthorized'}), 403
+    week_ending_str = request.args.get('week_ending')
+    try:
+        payload = _get_weekly_checkin_report_payload(week_ending_str=week_ending_str, role_scope='auto')
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+    return jsonify({
+        'success': True,
+        'timezone': payload['timezone'],
+        'week_ending': payload['week_ending_date'].isoformat(),
+        'window_start': payload['window']['start_local'].isoformat(),
+        'window_end': payload['window']['end_local'].isoformat(),
+        'scope': payload['scope'],
+        'total_rows': len(payload['rows']),
+        'rows': payload['rows'],
+    })
+
+
+@app.route('/api/checkin-reports/weekly.csv', methods=['GET'])
+@login_required
+def api_checkin_reports_weekly_csv():
+    if not can_view_checkin_reports():
+        return jsonify({'error': 'Unauthorized'}), 403
+    week_ending_str = request.args.get('week_ending')
+    try:
+        payload = _get_weekly_checkin_report_payload(week_ending_str=week_ending_str, role_scope='auto')
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+    csv_bytes = _weekly_checkin_rows_to_csv_bytes(payload['rows'])
+    filename = _weekly_checkin_filename(payload['scope'], payload['week_ending_date'], 'csv')
+    return Response(
+        csv_bytes,
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )
+
+
+@app.route('/api/checkin-reports/weekly.pdf', methods=['GET'])
+@login_required
+def api_checkin_reports_weekly_pdf():
+    if not can_view_checkin_reports():
+        return jsonify({'error': 'Unauthorized'}), 403
+    week_ending_str = request.args.get('week_ending')
+    try:
+        payload = _get_weekly_checkin_report_payload(week_ending_str=week_ending_str, role_scope='auto')
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+    role_label = 'Admin' if payload['scope'] == 'admin' else 'Champion'
+    pdf_bytes = _weekly_checkin_rows_to_pdf_bytes(
+        payload['rows'],
+        role_label=role_label,
+        week_ending_date=payload['week_ending_date']
+    )
+    filename = _weekly_checkin_filename(payload['scope'], payload['week_ending_date'], 'pdf')
+    return Response(
+        pdf_bytes,
+        mimetype='application/pdf',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )
+
+
+def run_weekly_checkin_report_job(triggered_by='scheduler', week_ending_str=None, force_send=False):
+    tzinfo, _ = _get_checkin_reports_timezone()
+    week_ending_date = _resolve_week_ending_date(week_ending_str=week_ending_str, tzinfo=tzinfo)
+    week_key = week_ending_date.isoformat()
+
+    if not force_send:
+        last_sent_week = (AppSetting.get_value('checkin_reports_last_sent_week', '') or '').strip()
+        if triggered_by == 'scheduler' and last_sent_week == week_key:
+            return {'status': 'skipped', 'reason': 'already_sent', 'week_ending': week_key}
+
+    window = _compute_checkin_week_window(week_ending_date, tzinfo)
+    admin_rows = _build_weekly_checkin_report_rows(
+        window['start_utc'],
+        window['end_utc'],
+        champion_user_id=None,
+        include_admin_fields=True,
+    )
+    champions = User.query.filter(User.userRole == 'Brand Ambassador').all()
+    admins = User.query.filter(User.userRole == 'Admin').all()
+
+    admin_csv = _weekly_checkin_rows_to_csv_bytes(admin_rows)
+    admin_pdf = _weekly_checkin_rows_to_pdf_bytes(admin_rows, role_label='Admin', week_ending_date=week_ending_date)
+    admin_result = _send_weekly_checkin_report_email(
+        recipients=[u.email for u in admins if u.email],
+        role_label='Admin',
+        week_ending_date=week_ending_date,
+        csv_bytes=admin_csv,
+        csv_name=_weekly_checkin_filename('admin', week_ending_date, 'csv'),
+        pdf_bytes=admin_pdf,
+        pdf_name=_weekly_checkin_filename('admin', week_ending_date, 'pdf'),
+        total_count=len(admin_rows)
+    )
+
+    champion_results = []
+    for champion in champions:
+        if not champion.email:
+            champion_results.append({'username': champion.username, 'status': 'skipped', 'reason': 'missing_email'})
+            continue
+        champion_rows = _build_weekly_checkin_report_rows(window['start_utc'], window['end_utc'], champion_user_id=champion.id)
+        csv_bytes = _weekly_checkin_rows_to_csv_bytes(champion_rows)
+        pdf_bytes = _weekly_checkin_rows_to_pdf_bytes(champion_rows, role_label='Champion', week_ending_date=week_ending_date)
+        send_result = _send_weekly_checkin_report_email(
+            recipients=[champion.email],
+            role_label='Champion',
+            week_ending_date=week_ending_date,
+            csv_bytes=csv_bytes,
+            csv_name=_weekly_checkin_filename(f"champion_{champion.username}", week_ending_date, 'csv'),
+            pdf_bytes=pdf_bytes,
+            pdf_name=_weekly_checkin_filename(f"champion_{champion.username}", week_ending_date, 'pdf'),
+            total_count=len(champion_rows)
+        )
+        send_result['username'] = champion.username
+        champion_results.append(send_result)
+
+    sent_any = (admin_result.get('status') == 'sent') or any(r.get('status') == 'sent' for r in champion_results)
+    if sent_any:
+        AppSetting.set_value(
+            'checkin_reports_last_sent_week',
+            week_key,
+            description='Last successfully generated weekly check-in report week ending date.'
+        )
+    app.logger.info(
+        "Weekly check-in report run complete (trigger=%s week_ending=%s admin_status=%s champions=%d)",
+        triggered_by,
+        week_key,
+        admin_result.get('status'),
+        len(champion_results)
+    )
+
+    return {
+        'status': 'ok',
+        'triggered_by': triggered_by,
+        'week_ending': week_key,
+        'admin_result': admin_result,
+        'champion_results': champion_results,
+        'admin_rows': len(admin_rows),
     }
-
-    logs = SchoolVisitLog.query.filter(
-        SchoolVisitLog.checkin_at >= start_date,
-        SchoolVisitLog.checkin_at <= end_date
-    ).order_by(SchoolVisitLog.checkin_at.desc()).all()
-
-    output = []
-    for log in logs:
-        champion_user = user_lookup.get(log.username)
-        champion_name = log.username
-        champion_province = None
-        if champion_user:
-            champion_name = f"{champion_user.firstname} {champion_user.lastname}".strip() or champion_user.username
-            champion_province = champion_user.province
-
-        output.append({
-            "visit_id": log.id,
-            "champion": champion_name,
-            "username": log.username,
-            "province": champion_province,
-            "school_name": log.school_name,
-            "asl_school_id": log.asl_school_id,
-            "library_id": log.library_id,
-            "status": log.status,
-            "checkin_at": log.checkin_at.isoformat() if log.checkin_at else None,
-            "checkout_at": log.checkout_at.isoformat() if log.checkout_at else None,
-            "duration_minutes": log.duration_minutes,
-            "location_source": log.location_source,
-            "location_text": log.location_text,
-            "checkin_latitude": log.checkin_latitude,
-            "checkin_longitude": log.checkin_longitude,
-        })
-
-    return jsonify(output)
-
 
 
 
@@ -6011,6 +6415,286 @@ def can_view_revenue_reports():
     except Exception:
         pass
     return False
+
+
+def can_view_checkin_reports():
+    """Check if user can access weekly check-in reports.
+
+    Accepts the canonical Admin / Brand Ambassador role names, plus common
+    SuperAdmin / Manager variants used elsewhere in the app. Case- and
+    whitespace-insensitive so mobile clients that lowercase the role name do
+    not get spurious 403s.
+    """
+    try:
+        role = (getattr(current_user, 'userRole', '') or '').strip().lower()
+        admin_roles = {
+            'admin',
+            'super admin',
+            'superadmin',
+            'super-admin',
+            'manager',
+        }
+        if role in admin_roles:
+            return True
+        if role == 'brand ambassador':
+            return True
+        if hasattr(current_user, 'has_privilege'):
+            try:
+                if current_user.has_privilege('Check-in Reports'):
+                    return True
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False
+
+
+def _get_checkin_reports_timezone():
+    tz_name = (AppSetting.get_value('checkin_reports_timezone', 'Africa/Harare') or 'Africa/Harare').strip()
+    try:
+        return ZoneInfo(tz_name), tz_name
+    except Exception:
+        app.logger.warning("Invalid checkin reports timezone '%s'. Falling back to UTC.", tz_name)
+        return timezone.utc, 'UTC'
+
+
+def _resolve_week_ending_date(week_ending_str=None, tzinfo=None):
+    tzinfo = tzinfo or timezone.utc
+    now_local = datetime.now(tzinfo)
+    if week_ending_str:
+        try:
+            week_end_date = datetime.strptime(week_ending_str, '%Y-%m-%d').date()
+        except ValueError:
+            raise ValueError("week_ending must use YYYY-MM-DD format")
+    else:
+        days_since_friday = (now_local.weekday() - 4) % 7
+        week_end_date = (now_local - timedelta(days=days_since_friday)).date()
+    if week_end_date.weekday() != 4:
+        raise ValueError("week_ending must be a Friday date")
+    return week_end_date
+
+
+def _compute_checkin_week_window(week_ending_date, tzinfo):
+    start_date = week_ending_date - timedelta(days=6)
+    start_local = datetime.combine(start_date, datetime.min.time(), tzinfo)
+    end_local = datetime.combine(week_ending_date, datetime.max.time(), tzinfo)
+    start_utc = start_local.astimezone(timezone.utc).replace(tzinfo=None)
+    end_utc = end_local.astimezone(timezone.utc).replace(tzinfo=None)
+    return {
+        'start_local': start_local,
+        'end_local': end_local,
+        'start_utc': start_utc,
+        'end_utc': end_utc,
+    }
+
+
+def _build_weekly_checkin_report_rows(
+    start_utc,
+    end_utc,
+    champion_user_id=None,
+    *,
+    include_admin_fields=False,
+):
+    logs_query = SchoolVisitLog.query.filter(
+        SchoolVisitLog.checkin_at >= start_utc,
+        SchoolVisitLog.checkin_at <= end_utc
+    )
+    if champion_user_id is not None:
+        logs_query = logs_query.filter(SchoolVisitLog.user_id == champion_user_id)
+    logs = logs_query.order_by(SchoolVisitLog.checkin_at.desc()).all()
+
+    user_lookup = {
+        u.username: u
+        for u in User.query.filter(User.userRole == 'Brand Ambassador').all()
+    }
+    rows = []
+    for log in logs:
+        champion_user = user_lookup.get(log.username)
+        champion_name = log.username
+        champion_province = None
+        champion_email = None
+        if champion_user:
+            champion_name = f"{champion_user.firstname} {champion_user.lastname}".strip() or champion_user.username
+            champion_province = champion_user.province
+            champion_email = champion_user.email
+
+        rows.append(
+            _school_visit_log_report_row(
+                log,
+                champion_name=champion_name,
+                champion_province=champion_province,
+                champion_email=champion_email,
+                include_admin_fields=include_admin_fields,
+            )
+        )
+    return rows
+
+
+def _weekly_checkin_report_headers():
+    return [
+        "champion",
+        "username",
+        "province",
+        "school_name",
+        "status",
+        "checkin_at",
+        "checkout_at",
+        "duration_minutes",
+        "asl_school_id",
+        "library_id",
+        "location_source",
+        "location_text",
+        "checkin_latitude",
+        "checkin_longitude",
+        "checkout_location_source",
+        "checkout_location_text",
+        "checkout_latitude",
+        "checkout_longitude",
+        "checkin_device_install_id",
+        "checkout_device_install_id",
+    ]
+
+
+def _weekly_checkin_rows_to_csv_bytes(rows):
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=_weekly_checkin_report_headers())
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({k: row.get(k) for k in _weekly_checkin_report_headers()})
+    return output.getvalue().encode('utf-8')
+
+
+def _weekly_checkin_rows_to_pdf_bytes(rows, *, role_label, week_ending_date):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=20, rightMargin=20, topMargin=20, bottomMargin=20)
+    styles = getSampleStyleSheet()
+    title = Paragraph(
+        f"Weekly Check-in Report ({role_label}) - Week ending {week_ending_date.isoformat()}",
+        styles["Heading3"]
+    )
+    subtitle = Paragraph(f"Total records: {len(rows)}", styles["BodyText"])
+
+    table_rows = [["Champion", "Province", "School", "Status", "Check-in", "Check-out", "Duration", "Location"]]
+    for row in rows:
+        location_display = row.get("location_text") or ""
+        if row.get("checkin_latitude") is not None and row.get("checkin_longitude") is not None:
+            location_display = f"{location_display} ({row.get('checkin_latitude')}, {row.get('checkin_longitude')})".strip()
+        table_rows.append([
+            str(row.get("champion") or "-"),
+            str(row.get("province") or "-"),
+            str(row.get("school_name") or "-"),
+            str(row.get("status") or "-"),
+            str(row.get("checkin_at") or "-"),
+            str(row.get("checkout_at") or "-"),
+            str(row.get("duration_minutes") if row.get("duration_minutes") is not None else "-"),
+            location_display or "-",
+        ])
+
+    table = Table(table_rows, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2f4f4f")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
+    ]))
+
+    doc.build([title, Spacer(1, 8), subtitle, Spacer(1, 10), table])
+    return buffer.getvalue()
+
+
+def _weekly_checkin_filename(role_scope, week_ending_date, ext):
+    return f"checkins_weekly_{role_scope}_{week_ending_date.isoformat()}.{ext}"
+
+
+def _send_email_message(message):
+    if app.config.get('MAIL_SUPPRESS_SEND'):
+        app.logger.info("[MAIL_SUPPRESS_SEND] Email skipped for recipients=%s", message.get_all('To', []))
+        return True
+
+    smtp_host = app.config.get('MAIL_SERVER', 'smtp.gmail.com')
+    smtp_port = app.config.get('MAIL_PORT', 587)
+    use_tls = app.config.get('MAIL_USE_TLS', True)
+    username = app.config.get('MAIL_USERNAME')
+    password = app.config.get('MAIL_PASSWORD')
+
+    if not (username and password):
+        app.logger.warning('Email not sent: MAIL_USERNAME/PASSWORD not fully configured')
+        return False
+
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
+        if use_tls:
+            server.starttls()
+        server.login(username, password)
+        server.send_message(message)
+    return True
+
+
+def _send_weekly_checkin_report_email(*, recipients, role_label, week_ending_date, csv_bytes, csv_name, pdf_bytes, pdf_name, total_count):
+    recipients = [r for r in (recipients or []) if r]
+    if not recipients:
+        return {'status': 'skipped', 'reason': 'no_recipients'}
+
+    sender = app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME'))
+    if not sender:
+        app.logger.warning('Weekly check-in report email skipped: sender not configured')
+        return {'status': 'skipped', 'reason': 'sender_not_configured'}
+
+    msg = EmailMessage()
+    msg['Subject'] = f"Weekly Check-in Report ({role_label}) - {week_ending_date.isoformat()}"
+    msg['From'] = sender
+    msg['To'] = ', '.join(recipients)
+    msg.set_content(
+        f"Attached are the weekly check-in reports ({role_label}) for week ending {week_ending_date.isoformat()}.\n"
+        f"Total records: {total_count}."
+    )
+    msg.add_alternative(
+        f"<p>Attached are the weekly check-in reports (<strong>{role_label}</strong>) for week ending "
+        f"<strong>{week_ending_date.isoformat()}</strong>.</p><p>Total records: <strong>{total_count}</strong>.</p>",
+        subtype='html'
+    )
+    msg.add_attachment(csv_bytes, maintype='text', subtype='csv', filename=csv_name)
+    msg.add_attachment(pdf_bytes, maintype='application', subtype='pdf', filename=pdf_name)
+
+    sent = _send_email_message(msg)
+    return {'status': 'sent' if sent else 'failed', 'recipients': recipients}
+
+
+def _get_weekly_checkin_report_payload(week_ending_str=None, role_scope='auto'):
+    tzinfo, tz_name = _get_checkin_reports_timezone()
+    week_ending_date = _resolve_week_ending_date(week_ending_str, tzinfo=tzinfo)
+    window = _compute_checkin_week_window(week_ending_date, tzinfo)
+
+    if role_scope == 'auto':
+        role = (getattr(current_user, 'userRole', '') or '').strip().lower()
+        admin_roles = {
+            'admin',
+            'super admin',
+            'superadmin',
+            'super-admin',
+            'manager',
+        }
+        scope = 'admin' if role in admin_roles else 'champion'
+    else:
+        scope = role_scope
+
+    champion_user_id = current_user.id if scope == 'champion' else None
+    rows = _build_weekly_checkin_report_rows(
+        window['start_utc'],
+        window['end_utc'],
+        champion_user_id=champion_user_id,
+        include_admin_fields=(scope == 'admin'),
+    )
+
+    return {
+        'rows': rows,
+        'scope': scope,
+        'week_ending_date': week_ending_date,
+        'timezone': tz_name,
+        'window': window,
+    }
 
 
 def get_champion_school_approvers():
@@ -12042,6 +12726,17 @@ def api_profile_school_tables(username):
     """Return school tables data for profile page (loaded async with loading indicators)."""
     try:
         data = _get_profile_school_tables_data(username)
+        target_user = User.query.filter_by(username=username).first()
+        active_visit = None
+        if target_user:
+            active_visit = SchoolVisitLog.query.filter_by(
+                user_id=target_user.id,
+                status='checked_in',
+            ).order_by(SchoolVisitLog.checkin_at.desc()).first()
+        data['active_visit'] = (
+            _visit_dict_for_viewer(active_visit, include_admin_fields=_is_visit_admin_viewer())
+            if active_visit else None
+        )
         return jsonify(data)
     except Exception as e:
         logging.exception("profile school-tables API: %s", e)
@@ -12073,6 +12768,109 @@ def _require_json_request():
             400
         )
     return None
+
+
+def _is_visit_admin_viewer():
+    role = (getattr(current_user, 'userRole', '') or '').strip().lower()
+    return role in {
+        'admin',
+        'super admin',
+        'superadmin',
+        'super-admin',
+        'manager',
+    }
+
+
+def _visit_admin_metadata(log):
+    return {
+        'checkin_device_install_id': log.checkin_device_install_id,
+        'checkout_device_install_id': log.checkout_device_install_id,
+        'checkin_latitude': log.checkin_latitude,
+        'checkin_longitude': log.checkin_longitude,
+        'checkout_latitude': log.checkout_latitude,
+        'checkout_longitude': log.checkout_longitude,
+        'location_source': log.location_source,
+        'location_text': log.location_text,
+        'checkout_location_source': log.checkout_location_source,
+        'checkout_location_text': log.checkout_location_text,
+        'checkin_device_platform': log.checkin_device_platform,
+    }
+
+
+def _visit_dict_for_viewer(log, *, include_admin_fields=False):
+    payload = {
+        'visit_id': log.id,
+        'username': log.username,
+        'asl_school_id': log.asl_school_id,
+        'library_id': log.library_id,
+        'school_name': log.school_name,
+        'status': log.status,
+        'checkin_at': _visit_api_iso_utc(log.checkin_at),
+        'checkout_at': _visit_api_iso_utc(log.checkout_at),
+        'duration_minutes': log.duration_minutes,
+        'notes': log.notes,
+    }
+    if include_admin_fields:
+        payload['admin_metadata'] = _visit_admin_metadata(log)
+    return payload
+
+
+def _school_visit_log_report_row(
+    log,
+    *,
+    champion_name=None,
+    champion_province=None,
+    champion_email=None,
+    include_admin_fields=False,
+):
+    row = {
+        "visit_id": log.id,
+        "champion": champion_name or log.username,
+        "username": log.username,
+        "champion_email": champion_email,
+        "province": champion_province,
+        "school_name": log.school_name,
+        "asl_school_id": log.asl_school_id,
+        "library_id": log.library_id,
+        "status": log.status,
+        "checkin_at": _visit_api_iso_utc(log.checkin_at),
+        "checkout_at": _visit_api_iso_utc(log.checkout_at),
+        "duration_minutes": log.duration_minutes,
+    }
+    if include_admin_fields:
+        row["admin_metadata"] = _visit_admin_metadata(log)
+        row.update({
+            "location_source": log.location_source,
+            "location_text": log.location_text,
+            "checkin_latitude": log.checkin_latitude,
+            "checkin_longitude": log.checkin_longitude,
+            "checkout_location_source": log.checkout_location_source,
+            "checkout_location_text": log.checkout_location_text,
+            "checkout_latitude": log.checkout_latitude,
+            "checkout_longitude": log.checkout_longitude,
+            "checkin_device_install_id": log.checkin_device_install_id,
+            "checkout_device_install_id": log.checkout_device_install_id,
+        })
+    return row
+
+
+def _validate_device_payload(device, *, required=True):
+    if not isinstance(device, dict):
+        if required:
+            return None, None, "device object is required"
+        return None, None, None
+
+    install_id = str((device.get('install_id') or '')).strip()
+    platform = str((device.get('platform') or 'web')).strip().lower() or 'web'
+
+    if required and not install_id:
+        return None, None, "device.install_id is required"
+    if install_id and len(install_id) > 64:
+        return None, None, "device.install_id must be 64 characters or fewer"
+    if platform and len(platform) > 32:
+        return None, None, "device.platform must be 32 characters or fewer"
+
+    return install_id or None, platform, None
 
 
 def _validate_location_payload(location):
@@ -12123,6 +12921,16 @@ def api_profile_school_visit_checkin():
     if location_error:
         return _visit_api_error('ValidationError', location_error, 400)
 
+    install_id, platform, device_error = _validate_device_payload(data.get('device'), required=True)
+    if device_error:
+        return _visit_api_error('ValidationError', device_error, 400)
+    if platform == 'mobile' and (lat is None or lng is None):
+        return _visit_api_error(
+            'ValidationError',
+            'location.latitude and location.longitude are required for mobile visits',
+            400,
+        )
+
     active_visit = SchoolVisitLog.query.filter_by(
         user_id=current_user.id,
         status='checked_in'
@@ -12139,6 +12947,10 @@ def api_profile_school_visit_checkin():
             }
         )
 
+    user_agent = (request.headers.get('User-Agent') or '').strip() or None
+    if user_agent and len(user_agent) > 512:
+        user_agent = user_agent[:512]
+
     visit = SchoolVisitLog(
         user_id=current_user.id,
         username=current_user.username,
@@ -12151,14 +12963,18 @@ def api_profile_school_visit_checkin():
         checkin_longitude=lng,
         location_text=location_text,
         location_source=location_source,
+        checkin_device_install_id=install_id,
+        checkin_device_platform=platform,
+        checkin_user_agent=user_agent,
     )
     db.session.add(visit)
     db.session.commit()
 
+    include_admin_fields = _is_visit_admin_viewer()
     return jsonify({
         'success': True,
         'message': 'Checked in successfully.',
-        'data': visit.to_dict()
+        'data': _visit_dict_for_viewer(visit, include_admin_fields=include_admin_fields)
     }), 201
 
 
@@ -12172,12 +12988,37 @@ def api_profile_school_visit_checkout():
     data = request.get_json() or {}
     notes = (data.get('notes') or '').strip() or None
 
+    lat, lng, location_text, location_source, location_error = _validate_location_payload(data.get('location'))
+    if location_error:
+        return _visit_api_error('ValidationError', location_error, 400)
+
+    install_id, platform, device_error = _validate_device_payload(data.get('device'), required=True)
+    if device_error:
+        return _visit_api_error('ValidationError', device_error, 400)
+    if platform == 'mobile' and (lat is None or lng is None):
+        return _visit_api_error(
+            'ValidationError',
+            'location.latitude and location.longitude are required for mobile visits',
+            400,
+        )
+
     active_visit = SchoolVisitLog.query.filter_by(
         user_id=current_user.id,
         status='checked_in'
     ).order_by(SchoolVisitLog.checkin_at.desc()).first()
     if not active_visit:
         return _visit_api_error('NoActiveSession', 'No active check-in found for this user.', 404)
+
+    if active_visit.checkin_device_install_id and install_id and active_visit.checkin_device_install_id != install_id:
+        return _visit_api_error(
+            'DeviceMismatch',
+            'Checkout device does not match the device used for check-in.',
+            409,
+            {
+                'checkin_device_install_id': active_visit.checkin_device_install_id,
+                'checkout_device_install_id': install_id,
+            }
+        )
 
     now = datetime.utcnow()
     duration_minutes = None
@@ -12188,12 +13029,20 @@ def api_profile_school_visit_checkout():
     active_visit.duration_minutes = duration_minutes
     active_visit.status = 'checked_out'
     active_visit.notes = notes
+    active_visit.checkout_latitude = lat
+    active_visit.checkout_longitude = lng
+    active_visit.checkout_location_text = location_text
+    active_visit.checkout_location_source = location_source
+    active_visit.checkout_device_install_id = install_id
+    if platform:
+        active_visit.checkin_device_platform = active_visit.checkin_device_platform or platform
     db.session.commit()
 
+    include_admin_fields = _is_visit_admin_viewer()
     return jsonify({
         'success': True,
         'message': 'Checked out successfully.',
-        'data': active_visit.to_dict()
+        'data': _visit_dict_for_viewer(active_visit, include_admin_fields=include_admin_fields)
     }), 200
 
 
@@ -12204,7 +13053,11 @@ def api_profile_school_visit_status(username):
     if not target_user:
         return _visit_api_error('NotFound', 'User not found', 404)
 
-    if current_user.username != username and current_user.userRole != 'Admin':
+    if (
+        current_user.id != target_user.id
+        and current_user.username != username
+        and current_user.userRole != 'Admin'
+    ):
         return _visit_api_error('Unauthorized', 'Unauthorized', 403)
 
     active_visit = SchoolVisitLog.query.filter_by(
@@ -12217,11 +13070,12 @@ def api_profile_school_visit_status(username):
         status='checked_out'
     ).order_by(SchoolVisitLog.checkout_at.desc(), SchoolVisitLog.id.desc()).first()
 
+    include_admin_fields = _is_visit_admin_viewer()
     return jsonify({
         'success': True,
         'data': {
-            'active_visit': active_visit.to_dict() if active_visit else None,
-            'last_visit': last_visit.to_dict() if last_visit else None,
+            'active_visit': _visit_dict_for_viewer(active_visit, include_admin_fields=include_admin_fields) if active_visit else None,
+            'last_visit': _visit_dict_for_viewer(last_visit, include_admin_fields=include_admin_fields) if last_visit else None,
         }
     }), 200
 
@@ -15758,14 +16612,8 @@ def send_email(subject: str, recipient: str, html_body: str, text_body: str = No
         app.logger.info(f"[MAIL_SUPPRESS_SEND] To: {recipient}\nSubject: {subject}\n{text_body or ''}\n{html_body}")
         return True
 
-    smtp_host = app.config.get('MAIL_SERVER', 'smtp.gmail.com')
-    smtp_port = app.config.get('MAIL_PORT', 587)
-    use_tls = app.config.get('MAIL_USE_TLS', True)
-    username = app.config.get('MAIL_USERNAME')
-    password = app.config.get('MAIL_PASSWORD')
-    sender = app.config.get('MAIL_DEFAULT_SENDER', username)
-
-    if not (username and password and sender):
+    sender = app.config.get('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME'))
+    if not sender:
         app.logger.warning('Email not sent: MAIL_USERNAME/PASSWORD/SENDER not fully configured')
         return False
 
@@ -15776,14 +16624,7 @@ def send_email(subject: str, recipient: str, html_body: str, text_body: str = No
     if text_body:
         msg.set_content(text_body)
     msg.add_alternative(html_body, subtype='html')
-
-    with smtplib.SMTP(smtp_host, smtp_port) as server:
-        if use_tls:
-            server.starttls()
-        server.login(username, password)
-        server.send_message(msg)
-        
-    return True
+    return _send_email_message(msg)
 
 
 @app.route('/forgot-password', methods=['GET'])
@@ -21718,6 +22559,141 @@ def mobile_dashboard_overview():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': 'Server error'}), 500
+
+
+# ==================== MOBILE SYSTEM SETTINGS ====================
+# Admin-only mobile-friendly access to a small whitelist of `AppSetting`
+# rows. Anything outside this list stays editable only on the web admin to
+# preserve audit trails.
+
+_MOBILE_SETTINGS_WHITELIST = [
+    {
+        'key': 'checkin_reports_timezone',
+        'label': 'Weekly report timezone',
+        'description': 'Timezone used to compute the Sat-Fri reporting window.',
+        'type': 'timezone',
+        'default': 'Africa/Harare',
+    },
+    {
+        'key': 'checkin_reports_schedule_time',
+        'label': 'Friday report send time',
+        'description': 'Local time (HH:MM, 24h) when weekly reports are emailed.',
+        'type': 'time',
+        'default': '17:00',
+    },
+]
+
+
+def _mobile_settings_is_admin():
+    role = (getattr(current_user, 'userRole', '') or '').strip().lower()
+    if role in ('admin', 'super admin', 'superadmin', 'super-admin', 'manager'):
+        return True
+    # Fall back to any privilege-based admin check if defined.
+    try:
+        if hasattr(current_user, 'has_privilege') and (
+            current_user.has_privilege('Admin') or
+            current_user.has_privilege('Check-in Reports')
+        ):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _validate_mobile_setting(key, value):
+    """Returns (ok, normalized_value, error_msg)."""
+    if value is None:
+        return False, None, 'Value is required'
+    text = str(value).strip()
+    if key == 'checkin_reports_timezone':
+        try:
+            from zoneinfo import ZoneInfo
+            ZoneInfo(text)
+        except Exception:
+            return False, None, f'Unknown timezone: {text}'
+        return True, text, None
+    if key == 'checkin_reports_schedule_time':
+        import re
+        if not re.fullmatch(r'^([01]?\d|2[0-3]):([0-5]\d)$', text):
+            return False, None, 'Use HH:MM in 24-hour format (e.g. 17:00)'
+        return True, text, None
+    return True, text, None
+
+
+@app.route('/api/mobile/settings', methods=['GET'])
+@login_required
+def api_mobile_settings_get():
+    if not _mobile_settings_is_admin():
+        return jsonify({'error': 'Unauthorized'}), 403
+    settings = []
+    for entry in _MOBILE_SETTINGS_WHITELIST:
+        value = AppSetting.get_value(entry['key'], entry['default'])
+        settings.append({
+            'key': entry['key'],
+            'label': entry['label'],
+            'description': entry['description'],
+            'type': entry['type'],
+            'value': value,
+            'default': entry['default'],
+        })
+    return jsonify({'data': {'settings': settings}})
+
+
+@app.route('/api/mobile/settings', methods=['PATCH'])
+@login_required
+def api_mobile_settings_patch():
+    if not _mobile_settings_is_admin():
+        return jsonify({'error': 'Unauthorized'}), 403
+    payload = request.get_json(silent=True) or {}
+    raw_updates = payload.get('settings') or payload
+    updates = raw_updates if isinstance(raw_updates, dict) else {}
+
+    allowed_keys = {entry['key'] for entry in _MOBILE_SETTINGS_WHITELIST}
+    errors = {}
+    accepted = []
+    for key, value in updates.items():
+        if key not in allowed_keys:
+            errors[key] = 'Setting is not editable from mobile'
+            continue
+        ok, normalized, err = _validate_mobile_setting(key, value)
+        if not ok:
+            errors[key] = err
+            continue
+        try:
+            AppSetting.set_value(
+                key,
+                normalized,
+                user_id=getattr(current_user, 'id', None),
+            )
+            accepted.append(key)
+        except Exception as e:
+            errors[key] = str(e)
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+    if errors and not accepted:
+        return jsonify({'error': 'No settings updated', 'errors': errors}), 400
+
+    # Return refreshed list so clients can replace local state in one round-trip.
+    settings = []
+    for entry in _MOBILE_SETTINGS_WHITELIST:
+        value = AppSetting.get_value(entry['key'], entry['default'])
+        settings.append({
+            'key': entry['key'],
+            'label': entry['label'],
+            'description': entry['description'],
+            'type': entry['type'],
+            'value': value,
+            'default': entry['default'],
+        })
+    return jsonify({
+        'data': {'settings': settings, 'accepted': accepted},
+        'errors': errors or None,
+    })
 
 
 # ==================== GAME SYSTEM ROUTES ====================

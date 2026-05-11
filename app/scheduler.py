@@ -69,6 +69,52 @@ def refresh_revenue_report_schedule(app):
     logger.info("Revenue report scheduler set to daily %02d:%02d", hour, minute)
 
 
+def _read_weekly_checkin_schedule():
+    from app.models import AppSetting
+
+    raw = (AppSetting.get_value('checkin_reports_schedule_time', '17:00') or '17:00').strip()
+    try:
+        hour_s, minute_s = raw.split(':', 1)
+        hour, minute = int(hour_s), int(minute_s)
+        if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+            raise ValueError("out of range")
+    except Exception:
+        logger.warning("Invalid weekly check-in schedule '%s'. Falling back to 17:00.", raw)
+        hour, minute = 17, 0
+    return hour, minute
+
+
+def _scheduled_weekly_checkin_report(app):
+    with app.app_context():
+        try:
+            from app.routes import run_weekly_checkin_report_job
+            logger.info("Weekly check-in scheduler run starting")
+            result = run_weekly_checkin_report_job(triggered_by="scheduler")
+            logger.info("Weekly check-in scheduler run result: %s", result.get("status"))
+        except Exception as e:
+            logger.exception("Weekly check-in scheduler job failed: %s", e)
+
+
+def refresh_weekly_checkin_schedule(app):
+    """Create/update the weekly Friday check-in report job from AppSetting time."""
+    global _scheduler
+    if _scheduler is None:
+        return
+
+    hour, minute = _read_weekly_checkin_schedule()
+    _scheduler.add_job(
+        func=_scheduled_weekly_checkin_report,
+        args=[app],
+        trigger="cron",
+        day_of_week='fri',
+        hour=hour,
+        minute=minute,
+        id="weekly_checkin_reports_job",
+        replace_existing=True,
+    )
+    logger.info("Weekly check-in scheduler set to Fridays %02d:%02d", hour, minute)
+
+
 def start_scheduler(app):
     """
     Start the background scheduler with a 60-second email fetch job.
@@ -87,5 +133,6 @@ def start_scheduler(app):
     )
     with app.app_context():
         refresh_revenue_report_schedule(app)
+        refresh_weekly_checkin_schedule(app)
     _scheduler.start()
     logger.info("Helpdesk email scheduler started (interval 60s)")

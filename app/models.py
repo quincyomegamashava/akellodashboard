@@ -542,6 +542,16 @@ class SchoolVisitLog(db.Model):
     location_text = db.Column(db.String(255), nullable=True)
     location_source = db.Column(db.String(20), nullable=False, default='unknown')
 
+    checkout_latitude = db.Column(db.Float, nullable=True)
+    checkout_longitude = db.Column(db.Float, nullable=True)
+    checkout_location_text = db.Column(db.String(255), nullable=True)
+    checkout_location_source = db.Column(db.String(20), nullable=True)
+
+    checkin_device_install_id = db.Column(db.String(64), nullable=True, index=True)
+    checkout_device_install_id = db.Column(db.String(64), nullable=True, index=True)
+    checkin_device_platform = db.Column(db.String(32), nullable=True)
+    checkin_user_agent = db.Column(db.String(512), nullable=True)
+
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -565,11 +575,28 @@ class SchoolVisitLog(db.Model):
             'checkin_at': self._to_iso_utc(self.checkin_at),
             'checkout_at': self._to_iso_utc(self.checkout_at),
             'duration_minutes': self.duration_minutes,
+            'checkin_location': {
+                'latitude': self.checkin_latitude,
+                'longitude': self.checkin_longitude,
+                'location_text': self.location_text,
+                'source': self.location_source,
+            },
+            'checkout_location': {
+                'latitude': self.checkout_latitude,
+                'longitude': self.checkout_longitude,
+                'location_text': self.checkout_location_text,
+                'source': self.checkout_location_source,
+            },
             'location': {
                 'latitude': self.checkin_latitude,
                 'longitude': self.checkin_longitude,
                 'location_text': self.location_text,
                 'source': self.location_source,
+            },
+            'device': {
+                'checkin_install_id': self.checkin_device_install_id,
+                'checkout_install_id': self.checkout_device_install_id,
+                'platform': self.checkin_device_platform,
             },
             'notes': self.notes,
         }
