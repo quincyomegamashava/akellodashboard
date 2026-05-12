@@ -47,9 +47,21 @@ docker rm akello-dashboard-app || true
 echo "Rebuilding Docker image..."
 docker build -t akello-dashboard .
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MIGRATION_MSG="deploy $(date -u +%Y%m%d_%H%M%S)"
+
+# Apply schema updates to the mounted app.db (adds columns/tables; does not wipe data).
+echo "Running database migrations against mounted app.db..."
+docker run --rm \
+  -v "$SCRIPT_DIR/app.db:/app/app.db" \
+  -v "$SCRIPT_DIR/.env:/app/.env" \
+  -v "$SCRIPT_DIR/migrations:/app/migrations" \
+  -e FLASK_APP=app.py \
+  akello-dashboard \
+  sh -c "flask db migrate -m \"$MIGRATION_MSG\" || true; flask db upgrade"
+
 # Start the new container with volume mounts for database and .env file persistence
 echo "Starting new container with database and .env file mounts..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 docker run -d --name akello-dashboard-app -p 5000:5000 \
   -v "$SCRIPT_DIR/app.db:/app/app.db" \
   -v "$SCRIPT_DIR/.env:/app/.env" \
