@@ -182,6 +182,202 @@
       outline-offset: 2px;
     }
 
+    /* Calendar tab */
+    .pm-cal-month-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-auto-rows: minmax(5.5rem, 1fr);
+      border-top: 1px solid #e4e4e7;
+      border-left: 1px solid #e4e4e7;
+    }
+    .pm-cal-dow {
+      text-align: center;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #71717a;
+      padding: 0.5rem 0.25rem;
+      background: #fafafa;
+      border-right: 1px solid #e4e4e7;
+      border-bottom: 1px solid #e4e4e7;
+    }
+    .pm-cal-dow.pm-cal-dow--weekend { background: #f4f4f5; color: #a1a1aa; }
+    .pm-cal-cell {
+      border-right: 1px solid #e4e4e7;
+      border-bottom: 1px solid #e4e4e7;
+      padding: 0.25rem 0.35rem 0.35rem;
+      min-height: 5.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.15rem;
+      background: #fff;
+      position: relative;
+    }
+    .pm-cal-cell.pm-cal-cell--weekend { background: #fafafa; }
+    .pm-cal-cell.pm-cal-cell--muted { background: #fcfcfc; }
+    .pm-cal-cell.pm-cal-cell--muted .pm-cal-daynum { color: #d4d4d8; }
+    .pm-cal-cell.pm-cal-cell--today .pm-cal-daynum {
+      color: #0d9488;
+      font-weight: 700;
+    }
+    .pm-cal-cell.pm-cal-cell--today {
+      box-shadow: inset 0 0 0 2px rgba(13, 148, 136, 0.35);
+    }
+    .pm-cal-daynum {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #3f3f46;
+      line-height: 1.2;
+    }
+    .pm-cal-cell.pm-cal-cell--weekend .pm-cal-daynum { color: #9f1239; opacity: 0.85; }
+    .pm-cal-cell.pm-cal-cell--muted.pm-cal-cell--weekend .pm-cal-daynum { color: #d6d3d1; opacity: 1; }
+    .pm-cal-chips {
+      display: flex;
+      flex-direction: column;
+      gap: 0.12rem;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .pm-cal-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.2rem;
+      max-width: 100%;
+      border: 0;
+      border-radius: 0.25rem;
+      padding: 0.1rem 0.25rem;
+      font-size: 0.65rem;
+      line-height: 1.2;
+      text-align: left;
+      cursor: pointer;
+      background: #eef2ff;
+      color: #312e81;
+      position: relative;
+    }
+    .pm-cal-chip:hover { filter: brightness(0.97); }
+    .pm-cal-chip--overdue {
+      background: repeating-linear-gradient(-45deg, #fee2e2, #fee2e2 4px, #fecaca 4px, #fecaca 8px);
+      color: #7f1d1d;
+    }
+    .pm-cal-chip-t {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      min-width: 0;
+    }
+    .pm-cal-chip--done::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 0;
+      height: 0;
+      border-style: solid;
+      border-width: 0 0.55rem 0.55rem 0;
+      border-color: transparent #6366f1 transparent transparent;
+      pointer-events: none;
+    }
+    .pm-cal-asg {
+      flex-shrink: 0;
+      min-width: 1rem;
+      height: 1rem;
+      border-radius: 9999px;
+      background: #3f3f46;
+      color: #fff;
+      font-size: 0.55rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .pm-cal-more {
+      font-size: 0.6rem;
+      color: #71717a;
+      padding-left: 0.1rem;
+    }
+    .pm-cal-week-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      border-top: 1px solid #e4e4e7;
+      border-left: 1px solid #e4e4e7;
+    }
+    .pm-cal-week-cell {
+      border-right: 1px solid #e4e4e7;
+      border-bottom: 1px solid #e4e4e7;
+      min-height: 12rem;
+      padding: 0.35rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      background: #fff;
+    }
+    .pm-cal-week-cell.pm-cal-cell--weekend { background: #fafafa; }
+    .pm-cal-year-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+      gap: 0.75rem;
+      padding: 0.75rem;
+      max-height: min(78vh, 900px);
+      overflow-y: auto;
+    }
+    .pm-cal-mini-wrap {
+      border: 1px solid #e4e4e7;
+      border-radius: 0.5rem;
+      padding: 0.35rem;
+      background: #fff;
+    }
+    .pm-cal-mini-title {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: #52525b;
+      margin-bottom: 0.25rem;
+      text-align: center;
+    }
+    .pm-cal-mini-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+    }
+    .pm-cal-mini-dh {
+      font-size: 0.55rem;
+      color: #a1a1aa;
+      text-align: center;
+    }
+    .pm-cal-mini-day {
+      font-size: 0.55rem;
+      min-height: 0.95rem;
+      text-align: center;
+      color: #a1a1aa;
+      position: relative;
+    }
+    .pm-cal-mini-day.pm-cal-mini-day--in {
+      color: #52525b;
+      font-weight: 500;
+    }
+    .pm-cal-mini-day.pm-cal-mini-day--today {
+      color: #0d9488;
+      font-weight: 700;
+    }
+    .pm-cal-mini-dot {
+      display: block;
+      width: 4px;
+      height: 4px;
+      border-radius: 9999px;
+      background: #6366f1;
+      margin: 1px auto 0;
+    }
+    .pm-cal-mini-dot.pm-cal-mini-dot--overdue { background: #ef4444; }
+    .cal-view-btn[aria-pressed="true"] {
+      color: #4f46e5;
+      font-weight: 600;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(79, 70, 229, 0.12);
+    }
+
     /* Icon button tooltip styles */
     .icon-btn-group {
       display: flex;
@@ -390,6 +586,7 @@
           <button type="button" id="tab-board" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="true" aria-controls="panel-board">Board</button>
           <button type="button" id="tab-timeline" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-timeline">Timeline</button>
           <button type="button" id="tab-gantt" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-gantt">Schedule</button>
+          <button type="button" id="tab-calendar" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-calendar">Calendar</button>
           <button type="button" id="tab-documents" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-documents">Documents</button>
         </div>
       </div>
@@ -513,6 +710,34 @@
           <div id="ganttSheetMount" class="flex-1 min-h-[480px] rounded-xl border border-zinc-200 bg-white"></div>
         </div>
 
+        <!-- Calendar: month / week / year from task due (end_date) or start_date -->
+        <div id="panel-calendar" role="tabpanel" aria-labelledby="tab-calendar" class="hidden flex-1 flex-col min-h-0" aria-hidden="true">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <div class="flex items-center gap-2">
+              <button type="button" id="calBtnToday" class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/></svg>
+                Today
+              </button>
+            </div>
+            <div class="flex items-center gap-1">
+              <button type="button" id="calBtnPrev" class="rounded-lg border border-zinc-200 bg-white p-2 text-zinc-600 hover:bg-zinc-50" aria-label="Previous period">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>
+              </button>
+              <h2 id="calNavTitle" class="min-w-[10rem] text-center text-base font-semibold text-zinc-900 px-2">—</h2>
+              <button type="button" id="calBtnNext" class="rounded-lg border border-zinc-200 bg-white p-2 text-zinc-600 hover:bg-zinc-50" aria-label="Next period">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>
+              </button>
+            </div>
+            <div class="inline-flex rounded-lg border border-zinc-200 bg-zinc-50/80 p-0.5 gap-0.5" role="group" aria-label="Calendar scale">
+              <button type="button" class="cal-view-btn rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:bg-white/90 transition" data-cal-mode="year" aria-pressed="false">Year</button>
+              <button type="button" class="cal-view-btn rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:bg-white/90 transition" data-cal-mode="month" aria-pressed="true">Month</button>
+              <button type="button" class="cal-view-btn rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:bg-white/90 transition" data-cal-mode="week" aria-pressed="false">Week</button>
+            </div>
+          </div>
+          <p id="calNoteUndated" class="hidden text-xs text-zinc-500 mb-2"></p>
+          <div id="calendarMount" class="flex-1 min-h-[420px] rounded-xl border border-zinc-200 bg-white overflow-hidden"></div>
+        </div>
+
         <div id="panel-documents" role="tabpanel" aria-labelledby="tab-documents" class="hidden flex-1 flex-col min-h-0 overflow-auto" aria-hidden="true">
           <div class="space-y-4">
             <div>
@@ -577,6 +802,9 @@ let timelineDraggingTask = false;
 let timelineSortDirection = 'asc';
 let lastTimelineTableItems = []; // full sorted list for Items-by-month filters
 let activePmTab = 'board';
+/** Calendar tab: 'month' | 'week' | 'year' — cursor is a local date (time stripped) used as anchor for the visible range */
+let calendarViewMode = 'month';
+let calendarCursor = new Date();
 // Mini-map state
 let isMiniDragging = false;
 let miniDragStartX = 0;
@@ -824,7 +1052,7 @@ function closeModal() {
 }
 
 /* ---------- Tabbed workspace ---------- */
-const PM_TAB_IDS = ['board', 'timeline', 'gantt', 'documents'];
+const PM_TAB_IDS = ['board', 'timeline', 'gantt', 'calendar', 'documents'];
 
 function setActiveTab(tab) {
   const next = PM_TAB_IDS.includes(tab) ? tab : 'board';
@@ -833,12 +1061,14 @@ function setActiveTab(tab) {
     board: $('panel-board'),
     timeline: $('panel-timeline'),
     gantt: $('panel-gantt'),
+    calendar: $('panel-calendar'),
     documents: $('panel-documents')
   };
   const tabs = {
     board: $('tab-board'),
     timeline: $('tab-timeline'),
     gantt: $('tab-gantt'),
+    calendar: $('tab-calendar'),
     documents: $('tab-documents')
   };
   Object.keys(panels).forEach((key) => {
@@ -856,6 +1086,9 @@ function setActiveTab(tab) {
   });
   if (next === 'gantt') {
     requestAnimationFrame(() => renderVisGantt(lastBoardData));
+  }
+  if (next === 'calendar') {
+    requestAnimationFrame(() => renderCalendar(lastBoardData));
   }
   if (next === 'documents') {
     requestAnimationFrame(() => renderDocumentsPanel(lastBoardData));
@@ -960,6 +1193,291 @@ function renderDocumentsPanel(boardData) {
       if (found) openTaskDetails(found);
     };
   });
+}
+
+/* ---------- Calendar (month / week / year) ---------- */
+function calDayKey(d) {
+  const x = ganttStripTime(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+}
+
+/** Placement: end_date if set, else start_date (local calendar day). */
+function taskCalendarAnchorDate(task) {
+  const iso = task.end_date || task.start_date;
+  return iso ? ganttParseLocal(iso) : null;
+}
+
+function buildCalendarTaskIndex(boardData) {
+  const byDay = new Map();
+  let undated = 0;
+  (boardData.columns || []).forEach((col) => {
+    (col.tasks || []).forEach((task) => {
+      const d = taskCalendarAnchorDate(task);
+      if (!d || isNaN(d.getTime())) {
+        undated++;
+        return;
+      }
+      const k = calDayKey(d);
+      if (!byDay.has(k)) byDay.set(k, []);
+      byDay.get(k).push({ task, columnTitle: col.title || '' });
+    });
+  });
+  return { byDay, undated };
+}
+
+function calIsOverdue(task) {
+  const pct = typeof task.progress === 'number' ? task.progress : 0;
+  if (pct >= 100) return false;
+  if (!task.end_date) return false;
+  const end = ganttParseLocal(task.end_date);
+  if (!end) return false;
+  const today = ganttStripTime(new Date());
+  return end < today;
+}
+
+function calIsDone(task) {
+  return typeof task.progress === 'number' && task.progress >= 100;
+}
+
+function calTaskChipMarkup(item) {
+  const { task, columnTitle } = item;
+  const tid = task.id;
+  const rawTitle = (task.title || '').slice(0, 80);
+  const overdue = calIsOverdue(task);
+  const done = calIsDone(task);
+  const nAsg = Array.isArray(task.assignees) ? task.assignees.length : 0;
+  const badge = nAsg ? `<span class="pm-cal-asg">${nAsg > 9 ? '9+' : String(nAsg)}</span>` : '';
+  const cls = ['pm-cal-chip'];
+  if (overdue) cls.push('pm-cal-chip--overdue');
+  if (done) cls.push('pm-cal-chip--done');
+  const tip = escapeHtml([task.title || '', columnTitle].filter(Boolean).join(' — ').slice(0, 220));
+  return `<button type="button" class="${cls.join(' ')}" data-cal-task-id="${tid}" title="${tip}">${badge}<span class="pm-cal-chip-t">${escapeHtml(rawTitle)}</span></button>`;
+}
+
+function calWeekStartSunday(d) {
+  const t = ganttStripTime(d);
+  const w = t.getDay();
+  const s = new Date(t);
+  s.setDate(s.getDate() - w);
+  return s;
+}
+
+function calSameLocalDay(a, b) {
+  return calDayKey(a) === calDayKey(b);
+}
+
+function syncCalViewToggleButtons() {
+  document.querySelectorAll('#panel-calendar .cal-view-btn').forEach((b) => {
+    const mode = b.getAttribute('data-cal-mode');
+    const on = mode === calendarViewMode;
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
+function calNavigateToday() {
+  calendarCursor = ganttStripTime(new Date());
+  renderCalendar(lastBoardData);
+}
+
+function calNavigatePrev() {
+  const c = calendarCursor;
+  if (calendarViewMode === 'month') {
+    calendarCursor = new Date(c.getFullYear(), c.getMonth() - 1, 1);
+  } else if (calendarViewMode === 'week') {
+    const ws = calWeekStartSunday(c);
+    ws.setDate(ws.getDate() - 7);
+    calendarCursor = ws;
+  } else {
+    calendarCursor = new Date(c.getFullYear() - 1, 0, 1);
+  }
+  renderCalendar(lastBoardData);
+}
+
+function calNavigateNext() {
+  const c = calendarCursor;
+  if (calendarViewMode === 'month') {
+    calendarCursor = new Date(c.getFullYear(), c.getMonth() + 1, 1);
+  } else if (calendarViewMode === 'week') {
+    const ws = calWeekStartSunday(c);
+    ws.setDate(ws.getDate() + 7);
+    calendarCursor = ws;
+  } else {
+    calendarCursor = new Date(c.getFullYear() + 1, 0, 1);
+  }
+  renderCalendar(lastBoardData);
+}
+
+function calSetViewMode(mode) {
+  if (mode !== 'year' && mode !== 'month' && mode !== 'week') return;
+  calendarViewMode = mode;
+  const c = calendarCursor;
+  if (mode === 'month') {
+    calendarCursor = new Date(c.getFullYear(), c.getMonth(), 1);
+  } else if (mode === 'year') {
+    calendarCursor = new Date(c.getFullYear(), 0, 1);
+  }
+  renderCalendar(lastBoardData);
+}
+
+function renderCalendarMonth(mount, boardData, idx) {
+  const c = calendarCursor;
+  const y = c.getFullYear();
+  const m = c.getMonth();
+  const first = new Date(y, m, 1);
+  const gridStart = new Date(first);
+  gridStart.setDate(first.getDate() - first.getDay());
+  const today = ganttStripTime(new Date());
+  const titleEl = $('calNavTitle');
+  if (titleEl) titleEl.textContent = first.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+
+  const dows = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  let h = '<div class="pm-cal-month-grid">';
+  dows.forEach((label, i) => {
+    const wk = i === 0 || i === 6;
+    h += `<div class="pm-cal-dow${wk ? ' pm-cal-dow--weekend' : ''}">${label}</div>`;
+  });
+  for (let i = 0; i < 42; i++) {
+    const cellDate = new Date(gridStart);
+    cellDate.setDate(gridStart.getDate() + i);
+    const inMonth = cellDate.getMonth() === m;
+    const wk = cellDate.getDay();
+    const isWeekend = wk === 0 || wk === 6;
+    const isToday = calSameLocalDay(cellDate, today);
+    const k = calDayKey(cellDate);
+    const items = (idx.byDay.get(k) || []).slice();
+    items.sort((a, b) => String(a.task.title || '').localeCompare(String(b.task.title || '')));
+    const maxShow = 3;
+    const shown = items.slice(0, maxShow);
+    const more = items.length - shown.length;
+    let cls = 'pm-cal-cell';
+    if (!inMonth) cls += ' pm-cal-cell--muted';
+    if (isWeekend) cls += ' pm-cal-cell--weekend';
+    if (isToday) cls += ' pm-cal-cell--today';
+    h += `<div class="${cls}">`;
+    h += `<div class="pm-cal-daynum">${cellDate.getDate()}</div>`;
+    h += '<div class="pm-cal-chips">';
+    h += shown.map((it) => calTaskChipMarkup(it)).join('');
+    if (more > 0) h += `<div class="pm-cal-more">+${more} more</div>`;
+    h += '</div></div>';
+  }
+  h += '</div>';
+  mount.innerHTML = h;
+}
+
+function renderCalendarWeek(mount, boardData, idx) {
+  const ws = calWeekStartSunday(calendarCursor);
+  const titleEl = $('calNavTitle');
+  const we = new Date(ws);
+  we.setDate(we.getDate() + 6);
+  if (titleEl) {
+    titleEl.textContent = ws.getFullYear() === we.getFullYear()
+      ? `${ws.toLocaleString(undefined, { month: 'short', day: 'numeric' })} – ${we.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+      : `${ws.toLocaleDateString()} – ${we.toLocaleDateString()}`;
+  }
+  const today = ganttStripTime(new Date());
+  const dows = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  let h = '<div class="pm-cal-month-grid">';
+  dows.forEach((label, i) => {
+    const wk = i === 0 || i === 6;
+    h += `<div class="pm-cal-dow${wk ? ' pm-cal-dow--weekend' : ''}">${label}</div>`;
+  });
+  for (let i = 0; i < 7; i++) {
+    const cellDate = new Date(ws);
+    cellDate.setDate(ws.getDate() + i);
+    const wk = cellDate.getDay();
+    const isWeekend = wk === 0 || wk === 6;
+    const isToday = calSameLocalDay(cellDate, today);
+    const k = calDayKey(cellDate);
+    const items = (idx.byDay.get(k) || []).slice();
+    items.sort((a, b) => String(a.task.title || '').localeCompare(String(b.task.title || '')));
+    let cls = 'pm-cal-cell pm-cal-week-cell';
+    if (isWeekend) cls += ' pm-cal-cell--weekend';
+    if (isToday) cls += ' pm-cal-cell--today';
+    h += `<div class="${cls}">`;
+    h += `<div class="pm-cal-daynum">${cellDate.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>`;
+    h += '<div class="pm-cal-chips">';
+    items.forEach((it) => { h += calTaskChipMarkup(it); });
+    if (!items.length) h += '<span class="text-xs text-zinc-400">No dated tasks</span>';
+    h += '</div></div>';
+  }
+  h += '</div>';
+  mount.innerHTML = h;
+}
+
+function renderCalendarYear(mount, boardData, idx) {
+  const y = calendarCursor.getFullYear();
+  const titleEl = $('calNavTitle');
+  if (titleEl) titleEl.textContent = String(y);
+  const today = ganttStripTime(new Date());
+  let html = '<div class="pm-cal-year-grid">';
+  for (let m = 0; m < 12; m++) {
+    const first = new Date(y, m, 1);
+    const gridStart = new Date(first);
+    gridStart.setDate(first.getDate() - first.getDay());
+    html += '<div class="pm-cal-mini-wrap">';
+    html += `<div class="pm-cal-mini-title">${first.toLocaleString(undefined, { month: 'long' })}</div>`;
+    html += '<div class="pm-cal-mini-grid">';
+    ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach((d) => {
+      html += `<div class="pm-cal-mini-dh">${d}</div>`;
+    });
+    for (let i = 0; i < 42; i++) {
+      const cellDate = new Date(gridStart);
+      cellDate.setDate(gridStart.getDate() + i);
+      const inMonth = cellDate.getMonth() === m;
+      const k = calDayKey(cellDate);
+      const list = idx.byDay.get(k) || [];
+      const firstTask = list[0];
+      let dot = '';
+      if (list.length && firstTask) {
+        const od = calIsOverdue(firstTask.task) ? ' pm-cal-mini-dot--overdue' : '';
+        dot = `<span class="pm-cal-mini-dot${od}"></span>`;
+      }
+      let dcls = 'pm-cal-mini-day';
+      if (inMonth) dcls += ' pm-cal-mini-day--in';
+      if (calSameLocalDay(cellDate, today)) dcls += ' pm-cal-mini-day--today';
+      const label = inMonth ? String(cellDate.getDate()) : '';
+      const tip = list.map((x) => x.task.title).join(', ');
+      const openFirst = list.length ? ` data-cal-task-id="${list[0].task.id}" style="cursor:pointer"` : '';
+      html += `<div class="${dcls}" title="${escapeHtml(tip.slice(0, 200))}"${openFirst}>${label}${dot}</div>`;
+    }
+    html += '</div></div>';
+  }
+  html += '</div>';
+  mount.innerHTML = html;
+}
+
+function renderCalendar(boardData) {
+  const mount = $('calendarMount');
+  if (!mount) return;
+  if (!(calendarCursor instanceof Date) || isNaN(calendarCursor.getTime())) {
+    calendarCursor = ganttStripTime(new Date());
+  }
+  const note = $('calNoteUndated');
+  if (!currentProjectId || !boardData || !boardData.columns) {
+    mount.innerHTML = '<p class="p-12 text-center text-sm text-zinc-500">Select a project to view the calendar.</p>';
+    const titleEl = $('calNavTitle');
+    if (titleEl) titleEl.textContent = '—';
+    if (note) note.classList.add('hidden');
+    syncCalViewToggleButtons();
+    return;
+  }
+  const idx = buildCalendarTaskIndex(boardData);
+  if (note) {
+    if (idx.undated > 0) {
+      note.classList.remove('hidden');
+      note.textContent = `${idx.undated} task${idx.undated === 1 ? '' : 's'} have no start/end date and are not shown on the calendar. Open the Board tab to add dates.`;
+    } else {
+      note.classList.add('hidden');
+    }
+  }
+  if (calendarViewMode === 'month') {
+    renderCalendarMonth(mount, boardData, idx);
+  } else if (calendarViewMode === 'week') {
+    renderCalendarWeek(mount, boardData, idx);
+  } else {
+    renderCalendarYear(mount, boardData, idx);
+  }
+  syncCalViewToggleButtons();
 }
 
 const GANTT_DAY_W = 20;
@@ -1521,6 +2039,19 @@ function clearPmWorkspaceState() {
     ganttEmpty.classList.remove('hidden');
     ganttEmpty.textContent = 'Select a project to view the schedule.';
   }
+  const calMount = $('calendarMount');
+  if (calMount) {
+    calMount.innerHTML = '<p class="p-12 text-center text-sm text-zinc-500">Select a project to view the calendar.</p>';
+  }
+  const calNote = $('calNoteUndated');
+  if (calNote) {
+    calNote.classList.add('hidden');
+    calNote.textContent = '';
+  }
+  const calTitle = $('calNavTitle');
+  if (calTitle) calTitle.textContent = '—';
+  calendarViewMode = 'month';
+  calendarCursor = new Date();
   setActiveTab('board');
 }
 
@@ -1786,6 +2317,9 @@ const addColBtn = el('button', {class:'flex-none h-fit self-start px-4 py-2.5 ro
 
     if (activePmTab === 'gantt') {
       requestAnimationFrame(() => renderVisGantt(data));
+    }
+    if (activePmTab === 'calendar') {
+      requestAnimationFrame(() => renderCalendar(data));
     }
     if (activePmTab === 'documents') {
       requestAnimationFrame(() => renderDocumentsPanel(data));
@@ -3436,11 +3970,38 @@ window.onload = async () => {
   const tabBoard = $('tab-board');
   const tabTimeline = $('tab-timeline');
   const tabGantt = $('tab-gantt');
+  const tabCalendar = $('tab-calendar');
   const tabDocuments = $('tab-documents');
   if (tabBoard) tabBoard.onclick = () => setActiveTab('board');
   if (tabTimeline) tabTimeline.onclick = () => setActiveTab('timeline');
   if (tabGantt) tabGantt.onclick = () => setActiveTab('gantt');
+  if (tabCalendar) tabCalendar.onclick = () => setActiveTab('calendar');
   if (tabDocuments) tabDocuments.onclick = () => setActiveTab('documents');
+
+  const calBtnToday = $('calBtnToday');
+  if (calBtnToday) calBtnToday.onclick = () => calNavigateToday();
+  const calBtnPrev = $('calBtnPrev');
+  if (calBtnPrev) calBtnPrev.onclick = () => calNavigatePrev();
+  const calBtnNext = $('calBtnNext');
+  if (calBtnNext) calBtnNext.onclick = () => calNavigateNext();
+  document.querySelectorAll('#panel-calendar .cal-view-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const mode = btn.getAttribute('data-cal-mode');
+      if (mode) calSetViewMode(mode);
+    });
+  });
+  const panelCal = $('panel-calendar');
+  if (panelCal && !panelCal.dataset.calDelegate) {
+    panelCal.dataset.calDelegate = '1';
+    panelCal.addEventListener('click', (ev) => {
+      const chip = ev.target.closest('[data-cal-task-id]');
+      if (chip) {
+        ev.preventDefault();
+        const id = chip.getAttribute('data-cal-task-id');
+        if (id) openTaskFromTimeline(id);
+      }
+    });
+  }
 
   const ganttColorBy = $('ganttColorBy');
   if (ganttColorBy) {
