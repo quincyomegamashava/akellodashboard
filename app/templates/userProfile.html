@@ -1231,21 +1231,20 @@
         const activeOtherSchool = !!activeVisit && !isCurrentSchoolActive;
 
         if (isCurrentSchoolActive) {
-          const checkoutLibId = schoolLibId || normalizeVisitKey(activeVisit.library_id) || "";
-          const checkoutName = schoolName.replace(/"/g, "&quot;");
-          return `<button type="button" class="visit-action-btn checkout js-school-checkout-btn" data-asl-school-id="${schoolAslId}" data-library-id="${checkoutLibId}" data-school-name="${checkoutName}">Check out</button>`;
+          return '<span class="stat-subtle" title="Checked in here. Use the visit status card above to check out.">—</span>';
         }
 
         if (activeOtherSchool) {
           const activeName = activeVisit.school_name || "another school";
-          return `<button type="button" class="visit-action-btn disabled" disabled title="You are currently checked in at ${activeName}">Check in</button>`;
+          return `<span class="stat-subtle" title="Checked in at ${activeName.replace(/"/g, '&quot;')}">—</span>`;
         }
 
         if (!schoolLibId) {
           return '<span class="stat-subtle">N/A</span>';
         }
 
-        return `<button type="button" class="visit-action-btn checkin js-school-checkin-btn" data-asl-school-id="${schoolAslId}" data-library-id="${schoolLibId}" data-school-name="${schoolName.replace(/"/g, '&quot;')}">Check in</button>`;
+        /* Check-in from school rows is hidden; use visit status card / other flows if needed. */
+        return '<span class="stat-subtle">—</span>';
       }
 
       function renderRow(school) {

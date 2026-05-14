@@ -553,10 +553,34 @@ class SchoolVisitLog(db.Model):
     checkin_user_agent = db.Column(db.String(512), nullable=True)
 
     notes = db.Column(db.Text, nullable=True)
+    visit_grades_json = db.Column(db.Text, nullable=True)
+    teacher_name = db.Column(db.String(255), nullable=True)
+    teacher_contact = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = db.relationship('User', backref=db.backref('school_visit_logs', lazy='dynamic'))
+
+    def parsed_visit_grades(self):
+        if not self.visit_grades_json:
+            return None
+        try:
+            raw = json.loads(self.visit_grades_json)
+            if not isinstance(raw, list):
+                return None
+            out = []
+            for g in raw:
+                out.append(int(g))
+            return sorted(set(out))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+
+    def visit_context_dict(self):
+        return {
+            'grades': self.parsed_visit_grades(),
+            'teacher_name': self.teacher_name,
+            'teacher_contact': self.teacher_contact,
+        }
 
     @staticmethod
     def _to_iso_utc(value):
@@ -599,6 +623,7 @@ class SchoolVisitLog(db.Model):
                 'platform': self.checkin_device_platform,
             },
             'notes': self.notes,
+            'visit_context': self.visit_context_dict(),
         }
 
 

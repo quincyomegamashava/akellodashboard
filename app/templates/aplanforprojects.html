@@ -182,84 +182,281 @@
       outline-offset: 2px;
     }
 
-    /* Calendar tab */
+    /* Calendar tab — glass / depth / single accent system */
+    #panel-calendar {
+      --cal-accent: #6366f1;
+      --cal-accent-soft: rgba(99, 102, 241, 0.14);
+      --cal-teal: #0d9488;
+      --cal-teal-glow: rgba(13, 148, 136, 0.22);
+      --cal-line: rgba(148, 163, 184, 0.45);
+      --cal-surface: rgba(255, 255, 255, 0.72);
+    }
+    .pm-cal-toolbar {
+      border-radius: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.82) 0%, rgba(248, 250, 252, 0.9) 50%, rgba(239, 246, 255, 0.55) 100%);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow:
+        0 4px 24px -8px rgba(15, 23, 42, 0.12),
+        0 1px 0 rgba(255, 255, 255, 0.9) inset;
+    }
+    .cal-today-btn,
+    .cal-nav-btn {
+      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+    }
+    .cal-today-btn:hover,
+    .cal-nav-btn:hover {
+      border-color: rgba(99, 102, 241, 0.35);
+      box-shadow: 0 2px 12px -4px rgba(99, 102, 241, 0.25);
+    }
+    .cal-today-btn:focus-visible,
+    .cal-nav-btn:focus-visible,
+    .cal-view-btn:focus-visible {
+      outline: 2px solid var(--cal-accent);
+      outline-offset: 2px;
+    }
+    .cal-segment {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 0.875rem;
+      border: 1px solid rgba(226, 232, 240, 0.95);
+      background: rgba(255, 255, 255, 0.5);
+      padding: 0.2rem;
+      gap: 0.2rem;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) inset;
+    }
+    .cal-view-btn {
+      border-radius: 0.65rem;
+      border: 1px solid transparent;
+      transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    }
+    .cal-view-btn:hover {
+      background: rgba(255, 255, 255, 0.85);
+    }
+    .cal-view-btn[aria-pressed="true"] {
+      color: #4338ca;
+      font-weight: 600;
+      background: linear-gradient(180deg, #ffffff 0%, #eef2ff 100%);
+      border-color: rgba(99, 102, 241, 0.35);
+      box-shadow:
+        0 2px 8px -2px rgba(79, 70, 229, 0.2),
+        0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+    }
+    #calendarMount.pm-cal-mount {
+      flex: 1;
+      min-height: 420px;
+      border-radius: 1rem;
+      overflow: hidden;
+      border: 1px solid rgba(226, 232, 240, 0.95);
+      background:
+        radial-gradient(120% 80% at 100% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 55%),
+        radial-gradient(90% 60% at 0% 100%, rgba(13, 148, 136, 0.06) 0%, transparent 50%),
+        linear-gradient(165deg, rgba(255, 255, 255, 0.97) 0%, rgba(248, 250, 252, 0.98) 45%, rgba(241, 245, 249, 0.99) 100%);
+      box-shadow:
+        0 8px 32px -12px rgba(15, 23, 42, 0.14),
+        0 1px 0 rgba(255, 255, 255, 0.95) inset;
+    }
+    .pm-cal-empty {
+      padding: 3rem 1.5rem;
+      text-align: center;
+      font-size: 0.875rem;
+      color: #71717a;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, transparent 100%);
+    }
     .pm-cal-month-grid {
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
-      grid-auto-rows: minmax(5.5rem, 1fr);
-      border-top: 1px solid #e4e4e7;
-      border-left: 1px solid #e4e4e7;
+      grid-auto-rows: minmax(5.75rem, 1fr);
+      gap: 1px;
+      padding: 1px;
+      min-height: 100%;
+      background: var(--cal-line);
+      border-radius: 0 0 0.875rem 0.875rem;
     }
     .pm-cal-dow {
       text-align: center;
-      font-size: 0.7rem;
-      font-weight: 600;
+      font-size: 0.65rem;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #71717a;
-      padding: 0.5rem 0.25rem;
-      background: #fafafa;
-      border-right: 1px solid #e4e4e7;
-      border-bottom: 1px solid #e4e4e7;
+      letter-spacing: 0.1em;
+      color: #64748b;
+      padding: 0.55rem 0.2rem;
+      background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(241, 245, 249, 0.95) 100%);
     }
-    .pm-cal-dow.pm-cal-dow--weekend { background: #f4f4f5; color: #a1a1aa; }
+    .pm-cal-dow.pm-cal-dow--weekend {
+      background: linear-gradient(180deg, rgba(238, 242, 255, 0.75) 0%, rgba(224, 231, 255, 0.45) 100%);
+      color: #818cf8;
+    }
     .pm-cal-cell {
-      border-right: 1px solid #e4e4e7;
-      border-bottom: 1px solid #e4e4e7;
-      padding: 0.25rem 0.35rem 0.35rem;
-      min-height: 5.5rem;
+      padding: 0.3rem 0.4rem 0.4rem;
+      min-height: 5.75rem;
       display: flex;
       flex-direction: column;
       align-items: stretch;
-      gap: 0.15rem;
-      background: #fff;
+      gap: 0.2rem;
+      background: rgba(255, 255, 255, 0.92);
       position: relative;
+      overflow: hidden;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
     }
-    .pm-cal-cell.pm-cal-cell--weekend { background: #fafafa; }
-    .pm-cal-cell.pm-cal-cell--muted { background: #fcfcfc; }
-    .pm-cal-cell.pm-cal-cell--muted .pm-cal-daynum { color: #d4d4d8; }
-    .pm-cal-cell.pm-cal-cell--today .pm-cal-daynum {
-      color: #0d9488;
-      font-weight: 700;
+    .pm-cal-cell::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(99, 102, 241, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99, 102, 241, 0.04) 1px, transparent 1px);
+      background-size: 10px 10px;
+      pointer-events: none;
+      opacity: 0.65;
+    }
+    .pm-cal-cell:hover {
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.12) inset;
+    }
+    .pm-cal-cell.pm-cal-cell--weekend {
+      background: rgba(248, 250, 255, 0.88);
+    }
+    .pm-cal-cell.pm-cal-cell--muted {
+      background: rgba(250, 250, 250, 0.75);
+    }
+    .pm-cal-cell.pm-cal-cell--muted::before {
+      opacity: 0.35;
     }
     .pm-cal-cell.pm-cal-cell--today {
-      box-shadow: inset 0 0 0 2px rgba(13, 148, 136, 0.35);
+      box-shadow:
+        0 0 0 1px rgba(99, 102, 241, 0.15) inset,
+        0 0 28px -6px var(--cal-teal-glow),
+        0 0 20px -8px rgba(99, 102, 241, 0.12);
+      background: linear-gradient(160deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 253, 250, 0.55) 100%);
+    }
+    .pm-cal-cell.pm-cal-cell--has-tasks::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 0;
+      height: 0;
+      border-style: solid;
+      border-width: 0 7px 7px 0;
+      border-color: transparent rgba(99, 102, 241, 0.35) transparent transparent;
+      pointer-events: none;
+    }
+    .pm-cal-daynum-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 1.35rem;
+      position: relative;
+      z-index: 1;
     }
     .pm-cal-daynum {
-      font-size: 0.8rem;
-      font-weight: 500;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
       color: #3f3f46;
       line-height: 1.2;
     }
-    .pm-cal-cell.pm-cal-cell--weekend .pm-cal-daynum { color: #9f1239; opacity: 0.85; }
-    .pm-cal-cell.pm-cal-cell--muted.pm-cal-cell--weekend .pm-cal-daynum { color: #d6d3d1; opacity: 1; }
+    .pm-cal-daynum--muted {
+      color: #c4c4cc;
+      font-weight: 500;
+    }
+    .pm-cal-cell.pm-cal-cell--weekend:not(.pm-cal-cell--muted) .pm-cal-daynum:not(.pm-cal-daynum--pill) {
+      color: #4f46e5;
+      opacity: 0.88;
+    }
+    .pm-cal-daynum--pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.65rem;
+      height: 1.65rem;
+      padding: 0 0.35rem;
+      border-radius: 9999px;
+      font-weight: 700;
+      color: #0f766e;
+      background: linear-gradient(145deg, rgba(204, 251, 241, 0.95) 0%, rgba(153, 246, 228, 0.75) 100%);
+      border: 1px solid rgba(45, 212, 191, 0.45);
+      box-shadow:
+        0 0 16px -4px var(--cal-teal-glow),
+        0 1px 2px rgba(15, 118, 110, 0.12);
+    }
+    .pm-cal-week-cell .pm-cal-daynum--pill {
+      min-width: 0;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      min-height: 1.65rem;
+      white-space: normal;
+      text-align: center;
+      line-height: 1.25;
+      font-size: 0.62rem;
+      padding: 0.3rem 0.35rem;
+    }
     .pm-cal-chips {
       display: flex;
       flex-direction: column;
-      gap: 0.12rem;
+      gap: 0.18rem;
       min-height: 0;
       overflow: hidden;
+      position: relative;
+      z-index: 1;
     }
     .pm-cal-chip {
       display: flex;
       align-items: center;
-      gap: 0.2rem;
+      gap: 0.3rem;
       max-width: 100%;
-      border: 0;
-      border-radius: 0.25rem;
-      padding: 0.1rem 0.25rem;
-      font-size: 0.65rem;
-      line-height: 1.2;
+      border: 1px solid rgba(226, 232, 240, 0.95);
+      border-left: 3px solid var(--chip-bar, #6366f1);
+      border-radius: 0.4rem;
+      padding: 0.2rem 0.35rem;
+      font-size: 0.625rem;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      line-height: 1.25;
       text-align: left;
       cursor: pointer;
-      background: #eef2ff;
-      color: #312e81;
+      color: #27272a;
+      background: color-mix(in srgb, var(--chip-bar, #6366f1) 12%, rgba(255, 255, 255, 0.78));
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
       position: relative;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
     }
-    .pm-cal-chip:hover { filter: brightness(0.97); }
-    .pm-cal-chip--overdue {
-      background: repeating-linear-gradient(-45deg, #fee2e2, #fee2e2 4px, #fecaca 4px, #fecaca 8px);
-      color: #7f1d1d;
+    @supports not (background: color-mix(in srgb, red 10%, white)) {
+      .pm-cal-chip {
+        background: rgba(255, 255, 255, 0.78);
+      }
+    }
+    .pm-cal-chip:hover {
+      transform: translateY(-1px);
+      border-color: color-mix(in srgb, var(--chip-bar, #6366f1) 28%, rgba(226, 232, 240, 0.95));
+      border-left-color: var(--chip-bar, #6366f1);
+      box-shadow:
+        0 4px 14px -6px color-mix(in srgb, var(--chip-bar, #6366f1) 35%, transparent),
+        0 1px 3px rgba(15, 23, 42, 0.08);
+      background: color-mix(in srgb, var(--chip-bar, #6366f1) 18%, rgba(255, 255, 255, 0.9));
+    }
+    @supports not (background: color-mix(in srgb, red 10%, white)) {
+      .pm-cal-chip:hover {
+        background: rgba(255, 255, 255, 0.92);
+      }
+    }
+    .pm-cal-chip-dot {
+      flex-shrink: 0;
+      width: 6px;
+      height: 6px;
+      border-radius: 9999px;
+      background: var(--chip-bar, #6366f1);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85) inset, 0 0 8px -2px color-mix(in srgb, var(--chip-bar, #6366f1) 40%, transparent);
+    }
+    @supports not (background: color-mix(in srgb, red 10%, white)) {
+      .pm-cal-chip-dot {
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85) inset;
+      }
     }
     .pm-cal-chip-t {
       overflow: hidden;
@@ -277,105 +474,127 @@
       height: 0;
       border-style: solid;
       border-width: 0 0.55rem 0.55rem 0;
-      border-color: transparent #6366f1 transparent transparent;
+      border-color: transparent var(--chip-bar, #16a34a) transparent transparent;
       pointer-events: none;
     }
     .pm-cal-asg {
       flex-shrink: 0;
-      min-width: 1rem;
-      height: 1rem;
+      min-width: 1.05rem;
+      height: 1.05rem;
       border-radius: 9999px;
-      background: #3f3f46;
+      background: linear-gradient(145deg, #52525b, #27272a);
       color: #fff;
       font-size: 0.55rem;
       font-weight: 700;
+      font-variant-numeric: tabular-nums;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       line-height: 1;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
     }
     .pm-cal-more {
       font-size: 0.6rem;
-      color: #71717a;
-      padding-left: 0.1rem;
+      font-weight: 500;
+      color: #6366f1;
+      padding-left: 0.15rem;
+      opacity: 0.9;
     }
-    .pm-cal-week-grid {
-      display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      border-top: 1px solid #e4e4e7;
-      border-left: 1px solid #e4e4e7;
+    .pm-cal-week-empty {
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: #94a3b8;
+      padding: 0.25rem 0.1rem;
     }
     .pm-cal-week-cell {
-      border-right: 1px solid #e4e4e7;
-      border-bottom: 1px solid #e4e4e7;
       min-height: 12rem;
-      padding: 0.35rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-      background: #fff;
     }
-    .pm-cal-week-cell.pm-cal-cell--weekend { background: #fafafa; }
     .pm-cal-year-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
-      gap: 0.75rem;
-      padding: 0.75rem;
+      gap: 0.85rem;
+      padding: 0.85rem;
       max-height: min(78vh, 900px);
       overflow-y: auto;
     }
     .pm-cal-mini-wrap {
-      border: 1px solid #e4e4e7;
-      border-radius: 0.5rem;
-      padding: 0.35rem;
-      background: #fff;
+      border-radius: 0.65rem;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      padding: 0.4rem;
+      background: linear-gradient(165deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.88) 100%);
+      box-shadow: 0 2px 12px -6px rgba(15, 23, 42, 0.1);
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .pm-cal-mini-wrap:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px -10px rgba(79, 70, 229, 0.18);
     }
     .pm-cal-mini-title {
       font-size: 0.65rem;
-      font-weight: 600;
-      color: #52525b;
-      margin-bottom: 0.25rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 0.3rem;
       text-align: center;
     }
     .pm-cal-mini-grid {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
-      gap: 1px;
+      gap: 2px;
     }
     .pm-cal-mini-dh {
-      font-size: 0.55rem;
-      color: #a1a1aa;
+      font-size: 0.5rem;
+      font-weight: 600;
+      color: #94a3b8;
       text-align: center;
     }
     .pm-cal-mini-day {
       font-size: 0.55rem;
-      min-height: 0.95rem;
+      min-height: 1rem;
       text-align: center;
-      color: #a1a1aa;
+      color: #cbd5e1;
       position: relative;
+      border-radius: 0.2rem;
+      transition: background 0.15s ease;
     }
     .pm-cal-mini-day.pm-cal-mini-day--in {
-      color: #52525b;
-      font-weight: 500;
+      color: #475569;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
     }
     .pm-cal-mini-day.pm-cal-mini-day--today {
-      color: #0d9488;
-      font-weight: 700;
+      color: #0f766e;
+      font-weight: 800;
+      background: rgba(204, 251, 241, 0.65);
+      box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.35);
     }
     .pm-cal-mini-dot {
       display: block;
-      width: 4px;
-      height: 4px;
+      width: 5px;
+      height: 5px;
       border-radius: 9999px;
-      background: #6366f1;
-      margin: 1px auto 0;
+      background: var(--chip-bar, #6366f1);
+      margin: 2px auto 0;
+      box-shadow: 0 0 8px -1px color-mix(in srgb, var(--chip-bar, #6366f1) 55%, transparent);
     }
-    .pm-cal-mini-dot.pm-cal-mini-dot--overdue { background: #ef4444; }
-    .cal-view-btn[aria-pressed="true"] {
-      color: #4f46e5;
-      font-weight: 600;
-      background: #fff;
-      box-shadow: 0 1px 2px rgba(79, 70, 229, 0.12);
+    @supports not (background: color-mix(in srgb, red 10%, white)) {
+      .pm-cal-mini-dot {
+        box-shadow: none;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .pm-cal-chip,
+      .pm-cal-mini-wrap,
+      .cal-today-btn,
+      .cal-nav-btn,
+      .cal-view-btn {
+        transition: none;
+      }
+      .pm-cal-chip:hover,
+      .pm-cal-mini-wrap:hover {
+        transform: none;
+      }
     }
 
     /* Icon button tooltip styles */
@@ -712,30 +931,30 @@
 
         <!-- Calendar: month / week / year from task due (end_date) or start_date -->
         <div id="panel-calendar" role="tabpanel" aria-labelledby="tab-calendar" class="hidden flex-1 flex-col min-h-0" aria-hidden="true">
-          <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+          <div class="pm-cal-toolbar flex flex-wrap items-center justify-between gap-3 mb-3">
             <div class="flex items-center gap-2">
-              <button type="button" id="calBtnToday" class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/></svg>
+              <button type="button" id="calBtnToday" class="cal-today-btn inline-flex items-center gap-1.5 rounded-xl border border-zinc-200/90 bg-white/80 px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-indigo-500" aria-hidden="true"><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/></svg>
                 Today
               </button>
             </div>
-            <div class="flex items-center gap-1">
-              <button type="button" id="calBtnPrev" class="rounded-lg border border-zinc-200 bg-white p-2 text-zinc-600 hover:bg-zinc-50" aria-label="Previous period">
+            <div class="flex items-center gap-1 rounded-xl border border-zinc-200/80 bg-white/70 px-1 py-1 shadow-sm backdrop-blur-sm">
+              <button type="button" id="calBtnPrev" class="cal-nav-btn rounded-lg border border-transparent bg-transparent p-2 text-zinc-600 hover:bg-white/90" aria-label="Previous period">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>
               </button>
-              <h2 id="calNavTitle" class="min-w-[10rem] text-center text-base font-semibold text-zinc-900 px-2">—</h2>
-              <button type="button" id="calBtnNext" class="rounded-lg border border-zinc-200 bg-white p-2 text-zinc-600 hover:bg-zinc-50" aria-label="Next period">
+              <h2 id="calNavTitle" class="min-w-[10rem] text-center text-base font-semibold tracking-tight text-zinc-900 px-2">—</h2>
+              <button type="button" id="calBtnNext" class="cal-nav-btn rounded-lg border border-transparent bg-transparent p-2 text-zinc-600 hover:bg-white/90" aria-label="Next period">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>
               </button>
             </div>
-            <div class="inline-flex rounded-lg border border-zinc-200 bg-zinc-50/80 p-0.5 gap-0.5" role="group" aria-label="Calendar scale">
-              <button type="button" class="cal-view-btn rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:bg-white/90 transition" data-cal-mode="year" aria-pressed="false">Year</button>
-              <button type="button" class="cal-view-btn rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:bg-white/90 transition" data-cal-mode="month" aria-pressed="true">Month</button>
-              <button type="button" class="cal-view-btn rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:bg-white/90 transition" data-cal-mode="week" aria-pressed="false">Week</button>
+            <div class="cal-segment inline-flex" role="group" aria-label="Calendar scale">
+              <button type="button" class="cal-view-btn px-3 py-2 text-sm text-zinc-600" data-cal-mode="year" aria-pressed="false">Year</button>
+              <button type="button" class="cal-view-btn px-3 py-2 text-sm text-zinc-600" data-cal-mode="month" aria-pressed="true">Month</button>
+              <button type="button" class="cal-view-btn px-3 py-2 text-sm text-zinc-600" data-cal-mode="week" aria-pressed="false">Week</button>
             </div>
           </div>
-          <p id="calNoteUndated" class="hidden text-xs text-zinc-500 mb-2"></p>
-          <div id="calendarMount" class="flex-1 min-h-[420px] rounded-xl border border-zinc-200 bg-white overflow-hidden"></div>
+          <p id="calNoteUndated" class="hidden text-xs text-zinc-500 mb-2 rounded-lg border border-indigo-100/80 bg-indigo-50/40 px-3 py-2"></p>
+          <div id="calendarMount" class="pm-cal-mount flex-1 min-h-[420px] overflow-hidden"></div>
         </div>
 
         <div id="panel-documents" role="tabpanel" aria-labelledby="tab-documents" class="hidden flex-1 flex-col min-h-0 overflow-auto" aria-hidden="true">
@@ -1226,32 +1445,55 @@ function buildCalendarTaskIndex(boardData) {
 }
 
 function calIsOverdue(task) {
-  const pct = typeof task.progress === 'number' ? task.progress : 0;
+  const pct = typeof task.progress === 'number' ? Math.max(0, Math.min(100, task.progress)) : 0;
   if (pct >= 100) return false;
   if (!task.end_date) return false;
   const end = ganttParseLocal(task.end_date);
   if (!end) return false;
-  const today = ganttStripTime(new Date());
-  return end < today;
+  const today0 = ganttLocalDayStart(new Date());
+  const end0 = ganttStripTime(end);
+  return end0 < today0;
 }
 
 function calIsDone(task) {
   return typeof task.progress === 'number' && task.progress >= 100;
 }
 
+/** Bar color aligned with Schedule (Gantt): overdue + incomplete → #ef4444; else ganttProgressColor(progress). */
+function calScheduleBarColor(task) {
+  const pct = typeof task.progress === 'number' ? Math.max(0, Math.min(100, task.progress)) : 0;
+  const today0 = ganttLocalDayStart(new Date());
+  const e = task.end_date ? ganttParseLocal(task.end_date) : null;
+  const end0 = e ? ganttStripTime(e) : null;
+  const isOverdue = !!(end0 && end0 < today0);
+  if (isOverdue && pct < 100) return '#ef4444';
+  return ganttProgressColor(pct);
+}
+
+/** When a day has multiple tasks, prefer showing the most urgent hue on the year mini-dot. */
+function calDayWorstBarColor(items) {
+  if (!items || !items.length) return null;
+  for (const it of items) {
+    if (calIsOverdue(it.task)) return '#ef4444';
+  }
+  for (const it of items) {
+    if (calScheduleBarColor(it.task) === '#f59e0b') return '#f59e0b';
+  }
+  return calScheduleBarColor(items[0].task);
+}
+
 function calTaskChipMarkup(item) {
   const { task, columnTitle } = item;
   const tid = task.id;
   const rawTitle = (task.title || '').slice(0, 80);
-  const overdue = calIsOverdue(task);
+  const barColor = calScheduleBarColor(task);
   const done = calIsDone(task);
   const nAsg = Array.isArray(task.assignees) ? task.assignees.length : 0;
   const badge = nAsg ? `<span class="pm-cal-asg">${nAsg > 9 ? '9+' : String(nAsg)}</span>` : '';
   const cls = ['pm-cal-chip'];
-  if (overdue) cls.push('pm-cal-chip--overdue');
   if (done) cls.push('pm-cal-chip--done');
   const tip = escapeHtml([task.title || '', columnTitle].filter(Boolean).join(' — ').slice(0, 220));
-  return `<button type="button" class="${cls.join(' ')}" data-cal-task-id="${tid}" title="${tip}">${badge}<span class="pm-cal-chip-t">${escapeHtml(rawTitle)}</span></button>`;
+  return `<button type="button" class="${cls.join(' ')}" data-cal-task-id="${tid}" title="${tip}" style="--chip-bar:${barColor}"><span class="pm-cal-chip-dot" aria-hidden="true"></span>${badge}<span class="pm-cal-chip-t">${escapeHtml(rawTitle)}</span></button>`;
 }
 
 function calWeekStartSunday(d) {
@@ -1353,8 +1595,12 @@ function renderCalendarMonth(mount, boardData, idx) {
     if (!inMonth) cls += ' pm-cal-cell--muted';
     if (isWeekend) cls += ' pm-cal-cell--weekend';
     if (isToday) cls += ' pm-cal-cell--today';
+    if (items.length) cls += ' pm-cal-cell--has-tasks';
     h += `<div class="${cls}">`;
-    h += `<div class="pm-cal-daynum">${cellDate.getDate()}</div>`;
+    const dnCls = ['pm-cal-daynum'];
+    if (!inMonth) dnCls.push('pm-cal-daynum--muted');
+    if (isToday) dnCls.push('pm-cal-daynum--pill');
+    h += `<div class="pm-cal-daynum-row"><span class="${dnCls.join(' ')}">${cellDate.getDate()}</span></div>`;
     h += '<div class="pm-cal-chips">';
     h += shown.map((it) => calTaskChipMarkup(it)).join('');
     if (more > 0) h += `<div class="pm-cal-more">+${more} more</div>`;
@@ -1393,11 +1639,15 @@ function renderCalendarWeek(mount, boardData, idx) {
     let cls = 'pm-cal-cell pm-cal-week-cell';
     if (isWeekend) cls += ' pm-cal-cell--weekend';
     if (isToday) cls += ' pm-cal-cell--today';
+    if (items.length) cls += ' pm-cal-cell--has-tasks';
     h += `<div class="${cls}">`;
-    h += `<div class="pm-cal-daynum">${cellDate.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>`;
+    const label = cellDate.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const dnCls = ['pm-cal-daynum'];
+    if (isToday) dnCls.push('pm-cal-daynum--pill');
+    h += `<div class="pm-cal-daynum-row"><span class="${dnCls.join(' ')}">${escapeHtml(label)}</span></div>`;
     h += '<div class="pm-cal-chips">';
     items.forEach((it) => { h += calTaskChipMarkup(it); });
-    if (!items.length) h += '<span class="text-xs text-zinc-400">No dated tasks</span>';
+    if (!items.length) h += '<span class="pm-cal-week-empty">No dated tasks</span>';
     h += '</div></div>';
   }
   h += '</div>';
@@ -1429,8 +1679,8 @@ function renderCalendarYear(mount, boardData, idx) {
       const firstTask = list[0];
       let dot = '';
       if (list.length && firstTask) {
-        const od = calIsOverdue(firstTask.task) ? ' pm-cal-mini-dot--overdue' : '';
-        dot = `<span class="pm-cal-mini-dot${od}"></span>`;
+        const bar = calDayWorstBarColor(list);
+        dot = `<span class="pm-cal-mini-dot" style="--chip-bar:${bar}"></span>`;
       }
       let dcls = 'pm-cal-mini-day';
       if (inMonth) dcls += ' pm-cal-mini-day--in';
@@ -1454,7 +1704,7 @@ function renderCalendar(boardData) {
   }
   const note = $('calNoteUndated');
   if (!currentProjectId || !boardData || !boardData.columns) {
-    mount.innerHTML = '<p class="p-12 text-center text-sm text-zinc-500">Select a project to view the calendar.</p>';
+    mount.innerHTML = '<p class="pm-cal-empty">Select a project to view the calendar.</p>';
     const titleEl = $('calNavTitle');
     if (titleEl) titleEl.textContent = '—';
     if (note) note.classList.add('hidden');
@@ -2041,7 +2291,7 @@ function clearPmWorkspaceState() {
   }
   const calMount = $('calendarMount');
   if (calMount) {
-    calMount.innerHTML = '<p class="p-12 text-center text-sm text-zinc-500">Select a project to view the calendar.</p>';
+    calMount.innerHTML = '<p class="pm-cal-empty">Select a project to view the calendar.</p>';
   }
   const calNote = $('calNoteUndated');
   if (calNote) {

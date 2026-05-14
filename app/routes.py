@@ -890,119 +890,6 @@ def administration():
     )
 
 
-def _require_admin_user():
-    if getattr(current_user, 'userRole', None) != 'Admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    return None
-
-
-def _parse_school_visit_admin_date_range(start_date_str, end_date_str):
-    if not start_date_str or not end_date_str:
-        raise ValueError('start_date and end_date are required (YYYY-MM-DD).')
-    try:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-    except ValueError:
-        raise ValueError('Invalid date format. Use YYYY-MM-DD.')
-    if start_date > end_date:
-        raise ValueError('start_date must be on or before end_date.')
-
-    tzinfo, tz_name = _get_checkin_reports_timezone()
-    start_local = datetime.combine(start_date, datetime.min.time(), tzinfo)
-    end_local = datetime.combine(end_date, datetime.max.time(), tzinfo)
-    start_utc = start_local.astimezone(timezone.utc).replace(tzinfo=None)
-    end_utc = end_local.astimezone(timezone.utc).replace(tzinfo=None)
-    return {
-        'start_utc': start_utc,
-        'end_utc': end_utc,
-        'timezone': tz_name,
-        'start_date': start_date.isoformat(),
-        'end_date': end_date.isoformat(),
-    }
-
-
-def _school_visit_logs_in_range_query(start_utc, end_utc):
-    return SchoolVisitLog.query.filter(
-        SchoolVisitLog.checkin_at >= start_utc,
-        SchoolVisitLog.checkin_at <= end_utc,
-    )
-
-
-@app.route('/api/admin/school-visits/checkins/preview', methods=['GET'])
-@login_required
-def api_admin_school_visits_checkins_preview():
-    auth_error = _require_admin_user()
-    if auth_error:
-        return auth_error
-
-    try:
-        window = _parse_school_visit_admin_date_range(
-            request.args.get('start_date'),
-            request.args.get('end_date'),
-        )
-    except ValueError as exc:
-        return jsonify({'error': str(exc)}), 400
-
-    logs_query = _school_visit_logs_in_range_query(window['start_utc'], window['end_utc'])
-    total = logs_query.count()
-    checked_in = logs_query.filter(SchoolVisitLog.status == 'checked_in').count()
-    checked_out = logs_query.filter(SchoolVisitLog.status == 'checked_out').count()
-
-    return jsonify({
-        'success': True,
-        'timezone': window['timezone'],
-        'start_date': window['start_date'],
-        'end_date': window['end_date'],
-        'total': total,
-        'checked_in': checked_in,
-        'checked_out': checked_out,
-    })
-
-
-@app.route('/api/admin/school-visits/checkins/purge', methods=['POST'])
-@login_required
-def api_admin_school_visits_checkins_purge():
-    auth_error = _require_admin_user()
-    if auth_error:
-        return auth_error
-
-    data = request.get_json(silent=True) or {}
-    confirm_phrase = (data.get('confirm_phrase') or '').strip()
-    if confirm_phrase != 'DELETE CHECKINS':
-        return jsonify({'error': 'confirm_phrase must be DELETE CHECKINS'}), 400
-
-    try:
-        window = _parse_school_visit_admin_date_range(
-            data.get('start_date'),
-            data.get('end_date'),
-        )
-    except ValueError as exc:
-        return jsonify({'error': str(exc)}), 400
-
-    logs_query = _school_visit_logs_in_range_query(window['start_utc'], window['end_utc'])
-    deleted_count = logs_query.count()
-    if deleted_count:
-        logs_query.delete(synchronize_session=False)
-        db.session.commit()
-
-    app.logger.info(
-        "Admin %s purged %d school visit check-ins from %s to %s (%s)",
-        current_user.username,
-        deleted_count,
-        window['start_date'],
-        window['end_date'],
-        window['timezone'],
-    )
-
-    return jsonify({
-        'success': True,
-        'deleted_count': deleted_count,
-        'start_date': window['start_date'],
-        'end_date': window['end_date'],
-        'timezone': window['timezone'],
-    })
-
-
 def _ensure_helpdesk_resolved_at_column():
     """Add helpdesk_queries.resolved_at if missing (e.g. SQLite DB never migrated). Avoids OperationalError when loading User.assigned_queries."""
     try:
@@ -2627,12 +2514,7 @@ def run_weekly_checkin_report_job(triggered_by='scheduler', week_ending_str=None
             return {'status': 'skipped', 'reason': 'already_sent', 'week_ending': week_key}
 
     window = _compute_checkin_week_window(week_ending_date, tzinfo)
-    admin_rows = _build_weekly_checkin_report_rows(
-        window['start_utc'],
-        window['end_utc'],
-        champion_user_id=None,
-        include_admin_fields=True,
-    )
+    admin_rows = _build_weekly_checkin_report_rows(window['start_utc'], window['end_utc'], champion_user_id=None)
     champions = User.query.filter(User.userRole == 'Brand Ambassador').all()
     admins = User.query.filter(User.userRole == 'Admin').all()
 
@@ -6552,6 +6434,9 @@ def _weekly_checkin_report_headers():
         "checkout_longitude",
         "checkin_device_install_id",
         "checkout_device_install_id",
+        "visit_grades",
+        "teacher_name",
+        "teacher_contact",
     ]
 
 
@@ -12726,17 +12611,6 @@ def api_profile_school_tables(username):
     """Return school tables data for profile page (loaded async with loading indicators)."""
     try:
         data = _get_profile_school_tables_data(username)
-        target_user = User.query.filter_by(username=username).first()
-        active_visit = None
-        if target_user:
-            active_visit = SchoolVisitLog.query.filter_by(
-                user_id=target_user.id,
-                status='checked_in',
-            ).order_by(SchoolVisitLog.checkin_at.desc()).first()
-        data['active_visit'] = (
-            _visit_dict_for_viewer(active_visit, include_admin_fields=_is_visit_admin_viewer())
-            if active_visit else None
-        )
         return jsonify(data)
     except Exception as e:
         logging.exception("profile school-tables API: %s", e)
@@ -12797,6 +12671,57 @@ def _visit_admin_metadata(log):
     }
 
 
+def _apply_visit_context_to_log(log, vc):
+    """Apply optional visit_context fields to a SchoolVisitLog instance. Returns an error string or None."""
+    if vc is None:
+        return None
+    if not isinstance(vc, dict):
+        return 'visit_context must be an object'
+    if 'grades' in vc:
+        raw = vc.get('grades')
+        if raw is None or raw == []:
+            log.visit_grades_json = None
+        else:
+            if not isinstance(raw, list):
+                return 'grades must be a list of integers or null'
+            ints = []
+            for g in raw:
+                try:
+                    gi = int(g)
+                except (TypeError, ValueError):
+                    return 'grades must be a list of integers'
+                if gi < 4 or gi > 13:
+                    return 'each grade must be between 4 and 13'
+                ints.append(gi)
+            uniq = sorted(set(ints))
+            log.visit_grades_json = json.dumps(uniq)
+    if 'teacher_name' in vc:
+        raw = vc.get('teacher_name')
+        if raw is None:
+            log.teacher_name = None
+        else:
+            s = str(raw).strip()
+            if not s:
+                log.teacher_name = None
+            elif len(s) > 255:
+                return 'teacher_name must be 255 characters or fewer'
+            else:
+                log.teacher_name = s
+    if 'teacher_contact' in vc:
+        raw = vc.get('teacher_contact')
+        if raw is None:
+            log.teacher_contact = None
+        else:
+            s = str(raw).strip()
+            if not s:
+                log.teacher_contact = None
+            elif len(s) > 255:
+                return 'teacher_contact must be 255 characters or fewer'
+            else:
+                log.teacher_contact = s
+    return None
+
+
 def _visit_dict_for_viewer(log, *, include_admin_fields=False):
     payload = {
         'visit_id': log.id,
@@ -12809,6 +12734,7 @@ def _visit_dict_for_viewer(log, *, include_admin_fields=False):
         'checkout_at': _visit_api_iso_utc(log.checkout_at),
         'duration_minutes': log.duration_minutes,
         'notes': log.notes,
+        'visit_context': log.visit_context_dict(),
     }
     if include_admin_fields:
         payload['admin_metadata'] = _visit_admin_metadata(log)
@@ -12836,6 +12762,9 @@ def _school_visit_log_report_row(
         "checkin_at": _visit_api_iso_utc(log.checkin_at),
         "checkout_at": _visit_api_iso_utc(log.checkout_at),
         "duration_minutes": log.duration_minutes,
+        "visit_grades": log.visit_grades_json or "",
+        "teacher_name": log.teacher_name or "",
+        "teacher_contact": log.teacher_contact or "",
     }
     if include_admin_fields:
         row["admin_metadata"] = _visit_admin_metadata(log)
@@ -12924,12 +12853,6 @@ def api_profile_school_visit_checkin():
     install_id, platform, device_error = _validate_device_payload(data.get('device'), required=True)
     if device_error:
         return _visit_api_error('ValidationError', device_error, 400)
-    if platform == 'mobile' and (lat is None or lng is None):
-        return _visit_api_error(
-            'ValidationError',
-            'location.latitude and location.longitude are required for mobile visits',
-            400,
-        )
 
     active_visit = SchoolVisitLog.query.filter_by(
         user_id=current_user.id,
@@ -12967,6 +12890,10 @@ def api_profile_school_visit_checkin():
         checkin_device_platform=platform,
         checkin_user_agent=user_agent,
     )
+    if 'visit_context' in data:
+        ctx_err = _apply_visit_context_to_log(visit, data.get('visit_context'))
+        if ctx_err:
+            return _visit_api_error('ValidationError', ctx_err, 400)
     db.session.add(visit)
     db.session.commit()
 
@@ -12976,6 +12903,34 @@ def api_profile_school_visit_checkin():
         'message': 'Checked in successfully.',
         'data': _visit_dict_for_viewer(visit, include_admin_fields=include_admin_fields)
     }), 201
+
+
+@app.route('/api/profile/school-visit/active', methods=['PATCH'])
+@login_required
+def api_profile_school_visit_active_patch():
+    json_error = _require_json_request()
+    if json_error:
+        return json_error
+
+    data = request.get_json() or {}
+    active_visit = SchoolVisitLog.query.filter_by(
+        user_id=current_user.id,
+        status='checked_in'
+    ).order_by(SchoolVisitLog.checkin_at.desc()).first()
+    if not active_visit:
+        return _visit_api_error('NoActiveSession', 'No active check-in found for this user.', 404)
+
+    ctx_err = _apply_visit_context_to_log(active_visit, data.get('visit_context'))
+    if ctx_err:
+        return _visit_api_error('ValidationError', ctx_err, 400)
+    db.session.commit()
+
+    include_admin_fields = _is_visit_admin_viewer()
+    return jsonify({
+        'success': True,
+        'message': 'Visit updated.',
+        'data': _visit_dict_for_viewer(active_visit, include_admin_fields=include_admin_fields)
+    }), 200
 
 
 @app.route('/api/profile/school-visit/checkout', methods=['POST'])
@@ -12995,12 +12950,6 @@ def api_profile_school_visit_checkout():
     install_id, platform, device_error = _validate_device_payload(data.get('device'), required=True)
     if device_error:
         return _visit_api_error('ValidationError', device_error, 400)
-    if platform == 'mobile' and (lat is None or lng is None):
-        return _visit_api_error(
-            'ValidationError',
-            'location.latitude and location.longitude are required for mobile visits',
-            400,
-        )
 
     active_visit = SchoolVisitLog.query.filter_by(
         user_id=current_user.id,
@@ -13038,11 +12987,10 @@ def api_profile_school_visit_checkout():
         active_visit.checkin_device_platform = active_visit.checkin_device_platform or platform
     db.session.commit()
 
-    include_admin_fields = _is_visit_admin_viewer()
     return jsonify({
         'success': True,
         'message': 'Checked out successfully.',
-        'data': _visit_dict_for_viewer(active_visit, include_admin_fields=include_admin_fields)
+        'data': active_visit.to_dict()
     }), 200
 
 
@@ -13053,11 +13001,7 @@ def api_profile_school_visit_status(username):
     if not target_user:
         return _visit_api_error('NotFound', 'User not found', 404)
 
-    if (
-        current_user.id != target_user.id
-        and current_user.username != username
-        and current_user.userRole != 'Admin'
-    ):
+    if current_user.username != username and current_user.userRole != 'Admin':
         return _visit_api_error('Unauthorized', 'Unauthorized', 403)
 
     active_visit = SchoolVisitLog.query.filter_by(
@@ -13070,12 +13014,11 @@ def api_profile_school_visit_status(username):
         status='checked_out'
     ).order_by(SchoolVisitLog.checkout_at.desc(), SchoolVisitLog.id.desc()).first()
 
-    include_admin_fields = _is_visit_admin_viewer()
     return jsonify({
         'success': True,
         'data': {
-            'active_visit': _visit_dict_for_viewer(active_visit, include_admin_fields=include_admin_fields) if active_visit else None,
-            'last_visit': _visit_dict_for_viewer(last_visit, include_admin_fields=include_admin_fields) if last_visit else None,
+            'active_visit': active_visit.to_dict() if active_visit else None,
+            'last_visit': last_visit.to_dict() if last_visit else None,
         }
     }), 200
 
