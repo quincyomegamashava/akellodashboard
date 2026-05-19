@@ -51,6 +51,10 @@ from app.blueprints.new_creations import bp as new_creations_bp
 from app.blueprints.new_creations import models as new_creations_models  # noqa: F401
 app.register_blueprint(new_creations_bp)
 
+from app.blueprints.meeting_notes import bp as meeting_notes_bp
+from app.blueprints.meeting_notes import models as meeting_notes_models  # noqa: F401
+app.register_blueprint(meeting_notes_bp)
+
 # Start helpdesk email fetch scheduler (every 60s)
 from app.scheduler import start_scheduler
 start_scheduler(app)

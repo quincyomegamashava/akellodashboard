@@ -142,6 +142,11 @@
       <a href="{{ url_for('help_desk') }}" class="nav-item {{ 'active' if title == 'Help desk' else '' }}">
         <i class="fas fa-bug"></i> <span class="nav-text">Help Desk</span>
       </a>
+
+      <a href="{{ url_for('meeting_notes.index') }}"
+        class="nav-item {{ 'active' if request.blueprint == 'meeting_notes' else '' }}">
+        <i class="fas fa-people-group"></i> <span class="nav-text">Meeting notes</span>
+      </a>
       {% endif %}
 
       <!-- PROVINCES SECTION -->

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}All action items — Meeting notes{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/meeting_notes.css') }}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.css">
+{% endblock %}
+{% block content %}
+<div class="mn-page">
+  <header class="mn-hero d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div>
+      <nav class="mn-breadcrumb">
+        <a href="{{ url_for('meeting_notes.index') }}">Meeting notes</a>
+      </nav>
+      <h1 class="mn-hero-title">All action items</h1>
+      <p class="mn-hero-sub">Cross-meeting tracker. Open a meeting to edit items inline.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-export-pdf">
+        <i class="fas fa-file-pdf me-1"></i> Export PDF
+      </button>
+      <a class="btn btn-sm mn-btn-ghost" href="{{ url_for('meeting_notes.index') }}">Meetings list</a>
+      {% if overdue_count %}
+      <span class="badge bg-danger-subtle text-danger border">{{ overdue_count }} overdue (mine)</span>
+      {% endif %}
+    </div>
+  </header>
+
+  <div class="mn-card">
+    <div class="mn-card-body">
+      <div class="row g-2 align-items-end flex-wrap">
+        <div class="col-6 col-md-2">
+          <label class="mn-filter-label">Platform</label>
+          <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-platform">
+            <option value="">All</option>
+            {% for p in platforms %}<option value="{{ p|e }}">{{ p }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="mn-filter-label">Assignee</label>
+          <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-assignee">
+            <option value="">Any</option>
+            {% for u in user_opts %}<option value="{{ u.id }}">{{ u.label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="mn-filter-label">Status</label>
+          <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-status">
+            <option value="all">All</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="mn-filter-label">Due</label>
+          <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-due">
+            <option value="">Any</option>
+            <option value="overdue">Overdue</option>
+            <option value="this_week">This week</option>
+            <option value="this_month">This month</option>
+            <option value="next_month">Next month</option>
+            <option value="none">No due date</option>
+            <option value="custom">Custom range</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-2 mn-due-custom d-none">
+          <label class="mn-filter-label">From</label>
+          <input type="date" class="form-control form-control-sm mn-filter-ctrl" id="mn-due-start" />
+        </div>
+        <div class="col-6 col-md-2 mn-due-custom d-none">
+          <label class="mn-filter-label">To</label>
+          <input type="date" class="form-control form-control-sm mn-filter-ctrl" id="mn-due-end" />
+        </div>
+      </div>
+      <div class="mn-toolbar">
+        <div class="mn-view-pills" role="group">
+          <button type="button" class="btn" data-mn-view-btn="table">Table</button>
+          <button type="button" class="btn" data-mn-view-btn="calendar">Calendar</button>
+          <button type="button" class="btn" data-mn-view-btn="gantt">Gantt</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="mn-view-table" class="mn-view mn-card">
+    <div class="table-responsive mn-table-wrap">
+      <table class="table table-sm table-bordered mb-0 mn-inline-table">
+        <thead>
+          <tr>
+            <th>Meeting</th>
+            <th>Platform</th>
+            <th>Focus area</th>
+            <th>Call to action</th>
+            <th>Expected impact</th>
+            <th>Start / due</th>
+            <th>Challenges</th>
+            <th>Comments</th>
+            <th>Led by</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="mn-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="mn-view-calendar" class="mn-view mn-card d-none p-3">
+    <div id="mn-calendar"></div>
+  </div>
+
+  <div id="mn-view-gantt" class="mn-view mn-card d-none p-3">
+    <div id="mn-gantt-wrap">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="mn-gantt-toolbar">
+        <span class="small text-muted">Zoom</span>
+        <div class="mn-view-pills" role="group">
+          <button type="button" class="btn" data-gantt-mode="Month">Month</button>
+          <button type="button" class="btn" data-gantt-mode="Week">Week</button>
+          <button type="button" class="btn" data-gantt-mode="Day">Day</button>
+        </div>
+        <label class="small text-muted mb-0 ms-2">Month</label>
+        <input type="month" class="form-control form-control-sm" id="mn-gantt-month" style="width: auto;" />
+        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-gantt-today">Today</button>
+      </div>
+      <div id="mn-gantt"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
+<script>
+  const MN_MEETING_NOTE_ID = null;
+  const MN_MEETING_TITLE = null;
+  const MN_MEETING_DATE = null;
+  const MN_USER_OPTS = {{ user_opts|tojson }};
+  const MN_FOCUS_ROWS = [];
+  const MN_IS_ADMIN = {{ is_admin|tojson }};
+  const MN_DEFAULT_ASSIGNEE = {{ default_assignee_id|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/meeting_notes.js') }}"></script>
+{% endblock %}

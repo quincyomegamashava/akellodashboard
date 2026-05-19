@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Meeting notes{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/meeting_notes.css') }}">
+{% endblock %}
+{% block content %}
+<div class="mn-page">
+  <header class="mn-hero d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div>
+      <h1 class="mn-hero-title">Meeting notes</h1>
+      <p class="mn-hero-sub">Weekly minutes and trackable action items across platforms.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      {% if overdue_count %}
+      <a class="btn btn-sm mn-btn-ghost text-danger" href="{{ url_for('meeting_notes.all_items') }}?mine=1&due_preset=overdue">
+        {{ overdue_count }} overdue item{{ 's' if overdue_count != 1 else '' }}
+      </a>
+      {% endif %}
+      <a class="btn btn-sm mn-btn-ghost" href="{{ url_for('meeting_notes.all_items') }}?mine=1">My action items</a>
+      <a class="btn btn-sm mn-btn-ghost" href="{{ url_for('meeting_notes.all_items') }}">All action items</a>
+    </div>
+  </header>
+
+  <div class="mn-card mb-3">
+    <div class="mn-card-header">New meeting</div>
+    <div class="mn-card-body">
+      <form id="formNewMeeting" class="row g-3 align-items-end">
+        <div class="col-md-5">
+          <label class="mn-filter-label">Title</label>
+          <input type="text" class="form-control form-control-sm" name="title" placeholder="e.g. Platform demo — 19 May 2026" />
+        </div>
+        <div class="col-md-3">
+          <label class="mn-filter-label">Meeting date</label>
+          <input type="date" class="form-control form-control-sm" name="meeting_date" required />
+        </div>
+        <div class="col-md-4">
+          <button type="submit" class="btn btn-sm mn-btn-primary w-100">Create &amp; open</button>
+        </div>
+        <div class="col-12">
+          <label class="mn-filter-label">Summary (optional)</label>
+          <textarea class="form-control form-control-sm" name="summary" rows="2" placeholder="Discussion notes — tasks go in action items"></textarea>
+        </div>
+      </form>
+      <div id="newMeetingErr" class="text-danger small mt-2 d-none"></div>
+    </div>
+  </div>
+
+  <div class="mn-card">
+    <div class="mn-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span>Recent meetings</span>
+      <form method="get" class="d-flex gap-2">
+        <input type="search" name="q" class="form-control form-control-sm" placeholder="Search title…" value="{{ search_q|e }}" style="min-width: 200px;" />
+        <button type="submit" class="btn btn-sm mn-btn-ghost">Search</button>
+      </form>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0 mn-meetings-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Title</th>
+            <th class="text-center">Open</th>
+            <th class="text-center">In progress</th>
+            <th class="text-center">Done</th>
+            <th>Updated</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in meetings %}
+          {% set st = meeting_stats.get(m.id, {}) %}
+          <tr>
+            <td class="text-nowrap">{{ m.meeting_date.strftime('%Y-%m-%d') }}</td>
+            <td>{{ m.title }}</td>
+            <td class="text-center"><span class="mn-stat-open">{{ st.get('open', 0) }}</span></td>
+            <td class="text-center"><span class="mn-stat-progress">{{ st.get('in_progress', 0) }}</span></td>
+            <td class="text-center"><span class="mn-stat-done">{{ st.get('done', 0) }}</span></td>
+            <td class="text-nowrap small text-muted">{{ m.updated_at.strftime('%Y-%m-%d') if m.updated_at else '—' }}</td>
+            <td class="text-end text-nowrap">
+              <a href="{{ url_for('meeting_notes.detail', meeting_id=m.id) }}?view=table" class="btn btn-sm mn-btn-primary">Open</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-muted text-center py-4">No meetings yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  const form = document.getElementById('formNewMeeting');
+  const err = document.getElementById('newMeetingErr');
+  if (form) {
+    const d = form.querySelector('[name="meeting_date"]');
+    if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      err.classList.add('d-none');
+      const fd = new FormData(form);
+      const payload = {
+        title: (fd.get('title') || '').trim(),
+        meeting_date: fd.get('meeting_date'),
+        summary: (fd.get('summary') || '').trim() || null
+      };
+      try {
+        const res = await fetch('{{ url_for("meeting_notes.api_create_meeting") }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Create failed');
+        window.location.href = '/meeting-notes/' + data.id + '?view=table';
+      } catch (x) {
+        err.textContent = x.message || String(x);
+        err.classList.remove('d-none');
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

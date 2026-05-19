@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+{% block title %}{{ meeting.title }} — Meeting notes{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/meeting_notes.css') }}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+{% endblock %}
+{% block content %}
+<datalist id="mn-platform-datalist">
+  {% for p in platforms %}<option value="{{ p|e }}">{% endfor %}
+</datalist>
+
+<div class="mn-page mn-detail-layout" id="mn-page-detail">
+  <header class="mn-hero">
+    <nav class="mn-breadcrumb">
+      <a href="{{ url_for('meeting_notes.index') }}">Meeting notes</a>
+      <span class="text-muted"> / </span>
+      <span class="text-muted">{{ meeting.meeting_date.strftime('%Y-%m-%d') }}</span>
+      <span class="text-muted"> · </span>
+      <a href="{{ url_for('meeting_notes.all_items') }}">All action items</a>
+    </nav>
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <div>
+        <h1 class="mn-hero-title">{{ meeting.title }}</h1>
+        <p class="mn-hero-sub">Track action items, assign owners, and export minutes.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-save-meta">Save meeting</button>
+        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-carry-forward" {% if not carry_forward_sources %}disabled title="No other meetings yet"{% endif %} data-bs-toggle="modal" data-bs-target="#mnCarryForwardModal">Carry forward open items</button>
+        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-duplicate-meeting">Duplicate meeting</button>
+        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-export-pdf">
+          <i class="fas fa-file-pdf me-1"></i> Export PDF
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="row g-3">
+    <div class="col-lg-3">
+      <div class="mn-card mn-meta-card">
+        <div class="mn-card-header d-flex justify-content-between align-items-center py-2">
+          <span>Meeting details</span>
+          <button type="button" class="btn btn-sm mn-btn-ghost py-0" id="mn-meta-toggle" title="Collapse">−</button>
+        </div>
+        <div class="mn-card-body" id="mn-meta-body">
+          <label class="mn-filter-label">Title</label>
+          <input type="text" class="form-control form-control-sm mb-2" id="mn-meta-title" value="{{ meeting.title|e }}" />
+          <label class="mn-filter-label">Meeting date</label>
+          <input type="date" class="form-control form-control-sm mb-2" id="mn-meta-date" value="{{ meeting.meeting_date.strftime('%Y-%m-%d') }}" />
+          <label class="mn-filter-label">Summary</label>
+          <textarea class="form-control form-control-sm mb-2" id="mn-meta-summary" rows="3" placeholder="Discussion notes">{{ meeting.summary or '' }}</textarea>
+          <label class="mn-filter-label">Attendees</label>
+          <div id="mn-attendee-picker" class="mb-2"></div>
+          <label class="mn-filter-label">Guests</label>
+          <div id="mn-guest-picker"></div>
+          <div class="form-text small">Enter + press Enter for guests</div>
+          <div class="mt-3 d-grid gap-2">
+            <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-toggle="modal" data-bs-target="#mnFocusModal">Add focus row</button>
+            <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-new-item">New action item</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-9">
+      <div class="mn-card mb-3">
+        <div class="mn-card-body py-2">
+          <div class="row g-2 align-items-end flex-wrap">
+            <div class="col-6 col-md-2">
+              <label class="mn-filter-label">Platform</label>
+              <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-platform">
+                <option value="">All</option>
+                {% for p in platforms %}<option value="{{ p|e }}">{{ p }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="mn-filter-label">Assignee</label>
+              <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-assignee">
+                <option value="">Any</option>
+                {% for u in user_opts %}<option value="{{ u.id }}">{{ u.label }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="mn-filter-label">Status</label>
+              <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-status">
+                <option value="all">All</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In progress</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="mn-filter-label">Due</label>
+              <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-due">
+                <option value="">Any</option>
+                <option value="overdue">Overdue</option>
+                <option value="this_week">This week</option>
+                <option value="this_month">This month</option>
+                <option value="next_month">Next month</option>
+                <option value="none">No due date</option>
+                <option value="custom">Custom range</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-2 mn-due-custom d-none">
+              <label class="mn-filter-label">From</label>
+              <input type="date" class="form-control form-control-sm mn-filter-ctrl" id="mn-due-start" />
+            </div>
+            <div class="col-6 col-md-2 mn-due-custom d-none">
+              <label class="mn-filter-label">To</label>
+              <input type="date" class="form-control form-control-sm mn-filter-ctrl" id="mn-due-end" />
+            </div>
+          </div>
+          <div class="mn-toolbar mt-2">
+            <div class="mn-view-pills" role="group">
+              <button type="button" class="btn active" data-mn-view-btn="table">Table</button>
+              <button type="button" class="btn" data-mn-view-btn="calendar">Calendar</button>
+              <button type="button" class="btn" data-mn-view-btn="gantt">Gantt</button>
+            </div>
+            <div class="mn-view-pills ms-2" role="group">
+              <button type="button" class="btn" data-mn-col-preset="minutes">Minutes</button>
+              <button type="button" class="btn active" data-mn-col-preset="full">Full</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 mn-detail-table-col">
+      <div id="mn-view-table" class="mn-view mn-card">
+        <div class="mn-table-hint">
+          One bullet per line in text columns. Focus area is shared per platform/focus group. Scroll horizontally if needed.
+        </div>
+        <div class="mn-bulk-bar px-3 py-2 border-bottom d-flex flex-wrap gap-2 align-items-center">
+          <span class="small text-muted">Bulk:</span>
+          <select class="form-select form-select-sm" id="mn-bulk-status" style="width:auto;">
+            <option value="">Status…</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
+            <option value="done">Done</option>
+          </select>
+          <select class="form-select form-select-sm" id="mn-bulk-assignee" style="width:auto;">
+            <option value="">Assignee…</option>
+            {% for u in user_opts %}<option value="{{ u.id }}">{{ u.label }}</option>{% endfor %}
+          </select>
+          <button type="button" class="btn btn-sm mn-btn-primary" id="mn-bulk-apply">Apply to selected</button>
+        </div>
+        <div class="table-responsive mn-table-wrap">
+          <table class="table table-sm table-bordered mb-0 mn-inline-table" data-col-preset="full">
+            <colgroup>
+              <col class="mn-col-chk" />
+              <col class="mn-col-plat" />
+              <col class="mn-col-focus" />
+              <col class="mn-col-cta" />
+              <col class="mn-col-impact" />
+              <col class="mn-col-dates" />
+              <col class="mn-col-challenges" />
+              <col class="mn-col-comments" />
+              <col class="mn-col-assign" />
+              <col class="mn-col-status" />
+              <col class="mn-col-actions" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th class="mn-chk-col"><input type="checkbox" id="mn-chk-all" title="Select all" /></th>
+                <th class="col-plat">Platform</th>
+                <th class="col-focus">Focus area</th>
+                <th class="col-cta">Call to action</th>
+                <th class="col-impact">Expected impact</th>
+                <th class="col-dates">Start / due</th>
+                <th class="col-challenges">Challenges</th>
+                <th class="col-comments">Comments</th>
+                <th class="col-assign">Led by</th>
+                <th class="col-status">Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="mn-table-body"></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="11" class="py-3 px-3">
+                  <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-add-row">+ Add action item</button>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div id="mn-view-calendar" class="mn-view mn-card d-none p-3">
+        <div id="mn-calendar"></div>
+      </div>
+
+      <div id="mn-view-gantt" class="mn-view mn-card d-none p-3">
+        <div id="mn-gantt-wrap">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="mn-gantt-toolbar">
+            <span class="small text-muted">Zoom</span>
+            <div class="mn-view-pills" role="group">
+              <button type="button" class="btn" data-gantt-mode="Month">Month</button>
+              <button type="button" class="btn active" data-gantt-mode="Week">Week</button>
+              <button type="button" class="btn" data-gantt-mode="Day">Day</button>
+            </div>
+            <label class="small text-muted mb-0 ms-2">Month</label>
+            <input type="month" class="form-control form-control-sm" id="mn-gantt-month" style="width: auto;" />
+            <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-gantt-today">Today</button>
+          </div>
+          <div id="mn-gantt"></div>
+        </div>
+      </div>
+
+      {% if can_view_activity %}
+      <div class="mn-card mt-3">
+        <div class="mn-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span>Activity log</span>
+          <div class="d-flex gap-2 align-items-center">
+            <select class="form-select form-select-sm" id="mn-activity-filter" style="width:auto;">
+              <option value="all">All actions</option>
+              <option value="create">Created</option>
+              <option value="update">Updated</option>
+              <option value="delete">Deleted</option>
+            </select>
+            <button class="btn btn-sm mn-btn-ghost" type="button" data-bs-toggle="collapse" data-bs-target="#mnActivityCollapse">Toggle</button>
+          </div>
+        </div>
+        <div class="collapse show" id="mnActivityCollapse">
+          <div class="mn-card-body small" id="mn-activity-body">
+            {% if activity_rows %}
+            <ul class="list-unstyled small mb-0" id="mn-activity-list">
+              {% for r in activity_rows %}
+              <li class="mb-1">
+                <span class="text-muted">{{ r.occurred_at[:16].replace('T', ' ') if r.occurred_at else '' }}</span>
+                — {{ r.actor }} — <strong>{{ r.action }}</strong> {{ r.summary }}
+              </li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted mb-0">No activity yet.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="mnFocusModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius: 16px;">
+      <div class="modal-header"><h5 class="modal-title">New focus row</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="mn-filter-label">Platform</label>
+          <input type="text" class="form-control form-control-sm" id="mn-fr-platform" list="mn-platform-datalist" placeholder="e.g. Akello" />
+        </div>
+        <div class="mb-2">
+          <label class="mn-filter-label">Key focus area</label>
+          <textarea class="form-control form-control-sm mn-cell-bullets" id="mn-fr-focus" rows="3" placeholder="One bullet per line"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-save-focus">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="mnCarryForwardModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius: 16px;">
+      <div class="modal-header">
+        <h5 class="modal-title">Carry forward open items</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">
+          Copy non-completed action items from another meeting into this one. Items already present (same call to action) are skipped.
+        </p>
+        <label class="mn-filter-label" for="mn-cf-source">Source meeting</label>
+        <select class="form-select form-select-sm mb-3" id="mn-cf-source">
+          {% for m in carry_forward_sources %}
+          <option value="{{ m.id }}" {% if m.id == prev_meeting_id %}selected{% endif %}>
+            {{ m.meeting_date.strftime('%Y-%m-%d') }} — {{ m.title|e }}
+          </option>
+          {% endfor %}
+        </select>
+        <p class="mb-3" id="mn-cf-preview" aria-live="polite">
+          <span class="text-muted">Select a source meeting to preview.</span>
+        </p>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="mn-cf-mark-done" />
+          <label class="form-check-label" for="mn-cf-mark-done">Mark copied items as done on the source meeting</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-confirm-carry-forward" disabled>Import items</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="mnExportModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius: 16px;">
+      <div class="modal-header"><h5 class="modal-title">Export PDF options</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="mn-pdf-include-summary" checked />
+          <label class="form-check-label" for="mn-pdf-include-summary">Include meeting summary</label>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="mn-pdf-group-platform" checked />
+          <label class="form-check-label" for="mn-pdf-group-platform">Group by platform</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="mn-pdf-include-done" checked />
+          <label class="form-check-label" for="mn-pdf-include-done">Include completed items</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-confirm-export">Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
+<script>
+  const MN_MEETING_NOTE_ID = {{ meeting.id }};
+  const MN_MEETING_TITLE = {{ meeting.title|tojson }};
+  const MN_MEETING_DATE = {{ meeting.meeting_date.isoformat()|tojson }};
+  const MN_MEETING_SUMMARY = {{ (meeting.summary or '')|tojson }};
+  const MN_MEETING_ATTENDEE_IDS = {{ attendee_ids|tojson }};
+  const MN_MEETING_GUEST_NAMES = {{ guest_names|tojson }};
+  const MN_PREV_MEETING_ID = {{ prev_meeting_id|tojson }};
+  const MN_PLATFORMS = {{ platforms|tojson }};
+  const MN_USER_OPTS = {{ user_opts|tojson }};
+  const MN_FOCUS_ROWS = {{ focus_row_opts|tojson }};
+  const MN_IS_ADMIN = {{ is_admin|tojson }};
+  const MN_CAN_VIEW_ACTIVITY = {{ can_view_activity|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/meeting_notes.js') }}"></script>
+{% endblock %}
