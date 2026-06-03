@@ -1,0 +1,37 @@
+{% extends "learn/base.html" %}
+{% block title %}Guardian register · Akello Learn{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="card shadow-sm lh-card">
+      <div class="card-body p-4">
+        <h2 class="h4 mb-4">Create guardian account</h2>
+        <form method="post" action="{{ url_for('learn_guardian.register') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input name="email" type="email" class="form-control" required autocomplete="username" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Password (min 8 characters)</label>
+            <input name="password" type="password" class="form-control" required minlength="8" autocomplete="new-password" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Full name</label>
+            <input name="full_name" class="form-control" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Role</label>
+            <select name="guardian_role" class="form-select">
+              <option value="parent" selected>Parent / caregiver</option>
+              <option value="teacher">Teacher / mentor</option>
+            </select>
+          </div>
+          <button class="btn lh-btn-primary w-100" type="submit">Register</button>
+        </form>
+        <p class="small text-muted mt-3 mb-0"><a href="{{ url_for('learn_guardian.login') }}">Already have an account?</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

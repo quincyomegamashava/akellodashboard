@@ -1,0 +1,80 @@
+{% extends "learn/admin/base_admin.html" %}
+{% block title %}Learning Hub Admin · Overview{% endblock %}
+{% block lha_body %}
+<h1 class="lha-title mb-1">Overview</h1>
+<p class="text-muted small mb-4">XP is awarded only on each learner’s <strong>first passing</strong> graded attempt per challenge.</p>
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl">
+    <div class="lha-stat-card">
+      <div class="lha-stat-label">Learners</div>
+      <div class="lha-stat-value">{{ counts.learners }}</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl">
+    <div class="lha-stat-card">
+      <div class="lha-stat-label">Challenges</div>
+      <div class="lha-stat-value">{{ counts.challenges }}</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl">
+    <div class="lha-stat-card">
+      <div class="lha-stat-label">Attempts (all)</div>
+      <div class="lha-stat-value">{{ counts.attempts }}</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl">
+    <div class="lha-stat-card">
+      <div class="lha-stat-label">Pass completions</div>
+      <div class="lha-stat-value">{{ counts.credit_completions }}</div>
+      <div class="lha-stat-hint">Distinct learner × challenge passes</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl">
+    <div class="lha-stat-card">
+      <div class="lha-stat-label">XP-granting rows</div>
+      <div class="lha-stat-value">{{ counts.xp_awarded_rows }}</div>
+      <div class="lha-stat-hint">Attempts with xp_awarded &gt; 0</div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-4">
+  <form method="post" action="{{ url_for('learn_admin.seed_demo') }}" class="m-0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <button type="submit" class="btn lha-btn-solid">Seed demo track + quiz</button>
+  </form>
+  <form method="post" action="{{ url_for('learn_admin.seed_explorer_curriculum_view') }}" class="m-0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <button type="submit" class="btn lha-btn-accent">Seed Explorer curriculum</button>
+  </form>
+</div>
+
+<div class="row g-4 mb-4">
+  {% for cat, rows in category_boards.items() %}
+  <div class="col-lg-4">
+    <div class="lha-panel h-100">
+      <div class="lha-panel-head">
+        <span class="text-uppercase small fw-semibold tracking-wide">{{ cat }}</span>
+        <span class="badge rounded-pill lha-badge-soft">Top XP</span>
+      </div>
+      <ul class="list-group list-group-flush lha-leader-list">
+        {% for L in rows %}
+        <li class="list-group-item lha-leader-item d-flex justify-content-between align-items-center">
+          <div>
+            <a href="{{ url_for('learn_admin.learner_detail', learner_id=L.id) }}" class="lha-link">{{ L.full_name or L.username }}</a>
+            <div class="small text-muted">@{{ L.username }}</div>
+          </div>
+          <span class="fw-semibold font-monospace">{{ L.total_xp }}</span>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted small border-0">No learners in this band yet.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<p class="text-muted small mb-0">API health: <code>/api/v1/learn/health</code></p>
+{% endblock %}

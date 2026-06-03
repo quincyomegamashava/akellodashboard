@@ -1,0 +1,46 @@
+{% extends "learn/base.html" %}
+{% block title %}Guardian dashboard · Akello Learn{% endblock %}
+{% block content %}
+<h1 class="h3 mb-2">Welcome, {{ guardian.full_name or guardian.email }}</h1>
+<p class="text-muted small mb-4">{{ guardian.guardian_role|capitalize }} · Linked learners below</p>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card lh-card shadow-sm border-0">
+      <div class="card-header bg-transparent fw-semibold">Linked learners</div>
+      <ul class="list-group list-group-flush">
+        {% for L in learners %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>{{ L.full_name or L.username }} <span class="text-muted small">@{{ L.username }}</span></span>
+          <span class="badge bg-secondary">{{ L.skill_level }}</span>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">No learners linked yet. Ask your learner for a pairing code from their dashboard.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card lh-card shadow-sm border-0">
+      <div class="card-header bg-transparent fw-semibold">Link a learner</div>
+      <div class="card-body">
+        <p class="small text-muted">The learner generates a short code on their dashboard (expires in 30 minutes).</p>
+        <form method="post" action="{{ url_for('learn_guardian.link_child') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <div class="mb-3">
+            <label class="form-label">Learner username</label>
+            <input name="learner_username" class="form-control" required autocomplete="username" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Pairing code</label>
+            <input name="pairing_code" class="form-control text-uppercase" required maxlength="16" autocomplete="one-time-code" />
+          </div>
+          <button type="submit" class="btn lh-btn-primary">Link learner</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="mt-4 mb-0"><a href="{{ url_for('learn_guardian.logout') }}">Sign out</a></p>
+{% endblock %}

@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -16,6 +17,28 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(basedir, 'app.db')
+
+    # Flask-WTF CSRF — Learning Hub blueprints validate explicitly (legacy dashboard POSTs unchanged).
+    WTF_CSRF_ENABLED = os.environ.get('WTF_CSRF_ENABLED', 'true').lower() in ('true', '1', 't', 'yes', 'y')
+    WTF_CSRF_TIME_LIMIT = int(os.environ.get('WTF_CSRF_TIME_LIMIT', '86400'))
+    WTF_CSRF_CHECK_DEFAULT = os.environ.get('WTF_CSRF_CHECK_DEFAULT', 'false').lower() in ('true', '1', 't', 'yes', 'y')
+
+    PERMANENT_SESSION_LIFETIME = timedelta(days=int(os.environ.get('SESSION_LIFETIME_DAYS', '14')))
+
+    # Redis / RQ (optional — grading jobs fall back to synchronous if unset)
+    REDIS_URL = os.environ.get('REDIS_URL') or os.environ.get('CELERY_BROKER_URL')
+
+    # Judge0 / sandbox (optional — falls back to restricted local Python runner if unset)
+    JUDGE0_API_URL = os.environ.get('JUDGE0_API_URL', '').rstrip('/')
+    JUDGE0_API_TOKEN = os.environ.get('JUDGE0_API_TOKEN') or os.environ.get('JUDGE0_AUTH_TOKEN')
+    JUDGE0_LANGUAGE_PYTHON_ID = int(os.environ.get('JUDGE0_LANGUAGE_PYTHON_ID', '71'))
+
+    # Object storage (S3-compatible — optional local filesystem fallback under instance/)
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    AWS_ENDPOINT_URL = os.environ.get('AWS_ENDPOINT_URL') or os.environ.get('S3_ENDPOINT_URL')
+    AWS_REGION = os.environ.get('AWS_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
+    LEARN_S3_BUCKET = os.environ.get('LEARN_S3_BUCKET') or os.environ.get('AWS_S3_BUCKET')
 
     # Email settings (SMTP)
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')

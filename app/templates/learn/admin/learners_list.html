@@ -1,0 +1,50 @@
+{% extends "learn/admin/base_admin.html" %}
+{% block title %}Learners · Learn Admin{% endblock %}
+{% block lha_body %}
+<h1 class="lha-title mb-4">Learners</h1>
+
+{% if pagination is none %}
+<p class="text-muted">No learner table.</p>
+{% else %}
+<div class="table-responsive lha-table-wrap">
+  <table class="table table-hover align-middle mb-0">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Category</th>
+        <th>Skill</th>
+        <th class="text-end">XP</th>
+        <th>Active</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for L in pagination.items %}
+      <tr>
+        <td class="font-monospace small">{{ L.id }}</td>
+        <td><a href="{{ url_for('learn_admin.learner_detail', learner_id=L.id) }}" class="lha-link">{{ L.username }}</a></td>
+        <td class="small text-muted">{{ L.email }}</td>
+        <td><span class="badge lha-badge-soft">{{ L.category }}</span></td>
+        <td>{{ L.skill_level }}</td>
+        <td class="text-end font-monospace">{{ L.total_xp }}</td>
+        <td>{% if L.is_active %}<span class="text-success">yes</span>{% else %}<span class="text-muted">no</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<nav class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <span class="small text-muted">Page {{ pagination.page }} / {{ pagination.pages or 1 }}</span>
+  <div class="btn-group">
+    {% if pagination.has_prev %}
+    <a class="btn btn-sm lha-btn-outline" href="{{ url_for('learn_admin.learners_list', page=pagination.prev_num, per_page=pagination.per_page) }}">Previous</a>
+    {% endif %}
+    {% if pagination.has_next %}
+    <a class="btn btn-sm lha-btn-outline" href="{{ url_for('learn_admin.learners_list', page=pagination.next_num, per_page=pagination.per_page) }}">Next</a>
+    {% endif %}
+  </div>
+</nav>
+{% endif %}
+{% endblock %}

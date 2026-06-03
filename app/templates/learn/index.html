@@ -1,0 +1,32 @@
+{% extends "learn/base.html" %}
+{% block title %}Akello Learn · Start{% endblock %}
+{% block content %}
+<div class="row align-items-center lh-hero py-5">
+  <div class="col-lg-7">
+    <h1 class="display-5 fw-bold lh-gradient-text mb-3">Learn coding, AI & ICT — your way.</h1>
+    <p class="lead text-muted mb-4">
+      Structured tracks, quizzes, challenges, and XP — built for primary through tertiary learners.
+    </p>
+    <div class="d-flex flex-wrap gap-2">
+      {% if g.learn_learner %}
+      <a class="btn btn-lg lh-btn-primary" href="{{ url_for('learn_portal.dashboard') }}">Go to dashboard</a>
+      {% else %}
+      <a class="btn btn-lg lh-btn-primary" href="{{ url_for('learn_portal.register') }}">Create learner account</a>
+      <a class="btn btn-lg btn-outline-secondary" href="{{ url_for('learn_portal.login') }}">Sign in</a>
+      {% endif %}
+    </div>
+    <p class="small text-muted mt-3 mb-0">Staff use the main Akello sidebar · Learners use this separate login.</p>
+  </div>
+  <div class="col-lg-5 mt-5 mt-lg-0">
+    <div class="lh-card card border-0 shadow-lg p-4">
+      <h5 class="fw-semibold mb-3"><i class="fas fa-star text-warning me-2"></i>Why Akello Learn?</h5>
+      <ul class="list-unstyled mb-0 lh-feature-list">
+        <li><i class="fas fa-check text-success me-2"></i>Learning paths & badges</li>
+        <li><i class="fas fa-check text-success me-2"></i>Age bands & skill levels</li>
+        <li><i class="fas fa-check text-success me-2"></i>Tracks & hackathons (rolling out)</li>
+        <li><i class="fas fa-check text-success me-2"></i>Fair XP — streak & difficulty bonuses</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

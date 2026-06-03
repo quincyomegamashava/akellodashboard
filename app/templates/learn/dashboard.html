@@ -1,0 +1,143 @@
+{% extends "learn/base.html" %}
+{% block title %}Dashboard · Akello Learn{% endblock %}
+{% block content %}
+<div class="lh-dash lh-fade-in">
+  {# — Hero — #}
+  <header class="lh-dash-hero mb-4 pb-4 lh-dash-hero-border">
+    <div class="lh-dash-hero-main">
+      <p class="lh-dash-kicker mb-2">Your workspace</p>
+      <h1 class="lh-dash-title mb-3">Hi, {{ learner.full_name or learner.username }}</h1>
+      <div class="lh-dash-chips flex-wrap">
+        <span class="lh-chip"><i class="fas fa-layer-group me-1 opacity-75"></i>{{ learner.category|capitalize }}</span>
+        <span class="lh-chip"><i class="fas fa-user-clock me-1 opacity-75"></i>{{ learner.age_band }}</span>
+        <span class="lh-chip lh-chip-accent"><i class="fas fa-chart-line me-1 opacity-75"></i>{{ learner.skill_level }}</span>
+      </div>
+      <p class="lh-dash-hint small mt-3 mb-0">Skill level updates from your recent quiz and coding results.</p>
+    </div>
+    <div class="lh-dash-hero-stats">
+      <div class="lh-stat-pill lh-stat-pill-primary">
+        <span class="lh-stat-pill-label">Total XP</span>
+        <span class="lh-stat-pill-value lh-gradient-text">{{ learner.total_xp }}</span>
+      </div>
+      <div class="lh-stat-pill">
+        <span class="lh-stat-pill-label"><i class="fas fa-fire text-warning me-1"></i>Streak</span>
+        <span class="lh-stat-pill-value">{{ learner.streak_days }}<span class="lh-stat-pill-unit">days</span></span>
+      </div>
+    </div>
+  </header>
+
+  <div class="row g-4 align-items-start">
+    {# — Main column — #}
+    <div class="col-lg-8">
+      <section class="lh-dash-panel mb-4">
+        <div class="lh-dash-panel-head">
+          <div>
+            <h2 class="lh-dash-panel-title mb-0">Continue learning</h2>
+            <p class="lh-dash-panel-sub small mb-0 mt-1">Suggested challenges based on your level</p>
+          </div>
+          <a href="{{ url_for('learn_portal.challenges') }}" class="btn btn-sm lh-dash-link-btn">Browse all</a>
+        </div>
+        <div class="lh-dash-panel-body">
+          {% if suggestion_challenges %}
+          <div class="row g-3">
+            {% for ch in suggestion_challenges %}
+            <div class="col-md-6">
+              <a href="{{ url_for('learn_portal.challenge_detail', challenge_id=ch.id) }}" class="lh-suggestion-card text-decoration-none d-block h-100">
+                <span class="lh-suggestion-card-cat">{{ ch.challenge_category }}</span>
+                <span class="lh-suggestion-card-title">{{ ch.title }}</span>
+                <span class="lh-suggestion-card-meta">{{ ch.difficulty }} · {{ ch.challenge_type }}</span>
+                <span class="lh-suggestion-card-go">Open <i class="fas fa-arrow-right ms-1 small"></i></span>
+              </a>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="lh-dash-empty">
+            <p class="mb-3 text-muted">No suggestions yet — explore challenges or ask your teacher to publish tracks.</p>
+            <a href="{{ url_for('learn_portal.challenges') }}" class="btn lh-btn-primary btn-sm">Go to challenges</a>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="lh-dash-panel mb-4">
+        <div class="lh-dash-panel-head">
+          <h2 class="lh-dash-panel-title mb-0">Tracks</h2>
+          <a href="{{ url_for('learn_portal.tracks') }}" class="btn btn-sm lh-dash-link-btn">All tracks</a>
+        </div>
+        <ul class="list-unstyled lh-track-list mb-0">
+          {% for t in tracks %}
+          <li class="lh-track-item">
+            <div class="lh-track-info">
+              <span class="lh-track-title">{{ t.title }}</span>
+              <span class="lh-track-meta">{{ t.category }} · {{ t.difficulty }}{% if t.estimated_duration_minutes %} · ~{{ t.estimated_duration_minutes }} min{% endif %}</span>
+            </div>
+            <form method="post" action="{{ url_for('learn_portal.track_enroll', track_id=t.id) }}" class="m-0">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <button type="submit" class="btn btn-sm lh-track-enroll">Enroll</button>
+            </form>
+          </li>
+          {% else %}
+          <li class="lh-track-item lh-track-empty text-muted small py-4 px-3">No published tracks yet.</li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      <section class="lh-dash-panel">
+        <div class="lh-dash-panel-head">
+          <h2 class="lh-dash-panel-title mb-0">Your progress</h2>
+        </div>
+        <ul class="list-unstyled lh-progress-list mb-0">
+          {% for p in progress_rows %}
+          <li class="lh-progress-item">
+            <div class="lh-progress-top">
+              <span class="lh-progress-track">{{ p.track.title }}</span>
+              <span class="lh-progress-pct">{{ '%.0f'|format(p.percent_complete) }}%</span>
+            </div>
+            <div class="lh-progress-bar-wrap">
+              <div class="lh-progress-bar" style="width: {% if p.percent_complete > 100 %}100{% else %}{{ p.percent_complete }}{% endif %}%;"></div>
+            </div>
+          </li>
+          {% else %}
+          <li class="text-muted small py-4 px-3">Enroll in a track to see progress here.</li>
+          {% endfor %}
+        </ul>
+      </section>
+    </div>
+
+    {# — Sidebar — #}
+    <div class="col-lg-4">
+      <aside class="lh-dash-sidebar">
+        <div class="lh-dash-panel lh-dash-sidebar-card mb-4">
+          <div class="lh-dash-panel-head py-3">
+            <h2 class="lh-dash-panel-title mb-0 h6">Quick links</h2>
+          </div>
+          <div class="lh-dash-panel-body pt-0 pb-3">
+            <div class="d-grid gap-2">
+              <a href="{{ url_for('learn_portal.challenges') }}" class="btn lh-sidebar-btn"><i class="fas fa-puzzle-piece me-2"></i>Challenges</a>
+              <a href="{{ url_for('learn_portal.tracks') }}" class="btn lh-sidebar-btn"><i class="fas fa-route me-2"></i>Tracks</a>
+              <a href="{{ url_for('learn_portal.leaderboard') }}" class="btn lh-sidebar-btn"><i class="fas fa-trophy me-2"></i>Leaderboard</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="lh-dash-panel lh-dash-sidebar-card">
+          <div class="lh-dash-panel-head py-3">
+            <h2 class="lh-dash-panel-title mb-0 h6"><i class="fas fa-user-shield me-2 text-muted"></i>Guardian</h2>
+          </div>
+          <div class="lh-dash-panel-body pt-0 pb-3">
+            <p class="small text-muted mb-3">Share a short code so a parent or teacher can link your account (expires in 30 minutes).</p>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <form method="post" action="{{ url_for('learn_portal.pairing_code_generate') }}" class="m-0">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button type="submit" class="btn btn-sm lh-btn-primary">Generate code</button>
+              </form>
+              <a href="{{ url_for('learn_guardian.login') }}" class="small lh-dash-inline-link">Guardian login</a>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+{% endblock %}

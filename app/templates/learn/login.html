@@ -1,0 +1,26 @@
+{% extends "learn/base.html" %}
+{% block title %}Sign in · Akello Learn{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5">
+    <div class="card shadow-sm lh-card">
+      <div class="card-body p-4">
+        <h2 class="h4 mb-4">Learner sign in</h2>
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <div class="mb-3">
+            <label class="form-label">Username or email</label>
+            <input name="identifier" class="form-control" required autocomplete="username" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input name="password" type="password" class="form-control" required autocomplete="current-password" />
+          </div>
+          <button class="btn lh-btn-primary w-100" type="submit">Sign in</button>
+        </form>
+        <p class="small text-muted mt-3 mb-0"><a href="{{ url_for('learn_portal.register') }}">Need an account?</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

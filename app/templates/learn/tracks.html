@@ -1,0 +1,24 @@
+{% extends "learn/base.html" %}
+{% block title %}Tracks · Akello Learn{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">Learning tracks</h1>
+<div class="row g-3">
+  {% for t in tracks %}
+  <div class="col-md-6">
+    <div class="card lh-card h-100 shadow-sm border-0">
+      <div class="card-body">
+        <h2 class="h5">{{ t.title }}</h2>
+        <p class="small text-muted">{{ t.category }} · {{ t.difficulty }}{% if t.estimated_duration_minutes %} · ~{{ t.estimated_duration_minutes }} min{% endif %}</p>
+        <p>{{ t.description or '' }}</p>
+        <form method="post" action="{{ url_for('learn_portal.track_enroll', track_id=t.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <button type="submit" class="btn lh-btn-primary btn-sm">Enroll</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <p class="text-muted">No published tracks.</p>
+  {% endfor %}
+</div>
+{% endblock %}

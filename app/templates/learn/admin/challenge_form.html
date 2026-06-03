@@ -1,0 +1,44 @@
+{% extends "learn/admin/base_admin.html" %}
+{% block title %}New challenge · Learn Admin{% endblock %}
+{% block lha_body %}
+<h1 class="lha-title mb-4">New challenge</h1>
+<form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <div class="mb-3">
+      <label class="form-label">Title</label>
+      <input name="title" class="form-control" required />
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Description</label>
+      <textarea name="description" class="form-control" rows="3"></textarea>
+    </div>
+    <div class="row g-2">
+      <div class="col-md-4">
+        <label class="form-label">Category</label>
+        <input name="challenge_category" class="form-control" value="ICT Fundamentals" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Type</label>
+        <select name="challenge_type" class="form-select">
+          <option value="quiz">quiz</option>
+          <option value="coding">coding</option>
+          <option value="minigame">minigame</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Difficulty</label>
+        <select name="difficulty" class="form-select">
+          <option value="beginner">beginner</option>
+          <option value="intermediate">intermediate</option>
+          <option value="advanced">advanced</option>
+        </select>
+      </div>
+    </div>
+    <div class="mb-3 mt-2">
+      <label class="form-label">Base points</label>
+      <input name="base_points" type="number" class="form-control" value="10" />
+    </div>
+    <button type="submit" class="btn lha-btn-solid">Create</button>
+    <a href="{{ url_for('learn_admin.dashboard') }}" class="btn btn-link">Cancel</a>
+  </form>
+{% endblock %}

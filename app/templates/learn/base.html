@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f4c81" />
+  <link rel="manifest" href="{{ url_for('static', filename='learn/site.webmanifest') }}" />
+  <title>{% block title %}Akello Learn{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/learn_hub.css') }}">
+  {% block head_extra %}{% endblock %}
+</head>
+
+<body class="lh-body">
+  <nav class="navbar navbar-expand-lg lh-navbar mb-4 py-3">
+    <div class="container">
+      <a class="navbar-brand fw-bold" href="{{ url_for('learn_portal.index') }}"><i class="fas fa-rocket me-2"></i>Akello Learn</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#lhNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="lhNav">
+        <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
+          {% if g.learn_learner %}
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('learn_portal.dashboard') }}">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('learn_portal.challenges') }}">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('learn_portal.tracks') }}">Tracks</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('learn_portal.leaderboard') }}">Leaderboard</a></li>
+          <li class="nav-item ms-lg-2"><span class="badge lh-badge">{{ g.learn_learner.total_xp }} XP</span></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('learn_portal.logout') }}">Sign out</a></li>
+          {% else %}
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('learn_portal.login') }}">Sign in</a></li>
+          <li class="nav-item"><a class="btn btn-sm lh-btn-light ms-lg-2" href="{{ url_for('learn_portal.register') }}">Register</a></li>
+          {% endif %}
+          <li class="nav-item"><a class="nav-link small" href="{{ url_for('learn_guardian.login') }}">Guardians</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container pb-5">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} lh-alert shadow-sm" role="alert">{{ msg }}</div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="lh-footer py-4 mt-auto">
+    <div class="container text-center small text-muted">
+      Akello Learning Hub · For students & mentors · <a href="/">Staff dashboard</a>
+    </div>
+  </footer>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  {% block scripts %}{% endblock %}
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('{{ url_for("learn_portal.learn_service_worker") }}').catch(function () { });
+      });
+    }
+  </script>
+</body>
+
+</html>

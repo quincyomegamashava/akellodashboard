@@ -1,0 +1,11 @@
+{
+  "name": "Akello Learn",
+  "short_name": "Learn",
+  "description": "Structured tracks, quizzes, challenges, and XP for primary through tertiary learners.",
+  "start_url": "/learn/",
+  "scope": "/learn/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f4c81",
+  "icons": []
+}

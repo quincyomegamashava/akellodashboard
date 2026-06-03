@@ -149,6 +149,19 @@
       </a>
       {% endif %}
 
+      <div class="px-3 mt-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider sidebar-text">Learning
+        Hub</div>
+      <a href="{{ url_for('learn_portal.index') }}"
+        class="nav-item {{ 'active' if request.blueprint == 'learn_portal' else '' }}">
+        <i class="fas fa-rocket"></i> <span class="nav-text">Akello Learn</span>
+      </a>
+      {% if current_user.userRole == 'Admin' or current_user.has_privilege('Learning Hub Admin') %}
+      <a href="{{ url_for('learn_admin.dashboard') }}"
+        class="nav-item {{ 'active' if request.blueprint == 'learn_admin' else '' }}">
+        <i class="fas fa-chalkboard-user"></i> <span class="nav-text">Learn Admin</span>
+      </a>
+      {% endif %}
+
       <!-- PROVINCES SECTION -->
       <div class="px-3 mt-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider sidebar-text">Provinces
       </div>
