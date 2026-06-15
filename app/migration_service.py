@@ -35,6 +35,14 @@ _SCHEMA_HINTS = (
     {'check': 'meeting_notes_action_subtasks table', 'type': 'table', 'name': 'meeting_notes_action_subtasks'},
 )
 
+# Most specific schema signal first — used for stamp inference and recommendations.
+_SCHEMA_REVISION_HINTS = (
+    ('sales_marketing_stakeholder_leads.follow_up_status', 'r8s9t0u1v2w3', 'Sales marketing enhancements (follow-up status)'),
+    ('sales_marketing_stakeholder_leads table', 'o5p6q7r8s9t0', 'Sales marketing tables'),
+    ('meeting_notes_action_subtasks table', 'n4o5p6q7r8s9', 'Meeting notes action subtasks'),
+    ('meeting_notes_action_items table', 'f71e8a9b0c1d', 'Meeting notes action items'),
+)
+
 
 def _get_migrate_extension():
     return current_app.extensions['migrate']
@@ -252,6 +260,140 @@ def _build_schema_hints() -> list[dict[str, Any]]:
     return hints
 
 
+def _schema_hint_exists(schema_hints: list[dict[str, Any]], check: str) -> bool:
+    for hint in schema_hints:
+        if hint.get('check') == check:
+            return bool(hint.get('exists'))
+    return False
+
+
+def _infer_stamp_revision(
+    schema_hints: list[dict[str, Any]],
+    heads: list[str],
+    known_revisions: set[str] | None = None,
+) -> str | None:
+    """Pick a stamp target from schema probes; prefer revisions present on disk."""
+    known = known_revisions or set()
+    for check, revision, _label in _SCHEMA_REVISION_HINTS:
+        if not _schema_hint_exists(schema_hints, check):
+            continue
+        if known and revision not in known:
+            for alt in (revision, '88a51ab2a25e'):
+                if alt in known:
+                    return alt
+            continue
+        return revision
+    if len(heads) == 1:
+        return heads[0]
+    if len(heads) > 1:
+        return 'head'
+    return None
+
+
+def _build_recommended_stamp_targets(
+    scanned_files: list[dict[str, Any]],
+    heads: list[str],
+    schema_hints: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    known = {item['revision'] for item in scanned_files}
+    recommended: list[dict[str, Any]] = []
+    inferred = _infer_stamp_revision(schema_hints, heads, known)
+
+    if inferred:
+        label = 'Inferred from schema (recommended)'
+        for check, revision, desc in _SCHEMA_REVISION_HINTS:
+            if revision == inferred or (inferred == '88a51ab2a25e' and revision == 'o5p6q7r8s9t0'):
+                if _schema_hint_exists(schema_hints, check):
+                    label = f'Inferred from schema: {desc}'
+                    break
+        recommended.append({
+            'revision': inferred,
+            'label': label,
+            'confidence': 'schema',
+        })
+
+    if len(heads) == 1:
+        head_rev = heads[0]
+        if not any(item['revision'] == head_rev for item in recommended):
+            recommended.append({
+                'revision': head_rev,
+                'label': 'Head (latest deployed migration)',
+                'confidence': 'manual',
+            })
+    elif len(heads) > 1:
+        recommended.append({
+            'revision': 'head',
+            'label': 'Head (after merging branches)',
+            'confidence': 'manual',
+        })
+
+    for item in scanned_files:
+        rev = item['revision']
+        if rev in {r['revision'] for r in recommended}:
+            continue
+        if rev in heads:
+            recommended.append({
+                'revision': rev,
+                'label': item.get('message') or rev,
+                'confidence': 'manual',
+            })
+
+    return recommended
+
+
+def _build_suggested_actions(
+    analysis: dict[str, Any],
+    current: str | None,
+    schema_hints: list[dict[str, Any]],
+) -> list[str]:
+    actions: list[str] = []
+    heads = analysis.get('heads') or []
+    known = set(analysis.get('known_revisions') or [])
+    issues = analysis.get('issues') or []
+
+    if analysis.get('orphan_files'):
+        actions.append('remove_orphans')
+    if len(heads) > 1:
+        actions.append('merge_heads')
+
+    orphaned_db = any(issue.get('code') == 'orphaned_db_revision' for issue in issues)
+    inferred = _infer_stamp_revision(schema_hints, heads, known)
+    stamp_needed = orphaned_db or current is None
+    if not stamp_needed and inferred and current and inferred not in ('head', current):
+        if inferred in known and current in known and current != inferred:
+            stamp_needed = _schema_hint_exists(schema_hints, _SCHEMA_REVISION_HINTS[0][0]) or any(
+                _schema_hint_exists(schema_hints, check) for check, _, _ in _SCHEMA_REVISION_HINTS
+            )
+        elif current not in known:
+            stamp_needed = True
+
+    if stamp_needed:
+        actions.append('stamp')
+    actions.append('upgrade')
+    return actions
+
+
+def _stamp_needed(
+    current: str | None,
+    known_revisions: set[str],
+    schema_hints: list[dict[str, Any]],
+    heads: list[str],
+    issues: list[dict[str, Any]],
+) -> bool:
+    if any(issue.get('code') == 'orphaned_db_revision' for issue in issues):
+        return True
+    if current is None:
+        return True
+    if current not in known_revisions:
+        return True
+    inferred = _infer_stamp_revision(schema_hints, heads, known_revisions)
+    if not inferred or inferred in ('head', current):
+        return False
+    if inferred in known_revisions and current != inferred:
+        return any(_schema_hint_exists(schema_hints, check) for check, _, _ in _SCHEMA_REVISION_HINTS)
+    return False
+
+
 def _analyze_chain(scanned_files: list[dict[str, Any]], current: str | None) -> dict[str, Any]:
     revisions = {item['revision'] for item in scanned_files}
     orphan_files = _find_orphan_files(scanned_files)
@@ -315,14 +457,10 @@ def get_diagnostics() -> dict[str, Any]:
         ]
         available_revisions.sort(key=lambda item: item['revision'])
 
-        recommended = []
-        if heads:
-            head_rev = heads[0] if len(heads) == 1 else 'head'
-            recommended.append({
-                'revision': head_rev,
-                'label': 'Head (latest deployed migration)',
-                'confidence': 'manual',
-            })
+        recommended = _build_recommended_stamp_targets(scanned_files, heads, schema_hints)
+        multiple_heads = len(heads) > 1
+        has_orphan_files = bool(analysis['orphan_files'])
+        suggested_actions = _build_suggested_actions(analysis, current, schema_hints)
 
         return {
             'success': True,
@@ -336,6 +474,12 @@ def get_diagnostics() -> dict[str, Any]:
             'available_revisions': available_revisions,
             'database': _safe_database_label(),
             'web_migrations_enabled': current_app.config.get('ALLOW_WEB_MIGRATIONS', True),
+            'multiple_heads': multiple_heads,
+            'has_orphan_files': has_orphan_files,
+            'suggested_actions': suggested_actions,
+            'inferred_stamp_revision': _infer_stamp_revision(
+                schema_hints, heads, set(analysis['known_revisions'])
+            ),
         }
     except Exception as exc:
         logger.exception('Failed to read migration diagnostics')
@@ -362,6 +506,10 @@ def _merge_diagnostics_into_status(status: dict[str, Any]) -> dict[str, Any]:
     chain_broken = diagnostics.get('chain_broken', False)
     status['chain_broken'] = chain_broken
     status['needs_repair'] = chain_broken
+    status['multiple_heads'] = diagnostics.get('multiple_heads', False)
+    status['has_orphan_files'] = diagnostics.get('has_orphan_files', False)
+    status['suggested_actions'] = diagnostics.get('suggested_actions', [])
+    status['inferred_stamp_revision'] = diagnostics.get('inferred_stamp_revision')
     if chain_broken:
         status['is_up_to_date'] = False
         messages = [issue.get('message') for issue in diagnostics.get('issues', []) if issue.get('message')]
@@ -519,18 +667,309 @@ def _backup_sqlite_database() -> dict[str, Any]:
     }
 
 
-def run_repair(
-    stamp_revision: str,
-    *,
-    remove_orphan_files: bool = True,
-    run_upgrade_after: bool = True,
-) -> dict[str, Any]:
-    """Repair a broken migration chain: backup, cleanup, stamp, optional upgrade."""
+def _check_web_migrations_enabled() -> dict[str, Any] | None:
     if not current_app.config.get('ALLOW_WEB_MIGRATIONS', True):
         return {
             'success': False,
             'error': 'Web migrations are disabled (ALLOW_WEB_MIGRATIONS=false).',
         }
+    return None
+
+
+def _remove_orphan_files(orphan_files: list[dict[str, Any]]) -> list[str]:
+    removed_files: list[str] = []
+    for orphan in orphan_files:
+        file_path = orphan.get('path')
+        if file_path and os.path.isfile(file_path):
+            os.remove(file_path)
+            removed_files.append(orphan.get('file') or file_path)
+    return removed_files
+
+
+def _merge_heads_internal(
+    heads: list[str],
+    message: str | None = None,
+) -> dict[str, Any]:
+    config = _get_alembic_config()
+    buffer = io.StringIO()
+    merge_message = message or 'Merge migration heads (admin)'
+    with redirect_stdout(buffer):
+        script = command.merge(config, tuple(heads), message=merge_message)
+
+    new_revision = script.revision if script else None
+    new_file = None
+    if script is not None:
+        script_path = getattr(script, 'path', None)
+        if script_path:
+            new_file = {
+                'path': str(script_path),
+                'filename': Path(script_path).name,
+            }
+
+    after = get_diagnostics()
+    return {
+        'merged_heads': heads,
+        'new_revision': new_revision,
+        'new_file': new_file,
+        'output': buffer.getvalue().strip(),
+        'head_revisions_after': after.get('head_revisions') or [],
+    }
+
+
+def _stamp_revision(stamp_revision: str, stamped_from: str | None) -> dict[str, Any]:
+    config = _get_alembic_config()
+    diagnostics = get_diagnostics()
+    heads = diagnostics.get('head_revisions') or []
+    known_revisions = {item['revision'] for item in diagnostics.get('available_revisions', [])}
+
+    if stamp_revision == 'head':
+        if not heads:
+            raise CommandError('No migration head found to stamp.')
+        if len(heads) > 1:
+            raise CommandError(
+                'Multiple heads remain; merge heads before stamping to head.'
+            )
+        stamp_revision = heads[0]
+
+    if stamp_revision not in known_revisions:
+        raise CommandError(f'Unknown stamp revision: {stamp_revision}')
+
+    buffer = io.StringIO()
+    with redirect_stdout(buffer):
+        command.stamp(config, stamp_revision)
+    return {
+        'from': stamped_from,
+        'to': stamp_revision,
+        'output': buffer.getvalue().strip(),
+    }
+
+
+def _upgrade_to_head() -> dict[str, Any]:
+    config = _get_alembic_config()
+    buffer = io.StringIO()
+    with redirect_stdout(buffer):
+        command.upgrade(config, 'head')
+    upgrade_output = buffer.getvalue().strip()
+    upgrade_result = get_status()
+    return {
+        'output': upgrade_output,
+        'pending_count': upgrade_result.get('pending_count', 0),
+        'is_up_to_date': upgrade_result.get('is_up_to_date', False),
+        'current_revision': upgrade_result.get('current_revision'),
+    }
+
+
+def run_merge_heads(message: str | None = None) -> dict[str, Any]:
+    """Merge multiple migration heads into a single revision (creates a merge file)."""
+    disabled = _check_web_migrations_enabled()
+    if disabled:
+        return disabled
+
+    if not _upgrade_lock.acquire(blocking=False):
+        return {
+            'success': False,
+            'error': 'Another migration operation is already in progress.',
+        }
+
+    steps: list[dict[str, Any]] = []
+    try:
+        before = get_diagnostics()
+        if not before.get('success'):
+            return {
+                'success': False,
+                'error': before.get('error', 'Could not read migration diagnostics.'),
+            }
+
+        if before.get('has_orphan_files'):
+            orphan_names = [o.get('file') for o in before.get('orphan_files', [])]
+            return {
+                'success': False,
+                'error': (
+                    'Orphan migration files must be removed before merging heads. '
+                    'Use Fix migrations or remove orphans first: '
+                    + ', '.join(name for name in orphan_names if name)
+                ),
+            }
+
+        heads = before.get('head_revisions') or []
+        if len(heads) <= 1:
+            return {
+                'success': False,
+                'error': (
+                    'Multiple heads are not present; merge is not required.'
+                    if len(heads) == 1
+                    else 'No migration heads found.'
+                ),
+            }
+
+        backup_result = _backup_sqlite_database()
+        if not backup_result.get('success'):
+            return backup_result
+        steps.append({'step': 'backup', 'success': True, 'detail': backup_result.get('backup_path')})
+
+        merge_result = _merge_heads_internal(heads, message=message)
+        steps.append({'step': 'merge_heads', 'success': True, 'detail': merge_result})
+
+        after = get_diagnostics()
+        return {
+            'success': True,
+            'message': 'Migration heads merged successfully.',
+            'steps': steps,
+            'backup_path': backup_result.get('backup_path'),
+            'merged_heads': merge_result.get('merged_heads'),
+            'new_revision': merge_result.get('new_revision'),
+            'new_file': merge_result.get('new_file'),
+            'head_revisions_after': after.get('head_revisions') or [],
+            'chain_broken': after.get('chain_broken', False),
+            'multiple_heads': after.get('multiple_heads', False),
+            'output': merge_result.get('output', ''),
+            'git_commit_reminder': (
+                'Commit the new merge migration file to git so future deploys keep a consistent chain.'
+            ),
+        }
+    except CommandError as exc:
+        logger.error('Migration merge failed: %s', exc)
+        return {
+            'success': False,
+            'error': str(exc),
+            'steps': steps,
+        }
+    except Exception as exc:
+        logger.exception('Migration merge failed')
+        return {
+            'success': False,
+            'error': str(exc),
+            'steps': steps,
+        }
+    finally:
+        _upgrade_lock.release()
+
+
+def run_fix_migrations(
+    stamp_revision: str | None = None,
+    *,
+    remove_orphan_files: bool = True,
+    merge_heads: bool = True,
+    run_stamp: bool = True,
+    run_upgrade_after: bool = True,
+) -> dict[str, Any]:
+    """One-click recovery: backup, remove orphans, merge heads, stamp, upgrade."""
+    disabled = _check_web_migrations_enabled()
+    if disabled:
+        return disabled
+
+    if not _upgrade_lock.acquire(blocking=False):
+        return {
+            'success': False,
+            'error': 'Another migration operation is already in progress.',
+        }
+
+    steps: list[dict[str, Any]] = []
+    try:
+        before = get_diagnostics()
+        if not before.get('success'):
+            return {
+                'success': False,
+                'error': before.get('error', 'Could not read migration diagnostics.'),
+            }
+
+        backup_result = _backup_sqlite_database()
+        if not backup_result.get('success'):
+            return backup_result
+        steps.append({'step': 'backup', 'success': True, 'detail': backup_result.get('backup_path')})
+
+        removed_files: list[str] = []
+        if remove_orphan_files and before.get('orphan_files'):
+            removed_files = _remove_orphan_files(before.get('orphan_files', []))
+            steps.append({'step': 'remove_orphan_files', 'success': True, 'detail': removed_files})
+
+        diagnostics = get_diagnostics()
+        heads = diagnostics.get('head_revisions') or []
+        if merge_heads and len(heads) > 1:
+            merge_result = _merge_heads_internal(heads)
+            steps.append({'step': 'merge_heads', 'success': True, 'detail': merge_result})
+            diagnostics = get_diagnostics()
+            heads = diagnostics.get('head_revisions') or []
+
+        stamped_from = diagnostics.get('current_revision')
+        known_revisions = {item['revision'] for item in diagnostics.get('available_revisions', [])}
+        schema_hints = diagnostics.get('schema_hints') or []
+        issues = diagnostics.get('issues') or []
+
+        stamp_target = stamp_revision
+        if run_stamp and _stamp_needed(stamped_from, known_revisions, schema_hints, heads, issues):
+            if not stamp_target:
+                stamp_target = diagnostics.get('inferred_stamp_revision') or (
+                    heads[0] if len(heads) == 1 else 'head'
+                )
+            stamp_detail = _stamp_revision(stamp_target, stamped_from)
+            steps.append({'step': 'stamp', 'success': True, 'detail': stamp_detail})
+            stamped_from = stamp_detail.get('to', stamp_target)
+        elif run_stamp:
+            steps.append({
+                'step': 'stamp',
+                'success': True,
+                'detail': {'skipped': True, 'reason': 'Stamp not required.'},
+            })
+
+        upgrade_output = ''
+        if run_upgrade_after:
+            upgrade_detail = _upgrade_to_head()
+            upgrade_output = upgrade_detail.get('output', '')
+            steps.append({'step': 'upgrade', 'success': True, 'detail': upgrade_detail})
+
+        after = get_status()
+        merge_step = next((s for s in steps if s.get('step') == 'merge_heads'), None)
+        merge_detail = (merge_step or {}).get('detail') or {}
+        return {
+            'success': True,
+            'message': 'Migrations fixed successfully.',
+            'steps': steps,
+            'removed_files': removed_files,
+            'backup_path': backup_result.get('backup_path'),
+            'stamped_from': diagnostics.get('current_revision'),
+            'stamped_to': after.get('current_revision'),
+            'new_revision': merge_detail.get('new_revision'),
+            'new_file': merge_detail.get('new_file'),
+            'upgrade_output': upgrade_output,
+            'pending_count': after.get('pending_count', 0),
+            'is_up_to_date': after.get('is_up_to_date', False),
+            'chain_broken': after.get('chain_broken', False),
+            'git_commit_reminder': (
+                'Commit any new merge migration file to git so future deploys keep a consistent chain.'
+                if merge_detail.get('new_file')
+                else None
+            ),
+        }
+    except CommandError as exc:
+        logger.error('Migration fix failed: %s', exc)
+        return {
+            'success': False,
+            'error': str(exc),
+            'steps': steps,
+        }
+    except Exception as exc:
+        logger.exception('Migration fix failed')
+        return {
+            'success': False,
+            'error': str(exc),
+            'steps': steps,
+        }
+    finally:
+        _upgrade_lock.release()
+
+
+def run_repair(
+    stamp_revision: str,
+    *,
+    remove_orphan_files: bool = True,
+    run_upgrade_after: bool = True,
+    auto_merge_heads: bool = False,
+) -> dict[str, Any]:
+    """Repair a broken migration chain: backup, cleanup, stamp, optional upgrade."""
+    disabled = _check_web_migrations_enabled()
+    if disabled:
+        return disabled
 
     if not _upgrade_lock.acquire(blocking=False):
         return {
@@ -554,14 +993,33 @@ def run_repair(
             }
 
         heads = before.get('head_revisions') or []
+
+        backup_result = _backup_sqlite_database()
+        if not backup_result.get('success'):
+            return backup_result
+        steps.append({'step': 'backup', 'success': True, 'detail': backup_result.get('backup_path')})
+
+        removed_files: list[str] = []
+        if remove_orphan_files and before.get('orphan_files'):
+            removed_files = _remove_orphan_files(before.get('orphan_files', []))
+            steps.append({'step': 'remove_orphan_files', 'success': True, 'detail': removed_files})
+            before = get_diagnostics()
+            heads = before.get('head_revisions') or []
+
         if len(heads) > 1:
-            return {
-                'success': False,
-                'error': (
-                    'Multiple migration heads detected. Merge heads before running repair: '
-                    + ', '.join(heads)
-                ),
-            }
+            if not auto_merge_heads:
+                return {
+                    'success': False,
+                    'error': (
+                        'Multiple migration heads detected. Merge heads before running repair: '
+                        + ', '.join(heads)
+                    ),
+                    'steps': steps,
+                }
+            merge_result = _merge_heads_internal(heads)
+            steps.append({'step': 'merge_heads', 'success': True, 'detail': merge_result})
+            before = get_diagnostics()
+            heads = before.get('head_revisions') or []
 
         known_revisions = {item['revision'] for item in before.get('available_revisions', [])}
         if stamp_revision == 'head':
@@ -573,56 +1031,18 @@ def run_repair(
             return {
                 'success': False,
                 'error': f'Unknown stamp revision: {stamp_revision}',
+                'steps': steps,
             }
 
-        backup_result = _backup_sqlite_database()
-        if not backup_result.get('success'):
-            return backup_result
-        steps.append({'step': 'backup', 'success': True, 'detail': backup_result.get('backup_path')})
-
-        removed_files: list[str] = []
-        if remove_orphan_files:
-            for orphan in before.get('orphan_files', []):
-                file_path = orphan.get('path')
-                if file_path and os.path.isfile(file_path):
-                    os.remove(file_path)
-                    removed_files.append(orphan.get('file') or file_path)
-            steps.append({'step': 'remove_orphan_files', 'success': True, 'detail': removed_files})
-
-        config = _get_alembic_config()
         stamped_from = before.get('current_revision')
-        buffer = io.StringIO()
-        with redirect_stdout(buffer):
-            command.stamp(config, stamp_revision)
-        stamp_output = buffer.getvalue().strip()
-        steps.append({
-            'step': 'stamp',
-            'success': True,
-            'detail': {
-                'from': stamped_from,
-                'to': stamp_revision,
-                'output': stamp_output,
-            },
-        })
+        stamp_detail = _stamp_revision(stamp_revision, stamped_from)
+        steps.append({'step': 'stamp', 'success': True, 'detail': stamp_detail})
 
         upgrade_output = ''
-        upgrade_result = None
         if run_upgrade_after:
-            buffer = io.StringIO()
-            with redirect_stdout(buffer):
-                command.upgrade(config, 'head')
-            upgrade_output = buffer.getvalue().strip()
-            upgrade_result = get_status()
-            steps.append({
-                'step': 'upgrade',
-                'success': True,
-                'detail': {
-                    'output': upgrade_output,
-                    'pending_count': upgrade_result.get('pending_count', 0),
-                    'is_up_to_date': upgrade_result.get('is_up_to_date', False),
-                    'current_revision': upgrade_result.get('current_revision'),
-                },
-            })
+            upgrade_detail = _upgrade_to_head()
+            upgrade_output = upgrade_detail.get('output', '')
+            steps.append({'step': 'upgrade', 'success': True, 'detail': upgrade_detail})
 
         after = get_status()
         return {

@@ -46,19 +46,45 @@ def _register_meeting_notes_routes() -> None:
 
     @app.route(
         "/api/mobile/meeting-notes/action-items/<int:item_id>",
-        methods=["PUT"],
+        methods=["GET", "PUT", "DELETE"],
     )
     @login_required
-    def mobile_meeting_notes_update_item(item_id: int):
-        return mn.api_mobile_update_item(item_id)
+    def mobile_meeting_notes_action_item(item_id: int):
+        return mn.api_action_item(item_id)
+
+    @app.route(
+        "/api/mobile/meeting-notes/action-items/<int:item_id>/subtasks",
+        methods=["GET", "POST"],
+    )
+    @login_required
+    def mobile_meeting_notes_action_item_subtasks(item_id: int):
+        return mn.api_action_item_subtasks(item_id)
 
     @app.route(
         "/api/mobile/meeting-notes/subtasks/<int:subtask_id>",
-        methods=["PUT"],
+        methods=["PUT", "DELETE"],
     )
     @login_required
     def mobile_meeting_notes_update_subtask(subtask_id: int):
         return mn.api_subtask(subtask_id)
+
+    @app.route("/api/mobile/meeting-notes/users", methods=["GET"])
+    @login_required
+    def mobile_meeting_notes_users():
+        return mn.api_users()
+
+    @app.route("/api/mobile/meeting-notes/labels", methods=["GET"])
+    @login_required
+    def mobile_meeting_notes_labels():
+        return mn.api_labels()
+
+    @app.route(
+        "/api/mobile/meeting-notes/action-items/<int:item_id>/comments",
+        methods=["GET", "POST"],
+    )
+    @login_required
+    def mobile_meeting_notes_action_item_comments(item_id: int):
+        return mn.api_item_comments(item_id)
 
     @app.route("/api/mobile/meeting-notes/meetings", methods=["GET"])
     @login_required
