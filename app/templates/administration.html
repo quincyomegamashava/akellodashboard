@@ -541,6 +541,52 @@
         Loading migration status...
       </div>
 
+      <div id="migrationsRepairPanel" class="hidden space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <div>
+          <h3 class="text-sm font-bold text-amber-900 m-0">Migration chain repair required</h3>
+          <p class="text-xs text-amber-800 mt-1 m-0">
+            The database revision does not match deployed migration files. Choose a stamp target, then repair.
+          </p>
+        </div>
+        <div id="migrationsIssuesList" class="text-sm text-amber-900 space-y-1"></div>
+        <div>
+          <h4 class="text-xs font-bold text-amber-900 uppercase tracking-wider mb-2">Schema hints</h4>
+          <div class="rounded-xl border border-amber-200 bg-white overflow-hidden">
+            <table class="table-minimal text-sm">
+              <thead>
+                <tr>
+                  <th>Check</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="migrationsSchemaHintsBody">
+                <tr><td colspan="2" class="text-slate-500">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <label for="migrationsStampSelect" class="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-2">
+            Stamp target
+          </label>
+          <select id="migrationsStampSelect"
+            class="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-slate-800"></select>
+          <p class="text-xs text-amber-800 mt-2 m-0">
+            Pick head if schema already matches the latest deploy. Pick an earlier revision if tables are missing.
+          </p>
+        </div>
+        <div class="space-y-2 text-sm text-amber-900">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="migrationsRemoveOrphans" checked class="rounded border-amber-300">
+            Remove orphan migration files
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="migrationsUpgradeAfterRepair" checked class="rounded border-amber-300">
+            Apply pending migrations after repair
+          </label>
+        </div>
+      </div>
+
       <div>
         <h3 class="text-sm font-bold text-slate-700 mb-3">Pending migrations</h3>
         <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden">
@@ -583,6 +629,10 @@
         <button type="button" id="migrationsRefreshBtn" onclick="refreshMigrationsModal()"
           class="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-2xl transition-all active:scale-95">
           Refresh status
+        </button>
+        <button type="button" id="migrationsRepairBtn" onclick="applyMigrationsRepair()" disabled
+          class="hidden flex-1 px-4 py-3 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
+          Repair migration chain
         </button>
         <button type="button" id="migrationsUpgradeBtn" onclick="applyMigrationsUpgrade()" disabled
           class="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
@@ -2224,6 +2274,7 @@
   }
 
   let migrationsStatusCache = null;
+  let migrationsDiagnosticsCache = null;
 
   function escapeHtml(value) {
     return String(value == null ? '' : value)
@@ -2241,6 +2292,12 @@
 
     if (!status || !status.success) {
       label.textContent = 'Check migrations';
+      iconWrap.className = 'kpi-icon-minimal bg-rose-50 text-rose-600 mb-4';
+      return;
+    }
+
+    if (status.needs_repair || status.chain_broken) {
+      label.textContent = 'Chain broken';
       iconWrap.className = 'kpi-icon-minimal bg-rose-50 text-rose-600 mb-4';
       return;
     }
@@ -2306,14 +2363,114 @@
     }).join('');
   }
 
+  function loadMigrationDiagnostics() {
+    return fetch('/api/admin/migrations/diagnostics', { credentials: 'same-origin' })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, data: data };
+        });
+      })
+      .then(function (result) {
+        migrationsDiagnosticsCache = result.data;
+        return result;
+      })
+      .catch(function () {
+        return { ok: false, data: { success: false, error: 'Could not load migration diagnostics.' } };
+      });
+  }
+
+  function renderMigrationsSchemaHints(hints) {
+    const body = document.getElementById('migrationsSchemaHintsBody');
+    if (!body) return;
+    if (!hints || !hints.length) {
+      body.innerHTML = '<tr><td colspan="2" class="text-slate-500">No schema hints available.</td></tr>';
+      return;
+    }
+    body.innerHTML = hints.map(function (item) {
+      const status = item.exists
+        ? '<span class="text-emerald-700 font-semibold">Present</span>'
+        : '<span class="text-rose-700 font-semibold">Missing</span>';
+      return '<tr><td>' + escapeHtml(item.check) + '</td><td>' + status + '</td></tr>';
+    }).join('');
+  }
+
+  function renderMigrationsIssues(issues) {
+    const list = document.getElementById('migrationsIssuesList');
+    if (!list) return;
+    if (!issues || !issues.length) {
+      list.innerHTML = '<div class="text-amber-800">No specific issues reported.</div>';
+      return;
+    }
+    list.innerHTML = issues.map(function (issue) {
+      return '<div class="rounded-lg bg-white/70 px-3 py-2 border border-amber-200">' +
+        escapeHtml(issue.message || issue.code || 'Issue detected') + '</div>';
+    }).join('');
+  }
+
+  function renderMigrationsStampSelect(diagnostics) {
+    const select = document.getElementById('migrationsStampSelect');
+    if (!select) return;
+
+    const revisions = (diagnostics && diagnostics.available_revisions) || [];
+    if (!revisions.length) {
+      select.innerHTML = '<option value="">No revisions available</option>';
+      return;
+    }
+
+    const headRevisions = (diagnostics && diagnostics.head_revisions) || [];
+    const recommended = ((diagnostics && diagnostics.recommended_stamp_targets) || [])[0];
+    const defaultRevision = (recommended && recommended.revision) || headRevisions[0] || revisions[0].revision;
+
+    select.innerHTML = revisions.map(function (item) {
+      const headLabel = item.is_head ? ' (head)' : '';
+      const label = item.revision + headLabel + (item.message ? ' — ' + item.message : '');
+      const selected = item.revision === defaultRevision ? ' selected' : '';
+      return '<option value="' + escapeHtml(item.revision) + '"' + selected + '>' +
+        escapeHtml(label) + '</option>';
+    }).join('');
+  }
+
+  function renderMigrationsRepairPanel(status, diagnostics) {
+    const panel = document.getElementById('migrationsRepairPanel');
+    const repairBtn = document.getElementById('migrationsRepairBtn');
+    const needsRepair = !!(status && (status.needs_repair || status.chain_broken));
+
+    if (panel) {
+      panel.classList.toggle('hidden', !needsRepair);
+    }
+
+    if (!needsRepair) {
+      if (repairBtn) {
+        repairBtn.classList.add('hidden');
+        repairBtn.disabled = true;
+      }
+      return;
+    }
+
+    const diag = diagnostics || {};
+    renderMigrationsIssues(diag.issues || []);
+    renderMigrationsSchemaHints(diag.schema_hints || []);
+    renderMigrationsStampSelect(diag);
+
+    if (repairBtn) {
+      repairBtn.classList.remove('hidden');
+      repairBtn.disabled = !status.web_migrations_enabled;
+    }
+  }
+
   function renderMigrationsSummary(status) {
     const summary = document.getElementById('migrationsStatusSummary');
     const upgradeBtn = document.getElementById('migrationsUpgradeBtn');
+    const repairBtn = document.getElementById('migrationsRepairBtn');
     if (!summary) return;
 
     if (!status || !status.success) {
       summary.textContent = (status && status.error) ? status.error : 'Could not load migration status.';
       if (upgradeBtn) upgradeBtn.disabled = true;
+      if (repairBtn) {
+        repairBtn.disabled = true;
+        repairBtn.classList.add('hidden');
+      }
       return;
     }
 
@@ -2321,15 +2478,32 @@
     const heads = (status.head_revisions || []).map(function (h) { return h.revision; }).join(', ') || '(unknown)';
     const pendingCount = status.pending_count || 0;
     const dbLabel = status.database || 'unknown';
+    const needsRepair = !!(status.needs_repair || status.chain_broken);
 
-    summary.innerHTML =
+    let summaryHtml =
       '<div><strong>Database:</strong> ' + escapeHtml(dbLabel) + '</div>' +
       '<div class="mt-2"><strong>Current revision:</strong> <span class="font-mono text-xs">' + escapeHtml(current) + '</span></div>' +
       '<div class="mt-1"><strong>Head revision(s):</strong> <span class="font-mono text-xs">' + escapeHtml(heads) + '</span></div>' +
       '<div class="mt-1"><strong>Pending:</strong> ' + pendingCount + '</div>';
 
+    if (needsRepair && status.error_detail) {
+      summaryHtml += '<div class="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">' +
+        escapeHtml(status.error_detail) + '</div>';
+    }
+
+    summary.innerHTML = summaryHtml;
+
     if (upgradeBtn) {
-      upgradeBtn.disabled = !status.web_migrations_enabled || status.is_up_to_date || pendingCount === 0;
+      upgradeBtn.disabled = !status.web_migrations_enabled || status.is_up_to_date || pendingCount === 0 || needsRepair;
+    }
+    if (repairBtn) {
+      if (needsRepair) {
+        repairBtn.classList.remove('hidden');
+        repairBtn.disabled = !status.web_migrations_enabled;
+      } else {
+        repairBtn.classList.add('hidden');
+        repairBtn.disabled = true;
+      }
     }
   }
 
@@ -2338,6 +2512,7 @@
     const result = document.getElementById('migrationsResult');
     const refreshBtn = document.getElementById('migrationsRefreshBtn');
     const upgradeBtn = document.getElementById('migrationsUpgradeBtn');
+    const repairBtn = document.getElementById('migrationsRepairBtn');
 
     if (result) {
       result.classList.add('hidden');
@@ -2347,9 +2522,11 @@
     if (summary) summary.textContent = 'Loading migration status...';
     if (refreshBtn) refreshBtn.disabled = true;
     if (upgradeBtn) upgradeBtn.disabled = true;
+    if (repairBtn) repairBtn.disabled = true;
 
     Promise.all([
       loadMigrationStatus(),
+      loadMigrationDiagnostics(),
       fetch('/api/admin/migrations/history?limit=10', { credentials: 'same-origin' })
         .then(function (response) {
           return response.json().then(function (data) {
@@ -2359,9 +2536,12 @@
     ])
       .then(function (results) {
         const statusResult = results[0];
-        const historyResult = results[1];
+        const diagnosticsResult = results[1];
+        const historyResult = results[2];
         const status = statusResult.data || {};
+        const diagnostics = diagnosticsResult.data || {};
         renderMigrationsSummary(status);
+        renderMigrationsRepairPanel(status, diagnostics);
         renderMigrationsPending(status.pending_revisions || []);
         if (historyResult.ok && historyResult.data && historyResult.data.success) {
           renderMigrationsHistory(historyResult.data.revisions || []);
@@ -2386,6 +2566,11 @@
   function applyMigrationsUpgrade() {
     if (!migrationsStatusCache || migrationsStatusCache.is_up_to_date) {
       alert('Database is already up to date.');
+      return;
+    }
+
+    if (migrationsStatusCache.needs_repair || migrationsStatusCache.chain_broken) {
+      alert('Migration chain is broken. Use Repair migration chain first.');
       return;
     }
 
@@ -2441,6 +2626,106 @@
           result.classList.remove('hidden');
           result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800';
           result.textContent = 'Migration upgrade failed: ' + error;
+        }
+      });
+  }
+
+  function applyMigrationsRepair() {
+    const status = migrationsStatusCache || {};
+    const diagnostics = migrationsDiagnosticsCache || {};
+    if (!status.needs_repair && !status.chain_broken && !diagnostics.chain_broken) {
+      alert('Migration chain repair is not required.');
+      return;
+    }
+
+    const stampSelect = document.getElementById('migrationsStampSelect');
+    const removeOrphans = document.getElementById('migrationsRemoveOrphans');
+    const upgradeAfter = document.getElementById('migrationsUpgradeAfterRepair');
+    const stampRevision = stampSelect ? stampSelect.value : '';
+    if (!stampRevision) {
+      alert('Choose a stamp target before repairing.');
+      return;
+    }
+
+    const removeOrphanFiles = !!(removeOrphans && removeOrphans.checked);
+    const runUpgradeAfter = !!(upgradeAfter && upgradeAfter.checked);
+    const confirmMessage =
+      'This will repair the migration chain:\n\n' +
+      '- Backup SQLite database\n' +
+      (removeOrphanFiles ? '- Remove orphan migration files\n' : '') +
+      '- Stamp database to ' + stampRevision + '\n' +
+      (runUpgradeAfter ? '- Apply pending migrations\n' : '') +
+      '\nContinue?';
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    const repairBtn = document.getElementById('migrationsRepairBtn');
+    const upgradeBtn = document.getElementById('migrationsUpgradeBtn');
+    const refreshBtn = document.getElementById('migrationsRefreshBtn');
+    const result = document.getElementById('migrationsResult');
+    const originalText = repairBtn.textContent;
+
+    repairBtn.disabled = true;
+    if (upgradeBtn) upgradeBtn.disabled = true;
+    refreshBtn.disabled = true;
+    repairBtn.textContent = 'Repairing...';
+
+    fetch('/api/admin/migrations/repair', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        confirm: true,
+        stamp_revision: stampRevision,
+        remove_orphan_files: removeOrphanFiles,
+        run_upgrade_after: runUpgradeAfter
+      })
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, data: data };
+        });
+      })
+      .then(function (res) {
+        repairBtn.textContent = originalText;
+        refreshBtn.disabled = false;
+
+        if (result) {
+          result.classList.remove('hidden');
+          if (res.ok && res.data.success) {
+            result.className = 'rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800';
+            let message = res.data.message || 'Migration chain repaired successfully.';
+            if (res.data.backup_path) {
+              message += '\nBackup: ' + res.data.backup_path;
+            }
+            if (res.data.removed_files && res.data.removed_files.length) {
+              message += '\nRemoved files: ' + res.data.removed_files.join(', ');
+            }
+            if (res.data.stamped_from || res.data.stamped_to) {
+              message += '\nStamped: ' + (res.data.stamped_from || '(none)') + ' -> ' + (res.data.stamped_to || stampRevision);
+            }
+            if (res.data.upgrade_output) {
+              message += '\nUpgrade output: ' + res.data.upgrade_output;
+            }
+            result.textContent = message;
+          } else {
+            result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800';
+            result.textContent = (res.data && res.data.error) ? res.data.error : 'Migration repair failed.';
+          }
+        }
+
+        return refreshMigrationsModal();
+      })
+      .catch(function (error) {
+        repairBtn.disabled = false;
+        repairBtn.textContent = originalText;
+        refreshBtn.disabled = false;
+        if (result) {
+          result.classList.remove('hidden');
+          result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800';
+          result.textContent = 'Migration repair failed: ' + error;
         }
       });
   }

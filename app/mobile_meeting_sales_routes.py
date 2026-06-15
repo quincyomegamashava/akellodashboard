@@ -6,7 +6,7 @@ These live on the main app (not blueprints) so they work on deployments where
 
 from __future__ import annotations
 
-from flask import jsonify
+from flask import jsonify, request
 from flask_login import current_user, login_required
 
 from app import app
@@ -59,6 +59,73 @@ def _register_meeting_notes_routes() -> None:
     @login_required
     def mobile_meeting_notes_update_subtask(subtask_id: int):
         return mn.api_subtask(subtask_id)
+
+    @app.route("/api/mobile/meeting-notes/meetings", methods=["GET"])
+    @login_required
+    def mobile_meeting_notes_meetings_list():
+        from sqlalchemy import or_
+
+        from app.blueprints.meeting_notes.models import MeetingNote
+        from app.blueprints.meeting_notes.services import meetings_index_stats
+
+        qterm = (request.args.get("q") or "").strip()
+        limit = min(request.args.get("limit", default=50, type=int), 200)
+        query = MeetingNote.query.order_by(MeetingNote.meeting_date.desc())
+        if qterm:
+            query = query.filter(or_(MeetingNote.title.ilike(f"%{qterm}%")))
+        meetings = query.limit(limit).all()
+        stats = meetings_index_stats([m.id for m in meetings])
+        return jsonify(
+            {
+                "meetings": [
+                    {
+                        "id": m.id,
+                        "title": m.title,
+                        "meeting_date": m.meeting_date.isoformat()
+                        if m.meeting_date
+                        else None,
+                        "stats": stats.get(
+                            m.id,
+                            {"open": 0, "in_progress": 0, "done": 0, "total": 0},
+                        ),
+                    }
+                    for m in meetings
+                ]
+            }
+        )
+
+    @app.route("/api/mobile/meeting-notes/meetings/<int:meeting_id>", methods=["GET"])
+    @login_required
+    def mobile_meeting_notes_meeting_detail(meeting_id: int):
+        from app.blueprints.meeting_notes.models import MeetingNote
+        from app.blueprints.meeting_notes.services import meeting_to_dict
+
+        mn = (
+            MeetingNote.query.options(joinedload(MeetingNote.attendees))
+            .filter_by(id=meeting_id)
+            .first()
+        )
+        if not mn:
+            return jsonify({"error": "Not found"}), 404
+        return jsonify(meeting_to_dict(mn))
+
+    @app.route(
+        "/api/mobile/meeting-notes/meetings/<int:meeting_id>/action-items",
+        methods=["GET"],
+    )
+    @login_required
+    def mobile_meeting_notes_meeting_action_items(meeting_id: int):
+        from app.blueprints.meeting_notes.models import (
+            MeetingActionItem,
+            MeetingFocusRow,
+        )
+
+        q = action_items_query(meeting_note_id=meeting_id, status="all")
+        items = q.order_by(
+            MeetingFocusRow.sort_order,
+            MeetingActionItem.sort_order,
+        ).all()
+        return jsonify({"items": [item_to_dict(i) for i in items]})
 
 
 def _register_sales_marketing_routes() -> None:

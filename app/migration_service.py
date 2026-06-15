@@ -1,11 +1,17 @@
-"""Alembic migration status and upgrade helpers for the admin UI."""
+"""Alembic migration status, diagnostics, repair, and upgrade helpers for the admin UI."""
 
 from __future__ import annotations
 
+import ast
 import io
 import logging
+import os
+import re
+import shutil
 import threading
 from contextlib import redirect_stdout
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from alembic import command
@@ -21,9 +27,22 @@ logger = logging.getLogger(__name__)
 
 _upgrade_lock = threading.Lock()
 
+# Schema probes tied to recent meeting notes / sales marketing migrations.
+_SCHEMA_HINTS = (
+    {'check': 'sales_marketing_stakeholder_leads table', 'type': 'table', 'name': 'sales_marketing_stakeholder_leads'},
+    {'check': 'sales_marketing_stakeholder_leads.follow_up_status', 'type': 'column', 'table': 'sales_marketing_stakeholder_leads', 'column': 'follow_up_status'},
+    {'check': 'meeting_notes_action_items table', 'type': 'table', 'name': 'meeting_notes_action_items'},
+    {'check': 'meeting_notes_action_subtasks table', 'type': 'table', 'name': 'meeting_notes_action_subtasks'},
+)
+
 
 def _get_migrate_extension():
     return current_app.extensions['migrate']
+
+
+def _get_versions_directory() -> Path:
+    migrate_ext = _get_migrate_extension()
+    return Path(migrate_ext.directory) / 'versions'
 
 
 def _get_alembic_config():
@@ -82,6 +101,279 @@ def _table_exists(table_name: str) -> bool:
         return False
 
 
+def _column_exists(table_name: str, column_name: str) -> bool:
+    try:
+        if not _table_exists(table_name):
+            return False
+        columns = {col['name'] for col in inspect(db.engine).get_columns(table_name)}
+        return column_name in columns
+    except Exception:
+        return False
+
+
+def _parse_migration_file(path: Path) -> dict[str, Any] | None:
+    """Parse revision metadata from a migration file without loading Alembic's revision map."""
+    try:
+        source = path.read_text(encoding='utf-8')
+    except OSError:
+        return None
+
+    revision = None
+    down_revision: str | tuple[str, ...] | None = None
+    message = ''
+
+    try:
+        tree = ast.parse(source)
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            for target in node.targets:
+                if not isinstance(target, ast.Name):
+                    continue
+                if target.id == 'revision':
+                    revision = _ast_constant(node.value)
+                elif target.id == 'down_revision':
+                    down_revision = _ast_constant(node.value)
+    except SyntaxError:
+        pass
+
+    if revision is None:
+        rev_match = re.search(r"^revision\s*=\s*['\"]([^'\"]+)['\"]", source, re.MULTILINE)
+        if rev_match:
+            revision = rev_match.group(1)
+
+    if down_revision is None:
+        down_match = re.search(r"^down_revision\s*=\s*(.+)$", source, re.MULTILINE)
+        if down_match:
+            down_revision = _parse_down_revision_literal(down_match.group(1).strip())
+
+    doc_match = re.search(r'"""(.*?)"""', source, re.DOTALL)
+    if doc_match:
+        message = doc_match.group(1).strip().split('\n')[0]
+
+    if not revision:
+        return None
+
+    return {
+        'file': path.name,
+        'path': str(path),
+        'revision': revision,
+        'down_revision': down_revision,
+        'message': message,
+    }
+
+
+def _ast_constant(value) -> Any:
+    if isinstance(value, ast.Constant):
+        return value.value
+    if isinstance(value, (ast.Tuple, ast.List)):
+        items = []
+        for elt in value.elts:
+            if isinstance(elt, ast.Constant):
+                items.append(elt.value)
+        return tuple(items) if isinstance(value, ast.Tuple) else items
+    if isinstance(value, ast.Name) and value.id == 'None':
+        return None
+    return None
+
+
+def _parse_down_revision_literal(raw: str) -> str | tuple[str, ...] | None:
+    if raw in ('None', 'null'):
+        return None
+    if raw.startswith('('):
+        inner = re.findall(r"['\"]([^'\"]+)['\"]", raw)
+        return tuple(inner) if inner else None
+    match = re.match(r"^['\"]([^'\"]+)['\"]", raw)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _normalize_down_revisions(down_revision: str | tuple[str, ...] | list[str] | None) -> list[str]:
+    if down_revision is None:
+        return []
+    if isinstance(down_revision, (tuple, list)):
+        return [str(item) for item in down_revision if item]
+    return [str(down_revision)]
+
+
+def scan_migration_files() -> list[dict[str, Any]]:
+    versions_dir = _get_versions_directory()
+    if not versions_dir.is_dir():
+        return []
+
+    files = []
+    for path in sorted(versions_dir.glob('*.py')):
+        if path.name.startswith('__'):
+            continue
+        parsed = _parse_migration_file(path)
+        if parsed:
+            files.append(parsed)
+    return files
+
+
+def _compute_heads(scanned_files: list[dict[str, Any]]) -> list[str]:
+    revisions = {item['revision'] for item in scanned_files}
+    child_counts: dict[str, int] = {rev: 0 for rev in revisions}
+    for item in scanned_files:
+        for parent in _normalize_down_revisions(item.get('down_revision')):
+            if parent in child_counts:
+                child_counts[parent] += 1
+    return sorted(rev for rev, count in child_counts.items() if count == 0)
+
+
+def _find_orphan_files(scanned_files: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    revisions = {item['revision'] for item in scanned_files}
+    orphans = []
+    for item in scanned_files:
+        for parent in _normalize_down_revisions(item.get('down_revision')):
+            if parent not in revisions:
+                orphans.append({
+                    'file': item['file'],
+                    'path': item['path'],
+                    'revision': item['revision'],
+                    'missing_parent': parent,
+                    'message': item.get('message') or '',
+                })
+    return orphans
+
+
+def _build_schema_hints() -> list[dict[str, Any]]:
+    hints = []
+    for probe in _SCHEMA_HINTS:
+        if probe['type'] == 'table':
+            exists = _table_exists(probe['name'])
+        else:
+            exists = _column_exists(probe['table'], probe['column'])
+        hints.append({
+            'check': probe['check'],
+            'exists': exists,
+        })
+    return hints
+
+
+def _analyze_chain(scanned_files: list[dict[str, Any]], current: str | None) -> dict[str, Any]:
+    revisions = {item['revision'] for item in scanned_files}
+    orphan_files = _find_orphan_files(scanned_files)
+    heads = _compute_heads(scanned_files)
+    issues: list[dict[str, Any]] = []
+
+    if current and current not in revisions:
+        issues.append({
+            'code': 'orphaned_db_revision',
+            'revision': current,
+            'message': (
+                f'Database revision {current} is not present in deployed migration files.'
+            ),
+        })
+
+    for orphan in orphan_files:
+        issues.append({
+            'code': 'missing_parent_file',
+            'revision': orphan['revision'],
+            'missing_parent': orphan['missing_parent'],
+            'file': orphan['file'],
+            'message': (
+                f"Migration file {orphan['file']} references missing parent "
+                f"{orphan['missing_parent']}."
+            ),
+        })
+
+    if len(heads) > 1:
+        issues.append({
+            'code': 'multiple_heads',
+            'heads': heads,
+            'message': f'Multiple migration heads detected: {", ".join(heads)}. Merge required.',
+        })
+
+    chain_broken = bool(issues)
+    return {
+        'issues': issues,
+        'orphan_files': orphan_files,
+        'heads': heads,
+        'chain_broken': chain_broken,
+        'known_revisions': sorted(revisions),
+    }
+
+
+def get_diagnostics() -> dict[str, Any]:
+    """Return migration chain health, orphan files, and schema hints."""
+    try:
+        scanned_files = scan_migration_files()
+        current = _get_current_revision() if _table_exists('alembic_version') else None
+        analysis = _analyze_chain(scanned_files, current)
+        heads = analysis['heads']
+        schema_hints = _build_schema_hints()
+
+        available_revisions = [
+            {
+                'revision': item['revision'],
+                'message': item.get('message') or '',
+                'is_head': item['revision'] in heads,
+            }
+            for item in scanned_files
+        ]
+        available_revisions.sort(key=lambda item: item['revision'])
+
+        recommended = []
+        if heads:
+            head_rev = heads[0] if len(heads) == 1 else 'head'
+            recommended.append({
+                'revision': head_rev,
+                'label': 'Head (latest deployed migration)',
+                'confidence': 'manual',
+            })
+
+        return {
+            'success': True,
+            'chain_broken': analysis['chain_broken'],
+            'issues': analysis['issues'],
+            'current_revision': current,
+            'head_revisions': heads,
+            'orphan_files': analysis['orphan_files'],
+            'schema_hints': schema_hints,
+            'recommended_stamp_targets': recommended,
+            'available_revisions': available_revisions,
+            'database': _safe_database_label(),
+            'web_migrations_enabled': current_app.config.get('ALLOW_WEB_MIGRATIONS', True),
+        }
+    except Exception as exc:
+        logger.exception('Failed to read migration diagnostics')
+        return {
+            'success': False,
+            'error': str(exc),
+            'chain_broken': None,
+            'issues': [],
+            'orphan_files': [],
+            'schema_hints': [],
+            'available_revisions': [],
+        }
+
+
+def _merge_diagnostics_into_status(status: dict[str, Any]) -> dict[str, Any]:
+    diagnostics = get_diagnostics()
+    if not diagnostics.get('success'):
+        if not status.get('success'):
+            status['needs_repair'] = True
+            status['chain_broken'] = True
+            status['error_detail'] = diagnostics.get('error') or status.get('error')
+        return status
+
+    chain_broken = diagnostics.get('chain_broken', False)
+    status['chain_broken'] = chain_broken
+    status['needs_repair'] = chain_broken
+    if chain_broken:
+        status['is_up_to_date'] = False
+        messages = [issue.get('message') for issue in diagnostics.get('issues', []) if issue.get('message')]
+        status['error_detail'] = ' '.join(messages) if messages else 'Migration chain requires repair.'
+        if diagnostics.get('head_revisions'):
+            status['head_revisions'] = [
+                {'revision': rev, 'message': '', 'is_head': True}
+                for rev in diagnostics['head_revisions']
+            ]
+    return status
+
+
 def get_status() -> dict[str, Any]:
     """Return current DB revision, heads, and pending migrations."""
     try:
@@ -117,7 +409,7 @@ def get_status() -> dict[str, Any]:
         if current is None and len(heads) > 0:
             is_up_to_date = False
 
-        return {
+        status = {
             'success': True,
             'current_revision': current,
             'head_revisions': head_revisions,
@@ -126,19 +418,30 @@ def get_status() -> dict[str, Any]:
             'is_up_to_date': is_up_to_date and len(pending) == 0,
             'database': _safe_database_label(),
             'web_migrations_enabled': current_app.config.get('ALLOW_WEB_MIGRATIONS', True),
+            'chain_broken': False,
+            'needs_repair': False,
         }
+        return _merge_diagnostics_into_status(status)
     except Exception as exc:
         logger.exception('Failed to read migration status')
-        return {
+        current = _get_current_revision() if _table_exists('alembic_version') else None
+        status = {
             'success': False,
             'error': str(exc),
-            'is_up_to_date': None,
-            'pending_count': None,
+            'current_revision': current,
+            'is_up_to_date': False,
+            'pending_count': 0,
+            'pending_revisions': [],
+            'database': _safe_database_label(),
+            'web_migrations_enabled': current_app.config.get('ALLOW_WEB_MIGRATIONS', True),
+            'chain_broken': True,
+            'needs_repair': True,
         }
+        return _merge_diagnostics_into_status(status)
 
 
 def get_history(limit: int = 20) -> dict[str, Any]:
-    """Return recent migration revisions from the script directory."""
+    """Return recent migration revisions from the script directory or scanned files."""
     try:
         script = _get_script_directory()
         current = _get_current_revision() if _table_exists('alembic_version') else None
@@ -154,13 +457,203 @@ def get_history(limit: int = 20) -> dict[str, Any]:
             'revisions': revisions,
             'current_revision': current,
         }
-    except Exception as exc:
-        logger.exception('Failed to read migration history')
+    except Exception:
+        logger.warning('Alembic history unavailable; falling back to scanned migration files')
+        try:
+            scanned_files = scan_migration_files()
+            current = _get_current_revision() if _table_exists('alembic_version') else None
+            heads = _compute_heads(scanned_files)
+            revisions = []
+            for item in scanned_files[:limit]:
+                revisions.append({
+                    'revision': item['revision'],
+                    'down_revision': item.get('down_revision'),
+                    'message': item.get('message') or '',
+                    'is_head': item['revision'] in heads,
+                    'is_current': item['revision'] == current,
+                })
+            return {
+                'success': True,
+                'revisions': revisions,
+                'current_revision': current,
+                'fallback': True,
+            }
+        except Exception as exc:
+            logger.exception('Failed to read migration history')
+            return {
+                'success': False,
+                'error': str(exc),
+                'revisions': [],
+            }
+
+
+def _sqlite_db_path() -> str | None:
+    url = _get_engine().url
+    if not url.drivername.startswith('sqlite'):
+        return None
+    database = url.database
+    if not database or database == ':memory:':
+        return None
+    if database.startswith('/'):
+        return database
+    return os.path.abspath(database)
+
+
+def _backup_sqlite_database() -> dict[str, Any]:
+    db_path = _sqlite_db_path()
+    if not db_path or not os.path.isfile(db_path):
+        return {
+            'success': False,
+            'error': 'Automatic backup is only supported for on-disk SQLite databases.',
+        }
+
+    basedir = Path(current_app.root_path).parent
+    backup_dir = basedir / 'backups'
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    backup_path = backup_dir / f'app.db.repair.{timestamp}'
+    shutil.copy2(db_path, backup_path)
+    return {
+        'success': True,
+        'backup_path': str(backup_path),
+    }
+
+
+def run_repair(
+    stamp_revision: str,
+    *,
+    remove_orphan_files: bool = True,
+    run_upgrade_after: bool = True,
+) -> dict[str, Any]:
+    """Repair a broken migration chain: backup, cleanup, stamp, optional upgrade."""
+    if not current_app.config.get('ALLOW_WEB_MIGRATIONS', True):
+        return {
+            'success': False,
+            'error': 'Web migrations are disabled (ALLOW_WEB_MIGRATIONS=false).',
+        }
+
+    if not _upgrade_lock.acquire(blocking=False):
+        return {
+            'success': False,
+            'error': 'Another migration operation is already in progress.',
+        }
+
+    steps: list[dict[str, Any]] = []
+    try:
+        before = get_diagnostics()
+        if not before.get('success'):
+            return {
+                'success': False,
+                'error': before.get('error', 'Could not read migration diagnostics.'),
+            }
+
+        if not before.get('chain_broken'):
+            return {
+                'success': False,
+                'error': 'Migration chain is not broken; repair is not required.',
+            }
+
+        heads = before.get('head_revisions') or []
+        if len(heads) > 1:
+            return {
+                'success': False,
+                'error': (
+                    'Multiple migration heads detected. Merge heads before running repair: '
+                    + ', '.join(heads)
+                ),
+            }
+
+        known_revisions = {item['revision'] for item in before.get('available_revisions', [])}
+        if stamp_revision == 'head':
+            if not heads:
+                return {'success': False, 'error': 'No migration head found to stamp.'}
+            stamp_revision = heads[0]
+
+        if stamp_revision not in known_revisions:
+            return {
+                'success': False,
+                'error': f'Unknown stamp revision: {stamp_revision}',
+            }
+
+        backup_result = _backup_sqlite_database()
+        if not backup_result.get('success'):
+            return backup_result
+        steps.append({'step': 'backup', 'success': True, 'detail': backup_result.get('backup_path')})
+
+        removed_files: list[str] = []
+        if remove_orphan_files:
+            for orphan in before.get('orphan_files', []):
+                file_path = orphan.get('path')
+                if file_path and os.path.isfile(file_path):
+                    os.remove(file_path)
+                    removed_files.append(orphan.get('file') or file_path)
+            steps.append({'step': 'remove_orphan_files', 'success': True, 'detail': removed_files})
+
+        config = _get_alembic_config()
+        stamped_from = before.get('current_revision')
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            command.stamp(config, stamp_revision)
+        stamp_output = buffer.getvalue().strip()
+        steps.append({
+            'step': 'stamp',
+            'success': True,
+            'detail': {
+                'from': stamped_from,
+                'to': stamp_revision,
+                'output': stamp_output,
+            },
+        })
+
+        upgrade_output = ''
+        upgrade_result = None
+        if run_upgrade_after:
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                command.upgrade(config, 'head')
+            upgrade_output = buffer.getvalue().strip()
+            upgrade_result = get_status()
+            steps.append({
+                'step': 'upgrade',
+                'success': True,
+                'detail': {
+                    'output': upgrade_output,
+                    'pending_count': upgrade_result.get('pending_count', 0),
+                    'is_up_to_date': upgrade_result.get('is_up_to_date', False),
+                    'current_revision': upgrade_result.get('current_revision'),
+                },
+            })
+
+        after = get_status()
+        return {
+            'success': True,
+            'message': 'Migration chain repaired successfully.',
+            'steps': steps,
+            'removed_files': removed_files,
+            'backup_path': backup_result.get('backup_path'),
+            'stamped_from': stamped_from,
+            'stamped_to': after.get('current_revision') or stamp_revision,
+            'upgrade_output': upgrade_output,
+            'pending_count': after.get('pending_count', 0),
+            'is_up_to_date': after.get('is_up_to_date', False),
+            'chain_broken': after.get('chain_broken', False),
+        }
+    except CommandError as exc:
+        logger.error('Migration repair failed: %s', exc)
         return {
             'success': False,
             'error': str(exc),
-            'revisions': [],
+            'steps': steps,
         }
+    except Exception as exc:
+        logger.exception('Migration repair failed')
+        return {
+            'success': False,
+            'error': str(exc),
+            'steps': steps,
+        }
+    finally:
+        _upgrade_lock.release()
 
 
 def run_upgrade(revision: str = 'head') -> dict[str, Any]:
@@ -179,6 +672,11 @@ def run_upgrade(revision: str = 'head') -> dict[str, Any]:
 
     try:
         before = get_status()
+        if before.get('needs_repair'):
+            return {
+                'success': False,
+                'error': before.get('error_detail') or 'Migration chain is broken. Run repair first.',
+            }
         if before.get('success') and before.get('is_up_to_date'):
             return {
                 'success': True,

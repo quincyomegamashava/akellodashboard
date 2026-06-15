@@ -1,10 +1,10 @@
-"""Admin API routes for database migration status and upgrades."""
+"""Admin API routes for database migration status, diagnostics, repair, and upgrades."""
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 
 from app.database_routes import admin_required
-from app.migration_service import get_history, get_status, run_upgrade
+from app.migration_service import get_diagnostics, get_history, get_status, run_repair, run_upgrade
 
 migration_bp = Blueprint('migrations', __name__)
 
@@ -14,6 +14,13 @@ migration_bp = Blueprint('migrations', __name__)
 @admin_required
 def migration_status():
     return jsonify(get_status())
+
+
+@migration_bp.route('/api/admin/migrations/diagnostics', methods=['GET'])
+@login_required
+@admin_required
+def migration_diagnostics():
+    return jsonify(get_diagnostics())
 
 
 @migration_bp.route('/api/admin/migrations/history', methods=['GET'])
@@ -49,6 +56,51 @@ def migration_upgrade():
     else:
         current_app.logger.error(
             'Migration upgrade failed for %s (from %s): %s',
+            current_user.username,
+            before.get('current_revision'),
+            result.get('error'),
+        )
+
+    status_code = 200 if result.get('success') else 500
+    return jsonify(result), status_code
+
+
+@migration_bp.route('/api/admin/migrations/repair', methods=['POST'])
+@login_required
+@admin_required
+def migration_repair():
+    data = request.get_json(silent=True) or {}
+    if not data.get('confirm'):
+        return jsonify({
+            'success': False,
+            'error': 'Confirmation required. Send {"confirm": true}.',
+        }), 400
+
+    stamp_revision = (data.get('stamp_revision') or '').strip()
+    if not stamp_revision:
+        return jsonify({
+            'success': False,
+            'error': 'stamp_revision is required.',
+        }), 400
+
+    before = get_diagnostics()
+    result = run_repair(
+        stamp_revision=stamp_revision,
+        remove_orphan_files=bool(data.get('remove_orphan_files', True)),
+        run_upgrade_after=bool(data.get('run_upgrade_after', True)),
+    )
+
+    if result.get('success'):
+        current_app.logger.info(
+            'Migration repair by %s: %s -> %s (backup=%s)',
+            current_user.username,
+            result.get('stamped_from'),
+            result.get('stamped_to'),
+            result.get('backup_path'),
+        )
+    else:
+        current_app.logger.error(
+            'Migration repair failed for %s (from %s): %s',
             current_user.username,
             before.get('current_revision'),
             result.get('error'),
