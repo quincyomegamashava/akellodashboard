@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
+{% endblock %}
+{% block content %}
+<div class="sm-page px-3 py-3">
+  <h1 class="h4 mb-1">{{ title }}</h1>
+  <p class="text-muted small mb-3">Register marketing events and assign attending staff.</p>
+  {% include "sales_marketing/_subnav.html" %}
+
+  <div class="sm-card mb-3">
+    <button type="button" class="btn btn-sm btn-primary mb-3" id="sm-new-event" style="background:#00407d;">New event</button>
+    <div id="sm-events-list"></div>
+  </div>
+</div>
+
+<div class="modal fade" id="smEventModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="sm-event-modal-title">Event</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="sm-event-id" />
+        <div class="row g-2 mb-2">
+          <div class="col-12"><label class="form-label">Name</label><input class="form-control" id="sm-event-name" /></div>
+          <div class="col-md-6"><label class="form-label">Start date</label><input type="date" class="form-control" id="sm-event-start" /></div>
+          <div class="col-md-6"><label class="form-label">End date</label><input type="date" class="form-control" id="sm-event-end" /></div>
+          <div class="col-md-6"><label class="form-label">Location</label><input class="form-control" id="sm-event-location" /></div>
+          <div class="col-md-6"><label class="form-label">Status</label>
+            <select class="form-select" id="sm-event-status"><option value="active">Active</option><option value="cancelled">Cancelled</option></select>
+          </div>
+          <div class="col-12"><label class="form-label">Notes</label><textarea class="form-control" id="sm-event-notes" rows="2"></textarea></div>
+          <div class="col-12">
+            <label class="form-label">Attending staff</label>
+            <p class="text-muted small mb-1">Type a name to search and select dashboard users.</p>
+            <div class="sm-user-picker" id="sm-attendee-picker"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger me-auto d-none" id="sm-event-delete">Delete</button>
+        <button type="button" class="btn btn-outline-secondary me-auto d-none" id="sm-event-qr" data-bs-toggle="modal" data-bs-target="#smQrModal">QR / link</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="sm-event-save" style="background:#00407d;">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="smQrModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Event connect link</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body text-center">
+        <canvas id="sm-qr-canvas" class="mb-2"></canvas>
+        <input type="text" class="form-control form-control-sm mb-2" id="sm-qr-url" readonly />
+        <button type="button" class="btn btn-sm btn-outline-primary w-100" id="sm-qr-copy">Copy link</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>window.SM_USER_OPTS = {{ user_opts|tojson }}; window.SM_PAGE = "events";</script>
+<script src="{{ url_for('static', filename='js/sales_marketing.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sm_extensions.js') }}"></script>
+{% endblock %}

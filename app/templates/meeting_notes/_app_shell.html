@@ -1,0 +1,15 @@
+{# Mobile bottom navigation + FAB. Include once per meeting-notes page. #}
+<nav class="mn-bottom-nav d-lg-none" aria-label="Meeting notes mobile navigation">
+  <a href="{{ url_for('meeting_notes.index') }}" class="mn-bottom-nav-item" data-mn-nav="home">
+    <i class="fas fa-house"></i><span>Home</span>
+  </a>
+  <a href="{{ url_for('meeting_notes.all_items') }}?mine=1" class="mn-bottom-nav-item" data-mn-nav="tasks">
+    <i class="fas fa-clipboard-list"></i><span>Tasks</span>
+  </a>
+  <button type="button" class="mn-bottom-nav-item" data-mn-nav="search" data-bs-toggle="modal" data-bs-target="#mn-command-palette" aria-label="Search">
+    <i class="fas fa-search"></i><span>Search</span>
+  </button>
+  <button type="button" class="mn-bottom-nav-item mn-bottom-nav-fab" data-mn-nav="new" aria-label="New meeting">
+    <i class="fas fa-plus"></i><span>New</span>
+  </button>
+</nav>

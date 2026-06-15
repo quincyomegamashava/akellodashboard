@@ -40,6 +40,7 @@ LIBRARY_DB_USER=kmudzimuirema
 LIBRARY_DB_PASS="Ak3110$2022"
 
 FLASK_APP=app.py
+FLASK_DEBUG=1
 
 # Ollama remote configuration (set these to use a remote Ollama server)
 # Replace http://your-ollama-host:11434 with your server URL

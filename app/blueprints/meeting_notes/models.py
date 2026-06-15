@@ -37,6 +37,24 @@ meeting_notes_attendees = db.Table(
     ),
 )
 
+meeting_notes_action_item_labels = db.Table(
+    "meeting_notes_action_item_labels",
+    db.Column(
+        "action_item_id",
+        db.Integer,
+        db.ForeignKey("meeting_notes_action_items.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    db.Column(
+        "label_id",
+        db.Integer,
+        db.ForeignKey("meeting_notes_labels.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
+VALID_PRIORITIES = ("low", "medium", "high", "urgent")
+
 
 class MeetingNote(db.Model):
     __tablename__ = "meeting_notes"
@@ -107,8 +125,11 @@ class MeetingActionItem(db.Model):
     challenges = db.Column(db.Text, nullable=True)
     comments = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(32), nullable=False, default="open", index=True)
+    priority = db.Column(db.String(16), nullable=False, default="medium", index=True)
     due_date = db.Column(db.Date, nullable=True, index=True)
     start_date = db.Column(db.Date, nullable=True)
+    source_excerpt = db.Column(db.Text, nullable=True)
+    ai_extracted = db.Column(db.Boolean, nullable=False, default=False)
     sort_order = db.Column(db.Integer, nullable=False, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
@@ -120,6 +141,39 @@ class MeetingActionItem(db.Model):
         secondary=meeting_notes_action_assignees,
         backref=db.backref("meeting_action_items_assigned", lazy="dynamic"),
     )
+    labels = db.relationship(
+        "MeetingLabel",
+        secondary=meeting_notes_action_item_labels,
+        backref=db.backref("action_items", lazy="dynamic"),
+    )
+    subtasks = db.relationship(
+        "MeetingActionSubtask",
+        back_populates="action_item",
+        lazy="select",
+        cascade="all, delete-orphan",
+        order_by="MeetingActionSubtask.sort_order",
+    )
+
+
+class MeetingActionSubtask(db.Model):
+    __tablename__ = "meeting_notes_action_subtasks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    action_item_id = db.Column(
+        db.Integer,
+        db.ForeignKey("meeting_notes_action_items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    title = db.Column(db.String(500), nullable=False, default="")
+    is_done = db.Column(db.Boolean, nullable=False, default=False)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    assignee_user_id = db.Column(
+        db.Integer, db.ForeignKey("user.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    action_item = db.relationship("MeetingActionItem", back_populates="subtasks")
+    assignee = db.relationship("User", foreign_keys=[assignee_user_id])
 
 
 class MeetingNotesActivityLog(db.Model):
@@ -139,3 +193,63 @@ class MeetingNotesActivityLog(db.Model):
 
     actor = db.relationship("User", foreign_keys=[actor_user_id])
     meeting_note = db.relationship("MeetingNote", foreign_keys=[meeting_note_id])
+
+
+class MeetingLabel(db.Model):
+    __tablename__ = "meeting_notes_labels"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False, unique=True)
+    color = db.Column(db.String(7), nullable=False, default="#64748b")
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class MeetingSavedView(db.Model):
+    __tablename__ = "meeting_notes_saved_views"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    name = db.Column(db.String(120), nullable=False)
+    filters_json = db.Column(db.JSON, nullable=False, default=dict)
+    view_mode = db.Column(db.String(32), nullable=False, default="board")
+    is_default = db.Column(db.Boolean, nullable=False, default=False)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+
+
+class MeetingTemplate(db.Model):
+    __tablename__ = "meeting_notes_templates"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    title_pattern = db.Column(db.String(255), nullable=False, default="")
+    summary_template = db.Column(db.Text, nullable=True)
+    focus_rows_json = db.Column(db.JSON, nullable=True)
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    creator = db.relationship("User", foreign_keys=[created_by])
+
+
+class MeetingItemComment(db.Model):
+    __tablename__ = "meeting_notes_item_comments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    action_item_id = db.Column(
+        db.Integer,
+        db.ForeignKey("meeting_notes_action_items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    author_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    body = db.Column(db.Text, nullable=False, default="")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    author = db.relationship("User", foreign_keys=[author_user_id])
+    action_item = db.relationship(
+        "MeetingActionItem",
+        backref=db.backref("comments_thread", lazy="dynamic", order_by="MeetingItemComment.created_at"),
+    )

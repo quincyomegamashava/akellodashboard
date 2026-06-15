@@ -155,6 +155,24 @@ def init_socketio_handlers(socketio):
             'timestamp': datetime.utcnow().isoformat()
         })
 
+    @socketio.on('join_meeting', namespace='/meeting-notes')
+    def on_join_meeting(data):
+        if not current_user.is_authenticated:
+            disconnect()
+            return False
+        meeting_id = (data or {}).get('meeting_id')
+        if not meeting_id:
+            return False
+        room = f"meeting_{meeting_id}"
+        join_room(room)
+        emit('joined', {'meeting_id': meeting_id, 'user': current_user.username})
+
+    @socketio.on('leave_meeting', namespace='/meeting-notes')
+    def on_leave_meeting(data):
+        meeting_id = (data or {}).get('meeting_id')
+        if meeting_id:
+            leave_room(f"meeting_{meeting_id}")
+
 
 def emit_activity_to_monitoring(activity_data):
     """Emit new activity to all monitoring clients"""
@@ -188,3 +206,18 @@ def emit_stats_update():
         
     except Exception as e:
         print(f"Error emitting stats update to monitoring: {e}")
+
+
+def emit_meeting_item_event(meeting_id: int, event_type: str, payload: dict):
+    """Broadcast meeting action-item changes to collaborators."""
+    try:
+        from flask_socketio import emit
+
+        emit(
+            event_type,
+            payload,
+            room=f"meeting_{meeting_id}",
+            namespace="/meeting-notes",
+        )
+    except Exception as e:
+        print(f"Error emitting meeting notes event: {e}")

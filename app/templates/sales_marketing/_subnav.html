@@ -1,0 +1,8 @@
+<nav class="sm-subnav" aria-label="Sales & Marketing">
+  <a href="/sales-marketing/" class="{{ 'active' if request.path == '/sales-marketing/' else '' }}">Stakeholders</a>
+  <a href="/sales-marketing/events/roadmap" class="{{ 'active' if request.path.endswith('/events/roadmap') else '' }}">Roadmap</a>
+  <a href="/sales-marketing/events" class="{{ 'active' if request.path.endswith('/events') else '' }}">Events</a>
+  <a href="/sales-marketing/campaigns" class="{{ 'active' if request.path.endswith('/campaigns') else '' }}">Campaigns</a>
+  <a href="/sales-marketing/settings" class="{{ 'active' if request.path.endswith('/settings') else '' }}">Settings</a>
+  <a href="/connect" target="_blank" rel="noopener">Public form ↗</a>
+</nav>

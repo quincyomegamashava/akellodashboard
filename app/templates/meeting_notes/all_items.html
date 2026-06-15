@@ -1,144 +1,458 @@
 {% extends "base.html" %}
+
 {% block title %}All action items — Meeting notes{% endblock %}
+
 {% block head_extra %}
+
 <link rel="stylesheet" href="{{ url_for('static', filename='css/meeting_notes.css') }}">
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.css">
+
 {% endblock %}
+
 {% block content %}
+
+<div class="mn-app-shell">
+
 <div class="mn-page">
-  <header class="mn-hero d-flex flex-wrap justify-content-between align-items-start gap-3">
-    <div>
-      <nav class="mn-breadcrumb">
-        <a href="{{ url_for('meeting_notes.index') }}">Meeting notes</a>
-      </nav>
-      <h1 class="mn-hero-title">All action items</h1>
-      <p class="mn-hero-sub">Cross-meeting tracker. Open a meeting to edit items inline.</p>
+
+  <header class="mn-subheader">
+
+    <nav class="mn-breadcrumb">
+
+      <a href="{{ url_for('meeting_notes.index') }}">Meeting notes</a>
+
+    </nav>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+
+      <div>
+
+        <h1 class="mn-hero-title mb-0">All action items</h1>
+
+        <p class="mn-hero-sub d-none d-md-block">Global workspace — edit tasks across all meetings.</p>
+
+      </div>
+
+      <div class="mn-subheader-actions">
+
+        <button type="button" class="btn btn-sm mn-btn-ghost d-none d-md-inline-flex" data-bs-toggle="modal" data-bs-target="#mn-command-palette"><i class="fas fa-search me-1"></i> Search</button>
+
+        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-export-pdf"><i class="fas fa-file-pdf me-1"></i><span class="d-none d-sm-inline"> PDF</span></button>
+
+        <a class="btn btn-sm mn-btn-ghost d-none d-md-inline-flex" href="{{ url_for('meeting_notes.index') }}">Meetings</a>
+
+        {% if overdue_count %}
+
+        <span class="badge bg-danger-subtle text-danger border">{{ overdue_count }} overdue</span>
+
+        {% endif %}
+
+      </div>
+
     </div>
-    <div class="d-flex gap-2">
-      <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-export-pdf">
-        <i class="fas fa-file-pdf me-1"></i> Export PDF
-      </button>
-      <a class="btn btn-sm mn-btn-ghost" href="{{ url_for('meeting_notes.index') }}">Meetings list</a>
-      {% if overdue_count %}
-      <span class="badge bg-danger-subtle text-danger border">{{ overdue_count }} overdue (mine)</span>
-      {% endif %}
-    </div>
+
+    {% set mn_active = 'all_items' %}
+
+    {% include "meeting_notes/_subnav.html" %}
+
   </header>
 
+
+
   <div class="mn-card">
+
     <div class="mn-card-body">
-      <div class="row g-2 align-items-end flex-wrap">
-        <div class="col-6 col-md-2">
-          <label class="mn-filter-label">Platform</label>
-          <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-platform">
-            <option value="">All</option>
-            {% for p in platforms %}<option value="{{ p|e }}">{{ p }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="col-6 col-md-2">
-          <label class="mn-filter-label">Assignee</label>
-          <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-assignee">
-            <option value="">Any</option>
-            {% for u in user_opts %}<option value="{{ u.id }}">{{ u.label }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="col-6 col-md-2">
-          <label class="mn-filter-label">Status</label>
-          <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-status">
-            <option value="all">All</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In progress</option>
-            <option value="done">Done</option>
-          </select>
-        </div>
-        <div class="col-6 col-md-2">
-          <label class="mn-filter-label">Due</label>
-          <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-due">
-            <option value="">Any</option>
-            <option value="overdue">Overdue</option>
-            <option value="this_week">This week</option>
-            <option value="this_month">This month</option>
-            <option value="next_month">Next month</option>
-            <option value="none">No due date</option>
-            <option value="custom">Custom range</option>
-          </select>
-        </div>
-        <div class="col-6 col-md-2 mn-due-custom d-none">
-          <label class="mn-filter-label">From</label>
-          <input type="date" class="form-control form-control-sm mn-filter-ctrl" id="mn-due-start" />
-        </div>
-        <div class="col-6 col-md-2 mn-due-custom d-none">
-          <label class="mn-filter-label">To</label>
-          <input type="date" class="form-control form-control-sm mn-filter-ctrl" id="mn-due-end" />
-        </div>
-      </div>
-      <div class="mn-toolbar">
+
+      {% include "meeting_notes/_filter_offcanvas.html" %}
+
+      <div class="mn-toolbar mt-2">
+
         <div class="mn-view-pills" role="group">
+
+          <button type="button" class="btn active" data-mn-view-btn="board">Board</button>
+
           <button type="button" class="btn" data-mn-view-btn="table">Table</button>
+
           <button type="button" class="btn" data-mn-view-btn="calendar">Calendar</button>
+
           <button type="button" class="btn" data-mn-view-btn="gantt">Gantt</button>
+
         </div>
+
+        <div class="mn-view-pills ms-2 mn-board-group-pills" id="mn-board-group-toggle" role="group">
+
+          <button type="button" class="btn active" data-mn-board-group="status">By status</button>
+
+          <button type="button" class="btn" data-mn-board-group="platform">By platform</button>
+
+        </div>
+
       </div>
+
     </div>
+
   </div>
 
-  <div id="mn-view-table" class="mn-view mn-card">
-    <div class="table-responsive mn-table-wrap">
-      <table class="table table-sm table-bordered mb-0 mn-inline-table">
-        <thead>
-          <tr>
-            <th>Meeting</th>
-            <th>Platform</th>
-            <th>Focus area</th>
-            <th>Call to action</th>
-            <th>Expected impact</th>
-            <th>Start / due</th>
-            <th>Challenges</th>
-            <th>Comments</th>
-            <th>Led by</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="mn-table-body"></tbody>
-      </table>
-    </div>
+
+
+  <div id="mn-mobile-table-hint" class="mn-mobile-table-hint d-none">
+
+    Wide table view works best on desktop. Switch to <strong>Board</strong> for mobile editing.
+
   </div>
+
+
+
+  <div id="mn-view-board" class="mn-view mn-card">
+
+    <div class="mn-board" id="mn-board">
+
+      <div class="mn-board-column" data-status="open">
+
+        <div class="mn-board-column-header">
+
+          <span>Not started</span>
+
+          <span class="mn-board-count" data-board-count="open">0</span>
+
+        </div>
+
+        <div class="mn-board-column-body" data-board-drop="open"></div>
+
+      </div>
+
+      <div class="mn-board-column" data-status="in_progress">
+
+        <div class="mn-board-column-header">
+
+          <span>In progress</span>
+
+          <span class="mn-board-count" data-board-count="in_progress">0</span>
+
+        </div>
+
+        <div class="mn-board-column-body" data-board-drop="in_progress"></div>
+
+      </div>
+
+      <div class="mn-board-column" data-status="done">
+
+        <div class="mn-board-column-header">
+
+          <span>Completed</span>
+
+          <span class="mn-board-count" data-board-count="done">0</span>
+
+        </div>
+
+        <div class="mn-board-column-body" data-board-drop="done"></div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <div id="mn-board-dots" class="mn-board-dots d-md-none d-none" aria-hidden="true"></div>
+
+
+
+  <div id="mn-view-table" class="mn-view mn-card d-none">
+
+    <div class="mn-bulk-bar px-3 py-2 border-bottom d-flex flex-wrap gap-2 align-items-center">
+
+      <span class="small text-muted">Bulk:</span>
+
+      <select class="form-select form-select-sm" id="mn-bulk-status" style="width:auto;">
+
+        <option value="">Status…</option>
+
+        <option value="open">Open</option>
+
+        <option value="in_progress">In progress</option>
+
+        <option value="done">Done</option>
+
+      </select>
+
+      <select class="form-select form-select-sm" id="mn-bulk-assignee" style="width:auto;">
+
+        <option value="">Assignee…</option>
+
+        {% for u in user_opts %}<option value="{{ u.id }}">{{ u.label }}</option>{% endfor %}
+
+      </select>
+
+      <button type="button" class="btn btn-sm mn-btn-primary" id="mn-bulk-apply">Apply to selected</button>
+
+    </div>
+
+    <div class="table-responsive mn-table-wrap">
+
+      <table class="table table-sm table-bordered mb-0 mn-inline-table" data-col-preset="full">
+
+        <thead>
+
+          <tr>
+
+            <th>Meeting</th>
+
+            <th>Platform</th>
+
+            <th>Focus area</th>
+
+            <th>Call to action</th>
+
+            <th>Expected impact</th>
+
+            <th>Start / due</th>
+
+            <th>Challenges</th>
+
+            <th>Comments</th>
+
+            <th>Led by</th>
+
+            <th>Status</th>
+
+            <th></th>
+
+          </tr>
+
+        </thead>
+
+        <tbody id="mn-table-body"></tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+
+
 
   <div id="mn-view-calendar" class="mn-view mn-card d-none p-3">
+
     <div id="mn-calendar"></div>
+
   </div>
 
+
+
   <div id="mn-view-gantt" class="mn-view mn-card d-none p-3">
+
     <div id="mn-gantt-wrap">
+
       <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="mn-gantt-toolbar">
+
         <span class="small text-muted">Zoom</span>
+
         <div class="mn-view-pills" role="group">
+
           <button type="button" class="btn" data-gantt-mode="Month">Month</button>
+
           <button type="button" class="btn" data-gantt-mode="Week">Week</button>
+
           <button type="button" class="btn" data-gantt-mode="Day">Day</button>
+
         </div>
+
         <label class="small text-muted mb-0 ms-2">Month</label>
+
         <input type="month" class="form-control form-control-sm" id="mn-gantt-month" style="width: auto;" />
+
         <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-gantt-today">Today</button>
+
       </div>
+
       <div id="mn-gantt"></div>
+
     </div>
+
   </div>
+
 </div>
+
+</div>
+
+
+
+{% include "meeting_notes/_app_shell.html" %}
+
+
+
+<div class="mn-task-panel-backdrop" id="mn-task-panel-backdrop" aria-hidden="true"></div>
+
+<aside class="mn-task-panel" id="mn-task-panel" aria-hidden="true">
+
+  <div class="mn-task-panel-handle d-lg-none" aria-hidden="true"></div>
+
+  <div class="mn-task-panel-header">
+
+    <div>
+
+      <h2 class="h6 mb-1" id="mn-panel-title">Action item</h2>
+
+      <p class="small text-muted mb-0" id="mn-panel-subtitle"></p>
+
+    </div>
+
+    <button type="button" class="btn-close" id="mn-panel-close" aria-label="Close"></button>
+
+  </div>
+
+  <div class="mn-task-panel-body">
+
+    <div id="mn-panel-readonly-body" class="d-none"></div>
+
+    <div id="mn-panel-editable-body">
+
+      <label class="mn-filter-label">Platform</label>
+
+      <input type="text" class="form-control form-control-sm mb-2 mn-panel-field" id="mn-panel-platform" />
+
+      <label class="mn-filter-label">Focus area</label>
+
+      <textarea class="form-control form-control-sm mb-2 mn-cell-bullets mn-panel-field" id="mn-panel-focus" rows="2"></textarea>
+
+      <label class="mn-filter-label">Task title</label>
+
+      <input type="text" class="form-control form-control-sm mb-2 mn-panel-field" id="mn-panel-task-title" />
+
+      <label class="mn-filter-label">Sub-tasks</label>
+
+      <div class="mn-subtask-list mb-2" id="mn-panel-subtasks"></div>
+
+      <label class="mn-filter-label">Expected impact</label>
+
+      <textarea class="form-control form-control-sm mb-2 mn-cell-bullets mn-panel-field" id="mn-panel-impact" rows="2"></textarea>
+
+      <label class="mn-filter-label">Priority</label>
+
+      <select class="form-select form-select-sm mn-panel-field mb-2" id="mn-panel-priority">
+
+        <option value="low">Low</option>
+
+        <option value="medium">Medium</option>
+
+        <option value="high">High</option>
+
+        <option value="urgent">Urgent</option>
+
+      </select>
+
+      <label class="mn-filter-label">Labels</label>
+
+      <div id="mn-panel-labels" class="mb-2"></div>
+
+      <div class="row g-2 mb-2">
+
+        <div class="col-6"><label class="mn-filter-label">Start</label><input type="date" class="form-control form-control-sm mn-panel-field" id="mn-panel-start" /></div>
+
+        <div class="col-6"><label class="mn-filter-label">Due</label><input type="date" class="form-control form-control-sm mn-panel-field" id="mn-panel-due" /></div>
+
+      </div>
+
+      <label class="mn-filter-label">Led by</label>
+
+      <div id="mn-panel-assignees" class="mb-2"></div>
+
+      <label class="mn-filter-label">Status</label>
+
+      <select class="form-select form-select-sm mn-panel-field" id="mn-panel-status">
+
+        <option value="open">Open</option>
+
+        <option value="in_progress">In progress</option>
+
+        <option value="done">Done</option>
+
+      </select>
+
+      <textarea class="d-none mn-panel-field" id="mn-panel-cta"></textarea>
+
+      <textarea class="d-none mn-panel-field" id="mn-panel-challenges"></textarea>
+
+      <textarea class="d-none mn-panel-field" id="mn-panel-comments"></textarea>
+
+    </div>
+
+  </div>
+
+  <div class="mn-task-panel-footer">
+
+    <span class="mn-panel-save-hint" id="mn-panel-save-hint"></span>
+
+    <div class="d-flex gap-2">
+
+      <a class="btn btn-sm mn-btn-ghost d-none" id="mn-panel-open-meeting" href="#">Open meeting</a>
+
+      <button type="button" class="btn btn-sm mn-btn-ghost text-danger" id="mn-panel-delete">Delete</button>
+
+      <button type="button" class="btn btn-sm mn-btn-primary" id="mn-panel-save">Save</button>
+
+    </div>
+
+  </div>
+
+</aside>
+
+{% include "meeting_notes/_planner_modals.html" %}
+
+{% include "meeting_notes/_export_modal.html" %}
+
 {% endblock %}
+
 {% block scripts %}
+
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+
 <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
+
 <script>
+
   const MN_MEETING_NOTE_ID = null;
+
+  const MN_GLOBAL_EDIT = true;
+
   const MN_MEETING_TITLE = null;
+
   const MN_MEETING_DATE = null;
+
   const MN_USER_OPTS = {{ user_opts|tojson }};
+
   const MN_FOCUS_ROWS = [];
+
   const MN_IS_ADMIN = {{ is_admin|tojson }};
+
   const MN_DEFAULT_ASSIGNEE = {{ default_assignee_id|tojson }};
+
+  const MN_PDF_LOGO_URL = {{ url_for('static', filename='smartlearning.webp')|tojson }};
+
 </script>
+
+<script src="{{ url_for('static', filename='js/mn-api.js') }}"></script>
+
 <script src="{{ url_for('static', filename='js/meeting_notes.js') }}"></script>
+
+<script src="{{ url_for('static', filename='js/mn-extensions.js') }}"></script>
+
+<script src="{{ url_for('static', filename='js/mn-mobile.js') }}"></script>
+
+<script>
+
+(function(){
+
+  const assignee = document.getElementById('mn-filter-assignee');
+
+  if (assignee && typeof MN_DEFAULT_ASSIGNEE === 'number') assignee.value = String(MN_DEFAULT_ASSIGNEE);
+
+})();
+
+</script>
+
 {% endblock %}
+

@@ -1,0 +1,94 @@
+{# Filter fields live in offcanvas; toolbar shows chips + Filters button. #}
+<div class="mn-filter-toolbar d-flex flex-wrap align-items-center gap-2 mb-2">
+  <div class="mn-filter-chips flex-grow-1" id="mn-filter-chips" aria-live="polite"></div>
+  <button type="button" class="btn btn-sm mn-btn-ghost mn-filter-open-btn" data-bs-toggle="offcanvas" data-bs-target="#mn-filter-sheet">
+    <i class="fas fa-sliders me-1"></i> Filters
+  </button>
+</div>
+
+<div class="offcanvas offcanvas-end mn-filter-sheet" tabindex="-1" id="mn-filter-sheet" aria-labelledby="mn-filter-sheet-label">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="mn-filter-sheet-label">Filters</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <div class="mn-filter-fields row g-3">
+      <div class="col-12 col-sm-6">
+        <label class="mn-filter-label">Platform</label>
+        <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-platform">
+          <option value="">All</option>
+          {% for p in platforms %}<option value="{{ p|e }}">{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="mn-filter-label">Assignee</label>
+        <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-assignee">
+          <option value="">Any</option>
+          {% for u in user_opts %}<option value="{{ u.id }}">{{ u.label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="mn-filter-label">Status</label>
+        <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-status">
+          <option value="all">All</option>
+          <option value="open">Open</option>
+          <option value="in_progress">In progress</option>
+          <option value="done">Done</option>
+        </select>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="mn-filter-label">Priority</label>
+        <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-priority">
+          <option value="">Any</option>
+          <option value="urgent">Urgent</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="mn-filter-label">Label</label>
+        <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-label">
+          <option value="">Any</option>
+        </select>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="mn-filter-label">Due</label>
+        <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-due">
+          <option value="">Any</option>
+          <option value="overdue">Overdue</option>
+          <option value="this_week">This week</option>
+          <option value="this_month">This month</option>
+          <option value="next_month">Next month</option>
+          <option value="none">No due date</option>
+          <option value="custom">Custom range</option>
+        </select>
+      </div>
+      <div class="col-12 col-sm-6 mn-due-custom d-none">
+        <label class="mn-filter-label">From</label>
+        <input type="date" class="form-control form-control-sm mn-filter-ctrl" id="mn-due-start" />
+      </div>
+      <div class="col-12 col-sm-6 mn-due-custom d-none">
+        <label class="mn-filter-label">To</label>
+        <input type="date" class="form-control form-control-sm mn-filter-ctrl" id="mn-due-end" />
+      </div>
+      <div class="col-12">
+        <label class="mn-filter-label">Search tasks</label>
+        <input type="search" class="form-control form-control-sm mn-filter-ctrl" id="mn-filter-search" placeholder="Keywords…" />
+      </div>
+      <div class="col-12">
+        <label class="mn-filter-label">Saved view</label>
+        <div class="d-flex gap-2">
+          <select class="form-select form-select-sm mn-filter-ctrl flex-grow-1" id="mn-saved-view-select">
+            <option value="">Saved views…</option>
+          </select>
+          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-saved-view-save" title="Save current filters">+</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="offcanvas-footer border-top p-3 d-flex gap-2">
+    <button type="button" class="btn btn-sm mn-btn-ghost flex-grow-1" id="mn-filter-clear-all">Clear all</button>
+    <button type="button" class="btn btn-sm mn-btn-primary flex-grow-1" data-bs-dismiss="offcanvas" id="mn-filter-apply">Apply</button>
+  </div>
+</div>

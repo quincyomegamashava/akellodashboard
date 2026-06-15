@@ -102,7 +102,7 @@ class User(UserMixin, db.Model):
 
     def get_privileges(self):
         """Ensure all expected privileges exist in dict, default False."""
-        all_privs = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access", "Approve Champion Schools", "Revenue Reports", "Learning Hub Admin"]
+        all_privs = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access", "Approve Champion Schools", "Revenue Reports", "Learning Hub Admin", "Sales & Marketing"]
         if not self.privileges:
             self.privileges = {}
         for p in all_privs:
@@ -797,8 +797,10 @@ class Notification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     query_id = db.Column(db.Integer, db.ForeignKey('helpdesk_queries.id'), nullable=True)
+    meeting_note_id = db.Column(db.Integer, db.ForeignKey('meeting_notes.id'), nullable=True, index=True)
+    action_item_id = db.Column(db.Integer, db.ForeignKey('meeting_notes_action_items.id'), nullable=True, index=True)
     message = db.Column(db.Text, nullable=False)
-    notification_type = db.Column(db.String(50), nullable=False)  # 'assignment', 'resolution'
+    notification_type = db.Column(db.String(50), nullable=False)  # assignment, resolution, meeting_*
     read = db.Column(db.Boolean, default=False, nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     

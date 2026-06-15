@@ -1,0 +1,30 @@
+{% if can_view_activity %}
+<div class="mn-card mt-3 mn-activity-log" id="mn-activity-section">
+  <div class="mn-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span>Activity log</span>
+    <div class="d-flex gap-2 align-items-center">
+      <select class="form-select form-select-sm" id="mn-activity-filter" style="width:auto;">
+        <option value="all">All actions</option>
+        <option value="create">Created</option>
+        <option value="update">Updated</option>
+        <option value="delete">Deleted</option>
+      </select>
+      <button class="btn btn-sm mn-btn-ghost" type="button" id="mn-activity-toggle" aria-expanded="true" aria-controls="mn-activity-body">Toggle</button>
+    </div>
+  </div>
+  <div class="mn-card-body small" id="mn-activity-body">
+    {% if activity_rows %}
+    <ul class="list-unstyled small mb-0" id="mn-activity-list">
+      {% for r in activity_rows %}
+      <li class="mb-1">
+        <span class="text-muted">{{ r.occurred_at[:16].replace('T', ' ') if r.occurred_at else '' }}</span>
+        — {{ r.actor }} — <strong>{{ r.action }}</strong> {{ r.summary }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted mb-0">No activity yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

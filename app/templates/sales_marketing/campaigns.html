@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
+{% endblock %}
+{% block content %}
+<div class="sm-page px-3 py-3">
+  <h1 class="h4 mb-1">{{ title }}</h1>
+  <p class="text-muted small mb-3">Compose bulk emails and review send history (consent required).</p>
+  {% include "sales_marketing/_subnav.html" %}
+
+  <div class="sm-card mb-3">
+    <h2 class="h6 mb-3">Compose campaign</h2>
+    <p class="small text-muted">Send to stakeholders from the <a href="/sales-marketing/">Stakeholders</a> list, or enter recipient emails manually below.</p>
+    <div class="row g-2 mb-2">
+      <div class="col-12">
+        <label class="form-label">Subject</label>
+        <input type="text" class="form-control form-control-sm" id="sm-campaign-subject" />
+      </div>
+      <div class="col-12">
+        <label class="form-label">Message (HTML allowed)</label>
+        <textarea class="form-control form-control-sm" id="sm-campaign-body" rows="5"></textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Stakeholder IDs (comma-separated, optional)</label>
+        <input type="text" class="form-control form-control-sm" id="sm-campaign-ids" placeholder="e.g. 1, 2, 3 — or use Stakeholders page" />
+      </div>
+      <div class="col-12">
+        <button type="button" class="btn btn-sm btn-primary" id="sm-campaign-send" style="background:#00407d;">Send campaign</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sm-card">
+    <h2 class="h6 mb-2">Send history</h2>
+    <table class="table table-sm sm-table mb-0">
+      <thead><tr><th>Subject</th><th>Recipients</th><th>Status</th><th>Sent</th><th></th></tr></thead>
+      <tbody id="sm-campaigns-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="smCampaignDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="sm-campaign-detail-title">Campaign</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body" id="sm-campaign-detail-body"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.SM_PAGE = "campaigns";</script>
+<script src="{{ url_for('static', filename='js/sales_marketing.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sm_extensions.js') }}"></script>
+{% endblock %}

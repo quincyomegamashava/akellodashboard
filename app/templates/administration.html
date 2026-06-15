@@ -195,11 +195,11 @@
         <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">ID Validation</div>
       </div>
 
-      <div class="minimal-card p-6">
-        <div class="kpi-icon-minimal bg-emerald-50 text-emerald-600 mb-4">
-          <i class="fas fa-database"></i>
+      <div class="minimal-card p-6" style="cursor: pointer;" onclick="openMigrationsModal()" id="systemStateCard">
+        <div class="kpi-icon-minimal bg-emerald-50 text-emerald-600 mb-4" id="systemStateIconWrap">
+          <i class="fas fa-database" id="systemStateIcon"></i>
         </div>
-        <div class="text-2xl font-black text-slate-800">Healthy</div>
+        <div class="text-2xl font-black text-slate-800" id="systemStateLabel">Loading...</div>
         <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">System State</div>
       </div>
       <div class="minimal-card p-6" style="cursor: pointer;"
@@ -509,6 +509,84 @@
         <button type="button" id="checkinsResetPurgeBtn" onclick="purgeCheckinsInRange()" disabled
           class="flex-1 px-4 py-3 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
           Delete check-ins
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Database Migrations Modal -->
+<div id="migrationsModal" class="w3-modal modal-minimal" style="z-index:2900;">
+  <div class="w3-modal-content w3-animate-top shadow-2xl bg-white"
+    style="width: 92vw; max-width: 760px; display: flex; flex-direction: column; max-height: 90vh;">
+    <header class="p-6 bg-white border-b border-slate-100 flex justify-between items-center shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+          <i class="fas fa-database text-xl"></i>
+        </div>
+        <div>
+          <h2 class="text-xl font-bold text-slate-800 m-0">Database migrations</h2>
+          <p class="text-xs text-slate-500 m-0 mt-1">Apply pending schema updates after a deploy.</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeMigrationsModal()"
+        class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors">
+        <i class="fas fa-times text-slate-400"></i>
+      </button>
+    </header>
+
+    <div class="p-6 space-y-6 bg-slate-50 overflow-y-auto flex-1">
+      <div id="migrationsStatusSummary"
+        class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+        Loading migration status...
+      </div>
+
+      <div>
+        <h3 class="text-sm font-bold text-slate-700 mb-3">Pending migrations</h3>
+        <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+          <table class="table-minimal text-sm">
+            <thead>
+              <tr>
+                <th>Revision</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody id="migrationsPendingBody">
+              <tr><td colspan="2" class="text-slate-500">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-bold text-slate-700 mb-3">Recent history</h3>
+        <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+          <table class="table-minimal text-sm">
+            <thead>
+              <tr>
+                <th>Revision</th>
+                <th>Description</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="migrationsHistoryBody">
+              <tr><td colspan="3" class="text-slate-500">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="migrationsResult"
+        class="hidden rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600"></div>
+
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button type="button" id="migrationsRefreshBtn" onclick="refreshMigrationsModal()"
+          class="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-2xl transition-all active:scale-95">
+          Refresh status
+        </button>
+        <button type="button" id="migrationsUpgradeBtn" onclick="applyMigrationsUpgrade()" disabled
+          class="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
+          Apply migrations
         </button>
       </div>
     </div>
@@ -2144,6 +2222,232 @@
         alert('Delete failed: ' + error);
       });
   }
+
+  let migrationsStatusCache = null;
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function setSystemStateCard(status) {
+    const label = document.getElementById('systemStateLabel');
+    const iconWrap = document.getElementById('systemStateIconWrap');
+    if (!label || !iconWrap) return;
+
+    if (!status || !status.success) {
+      label.textContent = 'Check migrations';
+      iconWrap.className = 'kpi-icon-minimal bg-rose-50 text-rose-600 mb-4';
+      return;
+    }
+
+    if (status.is_up_to_date) {
+      label.textContent = 'Healthy';
+      iconWrap.className = 'kpi-icon-minimal bg-emerald-50 text-emerald-600 mb-4';
+      return;
+    }
+
+    const count = status.pending_count || 0;
+    label.textContent = count === 1 ? '1 update pending' : count + ' updates pending';
+    iconWrap.className = 'kpi-icon-minimal bg-amber-50 text-amber-600 mb-4';
+  }
+
+  function loadMigrationStatus() {
+    return fetch('/api/admin/migrations/status', { credentials: 'same-origin' })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, data: data };
+        });
+      })
+      .then(function (result) {
+        migrationsStatusCache = result.data;
+        setSystemStateCard(result.data);
+        return result;
+      })
+      .catch(function () {
+        setSystemStateCard(null);
+        return { ok: false, data: { success: false, error: 'Could not load migration status.' } };
+      });
+  }
+
+  function renderMigrationsPending(pending) {
+    const body = document.getElementById('migrationsPendingBody');
+    if (!body) return;
+    if (!pending || !pending.length) {
+      body.innerHTML = '<tr><td colspan="2" class="text-slate-500">No pending migrations.</td></tr>';
+      return;
+    }
+    body.innerHTML = pending.map(function (item) {
+      return '<tr><td class="font-mono text-xs">' + escapeHtml(item.revision) + '</td><td>' +
+        escapeHtml(item.message || '(no description)') + '</td></tr>';
+    }).join('');
+  }
+
+  function renderMigrationsHistory(revisions) {
+    const body = document.getElementById('migrationsHistoryBody');
+    if (!body) return;
+    if (!revisions || !revisions.length) {
+      body.innerHTML = '<tr><td colspan="3" class="text-slate-500">No migration history found.</td></tr>';
+      return;
+    }
+    body.innerHTML = revisions.map(function (item) {
+      let statusLabel = item.is_head ? 'Head' : '';
+      if (item.is_current) {
+        statusLabel = statusLabel ? statusLabel + ', current' : 'Current';
+      }
+      if (!statusLabel) statusLabel = '—';
+      return '<tr><td class="font-mono text-xs">' + escapeHtml(item.revision) + '</td><td>' +
+        escapeHtml(item.message || '(no description)') + '</td><td class="text-xs text-slate-500">' +
+        escapeHtml(statusLabel) + '</td></tr>';
+    }).join('');
+  }
+
+  function renderMigrationsSummary(status) {
+    const summary = document.getElementById('migrationsStatusSummary');
+    const upgradeBtn = document.getElementById('migrationsUpgradeBtn');
+    if (!summary) return;
+
+    if (!status || !status.success) {
+      summary.textContent = (status && status.error) ? status.error : 'Could not load migration status.';
+      if (upgradeBtn) upgradeBtn.disabled = true;
+      return;
+    }
+
+    const current = status.current_revision || '(not stamped)';
+    const heads = (status.head_revisions || []).map(function (h) { return h.revision; }).join(', ') || '(unknown)';
+    const pendingCount = status.pending_count || 0;
+    const dbLabel = status.database || 'unknown';
+
+    summary.innerHTML =
+      '<div><strong>Database:</strong> ' + escapeHtml(dbLabel) + '</div>' +
+      '<div class="mt-2"><strong>Current revision:</strong> <span class="font-mono text-xs">' + escapeHtml(current) + '</span></div>' +
+      '<div class="mt-1"><strong>Head revision(s):</strong> <span class="font-mono text-xs">' + escapeHtml(heads) + '</span></div>' +
+      '<div class="mt-1"><strong>Pending:</strong> ' + pendingCount + '</div>';
+
+    if (upgradeBtn) {
+      upgradeBtn.disabled = !status.web_migrations_enabled || status.is_up_to_date || pendingCount === 0;
+    }
+  }
+
+  function refreshMigrationsModal() {
+    const summary = document.getElementById('migrationsStatusSummary');
+    const result = document.getElementById('migrationsResult');
+    const refreshBtn = document.getElementById('migrationsRefreshBtn');
+    const upgradeBtn = document.getElementById('migrationsUpgradeBtn');
+
+    if (result) {
+      result.classList.add('hidden');
+      result.textContent = '';
+    }
+
+    if (summary) summary.textContent = 'Loading migration status...';
+    if (refreshBtn) refreshBtn.disabled = true;
+    if (upgradeBtn) upgradeBtn.disabled = true;
+
+    Promise.all([
+      loadMigrationStatus(),
+      fetch('/api/admin/migrations/history?limit=10', { credentials: 'same-origin' })
+        .then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok, data: data };
+          });
+        })
+    ])
+      .then(function (results) {
+        const statusResult = results[0];
+        const historyResult = results[1];
+        const status = statusResult.data || {};
+        renderMigrationsSummary(status);
+        renderMigrationsPending(status.pending_revisions || []);
+        if (historyResult.ok && historyResult.data && historyResult.data.success) {
+          renderMigrationsHistory(historyResult.data.revisions || []);
+        } else {
+          renderMigrationsHistory([]);
+        }
+      })
+      .finally(function () {
+        if (refreshBtn) refreshBtn.disabled = false;
+      });
+  }
+
+  function openMigrationsModal() {
+    document.getElementById('migrationsModal').style.display = 'block';
+    refreshMigrationsModal();
+  }
+
+  function closeMigrationsModal() {
+    document.getElementById('migrationsModal').style.display = 'none';
+  }
+
+  function applyMigrationsUpgrade() {
+    if (!migrationsStatusCache || migrationsStatusCache.is_up_to_date) {
+      alert('Database is already up to date.');
+      return;
+    }
+
+    const pendingCount = migrationsStatusCache.pending_count || 0;
+    if (!window.confirm(
+      'This will apply ' + pendingCount + ' pending migration(s) to the database. Continue?'
+    )) {
+      return;
+    }
+
+    const upgradeBtn = document.getElementById('migrationsUpgradeBtn');
+    const refreshBtn = document.getElementById('migrationsRefreshBtn');
+    const result = document.getElementById('migrationsResult');
+    const originalText = upgradeBtn.textContent;
+
+    upgradeBtn.disabled = true;
+    refreshBtn.disabled = true;
+    upgradeBtn.textContent = 'Applying...';
+
+    fetch('/api/admin/migrations/upgrade', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: true })
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, data: data };
+        });
+      })
+      .then(function (res) {
+        upgradeBtn.textContent = originalText;
+        refreshBtn.disabled = false;
+
+        if (result) {
+          result.classList.remove('hidden');
+          if (res.ok && res.data.success) {
+            result.className = 'rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800';
+            result.textContent = res.data.message || 'Migrations applied successfully.';
+          } else {
+            result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800';
+            result.textContent = (res.data && res.data.error) ? res.data.error : 'Migration upgrade failed.';
+          }
+        }
+
+        return refreshMigrationsModal();
+      })
+      .catch(function (error) {
+        upgradeBtn.disabled = false;
+        upgradeBtn.textContent = originalText;
+        refreshBtn.disabled = false;
+        if (result) {
+          result.classList.remove('hidden');
+          result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800';
+          result.textContent = 'Migration upgrade failed: ' + error;
+        }
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    loadMigrationStatus();
+  });
 
 </script>
 

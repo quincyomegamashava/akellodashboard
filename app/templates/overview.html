@@ -4,6 +4,9 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 {% block title %}Overview • Akello{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
+{% endblock %}
 <style>
     body {
       font-family: "Inter", sans-serif;
@@ -155,6 +158,22 @@
     <div id="how-to" class="w3-container menu w3-padding-32 w3-white">
       
       <div class="max-w-7xl mx-auto space-y-8">
+
+    {% if sm_overview %}
+    <div class="sm-overview-widget">
+      <h3><i class="fas fa-bullhorn"></i> Sales &amp; Marketing</h3>
+      <div class="sm-overview-stats">
+        <span><strong>{{ sm_overview.leads_this_week }}</strong> leads this week</span>
+        <span><strong>{{ sm_overview.total_leads }}</strong> total</span>
+        <span><strong>{{ sm_overview.with_consent }}</strong> with consent</span>
+        <span><strong>{{ sm_overview.active_events }}</strong> active events</span>
+        {% if sm_overview.next_event %}
+        <span>Next: <strong>{{ sm_overview.next_event.name }}</strong> ({{ sm_overview.next_event.start_date }})</span>
+        {% endif %}
+      </div>
+      <a href="/sales-marketing/" class="btn btn-sm btn-primary mt-2" style="background:#00407d;">Open hub</a>
+    </div>
+    {% endif %}
 
     <!-- Yearly Totals -->
     <div id="totals" class="bg-white w3-hide p-4 rounded-2xl shadow mb-6 text-center">

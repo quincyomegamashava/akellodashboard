@@ -34,6 +34,7 @@ from app.logging_config import setup_logging
 logger = setup_logging(app)
 
 from app import routes, models, monitoring_routes
+from app import mobile_meeting_sales_routes  # noqa: F401 — /api/mobile/meeting-notes & sales-marketing
 
 # Register the global deletion-audit listener (after models are loaded).
 from app.audit import init_audit
@@ -46,6 +47,9 @@ from app import routes_asl_settings
 from app.database_routes import database_bp
 app.register_blueprint(database_bp)
 
+from app.migration_routes import migration_bp
+app.register_blueprint(migration_bp)
+
 from app.blueprints.content_dev import bp as content_dev_bp
 app.register_blueprint(content_dev_bp)
 
@@ -56,6 +60,15 @@ app.register_blueprint(new_creations_bp)
 from app.blueprints.meeting_notes import bp as meeting_notes_bp
 from app.blueprints.meeting_notes import models as meeting_notes_models  # noqa: F401
 app.register_blueprint(meeting_notes_bp)
+
+try:
+    from app.blueprints.sales_marketing import bp as sales_marketing_bp
+    from app.blueprints.sales_marketing import models as sales_marketing_models  # noqa: F401
+
+    app.register_blueprint(sales_marketing_bp)
+    logger.info("Sales & Marketing blueprint registered (/sales-marketing/)")
+except Exception:
+    logger.exception("Sales & Marketing blueprint failed to register")
 
 from app.blueprints.learn_admin import bp as learn_admin_bp
 from app.blueprints.learn_api import bp as learn_api_bp

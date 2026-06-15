@@ -25,9 +25,17 @@ def _scheduled_fetch(app):
 
 
 def _read_revenue_schedule():
+    from sqlalchemy.exc import OperationalError
+
     from app.models import AppSetting
 
-    raw = (AppSetting.get_value('revenue_reports_schedule_time', '06:00') or '06:00').strip()
+    try:
+        raw = (AppSetting.get_value('revenue_reports_schedule_time', '06:00') or '06:00').strip()
+    except OperationalError:
+        logger.warning(
+            "app_settings table missing; using default revenue schedule 06:00. Run flask db upgrade."
+        )
+        return 6, 0
     try:
         hour_s, minute_s = raw.split(':', 1)
         hour, minute = int(hour_s), int(minute_s)
@@ -70,9 +78,17 @@ def refresh_revenue_report_schedule(app):
 
 
 def _read_weekly_checkin_schedule():
+    from sqlalchemy.exc import OperationalError
+
     from app.models import AppSetting
 
-    raw = (AppSetting.get_value('checkin_reports_schedule_time', '17:00') or '17:00').strip()
+    try:
+        raw = (AppSetting.get_value('checkin_reports_schedule_time', '17:00') or '17:00').strip()
+    except OperationalError:
+        logger.warning(
+            "app_settings table missing; using default check-in schedule 17:00. Run flask db upgrade."
+        )
+        return 17, 0
     try:
         hour_s, minute_s = raw.split(':', 1)
         hour, minute = int(hour_s), int(minute_s)
@@ -115,6 +131,18 @@ def refresh_weekly_checkin_schedule(app):
     logger.info("Weekly check-in scheduler set to Fridays %02d:%02d", hour, minute)
 
 
+def _scheduled_meeting_overdue_notifications(app):
+    with app.app_context():
+        try:
+            from app.blueprints.meeting_notes.notifications import notify_overdue_items
+
+            count = notify_overdue_items()
+            if count:
+                logger.info("Meeting notes overdue notifications: %d", count)
+        except Exception as e:
+            logger.exception("Meeting overdue notification job failed: %s", e)
+
+
 def start_scheduler(app):
     """
     Start the background scheduler with a 60-second email fetch job.
@@ -130,6 +158,14 @@ def start_scheduler(app):
         trigger="interval",
         seconds=60,
         id="helpdesk_email_fetch",
+    )
+    _scheduler.add_job(
+        func=_scheduled_meeting_overdue_notifications,
+        args=[app],
+        trigger="cron",
+        hour=8,
+        minute=0,
+        id="meeting_notes_overdue_notifications",
     )
     with app.app_context():
         refresh_revenue_report_schedule(app)

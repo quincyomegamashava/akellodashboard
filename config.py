@@ -88,3 +88,6 @@ class Config:
     OLLAMA_TEMPERATURE = float(os.environ.get('OLLAMA_TEMPERATURE', '0.2'))
     OLLAMA_NUM_PREDICT = int(os.environ.get('OLLAMA_NUM_PREDICT', '900'))
     GENERATION_PROGRESS_TARGET_CHARS = int(os.environ.get('GENERATION_PROGRESS_TARGET_CHARS', '2600'))
+
+    # Allow applying Alembic upgrades from /administration (disable via .env in Docker if needed)
+    ALLOW_WEB_MIGRATIONS = os.environ.get('ALLOW_WEB_MIGRATIONS', 'true').lower() in ('true', '1', 't', 'yes', 'y')

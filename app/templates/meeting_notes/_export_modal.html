@@ -1,0 +1,40 @@
+<div class="modal fade" id="mnExportModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius: 16px;">
+      <div class="modal-header">
+        <h5 class="modal-title">Export PDF options</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="mn-pdf-include-summary" checked />
+          <label class="form-check-label" for="mn-pdf-include-summary">Include meeting summary</label>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="mn-pdf-group-platform" checked />
+          <label class="form-check-label" for="mn-pdf-group-platform">Group by platform</label>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="mn-pdf-include-done" checked />
+          <label class="form-check-label" for="mn-pdf-include-done">Include completed items</label>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="mn-pdf-include-labels-priority" checked />
+          <label class="form-check-label" for="mn-pdf-include-labels-priority">Include priority &amp; labels</label>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="mn-pdf-include-subtasks" checked />
+          <label class="form-check-label" for="mn-pdf-include-subtasks">Include sub-tasks</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="mn-pdf-include-discussion" />
+          <label class="form-check-label" for="mn-pdf-include-discussion">Include discussion threads</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-confirm-export">Export</button>
+      </div>
+    </div>
+  </div>
+</div>

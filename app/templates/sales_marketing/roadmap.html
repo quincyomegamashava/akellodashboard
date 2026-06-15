@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
+{% endblock %}
+{% block content %}
+<div class="sm-page px-3 py-3">
+  <h1 class="h4 mb-1">{{ title }}</h1>
+  <p class="text-muted small mb-3">Overview of all marketing events — past, ongoing, and upcoming.</p>
+  {% include "sales_marketing/_subnav.html" %}
+
+  <div class="sm-card mb-3">
+    <div class="sm-filter-row">
+      <select class="form-select form-select-sm" id="sm-roadmap-timeline" style="max-width:10rem;">
+        <option value="all">All</option>
+        <option value="ongoing">Happening now</option>
+        <option value="upcoming">Upcoming</option>
+        <option value="past">Past</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+      <label class="form-check-label small d-flex align-items-center gap-1">
+        <input type="checkbox" class="form-check-input" id="sm-roadmap-mine" checked /> Events I'm attending
+      </label>
+      <input type="search" class="form-control form-control-sm" id="sm-roadmap-location" placeholder="Filter location…" style="max-width:12rem;" />
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="sm-roadmap-refresh">Refresh</button>
+    </div>
+    <div id="sm-roadmap-host"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.SM_PAGE = "roadmap";</script>
+<script src="{{ url_for('static', filename='js/sales_marketing.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sm_extensions.js') }}"></script>
+{% endblock %}

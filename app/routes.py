@@ -13,7 +13,7 @@ from flask_login import login_user, logout_user, current_user, login_required
 import sqlalchemy as sa
 from docx import Document
 import re
-from app import app, db
+from app import app, db, csrf
 from app.forms import EventForm, LoginForm, PerfomanceTargetsForm, RegistrationForm, BookAllocationForm, ReportForm, WorkspaceForm, ProjectForm, TaskForm, CSVUploadForm, ChampionCSVUploadForm, ChampionSchoolForm, AkelloSimEventForm
 from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, SchoolVisitLog, Event, WeeklyReport, TaskA, ColumnA, ProjectA, TaskAttachment, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket, AuditLog, AppSetting
 from datetime import datetime, timezone, timedelta, date
@@ -2145,7 +2145,14 @@ def new_dash_layout():
 @app.route('/overview', methods=['GET'])
 @login_required
 def overview():
-    return render_template('overview.html', title="Akello Internal Dashboard")
+    sm_overview = None
+    try:
+        from app.blueprints.sales_marketing.services import can_access_sales_marketing, stakeholders_stats
+        if can_access_sales_marketing():
+            sm_overview = stakeholders_stats()
+    except Exception:
+        sm_overview = None
+    return render_template('overview.html', title="Akello Internal Dashboard", sm_overview=sm_overview)
 
 
 
@@ -21625,13 +21632,15 @@ def mobile_login():
             'lastname': user.lastname,
             'userRole': user.userRole,
             'department': user.department,
-            'province': user.province
+            'province': user.province,
+            'privileges': user.get_privileges(),
         }
         
         return jsonify({
             'success': True, 
             'message': 'Login successful',
-            'user': user_data
+            'user': user_data,
+            'privileges': user.get_privileges(),
         }), 200
         
     except Exception as e:
@@ -21667,12 +21676,14 @@ def mobile_get_user():
             'lastname': current_user.lastname,
             'userRole': current_user.userRole,
             'department': current_user.department,
-            'province': current_user.province
+            'province': current_user.province,
+            'privileges': current_user.get_privileges(),
         }
         
         return jsonify({
             'success': True,
-            'user': user_data
+            'user': user_data,
+            'privileges': current_user.get_privileges(),
         }), 200
         
     except Exception as e:
@@ -21696,7 +21707,8 @@ def mobile_user_profile():
             'lastname': user.lastname,
             'userRole': user.userRole,
             'department': user.department,
-            'province': user.province
+            'province': user.province,
+            'privileges': user.get_privileges(),
         }
         
         # Brand Ambassador specific data
@@ -21825,7 +21837,8 @@ def mobile_user_profile():
         
         return jsonify({
             'success': True,
-            'user': user_data
+            'user': user_data,
+            'privileges': user.get_privileges(),
         }), 200
         
     except Exception as e:
@@ -24136,5 +24149,36 @@ def all_champions_compare_upload():
         return jsonify({'error': str(e)}), 500
 
 
+# --- Sales & Marketing: public routes on main app (always registered with routes.py) ---
+
+
+@app.route('/connect')
+def sm_connect_page():
+    from app.blueprints.sales_marketing.routes import connect_page
+    return connect_page()
+
+
+@app.route('/interest')
+def sm_interest_redirect():
+    return redirect('/connect')
+
+
+@app.route('/api/public/marketing-events')
+def sm_api_public_marketing_events():
+    from app.blueprints.sales_marketing.routes import api_public_marketing_events
+    return api_public_marketing_events()
+
+
+@app.route('/api/public/interest-options')
+def sm_api_public_interest_options():
+    from app.blueprints.sales_marketing.routes import api_public_interest_options
+    return api_public_interest_options()
+
+
+@app.route('/api/public/stakeholder-leads', methods=['POST'])
+@csrf.exempt
+def sm_api_public_submit_lead():
+    from app.blueprints.sales_marketing.routes import api_public_submit_lead
+    return api_public_submit_lead()
 
 

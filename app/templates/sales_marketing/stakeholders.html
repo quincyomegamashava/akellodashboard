@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
+{% endblock %}
+{% block content %}
+<div class="sm-page px-3 py-3">
+  <h1 class="h4 mb-1">{{ title }}</h1>
+  <p class="text-muted small mb-3">Stakeholder leads from events and the public connect form.</p>
+  {% include "sales_marketing/_subnav.html" %}
+
+  <div class="sm-stats-row mb-3" id="sm-stats-row">
+    <div class="sm-stat-card"><div class="sm-stat-val" id="sm-stat-total">—</div><div class="sm-stat-lbl">Total leads</div></div>
+    <div class="sm-stat-card"><div class="sm-stat-val" id="sm-stat-week">—</div><div class="sm-stat-lbl">This week</div></div>
+    <div class="sm-stat-card"><div class="sm-stat-val" id="sm-stat-consent">—</div><div class="sm-stat-lbl">With consent</div></div>
+    <div class="sm-stat-card"><div class="sm-stat-val" id="sm-stat-dup">—</div><div class="sm-stat-lbl">Open duplicates</div></div>
+    <div class="sm-stat-card"><div class="sm-stat-val" id="sm-stat-events">—</div><div class="sm-stat-lbl">Active events</div></div>
+  </div>
+
+  <div class="sm-empty-guide d-none mb-3" id="sm-empty-guide">
+    <h2 class="h6">Get started</h2>
+    <ol class="small mb-2">
+      <li>Create a marketing event under <a href="/sales-marketing/events">Events</a></li>
+      <li>Share the public form: <a href="/connect" target="_blank" rel="noopener">/connect</a>
+        <button type="button" class="btn btn-sm btn-link p-0" id="sm-copy-connect">Copy link</button></li>
+      <li>Review submissions here and follow up by status</li>
+    </ol>
+  </div>
+
+  <div class="sm-card mb-3">
+    <div class="sm-filter-row" id="sm-filters">
+      <input type="search" class="form-control form-control-sm" id="sm-search" placeholder="Search name, email, school…" style="max-width:14rem;" />
+      <select class="form-select form-select-sm" id="sm-filter-event"><option value="">All events</option></select>
+      <select class="form-select form-select-sm" id="sm-filter-province">
+        <option value="">All provinces</option>
+        {% for p in provinces %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+      </select>
+      <select class="form-select form-select-sm" id="sm-filter-interest"><option value="">All interests</option></select>
+      <select class="form-select form-select-sm" id="sm-filter-status" style="max-width:9rem;">
+        <option value="">All statuses</option>
+        <option value="new">New</option>
+        <option value="contacted">Contacted</option>
+        <option value="qualified">Qualified</option>
+        <option value="closed">Closed</option>
+      </select>
+      <label class="form-check-label small d-flex align-items-center gap-1">
+        <input type="checkbox" class="form-check-input" id="sm-filter-consent" /> Consent only
+      </label>
+      <label class="form-check-label small d-flex align-items-center gap-1">
+        <input type="checkbox" class="form-check-input" id="sm-filter-dup" /> Duplicates only
+      </label>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="sm-btn-refresh">Refresh</button>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="sm-btn-export">Export CSV</button>
+      <button type="button" class="btn btn-sm btn-primary" id="sm-btn-email" style="background:#00407d;border-color:#00407d;">Email selected</button>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="sm-btn-email-filter">Email matching filters</button>
+      <button type="button" class="btn btn-sm btn-outline-success" id="sm-btn-add">Add lead</button>
+      <select class="form-select form-select-sm" id="sm-bulk-status" style="max-width:9rem;">
+        <option value="">Set status…</option>
+        <option value="new">New</option>
+        <option value="contacted">Contacted</option>
+        <option value="qualified">Qualified</option>
+        <option value="closed">Closed</option>
+      </select>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover sm-table mb-0">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="sm-chk-all" /></th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Event</th>
+            <th>Interest</th>
+            <th>Province</th>
+            <th>Submitted</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="sm-leads-body"></tbody>
+      </table>
+    </div>
+    <div class="d-flex justify-content-between align-items-center mt-2 small text-muted">
+      <span id="sm-pagination-info"></span>
+      <div class="btn-group btn-group-sm">
+        <button type="button" class="btn btn-outline-secondary" id="sm-prev">Prev</button>
+        <button type="button" class="btn btn-outline-secondary" id="sm-next">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sm-drawer-backdrop d-none" id="sm-drawer-backdrop"></div>
+<aside class="sm-drawer d-none" id="sm-lead-drawer" aria-label="Lead details">
+  <div class="sm-drawer-header">
+    <h2 class="h6 mb-0" id="sm-drawer-title">Lead</h2>
+    <button type="button" class="btn-close" id="sm-drawer-close" aria-label="Close"></button>
+  </div>
+  <div class="sm-drawer-body" id="sm-drawer-body"></div>
+  <div class="sm-drawer-footer">
+    <button type="button" class="btn btn-sm btn-outline-primary" id="sm-drawer-edit">Edit</button>
+    <button type="button" class="btn btn-sm btn-primary" id="sm-drawer-email" style="background:#00407d;">Email</button>
+  </div>
+</aside>
+
+<div class="modal fade" id="smEmailModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Send email</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <p class="small text-muted" id="sm-email-count"></p>
+        <label class="form-label">Subject</label>
+        <input type="text" class="form-control mb-2" id="sm-email-subject" />
+        <label class="form-label">Message (HTML allowed)</label>
+        <textarea class="form-control" id="sm-email-body" rows="6"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="sm-email-send" style="background:#00407d;">Send</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="smLeadModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="sm-lead-modal-title">Add lead</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body" id="sm-lead-form-host"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="sm-lead-save" style="background:#00407d;">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.SM_PAGE = "stakeholders"; window.SM_USER_OPTS = {{ user_opts|tojson }}; window.SM_PROVINCES = {{ provinces|tojson }};</script>
+<script src="{{ url_for('static', filename='js/sales_marketing.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sm_extensions.js') }}"></script>
+{% endblock %}

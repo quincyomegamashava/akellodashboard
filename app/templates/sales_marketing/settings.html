@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
+{% endblock %}
+{% block content %}
+<div class="sm-page px-3 py-3">
+  <h1 class="h4 mb-1">{{ title }}</h1>
+  <p class="text-muted small mb-3">Manage interest options shown on the public connect form.</p>
+  {% include "sales_marketing/_subnav.html" %}
+  <div class="sm-card">
+    <div class="input-group input-group-sm mb-3" style="max-width:24rem;">
+      <input type="text" class="form-control" id="sm-new-interest" placeholder="New option label" />
+      <button class="btn btn-primary" type="button" id="sm-add-interest" style="background:#00407d;">Add</button>
+    </div>
+    <ul class="list-group list-group-flush" id="sm-interest-list"></ul>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.SM_PAGE = "settings";</script>
+<script src="{{ url_for('static', filename='js/sales_marketing.js') }}"></script>
+{% endblock %}

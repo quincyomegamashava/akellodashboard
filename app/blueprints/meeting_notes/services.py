@@ -7,7 +7,7 @@ from calendar import monthrange
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 
 from app import db
@@ -15,8 +15,14 @@ from app.models import User
 
 from app.blueprints.meeting_notes.models import (
     MeetingActionItem,
+    MeetingActionSubtask,
     MeetingFocusRow,
+    MeetingItemComment,
+    MeetingLabel,
     MeetingNote,
+    MeetingSavedView,
+    MeetingTemplate,
+    VALID_PRIORITIES,
 )
 
 
@@ -153,6 +159,64 @@ def due_range_for_preset(
     return None, None, None
 
 
+def label_to_dict(label: MeetingLabel) -> dict:
+    return {"id": label.id, "name": label.name, "color": label.color}
+
+
+def saved_view_to_dict(view: MeetingSavedView) -> dict:
+    return {
+        "id": view.id,
+        "name": view.name,
+        "filters_json": view.filters_json or {},
+        "view_mode": view.view_mode,
+        "is_default": bool(view.is_default),
+        "sort_order": view.sort_order,
+    }
+
+
+def template_to_dict(tpl: MeetingTemplate) -> dict:
+    return {
+        "id": tpl.id,
+        "name": tpl.name,
+        "title_pattern": tpl.title_pattern,
+        "summary_template": tpl.summary_template,
+        "focus_rows_json": tpl.focus_rows_json or [],
+    }
+
+
+def comment_to_dict(comment: MeetingItemComment) -> dict:
+    author = comment.author
+    aname = user_display_name(author) if author else "?"
+    return {
+        "id": comment.id,
+        "action_item_id": comment.action_item_id,
+        "author_user_id": comment.author_user_id,
+        "author_name": aname,
+        "body": comment.body,
+        "created_at": comment.created_at.isoformat() if comment.created_at else None,
+    }
+
+
+def parse_mention_user_ids(body: str, users: Sequence[User]) -> set:
+    """Find @Firstname Lastname or @username mentions in comment body."""
+    if not body:
+        return set()
+    found = set()
+    lower_body = body.lower()
+    for u in users:
+        full = f"{(u.firstname or '').strip()} {(u.lastname or '').strip()}".strip()
+        candidates = [u.username]
+        if full:
+            candidates.append(full)
+        for cand in candidates:
+            if not cand:
+                continue
+            needle = "@" + cand.lower()
+            if needle in lower_body:
+                found.add(u.id)
+    return found
+
+
 def action_items_query(
     meeting_note_id: Optional[int] = None,
     platform: Optional[str] = None,
@@ -161,11 +225,18 @@ def action_items_query(
     due_preset: Optional[str] = None,
     due_start: Optional[date] = None,
     due_end: Optional[date] = None,
+    priority: Optional[str] = None,
+    label_id: Optional[int] = None,
+    search_q: Optional[str] = None,
 ) -> Any:
     q = (
         MeetingActionItem.query.options(
             joinedload(MeetingActionItem.assignees),
-            joinedload(MeetingActionItem.focus_row).joinedload(MeetingFocusRow.meeting_note),
+            joinedload(MeetingActionItem.labels),
+            joinedload(MeetingActionItem.subtasks).joinedload(MeetingActionSubtask.assignee),
+            joinedload(MeetingActionItem.focus_row)
+            .joinedload(MeetingFocusRow.meeting_note)
+            .joinedload(MeetingNote.attendees),
         )
         .join(MeetingFocusRow, MeetingActionItem.focus_row_id == MeetingFocusRow.id)
         .join(MeetingNote, MeetingFocusRow.meeting_note_id == MeetingNote.id)
@@ -197,10 +268,104 @@ def action_items_query(
     elif dmode == "between" and dstart is None and dend is not None:
         q = q.filter(MeetingActionItem.due_date.isnot(None), MeetingActionItem.due_date <= dend)
 
+    if priority and priority.strip().lower() in VALID_PRIORITIES:
+        q = q.filter(MeetingActionItem.priority == priority.strip().lower())
+
+    if label_id is not None:
+        q = q.filter(MeetingActionItem.labels.any(MeetingLabel.id == label_id))
+
+    if search_q and search_q.strip():
+        term = f"%{search_q.strip()}%"
+        q = q.filter(
+            db.or_(
+                MeetingActionItem.call_to_action.ilike(term),
+                MeetingActionItem.comments.ilike(term),
+                MeetingFocusRow.platform.ilike(term),
+            )
+        )
+
     return q
 
 
-def item_to_dict(item: MeetingActionItem) -> dict:
+def attendees_for_meeting(meeting_id: Optional[int]) -> List[User]:
+    """Registered users listed as attendees on a meeting."""
+    if not meeting_id:
+        return []
+    mn = db.session.get(MeetingNote, meeting_id)
+    if not mn:
+        return []
+    return list(mn.attendees or [])
+
+
+def attendee_ids_for_meeting(meeting_id: Optional[int]) -> List[int]:
+    return [u.id for u in attendees_for_meeting(meeting_id)]
+
+
+def subtask_allowed_assignee_ids(
+    meeting_id: Optional[int],
+    item: Optional[MeetingActionItem] = None,
+) -> set:
+    """Users who may be assigned to a sub-task: meeting attendees plus task owners."""
+    allowed = set(attendee_ids_for_meeting(meeting_id))
+    if item:
+        for u in item.assignees or []:
+            allowed.add(u.id)
+    return allowed
+
+
+def validate_subtask_assignee(
+    assignee_user_id: Optional[int],
+    meeting_id: Optional[int],
+    item: Optional[MeetingActionItem] = None,
+) -> Optional[str]:
+    """Return error message if assignee is invalid for this meeting/task."""
+    if assignee_user_id is None:
+        return None
+    allowed = subtask_allowed_assignee_ids(meeting_id, item)
+    if assignee_user_id not in allowed:
+        return "Assignee must be a meeting attendee or someone assigned to this task"
+    return None
+
+
+def subtask_to_dict(st: MeetingActionSubtask) -> dict:
+    assignee = getattr(st, "assignee", None)
+    aname = user_display_name(assignee) if assignee else None
+    return {
+        "id": st.id,
+        "title": st.title,
+        "is_done": bool(st.is_done),
+        "sort_order": st.sort_order,
+        "assignee_user_id": st.assignee_user_id,
+        "assignee_name": aname,
+    }
+
+
+def rollup_parent_status_from_subtasks(item: MeetingActionItem) -> Optional[str]:
+    subtasks = list(item.subtasks or [])
+    if not subtasks:
+        return None
+    done_count = sum(1 for s in subtasks if s.is_done)
+    if done_count == len(subtasks):
+        return "done"
+    if done_count > 0:
+        return "in_progress"
+    return "open"
+
+
+def apply_subtask_parent_rollup(item: MeetingActionItem) -> bool:
+    """Update parent status from sub-task completion. Returns True if status changed."""
+    new_status = rollup_parent_status_from_subtasks(item)
+    if new_status is None or item.status == new_status:
+        return False
+    item.status = new_status
+    item.updated_at = datetime.utcnow()
+    return True
+
+
+def item_to_dict(
+    item: MeetingActionItem,
+    comment_threads: Optional[Sequence[MeetingItemComment]] = None,
+) -> dict:
     fr = item.focus_row
     mn = fr.meeting_note if fr else None
     assignees = item.assignees or []
@@ -211,12 +376,17 @@ def item_to_dict(item: MeetingActionItem) -> dict:
     end_d = item.due_date or item.start_date
     if start_d and end_d and end_d < start_d:
         start_d, end_d = end_d, start_d
+    subtasks = sorted(item.subtasks or [], key=lambda s: (s.sort_order, s.id))
+    subtask_done_count = sum(1 for s in subtasks if s.is_done)
+    subtask_total = len(subtasks)
     progress = 0
-    if item.status == "in_progress":
+    if subtask_total:
+        progress = int(round(100 * subtask_done_count / subtask_total))
+    elif item.status == "in_progress":
         progress = 50
     elif item.status == "done":
         progress = 100
-    return {
+    d = {
         "id": item.id,
         "call_to_action": item.call_to_action,
         "expected_impact": item.expected_impact or "",
@@ -232,12 +402,24 @@ def item_to_dict(item: MeetingActionItem) -> dict:
         "meeting_note_id": mn.id if mn else None,
         "meeting_title": mn.title if mn else "",
         "meeting_date": mn.meeting_date.isoformat() if mn and mn.meeting_date else None,
+        "meeting_attendee_ids": [u.id for u in (mn.attendees or [])] if mn else [],
         "assignee_ids": [u.id for u in assignees],
         "assignee_names": names,
         "gantt_start": start_d.isoformat() if start_d else None,
         "gantt_end": end_d.isoformat() if end_d else None,
         "progress": progress,
+        "subtasks": [subtask_to_dict(s) for s in subtasks],
+        "subtask_done_count": subtask_done_count,
+        "subtask_total": subtask_total,
+        "priority": getattr(item, "priority", None) or "medium",
+        "label_ids": [lb.id for lb in (item.labels or [])],
+        "labels": [label_to_dict(lb) for lb in (item.labels or [])],
+        "source_excerpt": getattr(item, "source_excerpt", None) or "",
+        "ai_extracted": bool(getattr(item, "ai_extracted", False)),
     }
+    if comment_threads is not None:
+        d["comment_threads"] = [comment_to_dict(c) for c in comment_threads]
+    return d
 
 
 def items_to_fc_events(items: Sequence[MeetingActionItem]) -> List[dict]:
@@ -433,9 +615,119 @@ def carry_forward_preview(source_meeting_id: int, target_meeting_id: int) -> dic
 
 
 def overdue_items_count(assignee_user_id: Optional[int] = None) -> int:
-    today = date.today()
     q = action_items_query(
         assignee_user_id=assignee_user_id,
         due_preset="overdue",
     )
     return q.count()
+
+
+def copy_subtasks_to_item(source: MeetingActionItem, target: MeetingActionItem) -> None:
+    for st in sorted(source.subtasks or [], key=lambda s: (s.sort_order, s.id)):
+        db.session.add(
+            MeetingActionSubtask(
+                action_item_id=target.id,
+                title=st.title,
+                is_done=False,
+                sort_order=st.sort_order,
+            )
+        )
+
+
+def hub_user_items_query(user_id: int) -> Any:
+    """Action items assigned to the user on the task or on any sub-task."""
+    return (
+        MeetingActionItem.query.options(
+            joinedload(MeetingActionItem.assignees),
+            joinedload(MeetingActionItem.labels),
+            joinedload(MeetingActionItem.subtasks).joinedload(MeetingActionSubtask.assignee),
+            joinedload(MeetingActionItem.focus_row)
+            .joinedload(MeetingFocusRow.meeting_note)
+            .joinedload(MeetingNote.attendees),
+        )
+        .join(MeetingFocusRow, MeetingActionItem.focus_row_id == MeetingFocusRow.id)
+        .join(MeetingNote, MeetingFocusRow.meeting_note_id == MeetingNote.id)
+        .filter(
+            or_(
+                MeetingActionItem.assignees.any(User.id == user_id),
+                MeetingActionItem.subtasks.any(MeetingActionSubtask.assignee_user_id == user_id),
+            )
+        )
+    )
+
+
+def hub_my_tasks_buckets(user_id: int) -> dict:
+    """Bucket hub tasks: overdue, due this week, in progress."""
+    today = date.today()
+    week_start, week_end, _ = due_range_for_preset("this_week", None, None)
+    items = hub_user_items_query(user_id).order_by(
+        MeetingNote.meeting_date.desc(),
+        MeetingFocusRow.sort_order,
+        MeetingActionItem.sort_order,
+    ).all()
+
+    overdue: List[dict] = []
+    due_week: List[dict] = []
+    in_progress: List[dict] = []
+    seen: set = set()
+
+    for it in items:
+        if it.id in seen:
+            continue
+        seen.add(it.id)
+        d = item_to_dict(it)
+        st = (it.status or "open").lower()
+        if st == "done":
+            continue
+        due = it.due_date
+        in_overdue = False
+        in_week = False
+        if due and due < today:
+            overdue.append(d)
+            in_overdue = True
+        if due and week_start and week_end and week_start <= due <= week_end:
+            due_week.append(d)
+            in_week = True
+        # In-progress status, or open tasks not already shown by date buckets
+        if st == "in_progress" or (st == "open" and not in_overdue and not in_week):
+            in_progress.append(d)
+
+    return {
+        "overdue": overdue,
+        "due_this_week": due_week,
+        "in_progress": in_progress,
+    }
+
+
+def hub_analytics_summary() -> dict:
+    """Completion and overdue stats for hub analytics strip."""
+    today = date.today()
+    total = MeetingActionItem.query.count()
+    done = MeetingActionItem.query.filter_by(status="done").count()
+    overdue = MeetingActionItem.query.filter(
+        MeetingActionItem.due_date.isnot(None),
+        MeetingActionItem.due_date < today,
+        MeetingActionItem.status.in_(("open", "in_progress")),
+    ).count()
+    by_platform = (
+        db.session.query(MeetingFocusRow.platform, MeetingActionItem.status, func.count(MeetingActionItem.id))
+        .join(MeetingActionItem, MeetingActionItem.focus_row_id == MeetingFocusRow.id)
+        .group_by(MeetingFocusRow.platform, MeetingActionItem.status)
+        .all()
+    )
+    platform_stats: Dict[str, dict] = {}
+    for plat, status, cnt in by_platform:
+        if not plat:
+            continue
+        if plat not in platform_stats:
+            platform_stats[plat] = {"open": 0, "in_progress": 0, "done": 0, "total": 0}
+        platform_stats[plat][status] = cnt
+        platform_stats[plat]["total"] += cnt
+    completion_rate = int(round(100 * done / total)) if total else 0
+    return {
+        "total_items": total,
+        "done_items": done,
+        "overdue_items": overdue,
+        "completion_rate": completion_rate,
+        "by_platform": platform_stats,
+    }

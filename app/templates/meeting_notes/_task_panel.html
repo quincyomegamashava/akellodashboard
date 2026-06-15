@@ -1,0 +1,62 @@
+<div class="mn-task-panel-backdrop" id="mn-task-panel-backdrop" aria-hidden="true"></div>
+<aside class="mn-task-panel" id="mn-task-panel" aria-hidden="true">
+  <div class="mn-task-panel-handle d-lg-none" aria-hidden="true"></div>
+  <div class="mn-task-panel-header">
+    <div>
+      <h2 class="h6 mb-1" id="mn-panel-title">Action item</h2>
+      <p class="small text-muted mb-0" id="mn-panel-subtitle"></p>
+    </div>
+    <button type="button" class="btn-close" id="mn-panel-close" aria-label="Close"></button>
+  </div>
+  <div class="mn-task-panel-body">
+    <div id="mn-panel-readonly-body" class="d-none"></div>
+    <div id="mn-panel-editable-body">
+      <label class="mn-filter-label">Platform</label>
+      <input type="text" class="form-control form-control-sm mb-2 mn-panel-field" id="mn-panel-platform" />
+      <label class="mn-filter-label">Focus area</label>
+      <textarea class="form-control form-control-sm mb-2 mn-cell-bullets mn-panel-field" id="mn-panel-focus" rows="2"></textarea>
+      <label class="mn-filter-label">Task title</label>
+      <input type="text" class="form-control form-control-sm mb-2 mn-panel-field" id="mn-panel-task-title" />
+      <label class="mn-filter-label">Sub-tasks</label>
+      <div class="mn-subtask-list mb-2" id="mn-panel-subtasks"></div>
+      <div class="input-group input-group-sm mb-2">
+        <input type="text" class="form-control form-control-sm" id="mn-panel-subtask-input" placeholder="Add a sub-task…" />
+        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-panel-subtask-add">Add</button>
+      </div>
+      <label class="mn-filter-label">Expected impact</label>
+      <textarea class="form-control form-control-sm mb-2 mn-cell-bullets mn-panel-field" id="mn-panel-impact" rows="2"></textarea>
+      <label class="mn-filter-label">Priority</label>
+      <select class="form-select form-select-sm mn-panel-field mb-2" id="mn-panel-priority">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+        <option value="urgent">Urgent</option>
+      </select>
+      <label class="mn-filter-label">Labels</label>
+      <div id="mn-panel-labels" class="mb-2"></div>
+      <div class="row g-2 mb-2">
+        <div class="col-6"><label class="mn-filter-label">Start</label><input type="date" class="form-control form-control-sm mn-panel-field" id="mn-panel-start" /></div>
+        <div class="col-6"><label class="mn-filter-label">Due</label><input type="date" class="form-control form-control-sm mn-panel-field" id="mn-panel-due" /></div>
+      </div>
+      <label class="mn-filter-label">Led by</label>
+      <div id="mn-panel-assignees" class="mb-2"></div>
+      <label class="mn-filter-label">Status</label>
+      <select class="form-select form-select-sm mn-panel-field" id="mn-panel-status">
+        <option value="open">Open</option>
+        <option value="in_progress">In progress</option>
+        <option value="done">Done</option>
+      </select>
+      <textarea class="d-none mn-panel-field" id="mn-panel-cta"></textarea>
+      <textarea class="d-none mn-panel-field" id="mn-panel-challenges"></textarea>
+      <textarea class="d-none mn-panel-field" id="mn-panel-comments"></textarea>
+    </div>
+  </div>
+  <div class="mn-task-panel-footer">
+    <span class="mn-panel-save-hint" id="mn-panel-save-hint"></span>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm mn-btn-ghost d-none" id="mn-panel-open-meeting" href="#">Open meeting</a>
+      <button type="button" class="btn btn-sm mn-btn-ghost text-danger" id="mn-panel-delete">Delete</button>
+      <button type="button" class="btn btn-sm mn-btn-primary" id="mn-panel-save">Save</button>
+    </div>
+  </div>
+</aside>

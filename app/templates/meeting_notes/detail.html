@@ -12,33 +12,53 @@
   {% for p in platforms %}<option value="{{ p|e }}">{% endfor %}
 </datalist>
 
+<div class="mn-app-shell">
 <div class="mn-page mn-detail-layout" id="mn-page-detail">
-  <header class="mn-hero">
+  <header class="mn-subheader">
     <nav class="mn-breadcrumb">
       <a href="{{ url_for('meeting_notes.index') }}">Meeting notes</a>
       <span class="text-muted"> / </span>
       <span class="text-muted">{{ meeting.meeting_date.strftime('%Y-%m-%d') }}</span>
-      <span class="text-muted"> · </span>
-      <a href="{{ url_for('meeting_notes.all_items') }}">All action items</a>
     </nav>
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
       <div>
-        <h1 class="mn-hero-title">{{ meeting.title }}</h1>
-        <p class="mn-hero-sub">Track action items, assign owners, and export minutes.</p>
+        <h1 class="mn-hero-title mb-0">{{ meeting.title }}</h1>
+        <p class="mn-hero-sub d-none d-md-block">Track action items, assign owners, and export minutes.</p>
       </div>
-      <div class="d-flex flex-wrap gap-2 align-items-center">
-        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-save-meta">Save meeting</button>
-        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-carry-forward" {% if not carry_forward_sources %}disabled title="No other meetings yet"{% endif %} data-bs-toggle="modal" data-bs-target="#mnCarryForwardModal">Carry forward open items</button>
-        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-duplicate-meeting">Duplicate meeting</button>
-        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-export-pdf">
-          <i class="fas fa-file-pdf me-1"></i> Export PDF
-        </button>
+      <div class="mn-subheader-actions">
+        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-save-meta">Save</button>
+        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-ai-extract" title="AI extract tasks"><i class="fas fa-wand-magic-sparkles me-1"></i><span class="d-none d-sm-inline"> Extract</span></button>
+        <button type="button" class="btn btn-sm mn-btn-ghost d-none d-md-inline-flex" data-bs-toggle="modal" data-bs-target="#mn-command-palette"><i class="fas fa-search me-1"></i> Search</button>
+        <div class="mn-overflow-wrap d-lg-none">
+          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-overflow-toggle" aria-label="More actions"><i class="fas fa-ellipsis"></i></button>
+          <div class="mn-overflow-menu" id="mn-overflow-menu">
+            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#mn-command-palette">Search</button>
+            <button type="button" class="dropdown-item" id="mn-btn-carry-forward-overflow" {% if not carry_forward_sources %}disabled{% endif %} data-bs-toggle="modal" data-bs-target="#mnCarryForwardModal">Carry forward</button>
+            <button type="button" class="dropdown-item" id="mn-btn-duplicate-meeting-overflow">Duplicate meeting</button>
+            <button type="button" class="dropdown-item" id="mn-btn-export-pdf-overflow">Export PDF</button>
+            <button type="button" class="dropdown-item" id="mn-btn-ai-summarize-overflow" style="display:none;">Summarize</button>
+          </div>
+        </div>
+        <div class="d-none d-lg-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-ai-summarize" style="display:none;">Summarize</button>
+          <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-toggle="modal" data-bs-target="#mn-command-palette"><i class="fas fa-search"></i></button>
+          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-carry-forward" {% if not carry_forward_sources %}disabled title="No other meetings yet"{% endif %} data-bs-toggle="modal" data-bs-target="#mnCarryForwardModal">Carry forward</button>
+          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-duplicate-meeting">Duplicate</button>
+          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-export-pdf"><i class="fas fa-file-pdf me-1"></i> PDF</button>
+        </div>
       </div>
+    </div>
+    {% set mn_active = 'detail' %}
+    {% include "meeting_notes/_subnav.html" %}
+    <div class="mn-detail-tabs d-md-none" id="mn-detail-tabs" role="tablist">
+      <button type="button" class="mn-detail-tab active" data-mn-detail-tab="tasks">Tasks</button>
+      <button type="button" class="mn-detail-tab" data-mn-detail-tab="notes">Notes</button>
+      <button type="button" class="mn-detail-tab" data-mn-detail-tab="filters">Filters</button>
     </div>
   </header>
 
-  <div class="row g-3">
-    <div class="col-lg-3">
+  <div class="mn-detail-grid">
+    <div class="mn-detail-notes d-none d-md-block" id="mn-detail-pane-notes">
       <div class="mn-card mn-meta-card">
         <div class="mn-card-header d-flex justify-content-between align-items-center py-2">
           <span>Meeting details</span>
@@ -64,57 +84,14 @@
       </div>
     </div>
 
-    <div class="col-lg-9">
+    <div class="mn-detail-main" id="mn-detail-pane-tasks">
       <div class="mn-card mb-3">
         <div class="mn-card-body py-2">
-          <div class="row g-2 align-items-end flex-wrap">
-            <div class="col-6 col-md-2">
-              <label class="mn-filter-label">Platform</label>
-              <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-platform">
-                <option value="">All</option>
-                {% for p in platforms %}<option value="{{ p|e }}">{{ p }}</option>{% endfor %}
-              </select>
-            </div>
-            <div class="col-6 col-md-2">
-              <label class="mn-filter-label">Assignee</label>
-              <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-assignee">
-                <option value="">Any</option>
-                {% for u in user_opts %}<option value="{{ u.id }}">{{ u.label }}</option>{% endfor %}
-              </select>
-            </div>
-            <div class="col-6 col-md-2">
-              <label class="mn-filter-label">Status</label>
-              <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-status">
-                <option value="all">All</option>
-                <option value="open">Open</option>
-                <option value="in_progress">In progress</option>
-                <option value="done">Done</option>
-              </select>
-            </div>
-            <div class="col-6 col-md-2">
-              <label class="mn-filter-label">Due</label>
-              <select class="form-select form-select-sm mn-filter-ctrl" id="mn-filter-due">
-                <option value="">Any</option>
-                <option value="overdue">Overdue</option>
-                <option value="this_week">This week</option>
-                <option value="this_month">This month</option>
-                <option value="next_month">Next month</option>
-                <option value="none">No due date</option>
-                <option value="custom">Custom range</option>
-              </select>
-            </div>
-            <div class="col-6 col-md-2 mn-due-custom d-none">
-              <label class="mn-filter-label">From</label>
-              <input type="date" class="form-control form-control-sm mn-filter-ctrl" id="mn-due-start" />
-            </div>
-            <div class="col-6 col-md-2 mn-due-custom d-none">
-              <label class="mn-filter-label">To</label>
-              <input type="date" class="form-control form-control-sm mn-filter-ctrl" id="mn-due-end" />
-            </div>
-          </div>
+          {% include "meeting_notes/_filter_offcanvas.html" %}
           <div class="mn-toolbar mt-2">
             <div class="mn-view-pills" role="group">
-              <button type="button" class="btn active" data-mn-view-btn="table">Table</button>
+              <button type="button" class="btn active" data-mn-view-btn="board">Board</button>
+              <button type="button" class="btn" data-mn-view-btn="table">Table</button>
               <button type="button" class="btn" data-mn-view-btn="calendar">Calendar</button>
               <button type="button" class="btn" data-mn-view-btn="gantt">Gantt</button>
             </div>
@@ -122,17 +99,53 @@
               <button type="button" class="btn" data-mn-col-preset="minutes">Minutes</button>
               <button type="button" class="btn active" data-mn-col-preset="full">Full</button>
             </div>
+            <div class="mn-view-pills ms-2 mn-board-group-pills" id="mn-board-group-toggle" role="group">
+              <button type="button" class="btn active" data-mn-board-group="status">By status</button>
+              <button type="button" class="btn" data-mn-board-group="platform">By platform</button>
+              <button type="button" class="btn" data-mn-board-group="priority">By priority</button>
+            </div>
+          </div>
+          <div class="mn-quick-capture mt-2" id="mn-quick-capture">
+            <input type="text" id="mn-quick-capture-input" placeholder="Quick capture: Fix API @Jane due 2026-06-15 #Platform !high" />
+            <button type="button" class="btn btn-sm mn-btn-primary" id="mn-quick-capture-go">Add task</button>
           </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <div class="row g-3">
-    <div class="col-12 mn-detail-table-col">
-      <div id="mn-view-table" class="mn-view mn-card">
+      <div id="mn-mobile-table-hint" class="mn-mobile-table-hint d-none">
+        Wide table view works best on desktop. Switch to <strong>Board</strong> for mobile editing.
+      </div>
+
+      <div class="mn-detail-table-col">
+      <div id="mn-view-board" class="mn-view mn-card">
+        <div class="mn-board" id="mn-board">
+          <div class="mn-board-column" data-status="open">
+            <div class="mn-board-column-header">
+              <span>Not started</span>
+              <span class="mn-board-count" data-board-count="open">0</span>
+            </div>
+            <div class="mn-board-column-body" data-board-drop="open"></div>
+          </div>
+          <div class="mn-board-column" data-status="in_progress">
+            <div class="mn-board-column-header">
+              <span>In progress</span>
+              <span class="mn-board-count" data-board-count="in_progress">0</span>
+            </div>
+            <div class="mn-board-column-body" data-board-drop="in_progress"></div>
+          </div>
+          <div class="mn-board-column" data-status="done">
+            <div class="mn-board-column-header">
+              <span>Completed</span>
+              <span class="mn-board-count" data-board-count="done">0</span>
+            </div>
+            <div class="mn-board-column-body" data-board-drop="done"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="mn-view-table" class="mn-view mn-card d-none">
         <div class="mn-table-hint">
-          One bullet per line in text columns. Focus area is shared per platform/focus group. Scroll horizontally if needed.
+          Enter for new bullets; long text wraps automatically. Focus area is shared per platform/focus group.
         </div>
         <div class="mn-bulk-bar px-3 py-2 border-bottom d-flex flex-wrap gap-2 align-items-center">
           <span class="small text-muted">Bulk:</span>
@@ -210,42 +223,93 @@
           <div id="mn-gantt"></div>
         </div>
       </div>
+      <div id="mn-board-dots" class="mn-board-dots d-md-none d-none" aria-hidden="true"></div>
 
-      {% if can_view_activity %}
-      <div class="mn-card mt-3">
-        <div class="mn-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <span>Activity log</span>
-          <div class="d-flex gap-2 align-items-center">
-            <select class="form-select form-select-sm" id="mn-activity-filter" style="width:auto;">
-              <option value="all">All actions</option>
-              <option value="create">Created</option>
-              <option value="update">Updated</option>
-              <option value="delete">Deleted</option>
-            </select>
-            <button class="btn btn-sm mn-btn-ghost" type="button" data-bs-toggle="collapse" data-bs-target="#mnActivityCollapse">Toggle</button>
-          </div>
-        </div>
-        <div class="collapse show" id="mnActivityCollapse">
-          <div class="mn-card-body small" id="mn-activity-body">
-            {% if activity_rows %}
-            <ul class="list-unstyled small mb-0" id="mn-activity-list">
-              {% for r in activity_rows %}
-              <li class="mb-1">
-                <span class="text-muted">{{ r.occurred_at[:16].replace('T', ' ') if r.occurred_at else '' }}</span>
-                — {{ r.actor }} — <strong>{{ r.action }}</strong> {{ r.summary }}
-              </li>
-              {% endfor %}
-            </ul>
-            {% else %}
-            <p class="text-muted mb-0">No activity yet.</p>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-      {% endif %}
     </div>
+    </div>
+
+    {% include "meeting_notes/_activity_log.html" %}
+
+    <div id="mn-detail-pane-filters" class="d-none" aria-hidden="true"></div>
   </div>
 </div>
+</div>
+
+{% include "meeting_notes/_app_shell.html" %}
+
+<div class="mn-task-panel-backdrop" id="mn-task-panel-backdrop" aria-hidden="true"></div>
+<aside class="mn-task-panel" id="mn-task-panel" aria-hidden="true">
+  <div class="mn-task-panel-handle d-lg-none" aria-hidden="true"></div>
+  <div class="mn-task-panel-header">
+    <div>
+      <h2 class="h6 mb-1" id="mn-panel-title">Action item</h2>
+      <p class="small text-muted mb-0" id="mn-panel-subtitle"></p>
+    </div>
+    <button type="button" class="btn-close" id="mn-panel-close" aria-label="Close"></button>
+  </div>
+  <div class="mn-task-panel-body">
+    <label class="mn-filter-label">Platform</label>
+    <input type="text" class="form-control form-control-sm mb-2 mn-panel-field" id="mn-panel-platform" list="mn-platform-datalist" />
+    <label class="mn-filter-label">Focus area</label>
+    <textarea class="form-control form-control-sm mb-2 mn-cell-bullets mn-panel-field" id="mn-panel-focus" rows="3"></textarea>
+    <label class="mn-filter-label">Task title</label>
+    <input type="text" class="form-control form-control-sm mb-2 mn-panel-field" id="mn-panel-task-title" placeholder="Main action item title" />
+    <label class="mn-filter-label">Sub-tasks</label>
+    <div class="mn-subtask-list mb-2" id="mn-panel-subtasks"></div>
+    <div class="mn-subtask-add d-flex gap-2 mb-2">
+      <input type="text" class="form-control form-control-sm" id="mn-panel-subtask-input" placeholder="Add a sub-task…" />
+      <button type="button" class="btn btn-sm mn-btn-primary" id="mn-panel-subtask-add">Add</button>
+    </div>
+    <label class="mn-filter-label d-none" id="mn-panel-cta-label">Call to action (legacy)</label>
+    <textarea class="form-control form-control-sm mb-2 mn-cell-bullets mn-panel-field d-none" id="mn-panel-cta" rows="2"></textarea>
+    <label class="mn-filter-label">Expected impact</label>
+    <textarea class="form-control form-control-sm mb-2 mn-cell-bullets mn-panel-field" id="mn-panel-impact" rows="3"></textarea>
+    <label class="mn-filter-label">Challenges</label>
+    <textarea class="form-control form-control-sm mb-2 mn-cell-bullets mn-panel-field" id="mn-panel-challenges" rows="3"></textarea>
+    <label class="mn-filter-label">Comments</label>
+    <textarea class="form-control form-control-sm mb-2 mn-cell-bullets mn-panel-field" id="mn-panel-comments" rows="3"></textarea>
+    <div class="row g-2 mb-2">
+      <div class="col-6">
+        <label class="mn-filter-label">Start</label>
+        <input type="date" class="form-control form-control-sm mn-panel-field" id="mn-panel-start" />
+      </div>
+      <div class="col-6">
+        <label class="mn-filter-label">Due</label>
+        <input type="date" class="form-control form-control-sm mn-panel-field" id="mn-panel-due" />
+      </div>
+    </div>
+    <label class="mn-filter-label">Led by</label>
+    <div id="mn-panel-assignees" class="mb-2"></div>
+    <label class="mn-filter-label">Labels</label>
+    <div id="mn-panel-labels" class="mb-2"></div>
+    <label class="mn-filter-label">Priority</label>
+    <select class="form-select form-select-sm mn-panel-field mb-2" id="mn-panel-priority">
+      <option value="low">Low</option>
+      <option value="medium">Medium</option>
+      <option value="high">High</option>
+      <option value="urgent">Urgent</option>
+    </select>
+    <label class="mn-filter-label">Comments thread</label>
+    <div id="mn-panel-comments-thread" class="mb-2 small"></div>
+    <div class="d-flex gap-2 mb-2">
+      <input type="text" class="form-control form-control-sm" id="mn-panel-comment-input" placeholder="Add comment (@name to mention)" />
+      <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-panel-comment-add">Post</button>
+    </div>
+    <label class="mn-filter-label">Status</label>
+    <select class="form-select form-select-sm mn-panel-field" id="mn-panel-status">
+      <option value="open">Open</option>
+      <option value="in_progress">In progress</option>
+      <option value="done">Done</option>
+    </select>
+  </div>
+  <div class="mn-task-panel-footer">
+    <span class="mn-panel-save-hint" id="mn-panel-save-hint"></span>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-sm mn-btn-ghost text-danger" id="mn-panel-delete">Delete</button>
+      <button type="button" class="btn btn-sm mn-btn-primary" id="mn-panel-save">Save</button>
+    </div>
+  </div>
+</aside>
 
 <div class="modal fade" id="mnFocusModal" tabindex="-1">
   <div class="modal-dialog">
@@ -303,33 +367,40 @@
   </div>
 </div>
 
-<div class="modal fade" id="mnExportModal" tabindex="-1">
-  <div class="modal-dialog">
+{% include "meeting_notes/_export_modal.html" %}
+<div class="modal fade" id="mnAiExtractModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content" style="border-radius: 16px;">
-      <div class="modal-header"><h5 class="modal-title">Export PDF options</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header">
+        <h5 class="modal-title">Review AI-suggested tasks</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
       <div class="modal-body">
-        <div class="form-check mb-2">
-          <input class="form-check-input" type="checkbox" id="mn-pdf-include-summary" checked />
-          <label class="form-check-label" for="mn-pdf-include-summary">Include meeting summary</label>
-        </div>
-        <div class="form-check mb-2">
-          <input class="form-check-input" type="checkbox" id="mn-pdf-group-platform" checked />
-          <label class="form-check-label" for="mn-pdf-group-platform">Group by platform</label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="mn-pdf-include-done" checked />
-          <label class="form-check-label" for="mn-pdf-include-done">Include completed items</label>
+        <label class="mn-filter-label">Target focus row</label>
+        <select class="form-select form-select-sm mb-3" id="mn-ai-focus-row">
+          {% for r in focus_row_opts %}
+          <option value="{{ r.id }}">{{ r.platform }} — {{ r.focus_area[:60] }}</option>
+          {% endfor %}
+        </select>
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead><tr><th></th><th>Task</th><th>Priority</th><th>Due</th><th>Assignee hint</th></tr></thead>
+            <tbody id="mn-ai-tasks-body"></tbody>
+          </table>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-confirm-export">Export</button>
+        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-ai-summarize-modal">Polish summary</button>
+        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-ai-apply">Apply selected</button>
       </div>
     </div>
   </div>
 </div>
+{% include "meeting_notes/_planner_modals.html" %}
 {% endblock %}
 {% block scripts %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css">
+<script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
 <script>
@@ -345,6 +416,25 @@
   const MN_FOCUS_ROWS = {{ focus_row_opts|tojson }};
   const MN_IS_ADMIN = {{ is_admin|tojson }};
   const MN_CAN_VIEW_ACTIVITY = {{ can_view_activity|tojson }};
+  const MN_PDF_LOGO_URL = {{ url_for('static', filename='smartlearning.webp')|tojson }};
 </script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='js/mn-api.js') }}"></script>
 <script src="{{ url_for('static', filename='js/meeting_notes.js') }}"></script>
+<script src="{{ url_for('static', filename='js/mn-extensions.js') }}"></script>
+<script src="{{ url_for('static', filename='js/mn-mobile.js') }}"></script>
+<script>
+(function () {
+  function wireOverflowClone(srcId, dstId) {
+    var src = document.getElementById(srcId);
+    var dst = document.getElementById(dstId);
+    if (!src || !dst) return;
+    dst.addEventListener("click", function () { if (!dst.disabled) src.click(); });
+  }
+  wireOverflowClone("mn-btn-carry-forward", "mn-btn-carry-forward-overflow");
+  wireOverflowClone("mn-btn-duplicate-meeting", "mn-btn-duplicate-meeting-overflow");
+  wireOverflowClone("mn-btn-export-pdf", "mn-btn-export-pdf-overflow");
+  wireOverflowClone("mn-btn-ai-summarize", "mn-btn-ai-summarize-overflow");
+})();
+</script>
 {% endblock %}

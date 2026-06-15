@@ -1,126 +1,440 @@
 {% extends "base.html" %}
+
 {% block title %}Meeting notes{% endblock %}
+
 {% block head_extra %}
+
 <link rel="stylesheet" href="{{ url_for('static', filename='css/meeting_notes.css') }}">
+
 {% endblock %}
+
 {% block content %}
+
+<div class="mn-app-shell">
+
 <div class="mn-page">
-  <header class="mn-hero d-flex flex-wrap justify-content-between align-items-start gap-3">
-    <div>
-      <h1 class="mn-hero-title">Meeting notes</h1>
-      <p class="mn-hero-sub">Weekly minutes and trackable action items across platforms.</p>
+
+  <header class="mn-subheader">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+
+      <div>
+
+        <h1 class="mn-hero-title mb-0">My work</h1>
+
+        <p class="mn-hero-sub d-none d-md-block">Tasks, meetings, and action items — Planner-style hub.</p>
+
+        <div class="mn-hub-analytics mt-2" id="mn-hub-analytics"></div>
+
+      </div>
+
+      <div class="mn-subheader-actions d-none d-md-flex">
+
+        <button type="button" class="btn btn-sm mn-btn-ghost" title="Command palette (Ctrl+K)" data-bs-toggle="modal" data-bs-target="#mn-command-palette"><i class="fas fa-search me-1"></i> Search</button>
+
+        {% if overdue_count %}
+
+        <a class="btn btn-sm mn-btn-ghost text-danger" href="{{ url_for('meeting_notes.all_items') }}?mine=1&due_preset=overdue">
+
+          {{ overdue_count }} overdue
+
+        </a>
+
+        {% endif %}
+
+      </div>
+
     </div>
-    <div class="d-flex flex-wrap gap-2 align-items-center">
-      {% if overdue_count %}
-      <a class="btn btn-sm mn-btn-ghost text-danger" href="{{ url_for('meeting_notes.all_items') }}?mine=1&due_preset=overdue">
-        {{ overdue_count }} overdue item{{ 's' if overdue_count != 1 else '' }}
-      </a>
-      {% endif %}
-      <a class="btn btn-sm mn-btn-ghost" href="{{ url_for('meeting_notes.all_items') }}?mine=1">My action items</a>
-      <a class="btn btn-sm mn-btn-ghost" href="{{ url_for('meeting_notes.all_items') }}">All action items</a>
-    </div>
+
+    {% set mn_active = 'hub' %}
+
+    {% include "meeting_notes/_subnav.html" %}
+
   </header>
 
-  <div class="mn-card mb-3">
-    <div class="mn-card-header">New meeting</div>
-    <div class="mn-card-body">
-      <form id="formNewMeeting" class="row g-3 align-items-end">
-        <div class="col-md-5">
-          <label class="mn-filter-label">Title</label>
-          <input type="text" class="form-control form-control-sm" name="title" placeholder="e.g. Platform demo — 19 May 2026" />
-        </div>
-        <div class="col-md-3">
-          <label class="mn-filter-label">Meeting date</label>
-          <input type="date" class="form-control form-control-sm" name="meeting_date" required />
-        </div>
-        <div class="col-md-4">
-          <button type="submit" class="btn btn-sm mn-btn-primary w-100">Create &amp; open</button>
-        </div>
-        <div class="col-12">
-          <label class="mn-filter-label">Summary (optional)</label>
-          <textarea class="form-control form-control-sm" name="summary" rows="2" placeholder="Discussion notes — tasks go in action items"></textarea>
-        </div>
-      </form>
-      <div id="newMeetingErr" class="text-danger small mt-2 d-none"></div>
+
+
+  <div class="mn-card mb-3" id="mn-my-tasks-section">
+
+    <div class="mn-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+
+      <span>My tasks</span>
+
+      <div class="mn-my-tasks-summary" id="mn-my-tasks-summary"></div>
+
     </div>
+
+    <div class="mn-card-body">
+
+      <div class="mn-my-tasks-grid" id="mn-my-tasks-track">
+
+        <div class="mn-my-tasks-column mn-my-tasks-slide">
+
+          <h3>Overdue</h3>
+
+          <div id="mn-my-tasks-overdue" class="d-flex flex-column gap-2"></div>
+
+        </div>
+
+        <div class="mn-my-tasks-column mn-my-tasks-slide">
+
+          <h3>Due this week</h3>
+
+          <div id="mn-my-tasks-week" class="d-flex flex-column gap-2"></div>
+
+        </div>
+
+        <div class="mn-my-tasks-column mn-my-tasks-slide">
+
+          <h3>Active</h3>
+
+          <div id="mn-my-tasks-progress" class="d-flex flex-column gap-2"></div>
+
+        </div>
+
+      </div>
+
+      <div id="mn-my-tasks-dots" class="mn-my-tasks-dots d-lg-none"></div>
+
+    </div>
+
   </div>
 
-  <div class="mn-card">
-    <div class="mn-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <span>Recent meetings</span>
-      <form method="get" class="d-flex gap-2">
-        <input type="search" name="q" class="form-control form-control-sm" placeholder="Search title…" value="{{ search_q|e }}" style="min-width: 200px;" />
-        <button type="submit" class="btn btn-sm mn-btn-ghost">Search</button>
+
+
+  <div class="mn-card mb-3 mn-new-meeting-desktop">
+
+    <div class="mn-card-header">New meeting</div>
+
+    <div class="mn-card-body">
+
+      <form id="formNewMeeting" class="row g-3 align-items-end">
+
+        <div class="col-md-4">
+
+          <label class="mn-filter-label">Title</label>
+
+          <input type="text" class="form-control form-control-sm" name="title" placeholder="e.g. Platform demo — 19 May 2026" />
+
+        </div>
+
+        <div class="col-md-2">
+
+          <label class="mn-filter-label">Date</label>
+
+          <input type="date" class="form-control form-control-sm" name="meeting_date" required />
+
+        </div>
+
+        <div class="col-md-3">
+
+          <label class="mn-filter-label">From template</label>
+
+          <select class="form-select form-select-sm" id="mn-template-select">
+
+            <option value="">Blank meeting</option>
+
+          </select>
+
+        </div>
+
+        <div class="col-md-3 d-flex gap-2">
+
+          <button type="submit" class="btn btn-sm mn-btn-primary flex-grow-1">Create &amp; open</button>
+
+          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-template-create" title="Create from template">Template</button>
+
+        </div>
+
+        <div class="col-12">
+
+          <label class="mn-filter-label">Summary (optional)</label>
+
+          <textarea class="form-control form-control-sm" name="summary" rows="2" placeholder="Discussion notes"></textarea>
+
+        </div>
+
       </form>
+
+      <div id="newMeetingErr" class="text-danger small mt-2 d-none"></div>
+
     </div>
-    <div class="table-responsive">
-      <table class="table table-hover table-sm mb-0 mn-meetings-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Title</th>
-            <th class="text-center">Open</th>
-            <th class="text-center">In progress</th>
-            <th class="text-center">Done</th>
-            <th>Updated</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for m in meetings %}
-          {% set st = meeting_stats.get(m.id, {}) %}
-          <tr>
-            <td class="text-nowrap">{{ m.meeting_date.strftime('%Y-%m-%d') }}</td>
-            <td>{{ m.title }}</td>
-            <td class="text-center"><span class="mn-stat-open">{{ st.get('open', 0) }}</span></td>
-            <td class="text-center"><span class="mn-stat-progress">{{ st.get('in_progress', 0) }}</span></td>
-            <td class="text-center"><span class="mn-stat-done">{{ st.get('done', 0) }}</span></td>
-            <td class="text-nowrap small text-muted">{{ m.updated_at.strftime('%Y-%m-%d') if m.updated_at else '—' }}</td>
-            <td class="text-end text-nowrap">
-              <a href="{{ url_for('meeting_notes.detail', meeting_id=m.id) }}?view=table" class="btn btn-sm mn-btn-primary">Open</a>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="7" class="text-muted text-center py-4">No meetings yet.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+
   </div>
+
+
+
+  <div class="mn-card" id="mn-meetings-section">
+
+    <div class="mn-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+
+      <span>Recent meetings</span>
+
+      <form method="get" class="d-flex gap-2">
+
+        <input type="search" name="q" class="form-control form-control-sm" placeholder="Search title…" value="{{ search_q|e }}" style="min-width: 200px;" />
+
+        <button type="submit" class="btn btn-sm mn-btn-ghost">Search</button>
+
+      </form>
+
+    </div>
+
+    <div class="mn-card-body">
+
+      <div class="mn-meetings-grid">
+
+        {% for m in meetings %}
+
+        {% set st = meeting_stats.get(m.id, {}) %}
+
+        {% set total = st.get('total', 0) %}
+
+        {% set done = st.get('done', 0) %}
+
+        {% set pct = (100 * done // total) if total else 0 %}
+
+        <article class="mn-meeting-card">
+
+          <svg class="mn-meeting-card-ring" viewBox="0 0 40 40" aria-hidden="true">
+
+            <circle cx="20" cy="20" r="16" fill="none" stroke="#e2e8f0" stroke-width="4"></circle>
+
+            <circle cx="20" cy="20" r="16" fill="none" stroke="#00407d" stroke-width="4" stroke-dasharray="{{ pct }} {{ 100 - pct }}" stroke-linecap="round" transform="rotate(-90 20 20)"></circle>
+
+          </svg>
+
+          <div class="small text-muted">{{ m.meeting_date.strftime('%Y-%m-%d') }}</div>
+
+          <h3 class="h6 mb-1">{{ m.title }}</h3>
+
+          <div class="small text-muted">{{ st.get('open', 0) }} open · {{ st.get('in_progress', 0) }} in progress · {{ done }} done</div>
+
+          {% if m.updated_at %}
+
+          <div class="mn-meeting-card-updated mt-1">Updated {{ m.updated_at.strftime('%d %b') }}</div>
+
+          {% endif %}
+
+          <div class="mn-meeting-card-progress"><span style="width: {{ pct }}%;"></span></div>
+
+          <a href="{{ url_for('meeting_notes.detail', meeting_id=m.id) }}?view=board" class="btn btn-sm mn-btn-primary mt-2 w-100">Open</a>
+
+        </article>
+
+        {% else %}
+
+        <p class="text-muted">No meetings yet.</p>
+
+        {% endfor %}
+
+      </div>
+
+    </div>
+
+  </div>
+
 </div>
+
+</div>
+
+
+
+<div class="offcanvas offcanvas-bottom mn-new-meeting-sheet d-lg-none" tabindex="-1" id="mn-new-meeting-sheet" aria-labelledby="mn-new-meeting-sheet-label">
+
+  <div class="offcanvas-header">
+
+    <h5 class="offcanvas-title" id="mn-new-meeting-sheet-label">New meeting</h5>
+
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+
+  </div>
+
+  <div class="offcanvas-body">
+
+    <form id="formNewMeetingMobile" class="row g-3">
+
+      <div class="col-12">
+
+        <label class="mn-filter-label">Title</label>
+
+        <input type="text" class="form-control form-control-sm" name="title" placeholder="Meeting title" />
+
+      </div>
+
+      <div class="col-6">
+
+        <label class="mn-filter-label">Date</label>
+
+        <input type="date" class="form-control form-control-sm" name="meeting_date" required />
+
+      </div>
+
+      <div class="col-6">
+
+        <label class="mn-filter-label">Template</label>
+
+        <select class="form-select form-select-sm" id="mn-template-select-mobile">
+
+          <option value="">Blank</option>
+
+        </select>
+
+      </div>
+
+      <div class="col-12">
+
+        <label class="mn-filter-label">Summary (optional)</label>
+
+        <textarea class="form-control form-control-sm" name="summary" rows="2"></textarea>
+
+      </div>
+
+      <div class="col-12">
+
+        <button type="submit" class="btn btn-sm mn-btn-primary w-100">Create &amp; open</button>
+
+      </div>
+
+    </form>
+
+    <div id="newMeetingErrMobile" class="text-danger small mt-2 d-none"></div>
+
+  </div>
+
+</div>
+
+
+
+{% include "meeting_notes/_app_shell.html" %}
+
+{% include "meeting_notes/_task_panel.html" %}
+
+{% include "meeting_notes/_planner_modals.html" %}
+
 {% endblock %}
+
 {% block scripts %}
+
 <script>
-(function(){
-  const form = document.getElementById('formNewMeeting');
-  const err = document.getElementById('newMeetingErr');
-  if (form) {
-    const d = form.querySelector('[name="meeting_date"]');
-    if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);
-    form.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      err.classList.add('d-none');
-      const fd = new FormData(form);
-      const payload = {
-        title: (fd.get('title') || '').trim(),
-        meeting_date: fd.get('meeting_date'),
-        summary: (fd.get('summary') || '').trim() || null
-      };
-      try {
-        const res = await fetch('{{ url_for("meeting_notes.api_create_meeting") }}', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Create failed');
-        window.location.href = '/meeting-notes/' + data.id + '?view=table';
-      } catch (x) {
-        err.textContent = x.message || String(x);
-        err.classList.remove('d-none');
-      }
-    });
-  }
-})();
+
+  const MN_HUB_MODE = true;
+
+  const MN_HUB_EDIT = true;
+
+  const MN_CURRENT_USER_ID = {{ current_user_id|tojson }};
+
+  const MN_USER_OPTS = {{ user_opts|tojson }};
+
+  const MN_IS_ADMIN = {{ is_admin|tojson }};
+
 </script>
+
+<script src="{{ url_for('static', filename='js/mn-api.js') }}"></script>
+
+<script src="{{ url_for('static', filename='js/meeting_notes.js') }}"></script>
+
+<script src="{{ url_for('static', filename='js/mn-hub.js') }}"></script>
+
+<script src="{{ url_for('static', filename='js/mn-extensions.js') }}"></script>
+
+<script src="{{ url_for('static', filename='js/mn-mobile.js') }}"></script>
+
+<script>
+
+(function(){
+
+  async function submitNewMeeting(form, errEl) {
+
+    errEl.classList.add('d-none');
+
+    const fd = new FormData(form);
+
+    const payload = {
+
+      title: (fd.get('title') || '').trim(),
+
+      meeting_date: fd.get('meeting_date'),
+
+      summary: (fd.get('summary') || '').trim() || null
+
+    };
+
+    try {
+
+      const res = await fetch('{{ url_for("meeting_notes.api_create_meeting") }}', {
+
+        method: 'POST',
+
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+
+        body: JSON.stringify(payload)
+
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) throw new Error(data.error || 'Create failed');
+
+      window.location.href = '/meeting-notes/' + data.id + '?view=board';
+
+    } catch (x) {
+
+      errEl.textContent = x.message || String(x);
+
+      errEl.classList.remove('d-none');
+
+    }
+
+  }
+
+
+
+  const form = document.getElementById('formNewMeeting');
+
+  const err = document.getElementById('newMeetingErr');
+
+  if (form) {
+
+    const d = form.querySelector('[name="meeting_date"]');
+
+    if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);
+
+    form.addEventListener('submit', function(e) {
+
+      e.preventDefault();
+
+      submitNewMeeting(form, err);
+
+    });
+
+  }
+
+
+
+  const formM = document.getElementById('formNewMeetingMobile');
+
+  const errM = document.getElementById('newMeetingErrMobile');
+
+  if (formM) {
+
+    const d = formM.querySelector('[name="meeting_date"]');
+
+    if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);
+
+    formM.addEventListener('submit', function(e) {
+
+      e.preventDefault();
+
+      submitNewMeeting(formM, errM);
+
+    });
+
+  }
+
+})();
+
+</script>
+
 {% endblock %}
+

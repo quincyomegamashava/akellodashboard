@@ -83,3 +83,4 @@ fi
 
 echo "=== Redeployment Complete ==="
 echo "Your app is running on port 5000 with your existing database"
+echo "If schema changed in this deploy, apply migrations at /administration (System State card)."
