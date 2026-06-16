@@ -41,12 +41,12 @@ class Config:
     LEARN_S3_BUCKET = os.environ.get('LEARN_S3_BUCKET') or os.environ.get('AWS_S3_BUCKET')
 
     # Email settings (SMTP)
-    MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+    MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.office365.com')
     MAIL_PORT = int(os.environ.get('MAIL_PORT', '587'))
     MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'true').lower() in ('true', '1', 't', 'yes', 'y')
-    MAIL_USERNAME = os.environ.get('MAIL_USERNAME')  # e.g. your Gmail address
-    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')  # e.g. Gmail App Password
-    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', os.environ.get('MAIL_USERNAME'))
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME') or os.environ.get('HELPDESK_EMAIL') or os.environ.get('HELP_DESK_EMAIL') or 'quincy.mashava@akello.co'
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD') or os.environ.get('HELPDESK_APP_PASSWORD') or os.environ.get('HELP_DESK_EMAIL_APP_PASSWORD')
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', MAIL_USERNAME or 'quincy.mashava@akello.co')
     MAIL_SUPPRESS_SEND = os.environ.get('MAIL_SUPPRESS_SEND', 'false').lower() in ('true', '1', 't', 'yes', 'y')
 
     # Token salt for password reset

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ title }}{% endblock %}
 {% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
 {% endblock %}
 {% block content %}
@@ -13,6 +14,16 @@
     <h2 class="h6 mb-3">Compose campaign</h2>
     <p class="small text-muted">Send to stakeholders from the <a href="/sales-marketing/">Stakeholders</a> list, or enter recipient emails manually below.</p>
     <div class="row g-2 mb-2">
+      <div class="col-md-4">
+        <label class="form-label">Template</label>
+        <select class="form-select form-select-sm" id="sm-campaign-template"><option value="">— Choose template —</option></select>
+      </div>
+      <div class="col-md-8 d-flex align-items-end flex-wrap gap-1">
+        <span class="badge bg-light text-dark sm-token-chip" style="cursor:pointer;">{{first_name}}</span>
+        <span class="badge bg-light text-dark sm-token-chip" style="cursor:pointer;">{{event_name}}</span>
+        <span class="badge bg-light text-dark sm-token-chip" style="cursor:pointer;">{{interest}}</span>
+        <span class="badge bg-light text-dark sm-token-chip" style="cursor:pointer;">{{province}}</span>
+      </div>
       <div class="col-12">
         <label class="form-label">Subject</label>
         <input type="text" class="form-control form-control-sm" id="sm-campaign-subject" />
@@ -53,4 +64,5 @@
 <script>window.SM_PAGE = "campaigns";</script>
 <script src="{{ url_for('static', filename='js/sales_marketing.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sm_extensions.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sm_roadmap.js') }}"></script>
 {% endblock %}

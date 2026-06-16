@@ -41,12 +41,11 @@
     if (!tabs) return;
     const panes = {
       tasks: $("#mn-detail-pane-tasks"),
-      notes: $("#mn-detail-pane-notes"),
       filters: $("#mn-detail-pane-filters"),
     };
     const KEY = "mn-detail-tab";
     let active = sessionStorage.getItem(KEY) || "tasks";
-    if (active !== "tasks" && active !== "notes" && active !== "filters") active = "tasks";
+    if (active !== "tasks" && active !== "filters") active = "tasks";
 
     function showTab(name) {
       active = name;

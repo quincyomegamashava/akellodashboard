@@ -34,9 +34,11 @@
     aiApply: function (mid) { return "/meeting-notes/api/meetings/" + mid + "/ai/apply-tasks"; },
     aiSummarize: function (mid) { return "/meeting-notes/api/meetings/" + mid + "/ai/summarize"; },
     transcript: function (mid) { return "/meeting-notes/api/meetings/" + mid + "/transcript"; },
+    emailReport: function (mid) { return "/meeting-notes/api/meetings/" + mid + "/email-report"; },
     templates: "/meeting-notes/api/templates",
     templateCreateMeeting: function (id) { return "/meeting-notes/api/templates/" + id + "/create-meeting"; },
     itemComments: function (id) { return "/meeting-notes/api/action-items/" + id + "/comments"; },
+    pdfLogo: function (url) { return "/meeting-notes/api/pdf-logo?url=" + encodeURIComponent(url || ""); },
   };
   window.MN_API = API;
 
@@ -108,6 +110,12 @@
   }
 
   const currentUserId = resolveCurrentUserId();
+  const TASK_PALETTES = {
+    urgent: { border: "#dc2626", chipBg: "#fef2f2", chipText: "#b91c1c", rowBg: "#fff5f5" },
+    high: { border: "#ea580c", chipBg: "#fff7ed", chipText: "#c2410c", rowBg: "#fffaf5" },
+    medium: { border: "#0ea5e9", chipBg: "#eff6ff", chipText: "#0369a1", rowBg: "#f8fcff" },
+    low: { border: "#94a3b8", chipBg: "#f8fafc", chipText: "#475569", rowBg: "#f8fafc" },
+  };
   let boardGroupMode = "status";
   let labelsCache = [];
 
@@ -180,62 +188,76 @@
 
   function loadPdfLogoDataUrl(url) {
     if (!url) return Promise.resolve(null);
-    return fetch(url).then(function (res) {
-      if (!res.ok) throw new Error("logo fetch failed");
-      return res.blob();
-    }).then(function (blob) {
-      return new Promise(function (resolve, reject) {
-        const reader = new FileReader();
-        reader.onloadend = function () { resolve(reader.result); };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    }).then(function (dataUrl) {
-      if (!dataUrl || dataUrl.indexOf("image/webp") === -1) return dataUrl;
-      return new Promise(function (resolve) {
-        const img = new Image();
-        img.onload = function () {
-          try {
-            const canvas = document.createElement("canvas");
-            canvas.width = img.naturalWidth || img.width;
-            canvas.height = img.naturalHeight || img.height;
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0);
-            resolve(canvas.toDataURL("image/jpeg", 0.92));
-          } catch (e) {
-            resolve(null);
-          }
-        };
-        img.onerror = function () { resolve(null); };
-        img.src = dataUrl;
-      });
-    }).catch(function () { return null; });
+    return fetch(API.pdfLogo(url), {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error("logo proxy fetch failed");
+        return res.json();
+      })
+      .then(function (data) {
+        const dataUrl = data && data.data_url ? data.data_url : null;
+        if (!dataUrl || dataUrl.indexOf("image/webp") === -1) return dataUrl;
+        return new Promise(function (resolve) {
+          const img = new Image();
+          img.onload = function () {
+            try {
+              const canvas = document.createElement("canvas");
+              canvas.width = img.naturalWidth || img.width;
+              canvas.height = img.naturalHeight || img.height;
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(img, 0, 0);
+              resolve(canvas.toDataURL("image/jpeg", 0.92));
+            } catch (e) {
+              resolve(dataUrl);
+            }
+          };
+          img.onerror = function () { resolve(dataUrl); };
+          img.src = dataUrl;
+        });
+      })
+      .catch(function () { return null; });
   }
 
   function drawPdfPageChrome(doc, logoDataUrl, meta) {
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const pageNum = doc.internal.getNumberOfPages();
+    const accent = [56, 189, 248];
+    const primary = [3, 105, 161];
+    const muted = [71, 85, 105];
+
+    doc.setFillColor(248, 253, 255);
+    doc.rect(0, 0, pageW, 56, "F");
+    doc.setDrawColor(accent[0], accent[1], accent[2]);
+    doc.setLineWidth(1.2);
+    doc.line(24, 55, pageW - 24, 55);
+
     if (logoDataUrl) {
       try {
         const fmt = logoDataUrl.indexOf("image/png") !== -1 ? "PNG" : "JPEG";
-        doc.addImage(logoDataUrl, fmt, 28, 14, 28, 28);
+        doc.addImage(logoDataUrl, fmt, 28, 14, 96, 28);
       } catch (e) {
-        doc.setFontSize(11);
-        doc.setTextColor(0, 64, 125);
-        doc.text("Akello", 28, 28);
+        doc.setFontSize(16);
+        doc.setTextColor(primary[0], primary[1], primary[2]);
+        doc.text("Akello", 28, 32);
       }
     } else {
-      doc.setFontSize(11);
-      doc.setTextColor(0, 64, 125);
-      doc.text("Akello", 28, 28);
+      doc.setFontSize(16);
+      doc.setTextColor(primary[0], primary[1], primary[2]);
+      doc.text("Akello", 28, 32);
     }
-    doc.setDrawColor(0, 64, 125);
-    doc.setLineWidth(0.5);
-    doc.line(28, 46, pageW - 28, 46);
+
+    doc.setFontSize(10);
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    doc.text("Meeting Notes Intelligence Report", pageW - 28, 30, { align: "right" });
+
+    doc.setFillColor(246, 251, 255);
+    doc.rect(0, pageH - 24, pageW, 24, "F");
     doc.setFontSize(8);
-    doc.setTextColor(120, 120, 120);
-    const footerY = pageH - 14;
+    doc.setTextColor(muted[0], muted[1], muted[2]);
+    const footerY = pageH - 10;
     doc.text("Page " + pageNum, pageW - 28, footerY, { align: "right" });
     if (meta && meta.title) {
       const snippet = String(meta.title).slice(0, 60);
@@ -412,9 +434,158 @@
       return body;
     }
     colItems.forEach(function (it) {
-      body.appendChild(buildTaskCard(it, { readOnly: readOnly, compact: hubMode }));
+      if (boardGroupMode === "platform") {
+        body.appendChild(buildPlatformAccordionItem(it, status, readOnly));
+      } else {
+        body.appendChild(buildTaskCard(it, { readOnly: readOnly, compact: hubMode }));
+      }
     });
     return body;
+  }
+
+  function buildPlatformAccordionItem(item, status, readOnly) {
+    const wrap = document.createElement("div");
+    wrap.className = "mn-platform-accordion-item";
+    wrap.setAttribute("data-item-id", String(item.id));
+    wrap.setAttribute("data-status", status);
+    wrap.setAttribute("data-priority", (item.priority || "medium").toLowerCase());
+    if (!readOnly && canEditItems()) wrap.setAttribute("draggable", "true");
+    else wrap.setAttribute("draggable", "false");
+
+    const panelId = "mn-plat-acc-body-" + item.id + "-" + status;
+    const titleParts = splitCallToAction(item.call_to_action);
+    const title = firstLineOfBullets(item.focus_area) || titleParts.title || "Action item";
+
+    const header = document.createElement("button");
+    header.type = "button";
+    header.className = "mn-platform-accordion-header";
+    header.setAttribute("aria-expanded", "false");
+    header.setAttribute("aria-controls", panelId);
+    header.innerHTML = '<span class="mn-platform-accordion-title">' + escapeHtml(title) + '</span>' +
+      '<span class="mn-platform-accordion-meta">' + statusBadgeHtml(item.status) + "</span>";
+    wrap.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "mn-platform-accordion-body d-none";
+    body.id = panelId;
+
+    const previewText = titleParts.title && firstLineOfBullets(item.focus_area)
+      ? titleParts.title
+      : (titleParts.extra || titleParts.title || "");
+    if (previewText) {
+      const preview = document.createElement("div");
+      preview.className = "mn-platform-accordion-preview";
+      preview.textContent = previewText;
+      body.appendChild(preview);
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "mn-task-card-meta";
+    if (item.priority && item.priority !== "medium") {
+      const pr = document.createElement("span");
+      pr.className = "mn-task-chip mn-priority-chip mn-priority-" + item.priority;
+      pr.textContent = item.priority;
+      meta.appendChild(pr);
+    }
+    if (item.due_date) {
+      const due = document.createElement("span");
+      due.className = "mn-task-chip" + (isItemOverdue(item) ? " mn-task-chip-overdue" : "");
+      due.textContent = "Due " + dateVal(item.due_date);
+      meta.appendChild(due);
+    }
+    if (item.labels && item.labels.length) {
+      const lblWrap = document.createElement("span");
+      lblWrap.className = "mn-task-labels";
+      lblWrap.innerHTML = labelsHtml(item.labels);
+      meta.appendChild(lblWrap);
+    }
+    body.appendChild(meta);
+
+    const names = item.assignee_names || getAssigneeLabels(item.assignee_ids);
+    if (names.length) {
+      const assignWrap = document.createElement("div");
+      assignWrap.className = "mb-1";
+      assignWrap.innerHTML = assigneeChipsHtml(names);
+      body.appendChild(assignWrap);
+    }
+
+    renderSubtaskProgress(item, body);
+
+    const footer = document.createElement("div");
+    footer.className = "mn-task-card-footer";
+    if (readOnly) {
+      const viewBtn = document.createElement("button");
+      viewBtn.type = "button";
+      viewBtn.className = "btn btn-sm mn-btn-ghost";
+      viewBtn.textContent = "View details";
+      viewBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openTaskPanel(item, true);
+      });
+      footer.appendChild(viewBtn);
+    } else {
+      const statusSel = document.createElement("select");
+      statusSel.className = "form-select form-select-sm mn-card-status";
+      statusSel.style.maxWidth = "8rem";
+      ["open", "in_progress", "done"].forEach(function (s) {
+        const opt = document.createElement("option");
+        opt.value = s;
+        opt.textContent = s === "in_progress" ? "In progress" : s.charAt(0).toUpperCase() + s.slice(1);
+        if ((item.status || "open") === s) opt.selected = true;
+        statusSel.appendChild(opt);
+      });
+      statusSel.addEventListener("change", async function () {
+        const newStatus = statusSel.value;
+        try {
+          const res = await putActionItem(item.id, { status: newStatus, silent: true });
+          if (!res.ok) throw new Error("Status update failed");
+          item.status = newStatus;
+          await refreshItems();
+          loadActivity();
+        } catch (e) {
+          console.error(e);
+          statusSel.value = item.status || "open";
+        }
+      });
+      footer.appendChild(statusSel);
+
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "btn btn-sm mn-btn-ghost";
+      editBtn.textContent = "Expand";
+      editBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openTaskPanel(item, false);
+      });
+      footer.appendChild(editBtn);
+    }
+    body.appendChild(footer);
+    wrap.appendChild(body);
+
+    header.addEventListener("click", function () {
+      const hidden = body.classList.toggle("d-none");
+      header.setAttribute("aria-expanded", hidden ? "false" : "true");
+    });
+
+    if (!readOnly && canEditItems()) {
+      wrap.addEventListener("dragstart", function (e) {
+        dragItemId = item.id;
+        wrap.classList.add("is-dragging");
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", String(item.id));
+        }
+      });
+      wrap.addEventListener("dragend", function () {
+        dragItemId = null;
+        wrap.classList.remove("is-dragging");
+        $all(".mn-board-column.is-drag-over").forEach(function (col) {
+          col.classList.remove("is-drag-over");
+        });
+      });
+    }
+
+    return wrap;
   }
 
   function buildBoardStatusColumns(items, platform, readOnly) {
@@ -554,6 +725,10 @@
     tr.classList.remove("mn-row-open", "mn-row-in_progress", "mn-row-done", "table-warning");
     const st = (status || "open").toLowerCase();
     tr.classList.add("mn-row-" + st);
+    const pr = ((tr.getAttribute("data-priority") || "medium") + "").toLowerCase();
+    const pal = TASK_PALETTES[pr] || TASK_PALETTES.medium;
+    tr.style.setProperty("--mn-row-accent", pal.border);
+    tr.style.setProperty("--mn-row-bg", pal.rowBg);
     const hl = new URLSearchParams(window.location.search).get("highlight");
     const id = tr.getAttribute("data-item-id");
     if (hl && id && String(hl) === String(id)) tr.classList.add("table-warning");
@@ -585,7 +760,8 @@
 
   function priorityBadgeHtml(priority) {
     const pr = (priority || "medium").toLowerCase();
-    return '<span class="mn-priority-badge mn-priority-' + pr + '">' + escapeHtml(pr) + "</span>";
+    const pal = TASK_PALETTES[pr] || TASK_PALETTES.medium;
+    return '<span class="mn-priority-badge mn-priority-' + pr + '" style="background:' + pal.chipBg + ";color:" + pal.chipText + ';border-color:' + pal.border + '">' + escapeHtml(pr) + "</span>";
   }
 
   function labelsHtml(labels) {
@@ -977,6 +1153,7 @@
         if (opts.logText) itemPayload.log_text_edit = true;
         const itemRes = await putActionItem(parseInt(itemId, 10), itemPayload);
         if (!itemRes.ok) throw new Error("Item save failed");
+        tr.setAttribute("data-priority", (p.priority || "medium").toLowerCase());
         applyStatusRowClass(tr, p.status);
         setRowSaveState(tr, "saved");
         if (calendar) calendar.refetchEvents();
@@ -1031,6 +1208,7 @@
       tr.setAttribute("data-item-id", String(item.id));
       tr.setAttribute("data-focus-row-id", String(item.focus_row_id));
       setRowSaveState(tr, "saved");
+      tr.setAttribute("data-priority", (item.priority || "medium").toLowerCase());
       applyStatusRowClass(tr, item.status);
       loadActivity();
       if (calendar) calendar.refetchEvents();
@@ -1073,10 +1251,12 @@
     const tr = document.createElement("tr");
     if (isTemplate) {
       tr.setAttribute("data-template", "1");
+      tr.setAttribute("data-priority", "medium");
       applyStatusRowClass(tr, "open");
     } else {
       tr.setAttribute("data-item-id", String(it.id));
       tr.setAttribute("data-focus-row-id", String(it.focus_row_id));
+      tr.setAttribute("data-priority", (it.priority || "medium").toLowerCase());
       applyStatusRowClass(tr, it.status);
     }
 
@@ -2137,13 +2317,15 @@
         "<td class=\"small\">" + formatBulletsHtml(it.challenges) + "</td>" +
         "<td class=\"small\">" + formatBulletsHtml(it.comments) + "</td>" +
         "<td class=\"small\">" + assigneeChipsHtml(it.assignee_names || getAssigneeLabels(it.assignee_ids)) + "</td>" +
-        "<td class=\"small\">" + statusBadgeHtml(it.status) + (it.priority && it.priority !== "medium" ? " " + priorityBadgeHtml(it.priority) : "") + "</td>" +
+        "<td class=\"small mn-table-priority-cell\">" + statusBadgeHtml(it.status) + " " + priorityBadgeHtml(it.priority || "medium") + "</td>" +
         "<td class=\"text-end text-nowrap\">" +
         (globalEditMode
           ? '<button type="button" class="btn btn-sm mn-btn-primary mn-btn-edit-item" data-item-id="' + it.id + '">Edit</button> '
           : "") +
         '<a class="btn btn-sm mn-btn-ghost" href="/meeting-notes/' + it.meeting_note_id + "?view=board&highlight=" + it.id + '">Open meeting</a></td>';
       tb.appendChild(tr);
+      tr.setAttribute("data-priority", (it.priority || "medium").toLowerCase());
+      applyStatusRowClass(tr, it.status);
       if (globalEditMode) {
         const editBtn = tr.querySelector(".mn-btn-edit-item");
         if (editBtn) {
@@ -2507,65 +2689,129 @@
     return row;
   }
 
-  function buildPdfTableConfig(doc, headers, body, startY, logoDataUrl, pdfOpts, meta) {
+  function buildPdfTableConfig(doc, headers, body, startY, logoDataUrl, pdfOpts, meta, rawItems) {
     return {
       head: headers,
       body: body,
       startY: startY,
-      theme: "grid",
-      styles: { fontSize: 7, cellPadding: 3, overflow: "linebreak" },
-      headStyles: { fillColor: [0, 64, 125], textColor: 255, fontStyle: "bold" },
+      theme: "striped",
+      styles: {
+        fontSize: 7,
+        cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
+        overflow: "linebreak",
+        textColor: [30, 41, 59],
+        lineColor: [226, 232, 240],
+        lineWidth: 0.2,
+      },
+      headStyles: {
+        fillColor: [224, 242, 254],
+        textColor: [3, 105, 161],
+        fontStyle: "bold",
+        lineColor: [125, 211, 252],
+        lineWidth: 0.4,
+      },
+      alternateRowStyles: { fillColor: [248, 252, 255] },
+      tableLineColor: [226, 232, 240],
+      tableLineWidth: 0.2,
+      bodyStyles: { valign: "top" },
       margin: { top: 52, left: 28, right: 28, bottom: 32 },
+      didParseCell: function (data) {
+        if (data.section !== "body") return;
+        const row = rawItems && rawItems[data.row.index];
+        if (!row) return;
+        const pr = ((row.priority || "medium") + "").toLowerCase();
+        const pal = TASK_PALETTES[pr] || TASK_PALETTES.medium;
+        if (data.column.index === 0 || (!meetingNoteId && data.column.index === 1)) {
+          const rgb = hexToRgbArray(pal.rowBg);
+          if (rgb) data.cell.styles.fillColor = rgb;
+        }
+      },
       didDrawPage: function () {
         drawPdfPageChrome(doc, logoDataUrl, meta);
       },
     };
   }
 
+  function hexToRgbArray(hex) {
+    const s = String(hex || "").replace("#", "");
+    if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+    return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)];
+  }
+
   function renderPdfCover(doc, logoDataUrl, pdfOpts, meta) {
     drawPdfPageChrome(doc, logoDataUrl, meta);
-    let y = 56;
+    const accent = [56, 189, 248];
+    const primary = [3, 105, 161];
+    const muted = [71, 85, 105];
+    const pageW = doc.internal.pageSize.getWidth();
+    let y = 84;
     const title = meta.title || "All action items";
     const meetingDate = meta.meetingDate || "";
-    doc.setFontSize(14);
-    doc.setTextColor(0, 64, 125);
-    doc.text(title, 64, y);
-    y += 16;
+    doc.setDrawColor(accent[0], accent[1], accent[2]);
+    doc.setLineWidth(2);
+    doc.line(64, y, 64, y + 54);
+    doc.setFontSize(22);
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    doc.text(title, 76, y + 4);
+    y += 22;
+    doc.setFontSize(10);
+    doc.setTextColor(muted[0], muted[1], muted[2]);
+    doc.text("Strategic Meeting Execution Report", 76, y);
+    y += 18;
+    doc.setFillColor(239, 246, 255);
+    doc.roundedRect(76, y - 10, 220, 18, 6, 6, "F");
+    doc.setTextColor(primary[0], primary[1], primary[2]);
     doc.setFontSize(9);
-    doc.setTextColor(80, 80, 80);
+    doc.text("Generated: " + new Date().toISOString().slice(0, 16).replace("T", " "), 86, y + 2);
+    y += 18;
     if (meetingDate) {
-      doc.text("Meeting date: " + meetingDate, 64, y);
+      doc.setFillColor(224, 242, 254);
+      doc.roundedRect(76, y - 10, 160, 18, 6, 6, "F");
+      doc.setTextColor(12, 74, 110);
+      doc.text("Meeting date: " + meetingDate, 86, y + 2);
       y += 12;
     }
     if (meetingNoteId) {
       const attendeeLine = formatAttendeesPdfLine();
       if (attendeeLine) {
-        const attLines = doc.splitTextToSize(attendeeLine, 700);
-        doc.text(attLines, 64, y);
+        doc.setFontSize(9);
+        doc.setTextColor(muted[0], muted[1], muted[2]);
+        const attLines = doc.splitTextToSize(attendeeLine, pageW - 160);
+        doc.text(attLines, 76, y + 8);
         y += attLines.length * 10 + 2;
       }
       if (pdfOpts.includeSummary && typeof MN_MEETING_SUMMARY === "string" && MN_MEETING_SUMMARY.trim()) {
-        doc.text("Summary:", 64, y);
         y += 10;
-        const sumLines = doc.splitTextToSize(MN_MEETING_SUMMARY.trim(), 700);
-        doc.text(sumLines, 64, y);
-        y += sumLines.length * 10 + 4;
+        doc.setTextColor(primary[0], primary[1], primary[2]);
+        doc.setFontSize(11);
+        doc.text("Summary", 76, y);
+        y += 10;
+        const sumLines = doc.splitTextToSize(MN_MEETING_SUMMARY.trim(), pageW - 160);
+        doc.setFillColor(240, 249, 255);
+        const summaryHeight = Math.max(28, sumLines.length * 10 + 10);
+        doc.roundedRect(76, y - 9, pageW - 152, summaryHeight, 8, 8, "F");
+        doc.setTextColor(muted[0], muted[1], muted[2]);
+        doc.setFontSize(9);
+        doc.text(sumLines, 84, y + 2);
+        y += sumLines.length * 10 + 10;
       }
     }
-    doc.text("Exported: " + new Date().toISOString().slice(0, 16).replace("T", " "), 64, y);
-    y += 12;
     if (meta.hasAiItems) {
       doc.setFontSize(8);
-      doc.text("* AI-suggested task", 64, y);
+      doc.setTextColor(8, 145, 178);
+      doc.text("* Includes AI-suggested tasks", 76, y + 8);
       y += 10;
     }
-    return y + 4;
+    y += 14;
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.6);
+    doc.line(76, y, pageW - 76, y);
+    return y + 10;
   }
 
-  async function exportTablePdf() {
+  async function buildExportPdfDocument() {
     if (!window.jspdf || !window.jspdf.jsPDF) {
-      alert("PDF library not loaded.");
-      return;
+      throw new Error("PDF library not loaded.");
     }
     const pdfOpts = getPdfExportOptions();
     const logoUrl = typeof MN_PDF_LOGO_URL === "string" ? MN_PDF_LOGO_URL : "";
@@ -2579,15 +2825,13 @@
     try {
       items = await fetchItemsForPdf(pdfOpts);
     } catch (e) {
-      alert("Could not load data for export.");
-      return;
+      throw new Error("Could not load data for export.");
     }
     if (!pdfOpts.includeDone) {
       items = items.filter(function (it) { return (it.status || "open") !== "done"; });
     }
     if (!items.length) {
-      alert("No action items to export.");
-      return;
+      throw new Error("No action items to export.");
     }
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
@@ -2612,22 +2856,73 @@
         byPlat[p].push(it);
       });
       Object.keys(byPlat).sort().forEach(function (plat) {
-        doc.setFontSize(10);
-        doc.setTextColor(0, 64, 125);
-        doc.text(plat, 64, y);
-        y += 12;
-        doc.setTextColor(80, 80, 80);
+        doc.setFillColor(224, 242, 254);
+        doc.roundedRect(56, y - 9, 220, 18, 6, 6, "F");
         doc.setFontSize(9);
+        doc.setTextColor(2, 132, 199);
+        doc.text("PLATFORM", 66, y + 2);
+        doc.setTextColor(3, 105, 161);
+        doc.setFontSize(10);
+        doc.text(plat, 126, y + 2);
+        y += 16;
         const body = byPlat[plat].map(rowCells);
-        doc.autoTable(buildPdfTableConfig(doc, headers, body, y, logoDataUrl, pdfOpts, meta));
-        y = doc.lastAutoTable.finalY + 16;
+        doc.autoTable(buildPdfTableConfig(doc, headers, body, y, logoDataUrl, pdfOpts, meta, byPlat[plat]));
+        y = doc.lastAutoTable.finalY + 20;
       });
     } else {
       const body = items.map(rowCells);
-      doc.autoTable(buildPdfTableConfig(doc, headers, body, y, logoDataUrl, pdfOpts, meta));
+      doc.autoTable(buildPdfTableConfig(doc, headers, body, y, logoDataUrl, pdfOpts, meta, items));
     }
     const slug = String(title).replace(/[^\w\-]+/g, "_").slice(0, 40) || "export";
-    doc.save("meeting-notes_" + slug + "_" + new Date().toISOString().slice(0, 10) + ".pdf");
+    const filename = "meeting-notes_" + slug + "_" + new Date().toISOString().slice(0, 10) + ".pdf";
+    return { doc: doc, filename: filename };
+  }
+
+  async function exportTablePdf() {
+    try {
+      const built = await buildExportPdfDocument();
+      built.doc.save(built.filename);
+    } catch (e) {
+      alert((e && e.message) ? e.message : "PDF export failed.");
+    }
+  }
+
+  async function emailMeetingReport() {
+    if (!meetingNoteId) {
+      alert("Open a meeting to email a report.");
+      return;
+    }
+    const recipientsRaw = (document.getElementById("mn-pdf-email-recipients") || {}).value || "";
+    if (!recipientsRaw.trim()) {
+      alert("Enter at least one recipient email.");
+      return;
+    }
+    const subject = ((document.getElementById("mn-pdf-email-subject") || {}).value || "").trim();
+    try {
+      const built = await buildExportPdfDocument();
+      const pdfBase64 = built.doc.output("datauristring").split(",")[1] || "";
+      const res = await fetch(API.emailReport(meetingNoteId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          recipients: recipientsRaw,
+          subject: subject,
+          body_html: "<p>Please find attached the latest meeting report.</p>",
+          body_text: "Please find attached the latest meeting report.",
+          pdf_base64: pdfBase64,
+          pdf_filename: built.filename,
+        }),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) {
+        alert(data.error || "Email send failed.");
+        return;
+      }
+      alert("Meeting report emailed. Sent: " + (data.sent || 0) + ", Failed: " + (data.failed || 0));
+    } catch (e) {
+      alert("Could not send report email.");
+    }
   }
 
   let activityFetchSeq = 0;
@@ -3137,6 +3432,10 @@
           if (modal && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modal).hide();
           exportTablePdf();
         });
+      }
+      const emailExp = $("#mn-btn-email-export");
+      if (emailExp) {
+        emailExp.addEventListener("click", emailMeetingReport);
       }
     }
   }

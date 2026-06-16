@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
+{% endblock %}
+{% block content %}
+<div class="sm-page px-3 py-3">
+  <h1 class="h4 mb-1">{{ title }}</h1>
+  {% include "sales_marketing/_subnav.html" %}
+  <div id="sm-roi-host" class="sm-card p-3">Loading…</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.SM_PAGE = "event_dashboard"; window.SM_EVENT_DASHBOARD_ID = {{ event_id }};</script>
+<script src="{{ url_for('static', filename='js/sales_marketing.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sm_roadmap.js') }}"></script>
+{% endblock %}

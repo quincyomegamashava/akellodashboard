@@ -799,6 +799,12 @@ class Notification(db.Model):
     query_id = db.Column(db.Integer, db.ForeignKey('helpdesk_queries.id'), nullable=True)
     meeting_note_id = db.Column(db.Integer, db.ForeignKey('meeting_notes.id'), nullable=True, index=True)
     action_item_id = db.Column(db.Integer, db.ForeignKey('meeting_notes_action_items.id'), nullable=True, index=True)
+    stakeholder_lead_id = db.Column(
+        db.Integer,
+        db.ForeignKey('sales_marketing_stakeholder_leads.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
     message = db.Column(db.Text, nullable=False)
     notification_type = db.Column(db.String(50), nullable=False)  # assignment, resolution, meeting_*
     read = db.Column(db.Boolean, default=False, nullable=False, index=True)

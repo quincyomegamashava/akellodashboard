@@ -30,9 +30,24 @@
           <input class="form-check-input" type="checkbox" id="mn-pdf-include-discussion" />
           <label class="form-check-label" for="mn-pdf-include-discussion">Include discussion threads</label>
         </div>
+        <hr />
+        <label class="mn-filter-label" for="mn-pdf-email-recipients">Email recipients</label>
+        <input
+          type="text"
+          class="form-control form-control-sm mb-2"
+          id="mn-pdf-email-recipients"
+          placeholder="name@example.com, second@example.com"
+        />
+        <input
+          type="text"
+          class="form-control form-control-sm"
+          id="mn-pdf-email-subject"
+          placeholder="Email subject (optional)"
+        />
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-email-export">Email report</button>
         <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-confirm-export">Export</button>
       </div>
     </div>

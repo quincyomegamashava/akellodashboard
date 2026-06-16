@@ -228,6 +228,8 @@ def action_items_query(
     priority: Optional[str] = None,
     label_id: Optional[int] = None,
     search_q: Optional[str] = None,
+    stakeholder_lead_id: Optional[int] = None,
+    marketing_event_id: Optional[int] = None,
 ) -> Any:
     q = (
         MeetingActionItem.query.options(
@@ -283,6 +285,11 @@ def action_items_query(
                 MeetingFocusRow.platform.ilike(term),
             )
         )
+
+    if stakeholder_lead_id is not None:
+        q = q.filter(MeetingActionItem.stakeholder_lead_id == stakeholder_lead_id)
+    if marketing_event_id is not None:
+        q = q.filter(MeetingActionItem.marketing_event_id == marketing_event_id)
 
     return q
 
@@ -416,6 +423,9 @@ def item_to_dict(
         "labels": [label_to_dict(lb) for lb in (item.labels or [])],
         "source_excerpt": getattr(item, "source_excerpt", None) or "",
         "ai_extracted": bool(getattr(item, "ai_extracted", False)),
+        "carry_forward_count": getattr(item, "carry_forward_count", 0) or 0,
+        "stakeholder_lead_id": getattr(item, "stakeholder_lead_id", None),
+        "marketing_event_id": getattr(item, "marketing_event_id", None),
     }
     if comment_threads is not None:
         d["comment_threads"] = [comment_to_dict(c) for c in comment_threads]

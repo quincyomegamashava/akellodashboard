@@ -9,9 +9,14 @@
 </head>
 <body class="sm-connect-page">
   <div class="sm-connect-hero text-center mb-3">
+    {% if prefill_event %}
+    <p class="h5 mb-1">{{ prefill_event.name }}</p>
+    {% if prefill_event.banner_text %}<p class="small text-muted">{{ prefill_event.banner_text }}</p>{% endif %}
+    {% else %}
     <img src="{{ url_for('static', filename='smartlearning.webp') }}" alt="Akello" class="sm-connect-logo-img mb-2" onerror="this.style.display='none'" />
     <div class="sm-connect-logo">Akello</div>
     <p class="text-muted mb-0">Digital learning for Zimbabwe</p>
+    {% endif %}
   </div>
   <div class="sm-connect-card">
     <p class="mb-4">Share your details and we'll follow up with information tailored to your interest.</p>
@@ -22,7 +27,8 @@
       <p class="small"><a href="https://akello.co" target="_blank" rel="noopener">Visit akello.co</a> · <a href="/connect">Submit another response</a></p>
     </div>
     <form id="sm-public-form" novalidate>
-      <div class="row g-3">
+      <div class="sm-form-steps mb-3 small text-muted" id="sm-step-indicator">Step <span id="sm-step-num">1</span> of 3</div>
+      <div class="row g-3" data-sm-step="1">
         <div class="col-md-6">
           <label class="form-label">Full name *</label>
           <input type="text" class="form-control" name="full_name" required maxlength="255" autocomplete="name" />

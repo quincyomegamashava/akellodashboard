@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
+<style>
+.sm-stand-page { min-height: 100vh; background: #0f172a; color: #e2e8f0; }
+.sm-stand-count { font-size: 4rem; font-weight: 800; color: #38bdf8; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="sm-stand-page px-4 py-4">
+  <h1 class="h3 mb-1">{{ event.name }}</h1>
+  <p class="text-muted mb-4">{{ event.location }} · Live stand mode</p>
+  <div class="text-center mb-4">
+    <div class="sm-stand-count" id="sm-stand-count">0</div>
+    <div>leads captured</div>
+  </div>
+  <div class="row g-4">
+    <div class="col-md-6">
+      <h2 class="h6">Latest submissions</h2>
+      <div id="sm-stand-ticker"></div>
+    </div>
+    <div class="col-md-6 text-center">
+      <canvas id="sm-stand-qr" width="200" height="200" class="bg-white rounded"></canvas>
+      <p class="small mt-2"><a href="{{ event.connect_url }}" class="text-info" target="_blank" rel="noopener">{{ event.connect_url }}</a></p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.SM_PAGE = "stand"; window.SM_STAND_EVENT_ID = {{ event_id }};</script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="{{ url_for('static', filename='js/sales_marketing.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sm_extensions.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sm_roadmap.js') }}"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var url = {{ event.connect_url|tojson }};
+  var canvas = document.getElementById("sm-stand-qr");
+  if (canvas && window.QRCode) QRCode.toCanvas(canvas, url, { width: 200, margin: 1 });
+});
+</script>
+{% endblock %}

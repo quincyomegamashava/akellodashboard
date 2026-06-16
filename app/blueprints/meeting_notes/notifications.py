@@ -5,7 +5,10 @@ from __future__ import annotations
 from datetime import date
 from typing import Iterable, Optional, Set
 
+from flask import current_app
+
 from app import db
+from app.email_utils import send_html_email
 from app.models import Notification, User
 
 from app.blueprints.meeting_notes.models import MeetingActionItem
@@ -80,6 +83,11 @@ def notify_overdue_items() -> int:
         fr = item.focus_row
         mid = fr.meeting_note_id if fr else None
         cta = (item.call_to_action or "").strip()[:120] or "Action item"
+        due_str = item.due_date.isoformat() if item.due_date else ""
+        app_base_url = (current_app.config.get("APP_BASE_URL") or "").rstrip("/")
+        if not app_base_url:
+            app_base_url = "http://localhost:5000"
+        meeting_link = f"{app_base_url}/meeting-notes/{mid}" if mid else f"{app_base_url}/meeting-notes/"
         for u in item.assignees or []:
             _dedupe_notification(
                 u.id,
@@ -95,6 +103,22 @@ def notify_overdue_items() -> int:
             ).first()
             if n:
                 n.meeting_note_id = mid
+            if getattr(u, "email", None):
+                subject = f"Overdue task reminder: {cta}"
+                html = (
+                    "<p>Hello,</p>"
+                    "<p>You have an overdue meeting-notes task.</p>"
+                    f"<p><strong>Task:</strong> {cta}<br>"
+                    f"<strong>Due date:</strong> {due_str or 'N/A'}<br>"
+                    f"<strong>Status:</strong> {(item.status or 'open').replace('_', ' ')}</p>"
+                    f"<p><a href=\"{meeting_link}\">Open meeting notes</a></p>"
+                )
+                send_html_email(
+                    to_email=u.email,
+                    subject=subject[:200],
+                    html_body=html,
+                    text_body=f"Overdue task: {cta}\nDue date: {due_str or 'N/A'}\nView: {meeting_link}",
+                )
             count += 1
     db.session.commit()
     return count

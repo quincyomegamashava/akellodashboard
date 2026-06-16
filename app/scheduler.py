@@ -131,6 +131,40 @@ def refresh_weekly_checkin_schedule(app):
     logger.info("Weekly check-in scheduler set to Fridays %02d:%02d", hour, minute)
 
 
+def _scheduled_weekly_hub_digest(app):
+    with app.app_context():
+        try:
+            from app.email_utils import send_html_email
+            from app.models import User
+            from app.blueprints.meeting_notes.services import hub_analytics_summary, hub_my_tasks_buckets
+            from app.blueprints.sales_marketing.services import stakeholders_stats
+            from app.blueprints.sales_marketing.notifications import can_access_sales_marketing_for_user
+
+            users = User.query.filter(User.email.isnot(None)).all()
+            for user in users:
+                if not (user.email or "").strip():
+                    continue
+                parts = []
+                buckets = hub_my_tasks_buckets(user.id)
+                overdue = len(buckets.get("overdue") or [])
+                if overdue:
+                    parts.append(f"You have {overdue} overdue meeting action item(s).")
+                analytics = hub_analytics_summary()
+                parts.append(f"Team completion rate: {analytics.get('completion_rate', 0)}%.")
+                if can_access_sales_marketing_for_user(user):
+                    stats = stakeholders_stats()
+                    parts.append(
+                        f"Sales: {stats.get('leads_this_week', 0)} leads this week, "
+                        f"{stats.get('active_events', 0)} active events."
+                    )
+                if not parts:
+                    continue
+                body = "<p>" + "</p><p>".join(parts) + "</p>"
+                send_html_email(user.email, "Akello weekly hub digest", body)
+        except Exception as e:
+            logger.exception("Weekly hub digest failed: %s", e)
+
+
 def _scheduled_meeting_overdue_notifications(app):
     with app.app_context():
         try:
@@ -141,6 +175,108 @@ def _scheduled_meeting_overdue_notifications(app):
                 logger.info("Meeting notes overdue notifications: %d", count)
         except Exception as e:
             logger.exception("Meeting overdue notification job failed: %s", e)
+
+
+def _read_meeting_report_schedule():
+    from sqlalchemy.exc import OperationalError
+    from app.models import AppSetting
+
+    try:
+        enabled = (AppSetting.get_value("meeting_notes_report_emails_enabled", "false") or "false").strip().lower() in (
+            "true",
+            "1",
+            "yes",
+            "y",
+            "t",
+        )
+        cadence = (AppSetting.get_value("meeting_notes_report_emails_cadence", "weekly") or "weekly").strip().lower()
+        if cadence not in ("daily", "weekly"):
+            cadence = "weekly"
+        time_raw = (AppSetting.get_value("meeting_notes_report_emails_time", "08:30") or "08:30").strip()
+        recipients_raw = (AppSetting.get_value("meeting_notes_report_emails_recipients", "") or "").strip()
+    except OperationalError:
+        logger.warning("app_settings table missing; meeting report emails disabled until migrations run.")
+        return False, "weekly", 8, 30, ""
+
+    try:
+        hh, mm = time_raw.split(":", 1)
+        hour = max(0, min(23, int(hh)))
+        minute = max(0, min(59, int(mm)))
+    except Exception:
+        hour, minute = 8, 30
+    return enabled, cadence, hour, minute, recipients_raw
+
+
+def _scheduled_meeting_report_emails(app):
+    with app.app_context():
+        try:
+            from datetime import timedelta
+
+            from app.blueprints.meeting_notes.email_reports import normalize_recipients, send_meeting_report_email
+            from app.blueprints.meeting_notes.models import MeetingNote
+
+            enabled, cadence, _, _, recipients_raw = _read_meeting_report_schedule()
+            if not enabled:
+                return
+            recipients = normalize_recipients(recipients_raw)
+            if not recipients:
+                logger.warning("Meeting report email job skipped: no recipients configured.")
+                return
+
+            today = datetime.utcnow().date()
+            if cadence == "weekly":
+                if datetime.utcnow().weekday() != 0:  # Monday
+                    return
+                cutoff = today - timedelta(days=7)
+            else:
+                cutoff = today - timedelta(days=1)
+
+            meetings = (
+                MeetingNote.query.filter(MeetingNote.meeting_date >= cutoff)
+                .order_by(MeetingNote.meeting_date.desc())
+                .limit(50)
+                .all()
+            )
+            total_sent = 0
+            for meeting in meetings:
+                res = send_meeting_report_email(
+                    meeting=meeting,
+                    recipients=recipients,
+                    subject=f"Scheduled meeting report: {meeting.title}",
+                )
+                total_sent += int(res.get("sent", 0))
+            if meetings:
+                logger.info(
+                    "Scheduled meeting report emails: meetings=%d sent=%d cadence=%s",
+                    len(meetings),
+                    total_sent,
+                    cadence,
+                )
+        except Exception as e:
+            logger.exception("Meeting report email job failed: %s", e)
+
+
+def refresh_meeting_report_email_schedule(app):
+    global _scheduler
+    if _scheduler is None:
+        return
+    enabled, _, hour, minute, _ = _read_meeting_report_schedule()
+    if not enabled:
+        try:
+            _scheduler.remove_job("meeting_notes_report_email_job")
+        except Exception:
+            pass
+        return
+    _scheduler.add_job(
+        func=_scheduled_meeting_report_emails,
+        args=[app],
+        trigger="cron",
+        hour=hour,
+        minute=minute,
+        id="meeting_notes_report_email_job",
+        replace_existing=True,
+    )
+    logger.info("Meeting report email scheduler set to %02d:%02d", hour, minute)
 
 
 def start_scheduler(app):
@@ -167,8 +303,18 @@ def start_scheduler(app):
         minute=0,
         id="meeting_notes_overdue_notifications",
     )
+    _scheduler.add_job(
+        func=_scheduled_weekly_hub_digest,
+        args=[app],
+        trigger="cron",
+        day_of_week="mon",
+        hour=8,
+        minute=0,
+        id="weekly_hub_digest",
+    )
     with app.app_context():
         refresh_revenue_report_schedule(app)
         refresh_weekly_checkin_schedule(app)
+        refresh_meeting_report_email_schedule(app)
     _scheduler.start()
     logger.info("Helpdesk email scheduler started (interval 60s)")

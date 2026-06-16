@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ meeting.title }} — Meeting notes{% endblock %}
 {% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/meeting_notes.css') }}">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.css">
@@ -26,13 +27,17 @@
         <p class="mn-hero-sub d-none d-md-block">Track action items, assign owners, and export minutes.</p>
       </div>
       <div class="mn-subheader-actions">
+        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-meeting-mode" title="Meeting mode">Meeting mode</button>
+        <span id="mn-presence-avatars" class="d-inline-flex gap-1 ms-1"></span>
         <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-save-meta">Save</button>
+        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-meeting-details" data-bs-toggle="modal" data-bs-target="#mnMeetingDetailsModal">Meeting details</button>
         <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-ai-extract" title="AI extract tasks"><i class="fas fa-wand-magic-sparkles me-1"></i><span class="d-none d-sm-inline"> Extract</span></button>
         <button type="button" class="btn btn-sm mn-btn-ghost d-none d-md-inline-flex" data-bs-toggle="modal" data-bs-target="#mn-command-palette"><i class="fas fa-search me-1"></i> Search</button>
         <div class="mn-overflow-wrap d-lg-none">
           <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-overflow-toggle" aria-label="More actions"><i class="fas fa-ellipsis"></i></button>
           <div class="mn-overflow-menu" id="mn-overflow-menu">
             <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#mn-command-palette">Search</button>
+            <button type="button" class="dropdown-item" id="mn-btn-meeting-details-overflow">Meeting details</button>
             <button type="button" class="dropdown-item" id="mn-btn-carry-forward-overflow" {% if not carry_forward_sources %}disabled{% endif %} data-bs-toggle="modal" data-bs-target="#mnCarryForwardModal">Carry forward</button>
             <button type="button" class="dropdown-item" id="mn-btn-duplicate-meeting-overflow">Duplicate meeting</button>
             <button type="button" class="dropdown-item" id="mn-btn-export-pdf-overflow">Export PDF</button>
@@ -52,38 +57,18 @@
     {% include "meeting_notes/_subnav.html" %}
     <div class="mn-detail-tabs d-md-none" id="mn-detail-tabs" role="tablist">
       <button type="button" class="mn-detail-tab active" data-mn-detail-tab="tasks">Tasks</button>
-      <button type="button" class="mn-detail-tab" data-mn-detail-tab="notes">Notes</button>
       <button type="button" class="mn-detail-tab" data-mn-detail-tab="filters">Filters</button>
     </div>
   </header>
 
-  <div class="mn-detail-grid">
-    <div class="mn-detail-notes d-none d-md-block" id="mn-detail-pane-notes">
-      <div class="mn-card mn-meta-card">
-        <div class="mn-card-header d-flex justify-content-between align-items-center py-2">
-          <span>Meeting details</span>
-          <button type="button" class="btn btn-sm mn-btn-ghost py-0" id="mn-meta-toggle" title="Collapse">−</button>
-        </div>
-        <div class="mn-card-body" id="mn-meta-body">
-          <label class="mn-filter-label">Title</label>
-          <input type="text" class="form-control form-control-sm mb-2" id="mn-meta-title" value="{{ meeting.title|e }}" />
-          <label class="mn-filter-label">Meeting date</label>
-          <input type="date" class="form-control form-control-sm mb-2" id="mn-meta-date" value="{{ meeting.meeting_date.strftime('%Y-%m-%d') }}" />
-          <label class="mn-filter-label">Summary</label>
-          <textarea class="form-control form-control-sm mb-2" id="mn-meta-summary" rows="3" placeholder="Discussion notes">{{ meeting.summary or '' }}</textarea>
-          <label class="mn-filter-label">Attendees</label>
-          <div id="mn-attendee-picker" class="mb-2"></div>
-          <label class="mn-filter-label">Guests</label>
-          <div id="mn-guest-picker"></div>
-          <div class="form-text small">Enter + press Enter for guests</div>
-          <div class="mt-3 d-grid gap-2">
-            <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-toggle="modal" data-bs-target="#mnFocusModal">Add focus row</button>
-            <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-new-item">New action item</button>
-          </div>
-        </div>
-      </div>
-    </div>
+  <div id="mn-carry-suggestions" class="alert alert-info py-2 small d-none mb-2"></div>
 
+  <div class="mn-view-pills mb-2 d-none d-md-flex" role="group">
+    <button type="button" class="btn btn-sm active" data-mn-detail-tab="tasks">Tasks</button>
+    <button type="button" class="btn btn-sm" data-mn-detail-tab="decisions">Decisions</button>
+  </div>
+
+  <div class="mn-detail-grid mn-detail-tab-pane" id="mn-tab-tasks">
     <div class="mn-detail-main" id="mn-detail-pane-tasks">
       <div class="mn-card mb-3">
         <div class="mn-card-body py-2">
@@ -232,13 +217,23 @@
 
     <div id="mn-detail-pane-filters" class="d-none" aria-hidden="true"></div>
   </div>
+
+  <div class="mn-detail-tab-pane d-none mn-card p-3 mb-3" id="mn-tab-decisions">
+    <h2 class="h6">Decision register</h2>
+    <p class="small text-muted">Record decisions separately from action items. AI extract can populate these.</p>
+    <div id="mn-decisions-list" class="mb-3"></div>
+    <div class="d-flex gap-2">
+      <input type="text" class="form-control form-control-sm" id="mn-decision-input" placeholder="Add a decision…" />
+      <button type="button" class="btn btn-sm mn-btn-primary" id="mn-decision-add">Add</button>
+    </div>
+  </div>
 </div>
 </div>
 
 {% include "meeting_notes/_app_shell.html" %}
 
 <div class="mn-task-panel-backdrop" id="mn-task-panel-backdrop" aria-hidden="true"></div>
-<aside class="mn-task-panel" id="mn-task-panel" aria-hidden="true">
+<aside class="mn-task-panel" id="mn-task-panel" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="mn-panel-title">
   <div class="mn-task-panel-handle d-lg-none" aria-hidden="true"></div>
   <div class="mn-task-panel-header">
     <div>
@@ -332,6 +327,37 @@
   </div>
 </div>
 
+<div class="modal fade" id="mnMeetingDetailsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered mn-meeting-details-modal">
+    <div class="modal-content" style="border-radius: 16px;">
+      <div class="modal-header">
+        <h5 class="modal-title">Meeting details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="mn-meta-body">
+        <label class="mn-filter-label">Title</label>
+        <input type="text" class="form-control form-control-sm mb-2" id="mn-meta-title" value="{{ meeting.title|e }}" />
+        <label class="mn-filter-label">Meeting date</label>
+        <input type="date" class="form-control form-control-sm mb-2" id="mn-meta-date" value="{{ meeting.meeting_date.strftime('%Y-%m-%d') }}" />
+        <label class="mn-filter-label">Summary</label>
+        <textarea class="form-control form-control-sm mb-2" id="mn-meta-summary" rows="3" placeholder="Discussion notes">{{ meeting.summary or '' }}</textarea>
+        <label class="mn-filter-label">Attendees</label>
+        <div id="mn-attendee-picker" class="mb-2"></div>
+        <label class="mn-filter-label">Guests</label>
+        <div id="mn-guest-picker"></div>
+        <div class="form-text small">Enter + press Enter for guests</div>
+        <div class="mt-3 d-grid gap-2">
+          <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-toggle="modal" data-bs-target="#mnFocusModal">Add focus row</button>
+          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-new-item">New action item</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="mnCarryForwardModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content" style="border-radius: 16px;">
@@ -416,13 +442,15 @@
   const MN_FOCUS_ROWS = {{ focus_row_opts|tojson }};
   const MN_IS_ADMIN = {{ is_admin|tojson }};
   const MN_CAN_VIEW_ACTIVITY = {{ can_view_activity|tojson }};
-  const MN_PDF_LOGO_URL = {{ url_for('static', filename='smartlearning.webp')|tojson }};
+  const MN_PDF_LOGO_URL = "https://akello.co/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Flogo.294516ec.png&w=828&q=75";
 </script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script src="{{ url_for('static', filename='js/mn-api.js') }}"></script>
 <script src="{{ url_for('static', filename='js/meeting_notes.js') }}"></script>
 <script src="{{ url_for('static', filename='js/mn-extensions.js') }}"></script>
+<script src="{{ url_for('static', filename='js/mn_roadmap.js') }}"></script>
 <script src="{{ url_for('static', filename='js/mn-mobile.js') }}"></script>
+<script src="{{ url_for('static', filename='js/hub_command_palette.js') }}"></script>
 <script>
 (function () {
   function wireOverflowClone(srcId, dstId) {
@@ -435,6 +463,7 @@
   wireOverflowClone("mn-btn-duplicate-meeting", "mn-btn-duplicate-meeting-overflow");
   wireOverflowClone("mn-btn-export-pdf", "mn-btn-export-pdf-overflow");
   wireOverflowClone("mn-btn-ai-summarize", "mn-btn-ai-summarize-overflow");
+  wireOverflowClone("mn-btn-meeting-details", "mn-btn-meeting-details-overflow");
 })();
 </script>
 {% endblock %}

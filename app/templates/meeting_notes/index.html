@@ -4,6 +4,7 @@
 
 {% block head_extra %}
 
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/meeting_notes.css') }}">
 
 {% endblock %}
@@ -337,6 +338,8 @@
 <script src="{{ url_for('static', filename='js/mn-hub.js') }}"></script>
 
 <script src="{{ url_for('static', filename='js/mn-extensions.js') }}"></script>
+<script src="{{ url_for('static', filename='js/mn_roadmap.js') }}"></script>
+<script src="{{ url_for('static', filename='js/hub_command_palette.js') }}"></script>
 
 <script src="{{ url_for('static', filename='js/mn-mobile.js') }}"></script>
 

@@ -1,0 +1,164 @@
+/* Shared hub design tokens — Meeting Notes & Sales & Marketing */
+:root {
+  --hub-akello-blue: #00407d;
+  --hub-radius: 16px;
+  --hub-radius-sm: 14px;
+  --hub-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+  --hub-card-border: #e8ecf1;
+  --hub-glass-bg: rgba(255, 255, 255, 0.88);
+  --hub-chip-bg: #f1f5f9;
+  --hub-text-muted: #64748b;
+}
+
+.hub-sticky-subheader {
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+  background: var(--hub-glass-bg);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--hub-card-border);
+}
+
+.hub-analytics-chip,
+.mn-analytics-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  background: var(--hub-chip-bg);
+  color: #334155;
+  margin-right: 0.35rem;
+}
+
+.hub-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 1040;
+}
+
+.hub-card {
+  background: #fff;
+  border: 1px solid var(--hub-card-border);
+  border-radius: var(--hub-radius-sm);
+  box-shadow: var(--hub-shadow);
+}
+
+.hub-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.hub-stat-card {
+  flex: 1 1 8rem;
+  min-width: 7rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--hub-card-border);
+}
+
+.hub-stat-val {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--hub-akello-blue);
+}
+
+.hub-stat-lbl {
+  font-size: 0.75rem;
+  color: var(--hub-text-muted);
+}
+
+.hub-timeline-item {
+  border-left: 2px solid #e2e8f0;
+  padding-left: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.hub-timeline-meta {
+  font-size: 0.7rem;
+  color: var(--hub-text-muted);
+}
+
+.hub-kanban {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.hub-kanban-col {
+  flex: 0 0 16rem;
+  min-width: 14rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 0.5rem;
+  border: 1px solid var(--hub-card-border);
+}
+
+.hub-kanban-col h4 {
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #475569;
+}
+
+.hub-kanban-card {
+  background: #fff;
+  border: 1px solid var(--hub-card-border);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  margin-bottom: 0.45rem;
+  cursor: grab;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.hub-kanban-card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.hub-kanban-card.dragging {
+  opacity: 0.6;
+  transform: rotate(1deg);
+}
+
+.hub-kanban-drop-target {
+  outline: 2px dashed var(--hub-akello-blue);
+  background: #eff6ff;
+}
+
+/* Density */
+body[data-density="compact"] .hub-kanban-card,
+body[data-density="compact"] .sm-table td,
+body[data-density="compact"] .mn-inline-table td {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.8125rem;
+}
+
+/* Dark mode */
+body.hub-dark-mode {
+  --hub-glass-bg: rgba(15, 23, 42, 0.92);
+  --hub-card-border: #334155;
+  --hub-chip-bg: #1e293b;
+  color: #e2e8f0;
+}
+
+body.hub-dark-mode .hub-card,
+body.hub-dark-mode .sm-card,
+body.hub-dark-mode .mn-card {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+body.hub-dark-mode .hub-kanban-col {
+  background: #0f172a;
+}
+
+body.hub-dark-mode .hub-kanban-card {
+  background: #1e293b;
+}

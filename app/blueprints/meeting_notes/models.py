@@ -130,6 +130,19 @@ class MeetingActionItem(db.Model):
     start_date = db.Column(db.Date, nullable=True)
     source_excerpt = db.Column(db.Text, nullable=True)
     ai_extracted = db.Column(db.Boolean, nullable=False, default=False)
+    carry_forward_count = db.Column(db.Integer, nullable=False, default=0)
+    stakeholder_lead_id = db.Column(
+        db.Integer,
+        db.ForeignKey("sales_marketing_stakeholder_leads.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    marketing_event_id = db.Column(
+        db.Integer,
+        db.ForeignKey("sales_marketing_events.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     sort_order = db.Column(db.Integer, nullable=False, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
@@ -253,3 +266,24 @@ class MeetingItemComment(db.Model):
         "MeetingActionItem",
         backref=db.backref("comments_thread", lazy="dynamic", order_by="MeetingItemComment.created_at"),
     )
+
+
+class MeetingDecision(db.Model):
+    __tablename__ = "meeting_notes_decisions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    meeting_note_id = db.Column(
+        db.Integer,
+        db.ForeignKey("meeting_notes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    body = db.Column(db.Text, nullable=False, default="")
+    owner_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    source_excerpt = db.Column(db.Text, nullable=True)
+    decided_at = db.Column(db.Date, nullable=True)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    meeting_note = db.relationship("MeetingNote", backref=db.backref("decisions", lazy="dynamic"))
+    owner = db.relationship("User", foreign_keys=[owner_user_id])

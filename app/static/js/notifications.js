@@ -66,7 +66,7 @@ async function loadNotifications() {
              onclick="markNotificationRead(${notif.id})">
           <div class="flex items-start gap-3">
             <div class="flex-shrink-0 mt-1">
-              <i class="fa fa-${notif.notification_type === 'assignment' ? 'user-plus' : 'check-circle'} text-indigo-600"></i>
+              <i class="fa fa-${notif.notification_type === 'assignment' ? 'user-plus' : notif.notification_type && notif.notification_type.startsWith('sm_') ? 'bullhorn' : notif.notification_type && notif.notification_type.startsWith('meeting_') ? 'clipboard-list' : 'check-circle'} text-indigo-600"></i>
             </div>
             <div class="flex-grow min-w-0">
               <p class="text-sm text-slate-900 ${notif.read ? '' : 'font-semibold'}">${escapeHtml(notif.message)}</p>

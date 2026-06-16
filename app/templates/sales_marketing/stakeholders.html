@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ title }}{% endblock %}
 {% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
 {% endblock %}
 {% block content %}
@@ -8,6 +9,8 @@
   <h1 class="h4 mb-1">{{ title }}</h1>
   <p class="text-muted small mb-3">Stakeholder leads from events and the public connect form.</p>
   {% include "sales_marketing/_subnav.html" %}
+
+  <div id="sm-funnel-chart" class="sm-card mb-3 p-2"></div>
 
   <div class="sm-stats-row mb-3" id="sm-stats-row">
     <div class="sm-stat-card"><div class="sm-stat-val" id="sm-stat-total">—</div><div class="sm-stat-lbl">Total leads</div></div>
@@ -29,6 +32,12 @@
 
   <div class="sm-card mb-3">
     <div class="sm-filter-row" id="sm-filters">
+      <div class="btn-group btn-group-sm me-2">
+        <button type="button" class="btn btn-outline-secondary active" data-sm-view="table">Table</button>
+        <button type="button" class="btn btn-outline-secondary" data-sm-view="board">Board</button>
+      </div>
+      <select class="form-select form-select-sm" id="sm-saved-view-select" style="max-width:10rem;"><option value="">Saved views…</option></select>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="sm-saved-view-save">Save view</button>
       <input type="search" class="form-control form-control-sm" id="sm-search" placeholder="Search name, email, school…" style="max-width:14rem;" />
       <select class="form-select form-select-sm" id="sm-filter-event"><option value="">All events</option></select>
       <select class="form-select form-select-sm" id="sm-filter-province">
@@ -62,6 +71,7 @@
         <option value="closed">Closed</option>
       </select>
     </div>
+    <div id="sm-kanban-board" class="d-none mb-2"></div>
     <div class="table-responsive">
       <table class="table table-sm table-hover sm-table mb-0">
         <thead>
@@ -139,4 +149,6 @@
 <script>window.SM_PAGE = "stakeholders"; window.SM_USER_OPTS = {{ user_opts|tojson }}; window.SM_PROVINCES = {{ provinces|tojson }};</script>
 <script src="{{ url_for('static', filename='js/sales_marketing.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sm_extensions.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sm_roadmap.js') }}"></script>
+<script src="{{ url_for('static', filename='js/hub_command_palette.js') }}"></script>
 {% endblock %}

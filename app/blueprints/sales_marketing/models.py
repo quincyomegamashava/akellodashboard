@@ -32,6 +32,11 @@ class MarketingEvent(db.Model):
     location = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(32), nullable=False, default="active", index=True)
     notes = db.Column(db.Text, nullable=True)
+    slug = db.Column(db.String(120), nullable=True, unique=True, index=True)
+    banner_text = db.Column(db.Text, nullable=True)
+    cost_estimate = db.Column(db.Numeric(12, 2), nullable=True)
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
@@ -95,6 +100,8 @@ class StakeholderLead(db.Model):
     is_duplicate_flag = db.Column(db.Boolean, nullable=False, default=False)
     duplicate_dismissed = db.Column(db.Boolean, nullable=False, default=False)
     follow_up_status = db.Column(db.String(32), nullable=False, default="new", index=True)
+    lead_score = db.Column(db.Integer, nullable=True)
+    score_updated_at = db.Column(db.DateTime, nullable=True)
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
@@ -183,3 +190,51 @@ class PublicSubmissionRateLimit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ip_hash = db.Column(db.String(64), nullable=False, index=True)
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class StakeholderLeadActivity(db.Model):
+    __tablename__ = "sales_marketing_stakeholder_lead_activities"
+
+    id = db.Column(db.Integer, primary_key=True)
+    lead_id = db.Column(
+        db.Integer,
+        db.ForeignKey("sales_marketing_stakeholder_leads.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    activity_type = db.Column(db.String(64), nullable=False, index=True)
+    summary = db.Column(db.String(512), nullable=False, default="")
+    details_json = db.Column(db.JSON, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    lead = db.relationship("StakeholderLead", backref=db.backref("activities", lazy="dynamic"))
+    actor = db.relationship("User", foreign_keys=[actor_user_id])
+
+
+class StakeholderSavedView(db.Model):
+    __tablename__ = "sales_marketing_stakeholder_saved_views"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    name = db.Column(db.String(120), nullable=False)
+    filters_json = db.Column(db.JSON, nullable=False, default=dict)
+    view_mode = db.Column(db.String(32), nullable=False, default="table")
+    is_default = db.Column(db.Boolean, nullable=False, default=False)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+
+
+class EmailTemplate(db.Model):
+    __tablename__ = "sales_marketing_email_templates"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    subject = db.Column(db.String(500), nullable=False, default="")
+    body_html = db.Column(db.Text, nullable=False, default="")
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    creator = db.relationship("User", foreign_keys=[created_by])

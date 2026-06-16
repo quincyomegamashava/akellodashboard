@@ -2146,13 +2146,24 @@ def new_dash_layout():
 @login_required
 def overview():
     sm_overview = None
+    mn_overview = None
     try:
         from app.blueprints.sales_marketing.services import can_access_sales_marketing, stakeholders_stats
         if can_access_sales_marketing():
             sm_overview = stakeholders_stats()
     except Exception:
         sm_overview = None
-    return render_template('overview.html', title="Akello Internal Dashboard", sm_overview=sm_overview)
+    try:
+        from app.blueprints.meeting_notes.services import hub_analytics_summary
+        mn_overview = hub_analytics_summary()
+    except Exception:
+        mn_overview = None
+    return render_template(
+        'overview.html',
+        title="Akello Internal Dashboard",
+        sm_overview=sm_overview,
+        mn_overview=mn_overview,
+    )
 
 
 
@@ -20982,6 +20993,9 @@ def get_notifications():
             notifications_data.append({
                 'id': notif.id,
                 'query_id': notif.query_id,
+                'meeting_note_id': getattr(notif, 'meeting_note_id', None),
+                'action_item_id': getattr(notif, 'action_item_id', None),
+                'stakeholder_lead_id': getattr(notif, 'stakeholder_lead_id', None),
                 'message': notif.message,
                 'notification_type': notif.notification_type,
                 'read': notif.read,
@@ -24156,6 +24170,12 @@ def all_champions_compare_upload():
 def sm_connect_page():
     from app.blueprints.sales_marketing.routes import connect_page
     return connect_page()
+
+
+@app.route('/connect/e/<slug>')
+def sm_connect_page_by_slug(slug):
+    from app.blueprints.sales_marketing.sm_roadmap_routes import connect_page_by_slug
+    return connect_page_by_slug(slug)
 
 
 @app.route('/interest')

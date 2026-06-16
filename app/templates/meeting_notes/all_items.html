@@ -286,7 +286,7 @@
 
 <div class="mn-task-panel-backdrop" id="mn-task-panel-backdrop" aria-hidden="true"></div>
 
-<aside class="mn-task-panel" id="mn-task-panel" aria-hidden="true">
+<aside class="mn-task-panel" id="mn-task-panel" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="mn-panel-title">
 
   <div class="mn-task-panel-handle d-lg-none" aria-hidden="true"></div>
 
@@ -430,7 +430,7 @@
 
   const MN_DEFAULT_ASSIGNEE = {{ default_assignee_id|tojson }};
 
-  const MN_PDF_LOGO_URL = {{ url_for('static', filename='smartlearning.webp')|tojson }};
+  const MN_PDF_LOGO_URL = "https://akello.co/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Flogo.294516ec.png&w=828&q=75";
 
 </script>
 

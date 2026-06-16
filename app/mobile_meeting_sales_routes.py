@@ -153,6 +153,24 @@ def _register_meeting_notes_routes() -> None:
         ).all()
         return jsonify({"items": [item_to_dict(i) for i in items]})
 
+    @app.route("/api/mobile/meeting-notes/hub/analytics/extended", methods=["GET"])
+    @login_required
+    def mobile_mn_hub_analytics_extended():
+        from app.blueprints.meeting_notes.mn_roadmap_routes import api_hub_analytics_extended
+        return api_hub_analytics_extended()
+
+    @app.route("/api/mobile/meeting-notes/meetings/<int:meeting_id>/decisions", methods=["GET"])
+    @login_required
+    def mobile_mn_meeting_decisions(meeting_id: int):
+        from app.blueprints.meeting_notes.mn_roadmap_routes import api_meeting_decisions
+        return api_meeting_decisions(meeting_id)
+
+    @app.route("/api/mobile/meeting-notes/meetings/<int:meeting_id>/carry-forward/suggestions", methods=["GET"])
+    @login_required
+    def mobile_mn_carry_suggestions(meeting_id: int):
+        from app.blueprints.meeting_notes.mn_roadmap_routes import api_carry_forward_suggestions
+        return api_carry_forward_suggestions(meeting_id)
+
 
 def _register_sales_marketing_routes() -> None:
     try:
@@ -201,6 +219,23 @@ def _register_sales_marketing_routes() -> None:
     @login_required
     def mobile_sales_marketing_interest_options():
         return sm.api_interest_options()
+
+    @app.route("/api/mobile/sales-marketing/stakeholders/<int:lead_id>/timeline", methods=["GET"])
+    @login_required
+    def mobile_sm_stakeholder_timeline(lead_id: int):
+        from app.blueprints.sales_marketing.sm_roadmap_routes import api_stakeholder_timeline
+        return api_stakeholder_timeline(lead_id)
+
+    @app.route("/api/mobile/sales-marketing/stakeholders/stats", methods=["GET"])
+    @login_required
+    def mobile_sm_stats():
+        return sm.api_stakeholders_stats()
+
+    @app.route("/api/mobile/sales-marketing/stakeholders/funnel", methods=["GET"])
+    @login_required
+    def mobile_sm_funnel():
+        from app.blueprints.sales_marketing.sm_roadmap_routes import api_stakeholders_funnel
+        return api_stakeholders_funnel()
 
 
 _register_meeting_notes_routes()

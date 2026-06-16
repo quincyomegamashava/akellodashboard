@@ -112,7 +112,7 @@ def connect_page():
             ev = db.session.get(MarketingEvent, eid)
             if ev and ev.status == "active":
                 prefill_event_id = ev.id
-                prefill_event = {"id": ev.id, "name": ev.name, "location": ev.location or ""}
+                prefill_event = {"id": ev.id, "name": ev.name, "location": ev.location or "", "banner_text": getattr(ev, "banner_text", None) or ""}
         except (TypeError, ValueError):
             pass
     return render_template(
@@ -205,7 +205,17 @@ def api_public_submit_lead():
     )
     db.session.add(lead)
     record_rate_limit_hit()
+    db.session.flush()
+    from app.blueprints.sales_marketing.services import log_lead_activity, update_lead_score
+    from app.blueprints.sales_marketing.notifications import notify_hot_lead, notify_new_lead
+
+    log_lead_activity(lead.id, "form_submit", f"Submitted via public form: {full_name}")
+    update_lead_score(lead)
     db.session.commit()
+    notify_new_lead(lead)
+    io = db.session.get(InterestOption, interest_id)
+    if (lead.role_category or "").lower() == "principal" and io and "demo" in (io.label or "").lower():
+        notify_hot_lead(lead)
     return jsonify({"ok": True, "duplicate_warning": is_dup}), 201
 
 
@@ -297,6 +307,17 @@ def api_events_list_create():
         notes=(payload.get("notes") or "").strip() or None,
         created_by=current_user.id,
     )
+    from app.blueprints.sales_marketing.services import ensure_unique_event_slug, slugify_event_name
+
+    base_slug = slugify_event_name(name)
+    event.slug = ensure_unique_event_slug(base_slug)
+    if payload.get("banner_text"):
+        event.banner_text = (payload.get("banner_text") or "").strip() or None
+    if payload.get("cost_estimate") is not None:
+        try:
+            event.cost_estimate = float(payload.get("cost_estimate"))
+        except (TypeError, ValueError):
+            pass
     db.session.add(event)
     db.session.flush()
     apply_event_attendees(event, payload.get("attendee_ids"))
@@ -364,6 +385,29 @@ def api_event_detail(event_id: int):
         event.status = (payload.get("status") or "active").strip()[:32]
     if "notes" in payload:
         event.notes = (payload.get("notes") or "").strip() or None
+    if "banner_text" in payload:
+        event.banner_text = (payload.get("banner_text") or "").strip() or None
+    if "cost_estimate" in payload:
+        try:
+            event.cost_estimate = float(payload.get("cost_estimate")) if payload.get("cost_estimate") not in (None, "") else None
+        except (TypeError, ValueError):
+            pass
+    if "latitude" in payload:
+        try:
+            event.latitude = float(payload.get("latitude")) if payload.get("latitude") not in (None, "") else None
+        except (TypeError, ValueError):
+            pass
+    if "longitude" in payload:
+        try:
+            event.longitude = float(payload.get("longitude")) if payload.get("longitude") not in (None, "") else None
+        except (TypeError, ValueError):
+            pass
+    if "slug" in payload and (payload.get("slug") or "").strip():
+        from app.blueprints.sales_marketing.services import ensure_unique_event_slug, slugify_event_name
+        event.slug = ensure_unique_event_slug(slugify_event_name(payload.get("slug")), exclude_id=event.id)
+    elif "name" in payload and not getattr(event, "slug", None):
+        from app.blueprints.sales_marketing.services import ensure_unique_event_slug, slugify_event_name
+        event.slug = ensure_unique_event_slug(slugify_event_name(event.name), exclude_id=event.id)
     if "attendee_ids" in payload:
         apply_event_attendees(event, payload.get("attendee_ids"))
     event.updated_at = datetime.utcnow()
@@ -375,7 +419,23 @@ def api_event_detail(event_id: int):
 @bp.route("/api/stakeholders/stats")
 @sales_marketing_required
 def api_stakeholders_stats():
-    return jsonify(stakeholders_stats())
+    base = stakeholders_stats()
+    event_id = request.args.get("event_id")
+    if event_id:
+        try:
+            eid = int(event_id)
+            base["total_leads"] = StakeholderLead.query.filter_by(event_id=eid).count()
+            base["event_id"] = eid
+            latest = (
+                StakeholderLead.query.filter_by(event_id=eid)
+                .order_by(StakeholderLead.submitted_at.desc())
+                .limit(5)
+                .all()
+            )
+            base["latest_leads"] = [lead_to_dict(l) for l in latest]
+        except (TypeError, ValueError):
+            pass
+    return jsonify(base)
 
 
 @bp.route("/api/stakeholders/preview-count")
@@ -565,7 +625,18 @@ def api_stakeholder_detail(lead_id: int):
     if "follow_up_status" in payload:
         st = (payload.get("follow_up_status") or "new").strip()
         if st in VALID_LEAD_STATUSES:
+            old_st = lead.follow_up_status
             lead.follow_up_status = st
+            if old_st != st:
+                from app.blueprints.sales_marketing.services import log_lead_activity, update_lead_score
+                log_lead_activity(
+                    lead.id,
+                    "status_change",
+                    f"Status changed from {old_st} to {st}",
+                    current_user.id,
+                )
+    from app.blueprints.sales_marketing.services import update_lead_score
+    update_lead_score(lead)
     db.session.commit()
     return jsonify(lead_to_dict(lead))
 
@@ -584,6 +655,9 @@ def api_stakeholders_bulk_status():
         StakeholderLead.query.filter(StakeholderLead.id.in_(ids))
         .update({StakeholderLead.follow_up_status: status}, synchronize_session=False)
     )
+    from app.blueprints.sales_marketing.services import log_lead_activity
+    for lid in ids:
+        log_lead_activity(lid, "status_change", f"Bulk status set to {status}", current_user.id)
     db.session.commit()
     return jsonify({"ok": True, "updated": updated})
 
@@ -618,6 +692,9 @@ def api_stakeholder_notes(lead_id: int):
         return jsonify({"error": "body required"}), 400
     note = StakeholderLeadNote(lead_id=lead_id, user_id=current_user.id, body=body[:5000])
     db.session.add(note)
+    db.session.flush()
+    from app.blueprints.sales_marketing.services import log_lead_activity
+    log_lead_activity(lead_id, "note_added", body[:512], current_user.id, {"note_id": note.id})
     db.session.commit()
     return jsonify(note_to_dict(note)), 201
 
@@ -732,8 +809,27 @@ def api_campaigns_send():
     db.session.add(campaign)
     db.session.flush()
 
-    emails = list({normalize_email(l.email) for l in leads if l.email and l.consent_marketing})
-    results = send_bulk_html_emails(recipients=emails, subject=subject, html_body=body_html)
+    emails = []
+    per_lead_bodies = {}
+    for lead in leads:
+        if not lead.email or not lead.consent_marketing:
+            continue
+        em = normalize_email(lead.email)
+        emails.append(em)
+        per_lead_bodies[em] = replace_campaign_tokens(body_html, lead)
+    emails = list(dict.fromkeys(emails))
+    reply_to = (getattr(current_user, "email", "") or "").strip() or None
+    results = []
+    for em in emails:
+        html = per_lead_bodies.get(em, body_html)
+        batch = send_bulk_html_emails(
+            recipients=[em],
+            subject=subject,
+            html_body=html,
+            text_body=(payload.get("body_text") or "").strip() or None,
+            reply_to=reply_to,
+        )
+        results.extend(batch)
 
     result_by_email = {r["email"]: r for r in results}
     sent_count = 0
@@ -751,15 +847,24 @@ def api_campaigns_send():
         db.session.add(rec)
         if r.get("status") == "sent":
             sent_count += 1
+            from app.blueprints.sales_marketing.services import log_lead_activity
+            log_lead_activity(lead.id, "email_sent", f"Campaign: {subject[:120]}", current_user.id)
 
     campaign.status = "sent" if sent_count else "failed"
     campaign.sent_at = datetime.utcnow()
     db.session.commit()
+    failed = [r for r in results if r.get("status") != "sent"]
+    if failed:
+        from app.blueprints.sales_marketing.notifications import notify_campaign_failed
+        notify_campaign_failed(subject, len(failed))
+        db.session.commit()
     return jsonify(
         {
             "ok": True,
             "campaign_id": campaign.id,
             "sent": sent_count,
             "total": len(leads),
+            "failed": len(failed),
+            "failures": failed[:20],
         }
     )

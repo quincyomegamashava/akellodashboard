@@ -172,6 +172,19 @@
         {% endif %}
       </div>
       <a href="/sales-marketing/" class="btn btn-sm btn-primary mt-2" style="background:#00407d;">Open hub</a>
+      <a href="/sales-marketing/map" class="btn btn-sm btn-outline-primary mt-2 ms-1">Lead map</a>
+    </div>
+    {% endif %}
+
+    {% if mn_overview %}
+    <div class="sm-overview-widget" style="border-left:4px solid #0ea5e9;">
+      <h3><i class="fas fa-clipboard-list"></i> Meeting Notes</h3>
+      <div class="sm-overview-stats">
+        <span><strong>{{ mn_overview.completion_rate }}%</strong> tasks complete</span>
+        <span><strong>{{ mn_overview.overdue_items }}</strong> overdue</span>
+        <span><strong>{{ mn_overview.total_items }}</strong> total action items</span>
+      </div>
+      <a href="/meeting-notes/" class="btn btn-sm btn-primary mt-2" style="background:#0ea5e9;border-color:#0ea5e9;">My work</a>
     </div>
     {% endif %}
 

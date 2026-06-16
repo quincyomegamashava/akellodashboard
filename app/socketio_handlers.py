@@ -173,6 +173,42 @@ def init_socketio_handlers(socketio):
         if meeting_id:
             leave_room(f"meeting_{meeting_id}")
 
+    _meeting_presence = {}
+
+    @socketio.on('presence_join', namespace='/meeting-notes')
+    def on_presence_join(data):
+        if not current_user.is_authenticated:
+            return False
+        meeting_id = (data or {}).get('meeting_id')
+        if not meeting_id:
+            return False
+        room = f"meeting_{meeting_id}"
+        join_room(room)
+        key = f"meeting_{meeting_id}"
+        users = _meeting_presence.setdefault(key, set())
+        users.add(current_user.username)
+        emit('presence_update', {'users': sorted(users)}, room=room)
+
+    @socketio.on('presence_leave', namespace='/meeting-notes')
+    def on_presence_leave(data):
+        meeting_id = (data or {}).get('meeting_id')
+        if not meeting_id:
+            return
+        key = f"meeting_{meeting_id}"
+        users = _meeting_presence.get(key, set())
+        users.discard(getattr(current_user, 'username', ''))
+        room = f"meeting_{meeting_id}"
+        emit('presence_update', {'users': sorted(users)}, room=room)
+        leave_room(room)
+
+    @socketio.on('field_patch', namespace='/meeting-notes')
+    def on_field_patch(data):
+        meeting_id = (data or {}).get('meeting_id')
+        if not meeting_id or not current_user.is_authenticated:
+            return
+        room = f"meeting_{meeting_id}"
+        emit('item_updated', {'patch': data, 'user': current_user.username}, room=room, include_self=False)
+
 
 def emit_activity_to_monitoring(activity_data):
     """Emit new activity to all monitoring clients"""

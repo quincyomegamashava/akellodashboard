@@ -1,14 +1,17 @@
 """Routes and JSON API for weekly meeting notes."""
 
+import base64
 from datetime import date, datetime
 from typing import Any, List, Optional, Sequence
 
+import requests
 from flask import abort, jsonify, render_template, request
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from flask_login import current_user, login_required
 
 from app import db
+from app.email_utils import send_html_email_detailed
 from app.models import User
 
 from app.blueprints.meeting_notes import bp
@@ -32,6 +35,10 @@ from app.blueprints.meeting_notes.models import (
 from app.blueprints.meeting_notes.notifications import (
     notify_assignees,
     notify_mentioned_users,
+)
+from app.blueprints.meeting_notes.email_reports import (
+    normalize_recipients,
+    send_meeting_report_email,
 )
 from app.blueprints.meeting_notes.services import (
     VALID_STATUSES,
@@ -302,6 +309,8 @@ def _filter_args_from_request():
     priority = request.args.get("priority", type=str)
     label_id = request.args.get("label_id", type=int)
     search_q = request.args.get("q", type=str)
+    stakeholder_lead_id = request.args.get("stakeholder_lead_id", type=int)
+    marketing_event_id = request.args.get("marketing_event_id", type=int) or request.args.get("event_id", type=int)
     return (
         meeting_note_id,
         platform,
@@ -313,6 +322,8 @@ def _filter_args_from_request():
         priority,
         label_id,
         search_q,
+        stakeholder_lead_id,
+        marketing_event_id,
     )
 
 
@@ -362,6 +373,8 @@ def api_action_items():
         priority,
         label_id,
         search_q,
+        stakeholder_lead_id,
+        marketing_event_id,
     ) = _filter_args_from_request()
     q = action_items_query(
         meeting_note_id=meeting_note_id,
@@ -374,6 +387,8 @@ def api_action_items():
         priority=priority,
         label_id=label_id,
         search_q=search_q,
+        stakeholder_lead_id=stakeholder_lead_id,
+        marketing_event_id=marketing_event_id,
     )
     items = q.order_by(MeetingNote.meeting_date.desc(), MeetingFocusRow.sort_order, MeetingActionItem.sort_order).all()
     include_threads = request.args.get("include_comment_threads") == "1"
@@ -411,6 +426,8 @@ def api_calendar_events():
         priority,
         label_id,
         search_q,
+        _stakeholder_lead_id,
+        _marketing_event_id,
     ) = _filter_args_from_request()
     q = action_items_query(
         meeting_note_id=meeting_note_id,
@@ -423,6 +440,8 @@ def api_calendar_events():
         priority=priority,
         label_id=label_id,
         search_q=search_q,
+        stakeholder_lead_id=_stakeholder_lead_id,
+        marketing_event_id=_marketing_event_id,
     )
     items = q.all()
     return jsonify(items_to_fc_events(items))
@@ -442,6 +461,8 @@ def api_gantt_tasks():
         priority,
         label_id,
         search_q,
+        _stakeholder_lead_id,
+        _marketing_event_id,
     ) = _filter_args_from_request()
     q = action_items_query(
         meeting_note_id=meeting_note_id,
@@ -454,6 +475,8 @@ def api_gantt_tasks():
         priority=priority,
         label_id=label_id,
         search_q=search_q,
+        stakeholder_lead_id=_stakeholder_lead_id,
+        marketing_event_id=_marketing_event_id,
     )
     items = q.all()
     return jsonify({"tasks": items_to_gantt_tasks(items)})
@@ -627,6 +650,7 @@ def api_carry_forward(meeting_id: int):
                 due_date=it.due_date,
                 start_date=it.start_date,
                 sort_order=it.sort_order,
+                carry_forward_count=(getattr(it, "carry_forward_count", 0) or 0) + 1,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             )
@@ -1434,6 +1458,25 @@ def api_ai_apply_tasks(meeting_id: int):
         if summary:
             mn.summary = summary
             mn.updated_at = datetime.utcnow()
+    decisions = payload.get("decisions") or []
+    from app.blueprints.meeting_notes.models import MeetingDecision
+    for idx, dec in enumerate(decisions):
+        if not isinstance(dec, dict):
+            continue
+        body = (dec.get("body") or dec if isinstance(dec, str) else "").strip()
+        if isinstance(dec, dict):
+            body = (dec.get("body") or "").strip()
+        if not body:
+            continue
+        db.session.add(
+            MeetingDecision(
+                meeting_note_id=meeting_id,
+                body=body,
+                source_excerpt=(dec.get("source_excerpt") if isinstance(dec, dict) else body)[:500],
+                decided_at=mn.meeting_date,
+                sort_order=idx,
+            )
+        )
     _log_activity(meeting_id, "create", "action_item", None, f"AI applied {len(created)} action items")
     db.session.commit()
     return jsonify({"created": created, "count": len(created)})
@@ -1468,6 +1511,88 @@ def api_meeting_transcript(meeting_id: int):
     if err:
         return jsonify({"summary_updated": True, "extract_error": err})
     return jsonify({"summary_updated": True, "preview": data})
+
+
+@bp.route("/api/meetings/<int:meeting_id>/email-report", methods=["POST"])
+@login_required
+def api_email_meeting_report(meeting_id: int):
+    meeting = db.session.get(MeetingNote, meeting_id)
+    if not meeting:
+        return jsonify({"error": "Not found"}), 404
+    payload = request.get_json(silent=True) or {}
+    recipients = normalize_recipients(payload.get("recipients") or "")
+    if not recipients:
+        return jsonify({"error": "At least one valid recipient email is required"}), 400
+    subject = (payload.get("subject") or "").strip() or None
+    body_html = (payload.get("body_html") or "").strip() or None
+    body_text = (payload.get("body_text") or "").strip() or None
+    attachment_bytes = None
+    attachment_filename = None
+    if payload.get("pdf_base64"):
+        try:
+            attachment_bytes = base64.b64decode(str(payload.get("pdf_base64")), validate=True)
+            attachment_filename = (payload.get("pdf_filename") or "").strip() or None
+        except Exception:
+            return jsonify({"error": "Invalid pdf_base64 payload"}), 400
+    result = send_meeting_report_email(
+        meeting=meeting,
+        recipients=recipients,
+        subject=subject,
+        body_html=body_html,
+        body_text=body_text,
+        attachment_bytes=attachment_bytes,
+        attachment_filename=attachment_filename,
+    )
+    _log_activity(
+        meeting_id,
+        "create",
+        "meeting_note",
+        meeting_id,
+        f"Emailed meeting report to {result.get('sent', 0)} recipient(s)",
+    )
+    db.session.commit()
+    if result.get("sent", 0) <= 0:
+        failed_details = [r for r in (result.get("results") or []) if r.get("status") != "sent"]
+        return jsonify({"error": "No emails were sent. Please check SMTP configuration.", "details": failed_details, **result}), 502
+    return jsonify({"ok": True, **result})
+
+
+@bp.route("/api/pdf-logo")
+@login_required
+def api_pdf_logo():
+    url = (request.args.get("url") or "").strip()
+    if not url:
+        return jsonify({"error": "url required"}), 400
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return jsonify({"error": "Only http(s) urls allowed"}), 400
+    try:
+        resp = requests.get(url, timeout=12)
+        if not resp.ok:
+            return jsonify({"error": f"logo fetch failed ({resp.status_code})"}), 400
+        content_type = (resp.headers.get("Content-Type") or "image/png").split(";")[0].strip().lower()
+        if not content_type.startswith("image/"):
+            return jsonify({"error": "url did not return an image"}), 400
+        data_b64 = base64.b64encode(resp.content).decode("ascii")
+        return jsonify({"data_url": f"data:{content_type};base64,{data_b64}"})
+    except Exception as exc:
+        return jsonify({"error": str(exc)[:200]}), 500
+
+
+@bp.route("/api/email/diagnostics", methods=["POST"])
+@login_required
+def api_email_diagnostics():
+    payload = request.get_json(silent=True) or {}
+    to_email = (payload.get("to_email") or getattr(current_user, "email", "") or "").strip()
+    if not to_email:
+        return jsonify({"error": "to_email required"}), 400
+    result = send_html_email_detailed(
+        to_email=to_email,
+        subject="[Akello] SMTP diagnostics",
+        html_body="<p>SMTP diagnostics message from Akello.</p>",
+        text_body="SMTP diagnostics message from Akello.",
+        reply_to=(getattr(current_user, "email", "") or "").strip() or None,
+    )
+    return jsonify({"ok": bool(result.get("ok")), "result": result})
 
 
 @bp.route("/api/templates", methods=["GET", "POST"])

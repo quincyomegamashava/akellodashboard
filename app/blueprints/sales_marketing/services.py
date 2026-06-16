@@ -19,11 +19,14 @@ from app.models import User
 from app.blueprints.sales_marketing.models import (
     EmailCampaign,
     EmailCampaignRecipient,
+    EmailTemplate,
     InterestOption,
     MarketingEvent,
     PublicSubmissionRateLimit,
     StakeholderLead,
+    StakeholderLeadActivity,
     StakeholderLeadNote,
+    StakeholderSavedView,
 )
 
 PRIVILEGE_NAME = "Sales & Marketing"
@@ -149,8 +152,12 @@ def event_to_dict(event: MarketingEvent, *, include_lead_count: bool = True) -> 
     }
     if include_lead_count:
         data["lead_count"] = event.leads.count() if event.leads else 0
-    base = request.url_root.rstrip("/") if request else ""
-    data["connect_url"] = f"{base}/connect?event={event.id}"
+    data["connect_url"] = event_connect_url(event)
+    data["slug"] = getattr(event, "slug", None) or ""
+    data["banner_text"] = getattr(event, "banner_text", None) or ""
+    data["cost_estimate"] = float(event.cost_estimate) if getattr(event, "cost_estimate", None) else None
+    data["latitude"] = getattr(event, "latitude", None)
+    data["longitude"] = getattr(event, "longitude", None)
     return data
 
 
@@ -188,6 +195,7 @@ def lead_to_dict(lead: StakeholderLead) -> dict:
         "is_duplicate_flag": bool(lead.is_duplicate_flag),
         "duplicate_dismissed": bool(getattr(lead, "duplicate_dismissed", False)),
         "follow_up_status": getattr(lead, "follow_up_status", None) or "new",
+        "lead_score": getattr(lead, "lead_score", None),
         "notes_count": lead.notes.count() if getattr(lead, "notes", None) else 0,
         "submitted_at": lead.submitted_at.isoformat() if lead.submitted_at else None,
         "created_by": lead.created_by,
@@ -324,6 +332,7 @@ def leads_query(
     attendee_user_id: Optional[int] = None,
     follow_up_status: Optional[str] = None,
     duplicates_only: bool = False,
+    preferred_contact: Optional[str] = None,
 ):
     q = StakeholderLead.query.options(
         joinedload(StakeholderLead.event).joinedload(MarketingEvent.attendees),
@@ -363,6 +372,8 @@ def leads_query(
             StakeholderLead.is_duplicate_flag.is_(True),
             StakeholderLead.duplicate_dismissed.is_(False),
         )
+    if preferred_contact and preferred_contact.strip():
+        q = q.filter(StakeholderLead.preferred_contact == preferred_contact.strip())
 
     return q.order_by(StakeholderLead.submitted_at.desc())
 
@@ -423,3 +434,277 @@ def seed_interest_options_if_empty() -> None:
     for idx, label in enumerate(DEFAULT_INTEREST_OPTIONS):
         db.session.add(InterestOption(label=label, sort_order=idx, is_active=True))
     db.session.commit()
+
+
+def slugify_event_name(name: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")
+    return s[:100] or "event"
+
+
+def ensure_unique_event_slug(base: str, exclude_id: Optional[int] = None) -> str:
+    slug = base
+    n = 1
+    while True:
+        q = MarketingEvent.query.filter_by(slug=slug)
+        if exclude_id:
+            q = q.filter(MarketingEvent.id != exclude_id)
+        if not q.first():
+            return slug
+        n += 1
+        slug = f"{base}-{n}"
+
+
+def event_connect_url(event: MarketingEvent) -> str:
+    base = request.url_root.rstrip("/") if request else ""
+    if getattr(event, "slug", None):
+        return f"{base}/connect/e/{event.slug}"
+    return f"{base}/connect?event={event.id}"
+
+
+def log_lead_activity(
+    lead_id: int,
+    activity_type: str,
+    summary: str,
+    actor_user_id: Optional[int] = None,
+    details: Optional[dict] = None,
+) -> StakeholderLeadActivity:
+    act = StakeholderLeadActivity(
+        lead_id=lead_id,
+        actor_user_id=actor_user_id,
+        activity_type=activity_type,
+        summary=(summary or "")[:512],
+        details_json=details,
+    )
+    db.session.add(act)
+    return act
+
+
+def activity_to_dict(a: StakeholderLeadActivity) -> dict:
+    author = a.actor
+    return {
+        "id": a.id,
+        "activity_type": a.activity_type,
+        "summary": a.summary,
+        "details_json": a.details_json,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+        "actor_name": user_label(author) if author else "System",
+    }
+
+
+def lead_timeline(lead_id: int, limit: int = 100) -> List[dict]:
+    rows = (
+        StakeholderLeadActivity.query.filter_by(lead_id=lead_id)
+        .order_by(StakeholderLeadActivity.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [activity_to_dict(r) for r in rows]
+
+
+def compute_lead_score(lead: StakeholderLead) -> int:
+    score = 0
+    if lead.consent_marketing:
+        score += 20
+    if (lead.role_category or "").lower() == "principal":
+        score += 25
+    elif (lead.role_category or "").lower() == "teacher":
+        score += 10
+    label = (lead.interest_option.label if lead.interest_option else "").lower()
+    if "demo" in label:
+        score += 25
+    elif "training" in label:
+        score += 15
+    elif "partnership" in label:
+        score += 10
+    if lead.event_id:
+        score += 10
+    if lead.is_duplicate_flag and not lead.duplicate_dismissed:
+        score -= 15
+    if lead.submitted_at:
+        days = (datetime.utcnow() - lead.submitted_at).days
+        if days <= 3:
+            score += 15
+        elif days <= 7:
+            score += 8
+    return max(0, min(100, score))
+
+
+def update_lead_score(lead: StakeholderLead) -> int:
+    score = compute_lead_score(lead)
+    lead.lead_score = score
+    lead.score_updated_at = datetime.utcnow()
+    return score
+
+
+def suggested_action_for_lead(lead: StakeholderLead) -> str:
+    score = lead.lead_score if lead.lead_score is not None else compute_lead_score(lead)
+    status = lead.follow_up_status or "new"
+    if status == "closed":
+        return "Lead is closed — no action needed."
+    if status == "new" and score >= 60:
+        return "Schedule a demo call within 48 hours."
+    if status == "new":
+        return "Send introduction email and confirm interest."
+    if status == "contacted":
+        return "Follow up on last outreach; qualify needs."
+    if status == "qualified":
+        return "Propose next step: demo, training, or proposal."
+    return "Review lead details and update status."
+
+
+def replace_campaign_tokens(text: str, lead: StakeholderLead) -> str:
+    if not text:
+        return text
+    first = (lead.full_name or "").split()[0] if lead.full_name else ""
+    mapping = {
+        "{{first_name}}": first,
+        "{{full_name}}": lead.full_name or "",
+        "{{event_name}}": lead.event.name if lead.event else "",
+        "{{interest}}": lead.interest_option.label if lead.interest_option else "",
+        "{{province}}": lead.province or "",
+        "{{email}}": lead.email or "",
+    }
+    out = text
+    for k, v in mapping.items():
+        out = out.replace(k, v)
+    return out
+
+
+def stakeholders_by_province(period: str = "all") -> List[dict]:
+    q = StakeholderLead.query.filter(
+        StakeholderLead.province.isnot(None),
+        StakeholderLead.province != "",
+    )
+    if period == "week":
+        q = q.filter(StakeholderLead.submitted_at >= datetime.utcnow() - timedelta(days=7))
+    elif period == "month":
+        q = q.filter(StakeholderLead.submitted_at >= datetime.utcnow() - timedelta(days=30))
+    leads = q.all()
+    buckets: Dict[str, dict] = {}
+    for lead in leads:
+        prov = lead.province or "Unknown"
+        if prov not in buckets:
+            buckets[prov] = {"province": prov, "count": 0, "with_consent": 0}
+        buckets[prov]["count"] += 1
+        if lead.consent_marketing:
+            buckets[prov]["with_consent"] += 1
+    return list(buckets.values())
+
+
+def funnel_analytics(period_days: int = 30) -> dict:
+    cutoff = datetime.utcnow() - timedelta(days=period_days)
+    prev_cutoff = cutoff - timedelta(days=period_days)
+    stages = list(VALID_LEAD_STATUSES)
+    current = {}
+    previous = {}
+    for st in stages:
+        current[st] = StakeholderLead.query.filter(
+            StakeholderLead.submitted_at >= cutoff,
+            StakeholderLead.follow_up_status == st,
+        ).count()
+        previous[st] = StakeholderLead.query.filter(
+            StakeholderLead.submitted_at >= prev_cutoff,
+            StakeholderLead.submitted_at < cutoff,
+            StakeholderLead.follow_up_status == st,
+        ).count()
+    total = sum(current.values()) or 1
+    conversions = {}
+    for i, st in enumerate(stages[:-1]):
+        next_st = stages[i + 1]
+        base = current.get(st, 0) or 1
+        conversions[f"{st}_to_{next_st}"] = round((current.get(next_st, 0) / base) * 100, 1)
+    anomalies = []
+    for prov in ZIMBABWE_PROVINCES:
+        now_c = StakeholderLead.query.filter(
+            StakeholderLead.province == prov,
+            StakeholderLead.submitted_at >= cutoff,
+        ).count()
+        prev_c = StakeholderLead.query.filter(
+            StakeholderLead.province == prov,
+            StakeholderLead.submitted_at >= prev_cutoff,
+            StakeholderLead.submitted_at < cutoff,
+        ).count()
+        if prev_c >= 5 and now_c < prev_c * 0.6:
+            pct = round((1 - now_c / prev_c) * 100)
+            anomalies.append({"province": prov, "message": f"{prov} down {pct}% vs prior period"})
+    return {
+        "period_days": period_days,
+        "by_stage": current,
+        "previous_by_stage": previous,
+        "conversions": conversions,
+        "anomalies": anomalies,
+    }
+
+
+def event_roi_stats(event_id: int) -> dict:
+    event = db.session.get(MarketingEvent, event_id)
+    if not event:
+        return {}
+    leads = StakeholderLead.query.filter_by(event_id=event_id).all()
+    total = len(leads)
+    consent = sum(1 for l in leads if l.consent_marketing)
+    by_status = {}
+    by_interest = {}
+    for l in leads:
+        st = l.follow_up_status or "new"
+        by_status[st] = by_status.get(st, 0) + 1
+        lbl = l.interest_option.label if l.interest_option else "Unknown"
+        by_interest[lbl] = by_interest.get(lbl, 0) + 1
+    cost = float(event.cost_estimate) if event.cost_estimate else None
+    cpl = round(cost / total, 2) if cost and total else None
+    attendees = len(event.attendees or [])
+    return {
+        "event": event_to_dict(event),
+        "total_leads": total,
+        "consent_count": consent,
+        "consent_rate": round((consent / total) * 100, 1) if total else 0,
+        "by_status": by_status,
+        "by_interest": by_interest,
+        "cost_estimate": cost,
+        "cost_per_lead": cpl,
+        "leads_per_attendee": round(total / attendees, 1) if attendees else None,
+        "attendee_count": attendees,
+    }
+
+
+def template_to_dict(t: EmailTemplate) -> dict:
+    return {
+        "id": t.id,
+        "name": t.name,
+        "subject": t.subject,
+        "body_html": t.body_html,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    }
+
+
+def saved_view_to_dict(v: StakeholderSavedView) -> dict:
+    return {
+        "id": v.id,
+        "name": v.name,
+        "filters_json": v.filters_json or {},
+        "view_mode": v.view_mode,
+        "is_default": v.is_default,
+        "sort_order": v.sort_order,
+    }
+
+
+def normalize_whatsapp_mobile(mobile: str) -> str:
+    digits = re.sub(r"\D", "", mobile or "")
+    if digits.startswith("0"):
+        digits = "263" + digits[1:]
+    elif not digits.startswith("263"):
+        digits = "263" + digits
+    return digits
+
+
+def whatsapp_url_for_lead(lead: StakeholderLead) -> str:
+    mobile = normalize_whatsapp_mobile(lead.mobile)
+    interest = lead.interest_option.label if lead.interest_option else "Akello"
+    event = lead.event.name if lead.event else "our event"
+    text = (
+        f"Hello {lead.full_name.split()[0] if lead.full_name else ''}, "
+        f"thank you for your interest in {interest} at {event}. "
+        f"How can we assist you?"
+    )
+    from urllib.parse import quote
+    return f"https://wa.me/{mobile}?text={quote(text)}"
