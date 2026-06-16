@@ -19,9 +19,14 @@ from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from alembic.util import CommandError
 from flask import current_app
-from sqlalchemy import inspect
 
 from app import db
+from app.migration_schema import (
+    column_exists as schema_column_exists,
+    evaluate_operation_preflight,
+    parse_migration_schema_operations,
+    table_exists as schema_table_exists,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -102,19 +107,20 @@ def _safe_database_label() -> str:
         return 'unknown'
 
 
+def _get_bind():
+    return _get_engine()
+
+
 def _table_exists(table_name: str) -> bool:
     try:
-        return table_name in inspect(db.engine).get_table_names()
+        return schema_table_exists(_get_bind(), table_name)
     except Exception:
         return False
 
 
 def _column_exists(table_name: str, column_name: str) -> bool:
     try:
-        if not _table_exists(table_name):
-            return False
-        columns = {col['name'] for col in inspect(db.engine).get_columns(table_name)}
-        return column_name in columns
+        return schema_column_exists(_get_bind(), table_name, column_name)
     except Exception:
         return False
 
@@ -1076,8 +1082,187 @@ def run_repair(
         _upgrade_lock.release()
 
 
-def run_upgrade(revision: str = 'head') -> dict[str, Any]:
-    """Apply pending migrations up to the given revision."""
+def get_next_pending_revision() -> str | None:
+    """Return the next pending migration revision, or None if up to date."""
+    status = get_status()
+    pending = status.get('pending_revisions') or []
+    if not pending:
+        return None
+    return pending[0].get('revision')
+
+
+def _resolve_upgrade_target(
+    revision: str | None = None,
+    mode: str = 'all',
+) -> tuple[str | None, dict[str, Any] | None]:
+    """Resolve Alembic upgrade target revision; return (target, error_payload)."""
+    before = get_status()
+    if before.get('needs_repair'):
+        return None, {
+            'success': False,
+            'error': before.get('error_detail') or 'Migration chain is broken. Run repair first.',
+        }
+
+    pending = before.get('pending_revisions') or []
+    if before.get('success') and before.get('is_up_to_date'):
+        return None, {
+            'success': True,
+            'message': 'Database is already up to date.',
+            'applied_from': before.get('current_revision'),
+            'applied_to': before.get('current_revision'),
+            'output': '',
+            'mode': mode,
+        }
+
+    if mode == 'next':
+        if not pending:
+            return None, {
+                'success': True,
+                'message': 'Database is already up to date.',
+                'applied_from': before.get('current_revision'),
+                'applied_to': before.get('current_revision'),
+                'output': '',
+                'mode': mode,
+            }
+        return pending[0]['revision'], None
+
+    target = (revision or 'head').strip() or 'head'
+    if target != 'head':
+        pending_ids = {item['revision'] for item in pending}
+        if target not in pending_ids:
+            return None, {
+                'success': False,
+                'error': (
+                    f'Revision {target} is not in the pending migration list. '
+                    f'Pending: {", ".join(sorted(pending_ids)) or "(none)"}.'
+                ),
+            }
+    return target, None
+
+
+def _parse_failed_revision(output: str, pending: list[dict[str, Any]]) -> str | None:
+    """Infer which migration failed from Alembic stdout/stderr text."""
+    if not output:
+        return pending[0]['revision'] if pending else None
+
+    running = re.findall(
+        r'Running upgrade\s+([^\s]+)\s+->\s+([^\s,]+)',
+        output,
+        flags=re.IGNORECASE,
+    )
+    if running:
+        return running[-1][1]
+
+    for item in pending:
+        if item.get('revision') and item['revision'] in output:
+            return item['revision']
+    return pending[0]['revision'] if pending else None
+
+
+def get_preflight() -> dict[str, Any]:
+    """Static + live schema checks for each pending migration."""
+    try:
+        status = get_status()
+        if not status.get('success'):
+            return {
+                'success': False,
+                'error': status.get('error') or 'Could not read migration status.',
+            }
+
+        pending = status.get('pending_revisions') or []
+        if not pending:
+            return {
+                'success': True,
+                'ready': True,
+                'pending_count': 0,
+                'next_revision': None,
+                'findings': [],
+                'blockers': [],
+                'warnings': [],
+                'info': [],
+                'message': 'No pending migrations.',
+            }
+
+        versions_dir = _get_versions_directory()
+        bind = _get_bind()
+        findings: list[dict[str, Any]] = []
+        revision_files = {item['revision']: item for item in scan_migration_files()}
+
+        for item in pending:
+            revision = item['revision']
+            file_meta = revision_files.get(revision)
+            if not file_meta:
+                findings.append({
+                    'revision': revision,
+                    'severity': 'blocker',
+                    'code': 'missing_migration_file',
+                    'message': f'Migration file for revision {revision} is not on disk.',
+                })
+                continue
+
+            path = Path(file_meta['path'])
+            try:
+                source = path.read_text(encoding='utf-8')
+            except OSError as exc:
+                findings.append({
+                    'revision': revision,
+                    'severity': 'blocker',
+                    'code': 'unreadable_migration_file',
+                    'message': f'Could not read {path.name}: {exc}',
+                })
+                continue
+
+            operations = parse_migration_schema_operations(source)
+            if not operations:
+                findings.append({
+                    'revision': revision,
+                    'severity': 'warning',
+                    'code': 'unparsed_operations',
+                    'message': (
+                        f'Could not statically parse operations in {path.name}; '
+                        'upgrade may still succeed.'
+                    ),
+                })
+                continue
+
+            for operation in operations:
+                finding = evaluate_operation_preflight(bind, source, revision, operation)
+                if finding:
+                    findings.append(finding)
+
+        blockers = [f for f in findings if f.get('severity') == 'blocker']
+        warnings = [f for f in findings if f.get('severity') == 'warning']
+        info = [f for f in findings if f.get('severity') == 'info']
+        next_revision = pending[0]['revision']
+
+        return {
+            'success': True,
+            'ready': len(blockers) == 0,
+            'pending_count': len(pending),
+            'next_revision': next_revision,
+            'findings': findings,
+            'blockers': blockers,
+            'warnings': warnings,
+            'info': info,
+            'message': (
+                'Ready to apply migrations.'
+                if not blockers
+                else f'{len(blockers)} blocker(s) found. Resolve before upgrading.'
+            ),
+        }
+    except Exception as exc:
+        logger.exception('Migration preflight failed')
+        return {
+            'success': False,
+            'error': str(exc),
+        }
+
+
+def run_upgrade(
+    revision: str | None = 'head',
+    mode: str = 'all',
+) -> dict[str, Any]:
+    """Apply pending migrations up to the given revision (or only the next one)."""
     if not current_app.config.get('ALLOW_WEB_MIGRATIONS', True):
         return {
             'success': False,
@@ -1090,49 +1275,76 @@ def run_upgrade(revision: str = 'head') -> dict[str, Any]:
             'error': 'Another migration upgrade is already in progress.',
         }
 
+    buffer = io.StringIO()
+    before: dict[str, Any] = {}
+    target_revision: str | None = None
+
     try:
         before = get_status()
-        if before.get('needs_repair'):
-            return {
-                'success': False,
-                'error': before.get('error_detail') or 'Migration chain is broken. Run repair first.',
-            }
-        if before.get('success') and before.get('is_up_to_date'):
-            return {
-                'success': True,
-                'message': 'Database is already up to date.',
-                'applied_from': before.get('current_revision'),
-                'applied_to': before.get('current_revision'),
-                'output': '',
-            }
+        target_revision, early = _resolve_upgrade_target(revision=revision, mode=mode)
+        if early:
+            early['mode'] = mode
+            return early
+
+        assert target_revision is not None
+        pending = before.get('pending_revisions') or []
+        attempted_revision = (
+            pending[0]['revision']
+            if mode == 'next' and pending
+            else target_revision
+        )
 
         config = _get_alembic_config()
-        buffer = io.StringIO()
         with redirect_stdout(buffer):
-            command.upgrade(config, revision)
+            command.upgrade(config, target_revision)
         output = buffer.getvalue().strip()
 
         after = get_status()
+        applied_count = max(0, (before.get('pending_count') or 0) - (after.get('pending_count') or 0))
+        message = 'Migrations applied successfully.'
+        if mode == 'next':
+            message = 'Next migration applied successfully.'
+
         return {
             'success': True,
-            'message': 'Migrations applied successfully.',
+            'message': message,
+            'mode': mode,
+            'target_revision': target_revision,
+            'attempted_revision': attempted_revision,
             'applied_from': before.get('current_revision'),
             'applied_to': after.get('current_revision'),
+            'applied_count': applied_count,
             'pending_count': after.get('pending_count', 0),
             'is_up_to_date': after.get('is_up_to_date', False),
             'output': output,
         }
     except CommandError as exc:
+        output = buffer.getvalue().strip()
+        pending = before.get('pending_revisions') or []
+        failed_revision = _parse_failed_revision(output + '\n' + str(exc), pending)
         logger.error('Migration upgrade failed: %s', exc)
         return {
             'success': False,
             'error': str(exc),
+            'mode': mode,
+            'target_revision': target_revision,
+            'failed_revision': failed_revision,
+            'applied_from': before.get('current_revision'),
+            'output': output,
         }
     except Exception as exc:
+        output = buffer.getvalue().strip()
+        pending = before.get('pending_revisions') or []
+        failed_revision = _parse_failed_revision(output + '\n' + str(exc), pending)
         logger.exception('Migration upgrade failed')
         return {
             'success': False,
             'error': str(exc),
+            'mode': mode,
+            'target_revision': target_revision,
+            'failed_revision': failed_revision,
+            'applied_from': before.get('current_revision'),
+            'output': output,
         }
     finally:
         _upgrade_lock.release()

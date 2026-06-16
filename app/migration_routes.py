@@ -7,6 +7,7 @@ from app.database_routes import admin_required
 from app.migration_service import (
     get_diagnostics,
     get_history,
+    get_preflight,
     get_status,
     run_fix_migrations,
     run_merge_heads,
@@ -40,6 +41,13 @@ def migration_history():
     return jsonify(get_history(limit=limit))
 
 
+@migration_bp.route('/api/admin/migrations/preflight', methods=['GET'])
+@login_required
+@admin_required
+def migration_preflight():
+    return jsonify(get_preflight())
+
+
 @migration_bp.route('/api/admin/migrations/upgrade', methods=['POST'])
 @login_required
 @admin_required
@@ -52,7 +60,17 @@ def migration_upgrade():
         }), 400
 
     before = get_status()
-    result = run_upgrade(revision='head')
+    mode = (data.get('mode') or 'all').strip().lower()
+    if mode not in ('all', 'next'):
+        return jsonify({
+            'success': False,
+            'error': 'Invalid mode. Use "all" or "next".',
+        }), 400
+
+    revision = (data.get('revision') or '').strip() or None
+    if mode == 'next':
+        revision = None
+    result = run_upgrade(revision=revision, mode=mode)
 
     if result.get('success'):
         current_app.logger.info(

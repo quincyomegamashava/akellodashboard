@@ -589,6 +589,35 @@
         </div>
       </div>
 
+      <div id="migrationsPreflightPanel" class="hidden space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-bold text-slate-700 m-0">Preflight checks</h3>
+            <p id="migrationsPreflightSummary" class="text-xs text-slate-500 mt-1 m-0">
+              Scan pending migrations for schema conflicts before applying.
+            </p>
+          </div>
+          <button type="button" id="migrationsPreflightBtn" onclick="runMigrationsPreflight()"
+            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-bold rounded-xl transition-all">
+            Run preflight
+          </button>
+        </div>
+        <div class="rounded-xl border border-slate-200 overflow-hidden">
+          <table class="table-minimal text-sm">
+            <thead>
+              <tr>
+                <th>Severity</th>
+                <th>Revision</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="migrationsPreflightBody">
+              <tr><td colspan="3" class="text-slate-500">Run preflight to analyze pending migrations.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div>
         <h3 class="text-sm font-bold text-slate-700 mb-3">Pending migrations</h3>
         <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden">
@@ -597,10 +626,11 @@
               <tr>
                 <th>Revision</th>
                 <th>Description</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="migrationsPendingBody">
-              <tr><td colspan="2" class="text-slate-500">Loading...</td></tr>
+              <tr><td colspan="3" class="text-slate-500">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -644,9 +674,13 @@
           class="hidden flex-1 min-w-[140px] px-4 py-3 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
           Repair migration chain
         </button>
+        <button type="button" id="migrationsApplyNextBtn" onclick="applyMigrationsUpgradeNext()" disabled
+          class="flex-1 min-w-[140px] px-4 py-3 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
+          Apply next migration
+        </button>
         <button type="button" id="migrationsUpgradeBtn" onclick="applyMigrationsUpgrade()" disabled
           class="flex-1 min-w-[140px] px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
-          Apply migrations
+          Apply all migrations
         </button>
       </div>
     </div>
@@ -2285,6 +2319,7 @@
 
   let migrationsStatusCache = null;
   let migrationsDiagnosticsCache = null;
+  let migrationsPreflightCache = null;
 
   function escapeHtml(value) {
     return String(value == null ? '' : value)
@@ -2345,13 +2380,97 @@
     const body = document.getElementById('migrationsPendingBody');
     if (!body) return;
     if (!pending || !pending.length) {
-      body.innerHTML = '<tr><td colspan="2" class="text-slate-500">No pending migrations.</td></tr>';
+      body.innerHTML = '<tr><td colspan="3" class="text-slate-500">No pending migrations.</td></tr>';
       return;
     }
-    body.innerHTML = pending.map(function (item) {
+    body.innerHTML = pending.map(function (item, index) {
+      const isNext = index === 0;
+      const actionCell = isNext
+        ? '<span class="inline-flex items-center rounded-lg bg-teal-50 px-2 py-1 text-xs font-bold text-teal-700">Next</span>'
+        : '<span class="text-xs text-slate-400">Queued</span>';
       return '<tr><td class="font-mono text-xs">' + escapeHtml(item.revision) + '</td><td>' +
-        escapeHtml(item.message || '(no description)') + '</td></tr>';
+        escapeHtml(item.message || '(no description)') + '</td><td>' + actionCell + '</td></tr>';
     }).join('');
+  }
+
+  function renderMigrationsPreflight(preflight, status) {
+    const panel = document.getElementById('migrationsPreflightPanel');
+    const body = document.getElementById('migrationsPreflightBody');
+    const summary = document.getElementById('migrationsPreflightSummary');
+    const pendingCount = (status && status.pending_count) || 0;
+
+    if (panel) {
+      panel.classList.toggle('hidden', pendingCount === 0);
+    }
+    if (!body) return;
+
+    if (!preflight || !preflight.success) {
+      if (summary) {
+        summary.textContent = (preflight && preflight.error)
+          ? preflight.error
+          : 'Could not run preflight checks.';
+      }
+      body.innerHTML = '<tr><td colspan="3" class="text-rose-700">Preflight unavailable.</td></tr>';
+      return;
+    }
+
+    if (summary) {
+      summary.textContent = preflight.message || 'Preflight complete.';
+    }
+
+    const findings = preflight.findings || [];
+    if (!findings.length) {
+      body.innerHTML = '<tr><td colspan="3" class="text-emerald-700">No issues detected for pending migrations.</td></tr>';
+      return;
+    }
+
+    const severityClass = {
+      blocker: 'text-rose-700 font-bold',
+      warning: 'text-amber-700 font-semibold',
+      info: 'text-slate-600'
+    };
+
+    body.innerHTML = findings.map(function (item) {
+      const severity = item.severity || 'info';
+      return '<tr><td class="' + (severityClass[severity] || 'text-slate-600') + '">' +
+        escapeHtml(severity) + '</td><td class="font-mono text-xs">' +
+        escapeHtml(item.revision || '') + '</td><td>' +
+        escapeHtml(item.message || '') + '</td></tr>';
+    }).join('');
+  }
+
+  function loadMigrationPreflight() {
+    return fetch('/api/admin/migrations/preflight', { credentials: 'same-origin' })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, data: data };
+        });
+      })
+      .then(function (result) {
+        migrationsPreflightCache = result.data;
+        renderMigrationsPreflight(result.data, migrationsStatusCache);
+        updateMigrationsActionButtons(migrationsStatusCache, migrationsDiagnosticsCache);
+        return result;
+      })
+      .catch(function () {
+        migrationsPreflightCache = { success: false, error: 'Could not run preflight checks.' };
+        renderMigrationsPreflight(migrationsPreflightCache, migrationsStatusCache);
+        return { ok: false, data: migrationsPreflightCache };
+      });
+  }
+
+  function runMigrationsPreflight() {
+    const btn = document.getElementById('migrationsPreflightBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Running...';
+    }
+    return loadMigrationPreflight().finally(function () {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Run preflight';
+      }
+    });
   }
 
   function renderMigrationsHistory(revisions) {
@@ -2473,11 +2592,13 @@
     const mergeBtn = document.getElementById('migrationsMergeBtn');
     const repairBtn = document.getElementById('migrationsRepairBtn');
     const upgradeBtn = document.getElementById('migrationsUpgradeBtn');
+    const applyNextBtn = document.getElementById('migrationsApplyNextBtn');
     const enabled = !!(status && status.web_migrations_enabled);
     const needsRepair = !!(status && (status.needs_repair || status.chain_broken));
     const multipleHeads = !!(status && status.multiple_heads) || !!(diagnostics && diagnostics.multiple_heads);
     const hasOrphans = !!(status && status.has_orphan_files) || !!(diagnostics && diagnostics.has_orphan_files);
     const pendingCount = (status && status.pending_count) || 0;
+    const preflightReady = !migrationsPreflightCache || migrationsPreflightCache.ready !== false;
 
     if (fixBtn) {
       const showFix = needsRepair || multipleHeads || hasOrphans;
@@ -2497,9 +2618,74 @@
       repairBtn.classList.toggle('hidden', !showRepair);
       repairBtn.disabled = !enabled || !showRepair;
     }
-    if (upgradeBtn) {
-      upgradeBtn.disabled = !enabled || !status || status.is_up_to_date || pendingCount === 0 || needsRepair;
+    if (applyNextBtn) {
+      applyNextBtn.disabled = !enabled || !status || status.is_up_to_date || pendingCount === 0 || needsRepair || !preflightReady;
+      applyNextBtn.title = !preflightReady
+        ? 'Resolve preflight blockers or run preflight again before applying.'
+        : '';
     }
+    if (upgradeBtn) {
+      upgradeBtn.disabled = !enabled || !status || status.is_up_to_date || pendingCount === 0 || needsRepair || !preflightReady;
+      upgradeBtn.title = !preflightReady
+        ? 'Resolve preflight blockers or run preflight again before applying.'
+        : '';
+    }
+  }
+
+  function formatMigrationsResultMessage(res, successMessage) {
+    const data = (res && res.data) || {};
+    if (res.ok && data.success) {
+      let message = data.message || successMessage || 'Operation completed successfully.';
+      if (data.mode === 'next' && data.attempted_revision) {
+        message += '\nApplied revision: ' + data.attempted_revision;
+      }
+      if (data.applied_from || data.applied_to) {
+        message += '\nRevision: ' + (data.applied_from || '(none)') + ' -> ' + (data.applied_to || '(unknown)');
+      }
+      if (data.applied_count != null) {
+        message += '\nMigrations applied: ' + data.applied_count;
+      }
+      if (data.pending_count != null) {
+        message += '\nRemaining pending: ' + data.pending_count;
+      }
+      if (data.backup_path) {
+        message += '\nBackup: ' + data.backup_path;
+      }
+      if (data.removed_files && data.removed_files.length) {
+        message += '\nRemoved files: ' + data.removed_files.join(', ');
+      }
+      if (data.new_file && data.new_file.filename) {
+        message += '\nNew merge file: ' + data.new_file.filename;
+      }
+      if (data.git_commit_reminder) {
+        message += '\n\n' + data.git_commit_reminder;
+      }
+      if (data.stamped_from || data.stamped_to) {
+        message += '\nStamped: ' + (data.stamped_from || '(none)') + ' -> ' + (data.stamped_to || '(unknown)');
+      }
+      if (data.upgrade_output) {
+        message += '\nUpgrade output: ' + data.upgrade_output;
+      }
+      if (data.output) {
+        message += '\nOutput: ' + data.output;
+      }
+      return message;
+    }
+
+    let message = data.error || 'Operation failed.';
+    if (data.failed_revision) {
+      message = 'Failed revision: ' + data.failed_revision + '\n' + message;
+    }
+    if (data.target_revision) {
+      message += '\nTarget: ' + data.target_revision;
+    }
+    if (data.applied_from) {
+      message += '\nStarted from: ' + data.applied_from;
+    }
+    if (data.output) {
+      message += '\n\nOutput:\n' + data.output;
+    }
+    return message;
   }
 
   function showMigrationsResult(res, successMessage) {
@@ -2508,38 +2694,21 @@
     result.classList.remove('hidden');
     if (res.ok && res.data && res.data.success) {
       result.className = 'rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 whitespace-pre-wrap';
-      let message = (res.data && res.data.message) || successMessage || 'Operation completed successfully.';
-      if (res.data.backup_path) {
-        message += '\nBackup: ' + res.data.backup_path;
-      }
-      if (res.data.removed_files && res.data.removed_files.length) {
-        message += '\nRemoved files: ' + res.data.removed_files.join(', ');
-      }
-      if (res.data.new_file && res.data.new_file.filename) {
-        message += '\nNew merge file: ' + res.data.new_file.filename;
-      }
-      if (res.data.git_commit_reminder) {
-        message += '\n\n' + res.data.git_commit_reminder;
-      }
-      if (res.data.stamped_from || res.data.stamped_to) {
-        message += '\nStamped: ' + (res.data.stamped_from || '(none)') + ' -> ' + (res.data.stamped_to || '(unknown)');
-      }
-      if (res.data.upgrade_output) {
-        message += '\nUpgrade output: ' + res.data.upgrade_output;
-      }
-      result.textContent = message;
+      result.textContent = formatMigrationsResultMessage(res, successMessage);
     } else {
       result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 whitespace-pre-wrap';
-      result.textContent = (res.data && res.data.error) ? res.data.error : 'Operation failed.';
+      result.textContent = formatMigrationsResultMessage(res, successMessage);
     }
   }
 
   function setMigrationsButtonsLoading(loading, activeBtn, loadingText) {
     const buttons = [
       'migrationsRefreshBtn',
+      'migrationsPreflightBtn',
       'migrationsFixBtn',
       'migrationsMergeBtn',
       'migrationsRepairBtn',
+      'migrationsApplyNextBtn',
       'migrationsUpgradeBtn'
     ];
     buttons.forEach(function (id) {
@@ -2633,6 +2802,7 @@
     Promise.all([
       loadMigrationStatus(),
       loadMigrationDiagnostics(),
+      loadMigrationPreflight(),
       fetch('/api/admin/migrations/history?limit=10', { credentials: 'same-origin' })
         .then(function (response) {
           return response.json().then(function (data) {
@@ -2643,7 +2813,7 @@
       .then(function (results) {
         const statusResult = results[0];
         const diagnosticsResult = results[1];
-        const historyResult = results[2];
+        const historyResult = results[3];
         const status = statusResult.data || {};
         const diagnostics = diagnosticsResult.data || {};
         renderMigrationsSummary(status);
@@ -2669,6 +2839,78 @@
     document.getElementById('migrationsModal').style.display = 'none';
   }
 
+  function postMigrationsUpgrade(options) {
+    const payload = Object.assign({ confirm: true }, options || {});
+    const activeBtn = payload.mode === 'next'
+      ? document.getElementById('migrationsApplyNextBtn')
+      : document.getElementById('migrationsUpgradeBtn');
+    const loadingText = payload.mode === 'next' ? 'Applying next...' : 'Applying all...';
+    const result = document.getElementById('migrationsResult');
+
+    setMigrationsButtonsLoading(true, activeBtn, loadingText);
+
+    return fetch('/api/admin/migrations/upgrade', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, data: data };
+        });
+      })
+      .then(function (res) {
+        setMigrationsButtonsLoading(false);
+        const successMessage = payload.mode === 'next'
+          ? 'Next migration applied successfully.'
+          : 'Migrations applied successfully.';
+        showMigrationsResult(res, successMessage);
+        return refreshMigrationsModal();
+      })
+      .catch(function (error) {
+        setMigrationsButtonsLoading(false);
+        if (result) {
+          result.classList.remove('hidden');
+          result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800';
+          result.textContent = 'Migration upgrade failed: ' + error;
+        }
+      });
+  }
+
+  function applyMigrationsUpgradeNext() {
+    if (!migrationsStatusCache || migrationsStatusCache.is_up_to_date) {
+      alert('Database is already up to date.');
+      return;
+    }
+
+    if (migrationsStatusCache.needs_repair || migrationsStatusCache.chain_broken) {
+      alert('Migration chain is broken. Use Fix migrations or Repair migration chain first.');
+      return;
+    }
+
+    const pending = migrationsStatusCache.pending_revisions || [];
+    if (!pending.length) {
+      alert('No pending migrations to apply.');
+      return;
+    }
+
+    if (migrationsPreflightCache && migrationsPreflightCache.ready === false) {
+      alert('Preflight found blockers. Resolve them or run preflight again before applying.');
+      return;
+    }
+
+    const nextRevision = pending[0].revision;
+    if (!window.confirm(
+      'Apply the next pending migration only?\n\nRevision: ' + nextRevision +
+      '\n' + (pending[0].message || '')
+    )) {
+      return;
+    }
+
+    return postMigrationsUpgrade({ mode: 'next' });
+  }
+
   function applyMigrationsUpgrade() {
     if (!migrationsStatusCache || migrationsStatusCache.is_up_to_date) {
       alert('Database is already up to date.');
@@ -2681,42 +2923,17 @@
     }
 
     const pendingCount = migrationsStatusCache.pending_count || 0;
+    if (migrationsPreflightCache && migrationsPreflightCache.ready === false) {
+      alert('Preflight found blockers. Resolve them or run preflight again before applying.');
+      return;
+    }
     if (!window.confirm(
       'This will apply ' + pendingCount + ' pending migration(s) to the database. Continue?'
     )) {
       return;
     }
 
-    const upgradeBtn = document.getElementById('migrationsUpgradeBtn');
-    const result = document.getElementById('migrationsResult');
-
-    setMigrationsButtonsLoading(true, upgradeBtn, 'Applying...');
-
-    fetch('/api/admin/migrations/upgrade', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ confirm: true })
-    })
-      .then(function (response) {
-        return response.json().then(function (data) {
-          return { ok: response.ok, data: data };
-        });
-      })
-      .then(function (res) {
-        setMigrationsButtonsLoading(false);
-
-        showMigrationsResult(res, 'Migrations applied successfully.');
-        return refreshMigrationsModal();
-      })
-      .catch(function (error) {
-        setMigrationsButtonsLoading(false);
-        if (result) {
-          result.classList.remove('hidden');
-          result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800';
-          result.textContent = 'Migration upgrade failed: ' + error;
-        }
-      });
+    return postMigrationsUpgrade({ mode: 'all' });
   }
 
   function applyMigrationsMerge() {

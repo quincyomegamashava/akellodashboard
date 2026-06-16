@@ -3,6 +3,8 @@
 from alembic import op
 import sqlalchemy as sa
 
+from app.migration_schema import column_exists, fk_exists, index_exists, table_exists
+
 
 revision = "s1t2u3v4w5"
 down_revision = "r8s9t0u1v2w3"
@@ -10,10 +12,24 @@ branch_labels = None
 depends_on = None
 
 
+def _bind():
+    return op.get_bind()
+
+
 def _table_exists(name):
-    bind = op.get_bind()
-    insp = sa.inspect(bind)
-    return name in insp.get_table_names()
+    return table_exists(_bind(), name)
+
+
+def _column_exists(table_name, column_name):
+    return column_exists(_bind(), table_name, column_name)
+
+
+def _index_exists(table_name, index_name):
+    return index_exists(_bind(), table_name, index_name)
+
+
+def _fk_exists(table_name, fk_name):
+    return fk_exists(_bind(), table_name, fk_name)
 
 
 def upgrade():
@@ -68,20 +84,27 @@ def upgrade():
 
     if _table_exists("notifications"):
         with op.batch_alter_table("notifications", schema=None) as batch_op:
-            batch_op.add_column(
-                sa.Column("stakeholder_lead_id", sa.Integer(), nullable=True)
-            )
-            batch_op.create_foreign_key(
-                "fk_notifications_stakeholder_lead_id",
-                "sales_marketing_stakeholder_leads",
-                ["stakeholder_lead_id"],
-                ["id"],
-                ondelete="SET NULL",
-            )
-            batch_op.create_index(
-                "ix_notifications_stakeholder_lead_id",
-                ["stakeholder_lead_id"],
-            )
+            if not _column_exists("notifications", "stakeholder_lead_id"):
+                batch_op.add_column(
+                    sa.Column("stakeholder_lead_id", sa.Integer(), nullable=True)
+                )
+            if _column_exists("notifications", "stakeholder_lead_id") and not _fk_exists(
+                "notifications", "fk_notifications_stakeholder_lead_id"
+            ):
+                batch_op.create_foreign_key(
+                    "fk_notifications_stakeholder_lead_id",
+                    "sales_marketing_stakeholder_leads",
+                    ["stakeholder_lead_id"],
+                    ["id"],
+                    ondelete="SET NULL",
+                )
+            if _column_exists("notifications", "stakeholder_lead_id") and not _index_exists(
+                "notifications", "ix_notifications_stakeholder_lead_id"
+            ):
+                batch_op.create_index(
+                    "ix_notifications_stakeholder_lead_id",
+                    ["stakeholder_lead_id"],
+                )
 
     # Backfill activities from existing notes
     if _table_exists("sales_marketing_stakeholder_lead_notes") and _table_exists(
