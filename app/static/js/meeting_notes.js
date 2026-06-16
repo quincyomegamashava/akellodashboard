@@ -116,6 +116,20 @@
     medium: { border: "#0ea5e9", chipBg: "#eff6ff", chipText: "#0369a1", rowBg: "#f8fcff" },
     low: { border: "#94a3b8", chipBg: "#f8fafc", chipText: "#475569", rowBg: "#f8fafc" },
   };
+
+  const PDF_THEME = {
+    primary: [0, 64, 125],
+    primaryLight: [239, 246, 255],
+    sectionBg: [241, 245, 249],
+    text: [15, 23, 42],
+    muted: [100, 116, 139],
+    border: [203, 213, 225],
+    white: [255, 255, 255],
+    success: [22, 101, 52],
+    warning: [180, 83, 9],
+  };
+
+  const PDF_MARGINS = { left: 42, right: 42, top: 68, bottom: 36 };
   let boardGroupMode = "status";
   let labelsCache = [];
 
@@ -186,6 +200,17 @@
     }).join("\n");
   }
 
+  function getPdfAssigneeNames(it) {
+    if (it.assignee_names && it.assignee_names.length) return it.assignee_names.join(", ");
+    return getAssigneeLabels(it.assignee_ids).join(", ");
+  }
+
+  function hexToRgbArray(hex) {
+    const s = String(hex || "").replace("#", "");
+    if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+    return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)];
+  }
+
   function loadPdfLogoDataUrl(url) {
     if (!url) return Promise.resolve(null);
     return fetch(API.pdfLogo(url), {
@@ -224,45 +249,145 @@
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const pageNum = doc.internal.getNumberOfPages();
-    const accent = [56, 189, 248];
-    const primary = [3, 105, 161];
-    const muted = [71, 85, 105];
 
-    doc.setFillColor(248, 253, 255);
-    doc.rect(0, 0, pageW, 56, "F");
-    doc.setDrawColor(accent[0], accent[1], accent[2]);
-    doc.setLineWidth(1.2);
-    doc.line(24, 55, pageW - 24, 55);
+    doc.setFillColor(PDF_THEME.white[0], PDF_THEME.white[1], PDF_THEME.white[2]);
+    doc.rect(0, 0, pageW, 52, "F");
+    doc.setFillColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.rect(0, 0, pageW, 4, "F");
 
     if (logoDataUrl) {
       try {
         const fmt = logoDataUrl.indexOf("image/png") !== -1 ? "PNG" : "JPEG";
-        doc.addImage(logoDataUrl, fmt, 28, 14, 96, 28);
+        doc.addImage(logoDataUrl, fmt, PDF_MARGINS.left, 14, 88, 26);
       } catch (e) {
-        doc.setFontSize(16);
-        doc.setTextColor(primary[0], primary[1], primary[2]);
-        doc.text("Akello", 28, 32);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+        doc.text("Akello", PDF_MARGINS.left, 32);
       }
     } else {
-      doc.setFontSize(16);
-      doc.setTextColor(primary[0], primary[1], primary[2]);
-      doc.text("Akello", 28, 32);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+      doc.text("Akello", PDF_MARGINS.left, 32);
     }
 
-    doc.setFontSize(10);
-    doc.setTextColor(primary[0], primary[1], primary[2]);
-    doc.text("Meeting Notes Intelligence Report", pageW - 28, 30, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    doc.text("Meeting Action Report", pageW - PDF_MARGINS.right, 22, { align: "right" });
+    if (meta && meta.meetingDate) {
+      doc.setFontSize(8);
+      doc.text(pdfFormatDisplayDate(meta.meetingDate), pageW - PDF_MARGINS.right, 34, { align: "right" });
+    }
 
-    doc.setFillColor(246, 251, 255);
-    doc.rect(0, pageH - 24, pageW, 24, "F");
+    doc.setDrawColor(PDF_THEME.border[0], PDF_THEME.border[1], PDF_THEME.border[2]);
+    doc.setLineWidth(0.5);
+    doc.line(PDF_MARGINS.left, 52, pageW - PDF_MARGINS.right, 52);
+
+    doc.setDrawColor(PDF_THEME.border[0], PDF_THEME.border[1], PDF_THEME.border[2]);
+    doc.line(PDF_MARGINS.left, pageH - 28, pageW - PDF_MARGINS.right, pageH - 28);
     doc.setFontSize(8);
-    doc.setTextColor(muted[0], muted[1], muted[2]);
-    const footerY = pageH - 10;
-    doc.text("Page " + pageNum, pageW - 28, footerY, { align: "right" });
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    const footerY = pageH - 14;
+    doc.text("Page " + pageNum, pageW - PDF_MARGINS.right, footerY, { align: "right" });
     if (meta && meta.title) {
-      const snippet = String(meta.title).slice(0, 60);
-      doc.text(snippet, 28, footerY);
+      doc.text(String(meta.title).slice(0, 72), PDF_MARGINS.left, footerY);
     }
+  }
+
+  function pdfFormatDisplayDate(value) {
+    if (!value) return "";
+    const raw = String(value).slice(0, 10);
+    try {
+      const parts = raw.split("-");
+      if (parts.length === 3) {
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        return months[parseInt(parts[1], 10) - 1] + " " + parseInt(parts[2], 10) + ", " + parts[0];
+      }
+    } catch (e) { /* fall through */ }
+    return raw;
+  }
+
+  function pdfFormatGeneratedAt() {
+    const now = new Date();
+    return now.toLocaleDateString(undefined, {
+      year: "numeric", month: "short", day: "numeric",
+    }) + " at " + now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function pdfStatusLabel(status) {
+    return String(status || "open").replace(/_/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  function pdfPriorityLabel(priority) {
+    return String(priority || "medium").replace(/_/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  function pdfTaskText(it) {
+    const text = normalizeBulletText(it.call_to_action);
+    if (text) return text;
+    if (it.ai_extracted) return "AI-suggested task";
+    return "Untitled action item";
+  }
+
+  function pdfFocusLabel(it) {
+    const focus = normalizeBulletText(it.focus_area);
+    return (focus && focus.split("\n")[0]) || "General";
+  }
+
+  function computePdfStats(items) {
+    let open = 0;
+    let done = 0;
+    let overdue = 0;
+    items.forEach(function (it) {
+      if ((it.status || "open") === "done") done += 1;
+      else {
+        open += 1;
+        if (isItemOverdue(it)) overdue += 1;
+      }
+    });
+    return { total: items.length, open: open, done: done, overdue: overdue };
+  }
+
+  function pdfAutoTableChromeHook(doc, logoDataUrl, meta) {
+    return function () {
+      drawPdfPageChrome(doc, logoDataUrl, meta);
+    };
+  }
+
+  function pdfBaseTableStyles() {
+    return {
+      theme: "grid",
+      styles: {
+        font: "helvetica",
+        fontSize: 8.5,
+        cellPadding: 5,
+        lineColor: PDF_THEME.border,
+        lineWidth: 0.25,
+        textColor: PDF_THEME.text,
+        valign: "top",
+      },
+      headStyles: {
+        fillColor: PDF_THEME.primary,
+        textColor: PDF_THEME.white,
+        fontStyle: "bold",
+        fontSize: 8,
+        cellPadding: 6,
+      },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: PDF_MARGINS.left, right: PDF_MARGINS.right, top: PDF_MARGINS.top },
+      didDrawPage: null,
+    };
+  }
+
+  function pdfApplyPriorityStyle(data, columnIndex) {
+    if (data.section !== "body" || data.column.index !== columnIndex) return;
+    const pr = String(data.cell.raw || "").toLowerCase();
+    const pal = TASK_PALETTES[pr] || TASK_PALETTES.medium;
+    const rgb = hexToRgbArray(pal.chipText);
+    if (rgb) data.cell.styles.textColor = rgb;
+    data.cell.styles.fontStyle = "bold";
   }
 
   function formatBulletsHtml(text) {
@@ -2645,168 +2770,306 @@
     return data.items || [];
   }
 
-  function buildPdfHeaders(pdfOpts) {
-    const cols = [];
-    if (!meetingNoteId) cols.push("Meeting");
-    cols.push("Platform", "Focus area", "Call to action", "Impact", "Start", "Due");
-    if (pdfOpts.includeLabelsPriority) cols.push("Priority", "Labels");
-    cols.push("Progress");
-    if (pdfOpts.includeSubtasks) cols.push("Sub-tasks");
-    cols.push("Challenges", "Comments");
-    if (pdfOpts.includeDiscussion) cols.push("Discussion");
-    cols.push("Led by", "Status");
-    return [cols];
-  }
-
-  function buildPdfRowCells(it, pdfOpts) {
-    const names = (it.assignee_names && it.assignee_names.length)
-      ? it.assignee_names.join(", ")
-      : getAssigneeLabels(it.assignee_ids).join(", ");
-    const st = (it.status || "open").replace(/_/g, " ");
-    let cta = linesToBulletCell(it.call_to_action);
-    if (it.ai_extracted && cta) cta += " *";
-    else if (it.ai_extracted) cta = "*";
-    const row = [];
-    if (!meetingNoteId) {
-      row.push((it.meeting_title || "") + " (" + (it.meeting_date || "") + ")");
-    }
-    row.push(
-      it.platform || "",
-      linesToBulletCell(it.focus_area),
-      cta,
-      linesToBulletCell(it.expected_impact),
-      it.start_date ? String(it.start_date).slice(0, 10) : "",
-      it.due_date ? String(it.due_date).slice(0, 10) : ""
-    );
-    if (pdfOpts.includeLabelsPriority) {
-      row.push((it.priority || "medium").replace(/_/g, " "), formatLabelsPdf(it.labels));
-    }
-    row.push(formatProgressPdf(it));
-    if (pdfOpts.includeSubtasks) row.push(formatSubtasksPdf(it.subtasks));
-    row.push(linesToBulletCell(it.challenges), linesToBulletCell(it.comments));
-    if (pdfOpts.includeDiscussion) row.push(formatCommentThreadPdf(it.comment_threads));
-    row.push(names, st);
-    return row;
-  }
-
-  function buildPdfTableConfig(doc, headers, body, startY, logoDataUrl, pdfOpts, meta, rawItems) {
+  function getPdfContentBounds(doc) {
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
     return {
-      head: headers,
-      body: body,
-      startY: startY,
-      theme: "striped",
-      styles: {
-        fontSize: 7,
-        cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
-        overflow: "linebreak",
-        textColor: [30, 41, 59],
-        lineColor: [226, 232, 240],
-        lineWidth: 0.2,
-      },
-      headStyles: {
-        fillColor: [224, 242, 254],
-        textColor: [3, 105, 161],
-        fontStyle: "bold",
-        lineColor: [125, 211, 252],
-        lineWidth: 0.4,
-      },
-      alternateRowStyles: { fillColor: [248, 252, 255] },
-      tableLineColor: [226, 232, 240],
-      tableLineWidth: 0.2,
-      bodyStyles: { valign: "top" },
-      margin: { top: 52, left: 28, right: 28, bottom: 32 },
-      didParseCell: function (data) {
-        if (data.section !== "body") return;
-        const row = rawItems && rawItems[data.row.index];
-        if (!row) return;
-        const pr = ((row.priority || "medium") + "").toLowerCase();
-        const pal = TASK_PALETTES[pr] || TASK_PALETTES.medium;
-        if (data.column.index === 0 || (!meetingNoteId && data.column.index === 1)) {
-          const rgb = hexToRgbArray(pal.rowBg);
-          if (rgb) data.cell.styles.fillColor = rgb;
-        }
-      },
-      didDrawPage: function () {
-        drawPdfPageChrome(doc, logoDataUrl, meta);
-      },
+      left: PDF_MARGINS.left,
+      right: pageW - PDF_MARGINS.right,
+      width: pageW - PDF_MARGINS.left - PDF_MARGINS.right,
+      top: PDF_MARGINS.top,
+      maxY: pageH - PDF_MARGINS.bottom,
     };
   }
 
-  function hexToRgbArray(hex) {
-    const s = String(hex || "").replace("#", "");
-    if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
-    return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)];
+  function sortPdfItems(items, groupByPlatform) {
+    return items.slice().sort(function (a, b) {
+      const pa = a.platform || "General";
+      const pb = b.platform || "General";
+      if (groupByPlatform && pa !== pb) return pa.localeCompare(pb);
+      const fa = pdfFocusLabel(a);
+      const fb = pdfFocusLabel(b);
+      if (fa !== fb) return fa.localeCompare(fb);
+      return (a.sort_order || 0) - (b.sort_order || 0);
+    });
   }
 
-  function renderPdfCover(doc, logoDataUrl, pdfOpts, meta) {
+  function pdfOverviewColumns(pdfOpts) {
+    const showMeetingCol = !meetingNoteId;
+    const showPlatformCol = !pdfOpts.groupByPlatform || !meetingNoteId;
+    let count = 7;
+    if (showMeetingCol) count += 1;
+    if (showPlatformCol) count += 1;
+    if (pdfOpts.includeLabelsPriority) count += 1;
+
+    let priority = 1;
+    if (showMeetingCol) priority += 1;
+    priority += 1;
+    if (showPlatformCol) priority += 1;
+    priority += 1;
+
+    return {
+      showMeetingCol: showMeetingCol,
+      showPlatformCol: showPlatformCol,
+      includeLabels: pdfOpts.includeLabelsPriority,
+      count: count,
+      priority: priority,
+    };
+  }
+
+  function buildPdfOverviewBody(items, pdfOpts) {
+    const cols = pdfOverviewColumns(pdfOpts);
+    const body = [];
+    let lastPlatform = null;
+    const sorted = sortPdfItems(items, pdfOpts.groupByPlatform);
+
+    sorted.forEach(function (it, index) {
+      const platform = it.platform || "General";
+      if (pdfOpts.groupByPlatform && meetingNoteId && platform !== lastPlatform) {
+        body.push([{
+          content: "Platform: " + platform,
+          colSpan: cols.count,
+          styles: {
+            fillColor: PDF_THEME.primaryLight,
+            textColor: PDF_THEME.primary,
+            fontStyle: "bold",
+            fontSize: 9,
+          },
+        }]);
+        lastPlatform = platform;
+      }
+
+      const row = [String(index + 1)];
+      if (cols.showMeetingCol) {
+        const meetingLabel = it.meeting_title || "Meeting";
+        const dateSuffix = it.meeting_date ? "\n" + pdfFormatDisplayDate(it.meeting_date) : "";
+        row.push(meetingLabel + dateSuffix);
+      }
+      row.push(pdfTaskText(it));
+      if (cols.showPlatformCol) row.push(platform);
+      row.push(
+        pdfFocusLabel(it),
+        pdfPriorityLabel(it.priority),
+        pdfStatusLabel(it.status),
+        it.due_date ? pdfFormatDisplayDate(it.due_date) : "—",
+        getPdfAssigneeNames(it) || "—"
+      );
+      if (cols.includeLabels) {
+        row.push(formatLabelsPdf(it.labels) || "—");
+      }
+      body.push(row);
+    });
+    return { body: body, cols: cols, sorted: sorted };
+  }
+
+  function buildPdfOverviewHead(cols) {
+    const head = ["#", "Action item"];
+    if (cols.showMeetingCol) head.splice(1, 0, "Meeting");
+    if (cols.showPlatformCol) head.push("Platform");
+    head.push("Focus", "Priority", "Status", "Due", "Assignees");
+    if (cols.includeLabels) head.push("Labels");
+    return [head];
+  }
+
+  function renderPdfOverviewTable(doc, items, pdfOpts, meta, logoDataUrl, startY) {
+    if (!doc.autoTable) {
+      throw new Error("PDF table plugin not loaded.");
+    }
+    const built = buildPdfOverviewBody(items, pdfOpts);
+    const tableOpts = pdfBaseTableStyles();
+    tableOpts.startY = startY;
+    tableOpts.head = buildPdfOverviewHead(built.cols);
+    tableOpts.body = built.body;
+    tableOpts.didDrawPage = pdfAutoTableChromeHook(doc, logoDataUrl, meta);
+    tableOpts.columnStyles = { 0: { cellWidth: 22, halign: "center" } };
+    tableOpts.didParseCell = function (data) {
+      pdfApplyPriorityStyle(data, built.cols.priority);
+    };
+    doc.autoTable(tableOpts);
+    return { finalY: doc.lastAutoTable.finalY + 16, sorted: built.sorted };
+  }
+
+  function itemHasPdfDetails(it, pdfOpts) {
+    if (it.expected_impact || it.challenges || it.comments) return true;
+    if (pdfOpts.includeSubtasks && it.subtasks && it.subtasks.length) return true;
+    if (pdfOpts.includeDiscussion && it.comment_threads && it.comment_threads.length) return true;
+    return false;
+  }
+
+  function renderPdfDetailSection(doc, sortedItems, pdfOpts, meta, logoDataUrl, startY) {
+    if (!doc.autoTable) return startY;
+    const detailed = sortedItems.filter(function (it) { return itemHasPdfDetails(it, pdfOpts); });
+    if (!detailed.length) return startY;
+
+    const bounds = getPdfContentBounds(doc);
+    let y = startY;
+    if (y > bounds.top + 20) {
+      doc.addPage();
+      y = PDF_MARGINS.top;
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("Supporting detail", bounds.left, y);
+    y += 8;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    doc.text("Expanded context for action items with impact notes, challenges, sub-tasks, or discussion.", bounds.left, y);
+    y += 14;
+
+    const body = [];
+    detailed.forEach(function (it) {
+      const itemNum = sortedItems.indexOf(it) + 1;
+      const parts = [];
+      if (it.expected_impact) parts.push("Impact: " + normalizeBulletText(it.expected_impact));
+      if (it.challenges) parts.push("Challenges: " + normalizeBulletText(it.challenges));
+      if (it.comments) parts.push("Comments: " + normalizeBulletText(it.comments));
+      if (pdfOpts.includeSubtasks && it.subtasks && it.subtasks.length) {
+        parts.push("Sub-tasks:\n" + formatSubtasksPdf(it.subtasks));
+      }
+      if (pdfOpts.includeDiscussion && it.comment_threads && it.comment_threads.length) {
+        parts.push("Discussion:\n" + formatCommentThreadPdf(it.comment_threads));
+      }
+      const ref = "#" + itemNum + " — " + pdfFirstLine(pdfTaskText(it), 80);
+      body.push([ref, parts.join("\n\n")]);
+    });
+
+    const tableOpts = pdfBaseTableStyles();
+    tableOpts.startY = y;
+    tableOpts.head = [["Item", "Detail"]];
+    tableOpts.body = body;
+    tableOpts.didDrawPage = pdfAutoTableChromeHook(doc, logoDataUrl, meta);
+    tableOpts.columnStyles = {
+      0: { cellWidth: 148, fontStyle: "bold" },
+      1: { cellWidth: "auto" },
+    };
+    doc.autoTable(tableOpts);
+    return doc.lastAutoTable.finalY + 12;
+  }
+
+  function pdfFirstLine(text, maxLen) {
+    const line = String(text || "").split("\n")[0] || "";
+    if (maxLen && line.length > maxLen) return line.slice(0, maxLen - 1) + "…";
+    return line;
+  }
+
+  function drawPdfStatChip(doc, x, y, label, value, fillRgb) {
+    const w = 108;
+    const h = 42;
+    doc.setFillColor(fillRgb[0], fillRgb[1], fillRgb[2]);
+    doc.setDrawColor(PDF_THEME.border[0], PDF_THEME.border[1], PDF_THEME.border[2]);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(x, y, w, h, 6, 6, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text(String(value), x + 12, y + 22);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    doc.text(label, x + 12, y + 34);
+  }
+
+  function renderPdfCover(doc, logoDataUrl, pdfOpts, meta, stats) {
     drawPdfPageChrome(doc, logoDataUrl, meta);
-    const accent = [56, 189, 248];
-    const primary = [3, 105, 161];
-    const muted = [71, 85, 105];
-    const pageW = doc.internal.pageSize.getWidth();
-    let y = 84;
-    const title = meta.title || "All action items";
-    const meetingDate = meta.meetingDate || "";
-    doc.setDrawColor(accent[0], accent[1], accent[2]);
-    doc.setLineWidth(2);
-    doc.line(64, y, 64, y + 54);
+    const bounds = getPdfContentBounds(doc);
+    let y = 78;
+
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
-    doc.setTextColor(primary[0], primary[1], primary[2]);
-    doc.text(title, 76, y + 4);
-    y += 22;
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    const titleLines = doc.splitTextToSize(meta.title || "Meeting action report", bounds.width - 20);
+    doc.text(titleLines, bounds.left, y);
+    y += titleLines.length * 26 + 4;
+
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.setTextColor(muted[0], muted[1], muted[2]);
-    doc.text("Strategic Meeting Execution Report", 76, y);
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    doc.text("Strategic meeting action report", bounds.left, y);
     y += 18;
-    doc.setFillColor(239, 246, 255);
-    doc.roundedRect(76, y - 10, 220, 18, 6, 6, "F");
-    doc.setTextColor(primary[0], primary[1], primary[2]);
+
     doc.setFontSize(9);
-    doc.text("Generated: " + new Date().toISOString().slice(0, 16).replace("T", " "), 86, y + 2);
-    y += 18;
-    if (meetingDate) {
-      doc.setFillColor(224, 242, 254);
-      doc.roundedRect(76, y - 10, 160, 18, 6, 6, "F");
-      doc.setTextColor(12, 74, 110);
-      doc.text("Meeting date: " + meetingDate, 86, y + 2);
+    doc.text("Generated " + pdfFormatGeneratedAt(), bounds.left, y);
+    y += 12;
+    if (meta.meetingDate) {
+      doc.text("Meeting date: " + pdfFormatDisplayDate(meta.meetingDate), bounds.left, y);
       y += 12;
     }
+
+    if (stats) {
+      y += 6;
+      drawPdfStatChip(doc, bounds.left, y, "Total items", stats.total, PDF_THEME.primaryLight);
+      drawPdfStatChip(doc, bounds.left + 118, y, "Open", stats.open, [255, 251, 235]);
+      drawPdfStatChip(doc, bounds.left + 236, y, "Completed", stats.done, [240, 253, 244]);
+      drawPdfStatChip(doc, bounds.left + 354, y, "Overdue", stats.overdue, [254, 242, 242]);
+      y += 56;
+    }
+
     if (meetingNoteId) {
       const attendeeLine = formatAttendeesPdfLine();
       if (attendeeLine) {
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
-        doc.setTextColor(muted[0], muted[1], muted[2]);
-        const attLines = doc.splitTextToSize(attendeeLine, pageW - 160);
-        doc.text(attLines, 76, y + 8);
-        y += attLines.length * 10 + 2;
+        doc.setTextColor(PDF_THEME.text[0], PDF_THEME.text[1], PDF_THEME.text[2]);
+        doc.text("Attendees", bounds.left, y);
+        y += 12;
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+        const attLines = doc.splitTextToSize(attendeeLine, bounds.width);
+        doc.text(attLines, bounds.left, y);
+        y += attLines.length * 11 + 8;
       }
+
       if (pdfOpts.includeSummary && typeof MN_MEETING_SUMMARY === "string" && MN_MEETING_SUMMARY.trim()) {
-        y += 10;
-        doc.setTextColor(primary[0], primary[1], primary[2]);
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(11);
-        doc.text("Summary", 76, y);
-        y += 10;
-        const sumLines = doc.splitTextToSize(MN_MEETING_SUMMARY.trim(), pageW - 160);
-        doc.setFillColor(240, 249, 255);
-        const summaryHeight = Math.max(28, sumLines.length * 10 + 10);
-        doc.roundedRect(76, y - 9, pageW - 152, summaryHeight, 8, 8, "F");
-        doc.setTextColor(muted[0], muted[1], muted[2]);
-        doc.setFontSize(9);
-        doc.text(sumLines, 84, y + 2);
-        y += sumLines.length * 10 + 10;
+        doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+        doc.text("Executive summary", bounds.left, y);
+        y += 12;
+        doc.setFillColor(PDF_THEME.primaryLight[0], PDF_THEME.primaryLight[1], PDF_THEME.primaryLight[2]);
+        const sumLines = doc.splitTextToSize(MN_MEETING_SUMMARY.trim(), bounds.width - 24);
+        const boxH = Math.max(36, sumLines.length * 11 + 18);
+        doc.roundedRect(bounds.left, y - 8, bounds.width, boxH, 8, 8, "F");
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9.5);
+        doc.setTextColor(PDF_THEME.text[0], PDF_THEME.text[1], PDF_THEME.text[2]);
+        doc.text(sumLines, bounds.left + 12, y + 4);
+        y += boxH + 8;
       }
     }
+
     if (meta.hasAiItems) {
       doc.setFontSize(8);
-      doc.setTextColor(8, 145, 178);
-      doc.text("* Includes AI-suggested tasks", 76, y + 8);
+      doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+      doc.text("* Includes AI-suggested tasks", bounds.left, y);
       y += 10;
     }
-    y += 14;
-    doc.setDrawColor(203, 213, 225);
+
+    doc.setDrawColor(PDF_THEME.border[0], PDF_THEME.border[1], PDF_THEME.border[2]);
     doc.setLineWidth(0.6);
-    doc.line(76, y, pageW - 76, y);
-    return y + 10;
+    doc.line(bounds.left, y + 4, bounds.right, y + 4);
+    return y + 18;
+  }
+
+  function renderPdfReportBody(doc, items, pdfOpts, meta, logoDataUrl, startY) {
+    const bounds = getPdfContentBounds(doc);
+    let y = startY;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("Action items", bounds.left, y);
+    y += 10;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    doc.text("Overview of tasks, owners, priorities, and due dates.", bounds.left, y);
+    y += 14;
+
+    y = renderPdfOverviewTable(doc, items, pdfOpts, meta, logoDataUrl, y);
+    return renderPdfDetailSection(doc, y.sorted, pdfOpts, meta, logoDataUrl, y.finalY);
   }
 
   async function buildExportPdfDocument() {
@@ -2834,7 +3097,7 @@
       throw new Error("No action items to export.");
     }
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
     const title = meetingNoteId && typeof MN_MEETING_TITLE === "string"
       ? MN_MEETING_TITLE
       : "All action items";
@@ -2844,35 +3107,11 @@
       meetingDate: meetingDate,
       hasAiItems: items.some(function (it) { return it.ai_extracted; }),
     };
-    let y = renderPdfCover(doc, logoDataUrl, pdfOpts, meta);
-    const headers = buildPdfHeaders(pdfOpts);
-    const rowCells = function (it) { return buildPdfRowCells(it, pdfOpts); };
-
-    if (meetingNoteId && pdfOpts.groupByPlatform) {
-      const byPlat = {};
-      items.forEach(function (it) {
-        const p = it.platform || "General";
-        if (!byPlat[p]) byPlat[p] = [];
-        byPlat[p].push(it);
-      });
-      Object.keys(byPlat).sort().forEach(function (plat) {
-        doc.setFillColor(224, 242, 254);
-        doc.roundedRect(56, y - 9, 220, 18, 6, 6, "F");
-        doc.setFontSize(9);
-        doc.setTextColor(2, 132, 199);
-        doc.text("PLATFORM", 66, y + 2);
-        doc.setTextColor(3, 105, 161);
-        doc.setFontSize(10);
-        doc.text(plat, 126, y + 2);
-        y += 16;
-        const body = byPlat[plat].map(rowCells);
-        doc.autoTable(buildPdfTableConfig(doc, headers, body, y, logoDataUrl, pdfOpts, meta, byPlat[plat]));
-        y = doc.lastAutoTable.finalY + 20;
-      });
-    } else {
-      const body = items.map(rowCells);
-      doc.autoTable(buildPdfTableConfig(doc, headers, body, y, logoDataUrl, pdfOpts, meta, items));
-    }
+    const stats = computePdfStats(items);
+    let y = renderPdfCover(doc, logoDataUrl, pdfOpts, meta, stats);
+    doc.addPage();
+    drawPdfPageChrome(doc, logoDataUrl, meta);
+    renderPdfReportBody(doc, items, pdfOpts, meta, logoDataUrl, PDF_MARGINS.top);
     const slug = String(title).replace(/[^\w\-]+/g, "_").slice(0, 40) || "export";
     const filename = "meeting-notes_" + slug + "_" + new Date().toISOString().slice(0, 10) + ".pdf";
     return { doc: doc, filename: filename };

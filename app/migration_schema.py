@@ -74,6 +74,16 @@ def migration_source_guards_table_create(source: str, table_name: str) -> bool:
 
 
 def migration_source_guards_column_add(source: str, table_name: str, column_name: str) -> bool:
+    if re.search(
+        rf'add_column_if_missing\([^)]*["\']{re.escape(table_name)}["\'][^)]*["\']{re.escape(column_name)}["\']',
+        source,
+    ):
+        return True
+    if re.search(
+        rf'column_exists\([^)]*["\']{re.escape(table_name)}["\'][^)]*["\']{re.escape(column_name)}["\']',
+        source,
+    ):
+        return True
     return bool(
         re.search(
             rf'_column_exists\(\s*["\']{re.escape(table_name)}["\']\s*,\s*["\']{re.escape(column_name)}["\']\s*\)',
@@ -83,8 +93,11 @@ def migration_source_guards_column_add(source: str, table_name: str, column_name
 
 
 def migration_source_guards_index_create(source: str, index_name: str) -> bool:
+    if re.search(rf'create_index_if_missing\([^)]*["\']{re.escape(index_name)}["\']', source):
+        return True
     return bool(
         re.search(rf'_index_exists\([^)]*["\']{re.escape(index_name)}["\']', source)
+        or re.search(rf'index_exists\([^)]*["\']{re.escape(index_name)}["\']', source)
     )
 
 
@@ -120,6 +133,17 @@ def parse_migration_schema_operations(source: str) -> list[dict[str, Any]]:
                 'column': col_match.group(1),
             })
 
+        add_if_missing = re.search(
+            r'add_column_if_missing\(\s*\w+\s*,\s*["\']([\w]+)["\']\s*,\s*["\']([\w]+)["\']',
+            stripped,
+        )
+        if add_if_missing:
+            operations.append({
+                'type': 'add_column',
+                'table': add_if_missing.group(1),
+                'column': add_if_missing.group(2),
+            })
+
         idx_match = re.search(
             r'create_index\(\s*["\']([\w]+)["\']\s*,\s*["\']([\w]+)["\']'
             r'(?:\s*,\s*\[([^\]]+)\])?',
@@ -133,6 +157,19 @@ def parse_migration_schema_operations(source: str) -> list[dict[str, Any]]:
                 'index': idx_match.group(1),
                 'table': idx_match.group(2),
                 'columns': columns,
+                'unique': 'unique=True' in stripped,
+            })
+
+        idx_if_missing = re.search(
+            r'create_index_if_missing\(\s*\w+\s*,\s*["\']([\w]+)["\']\s*,\s*["\']([\w]+)["\']',
+            stripped,
+        )
+        if idx_if_missing:
+            operations.append({
+                'type': 'create_index',
+                'index': idx_if_missing.group(1),
+                'table': idx_if_missing.group(2),
+                'columns': [],
                 'unique': 'unique=True' in stripped,
             })
 
@@ -280,3 +317,23 @@ def evaluate_operation_preflight(
             }
 
     return None
+
+
+def add_column_if_missing(bind, table_name: str, column_name: str, ddl: str) -> bool:
+    """Add a column via raw DDL when missing. Returns True if column was added."""
+    if column_exists(bind, table_name, column_name):
+        return False
+    bind.execute(sa.text(f'ALTER TABLE "{table_name}" ADD COLUMN {ddl}'))
+    return True
+
+
+def create_index_if_missing(bind, index_name: str, table_name: str, columns: list[str], *, unique: bool = False) -> bool:
+    """Create an index when missing. Returns True if index was created."""
+    if index_exists(bind, table_name, index_name):
+        return False
+    cols = ', '.join(f'"{col}"' for col in columns)
+    unique_sql = 'UNIQUE ' if unique else ''
+    bind.execute(
+        sa.text(f'CREATE {unique_sql}INDEX IF NOT EXISTS "{index_name}" ON "{table_name}" ({cols})')
+    )
+    return True

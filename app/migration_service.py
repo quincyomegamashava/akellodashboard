@@ -34,14 +34,26 @@ _upgrade_lock = threading.Lock()
 
 # Schema probes tied to recent meeting notes / sales marketing migrations.
 _SCHEMA_HINTS = (
+    {'check': 'meeting_notes_action_items.priority', 'type': 'column', 'table': 'meeting_notes_action_items', 'column': 'priority'},
+    {'check': 'meeting_notes_action_items.source_excerpt', 'type': 'column', 'table': 'meeting_notes_action_items', 'column': 'source_excerpt'},
+    {'check': 'meeting_notes_labels table', 'type': 'table', 'name': 'meeting_notes_labels'},
+    {'check': 'notifications.meeting_note_id', 'type': 'column', 'table': 'notifications', 'column': 'meeting_note_id'},
+    {'check': 'meeting_notes_decisions table', 'type': 'table', 'name': 'meeting_notes_decisions'},
+    {'check': 'sales_marketing_events.slug', 'type': 'column', 'table': 'sales_marketing_events', 'column': 'slug'},
     {'check': 'sales_marketing_stakeholder_leads table', 'type': 'table', 'name': 'sales_marketing_stakeholder_leads'},
     {'check': 'sales_marketing_stakeholder_leads.follow_up_status', 'type': 'column', 'table': 'sales_marketing_stakeholder_leads', 'column': 'follow_up_status'},
     {'check': 'meeting_notes_action_items table', 'type': 'table', 'name': 'meeting_notes_action_items'},
     {'check': 'meeting_notes_action_subtasks table', 'type': 'table', 'name': 'meeting_notes_action_subtasks'},
+    {'check': 'meeting_notes_action_subtasks.assignee_user_id', 'type': 'column', 'table': 'meeting_notes_action_subtasks', 'column': 'assignee_user_id'},
 )
 
 # Most specific schema signal first — used for stamp inference and recommendations.
 _SCHEMA_REVISION_HINTS = (
+    ('sales_marketing_events.slug', 't2u3v4w5x6y7', 'Phase 1–3 meeting notes / sales marketing features'),
+    ('meeting_notes_decisions table', 't2u3v4w5x6y7', 'Meeting notes decisions'),
+    ('meeting_notes_labels table', 'p6q7r8s9t0u1', 'Meeting notes planner upgrade'),
+    ('meeting_notes_action_items.priority', 'p6q7r8s9t0u1', 'Meeting notes priority column'),
+    ('meeting_notes_action_subtasks.assignee_user_id', 'q7r8s9t0u1v2', 'Subtask assignee user id'),
     ('sales_marketing_stakeholder_leads.follow_up_status', 'r8s9t0u1v2w3', 'Sales marketing enhancements (follow-up status)'),
     ('sales_marketing_stakeholder_leads table', 'o5p6q7r8s9t0', 'Sales marketing tables'),
     ('meeting_notes_action_subtasks table', 'n4o5p6q7r8s9', 'Meeting notes action subtasks'),
@@ -528,8 +540,8 @@ def _merge_diagnostics_into_status(status: dict[str, Any]) -> dict[str, Any]:
     return status
 
 
-def get_status() -> dict[str, Any]:
-    """Return current DB revision, heads, and pending migrations."""
+def _read_migration_status() -> dict[str, Any]:
+    """Return current DB revision, heads, and pending migrations (no health merge)."""
     try:
         script = _get_script_directory()
         heads = script.get_heads()
@@ -592,6 +604,30 @@ def get_status() -> dict[str, Any]:
             'needs_repair': True,
         }
         return _merge_diagnostics_into_status(status)
+
+
+def get_status() -> dict[str, Any]:
+    """Return current DB revision, heads, pending migrations, and health recommendations."""
+    status = _read_migration_status()
+    diagnostics = get_diagnostics()
+    health = get_health_recommendations(
+        status=status,
+        diagnostics=diagnostics,
+        preflight=_preflight_for_health(status),
+    )
+    status['health'] = health
+    status['is_healthy'] = health.get('is_healthy', False)
+    status['can_sync'] = health.get('can_sync', False)
+    status['can_downgrade'] = health.get('can_downgrade', False)
+    return status
+
+
+def _preflight_for_health(status: dict[str, Any]) -> dict[str, Any] | None:
+    if status.get('needs_repair') or status.get('chain_broken'):
+        return None
+    if (status.get('pending_count') or 0) <= 0:
+        return None
+    return get_preflight(status=status)
 
 
 def get_history(limit: int = 20) -> dict[str, Any]:
@@ -1159,10 +1195,11 @@ def _parse_failed_revision(output: str, pending: list[dict[str, Any]]) -> str | 
     return pending[0]['revision'] if pending else None
 
 
-def get_preflight() -> dict[str, Any]:
+def get_preflight(status: dict[str, Any] | None = None) -> dict[str, Any]:
     """Static + live schema checks for each pending migration."""
     try:
-        status = get_status()
+        if status is None:
+            status = _read_migration_status()
         if not status.get('success'):
             return {
                 'success': False,
@@ -1244,6 +1281,7 @@ def get_preflight() -> dict[str, Any]:
             'blockers': blockers,
             'warnings': warnings,
             'info': info,
+            'can_sync': _can_sync_pending(pending, blockers, warnings, info),
             'message': (
                 'Ready to apply migrations.'
                 if not blockers
@@ -1256,6 +1294,374 @@ def get_preflight() -> dict[str, Any]:
             'success': False,
             'error': str(exc),
         }
+
+
+def _missing_schema_hints(schema_hints: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    hints = schema_hints if schema_hints is not None else _build_schema_hints()
+    return [hint for hint in hints if not hint.get('exists')]
+
+
+def _infer_actual_schema_revision(schema_hints: list[dict[str, Any]] | None = None) -> str | None:
+    """Best-effort revision inferred from present schema objects (not alembic_version)."""
+    hints = schema_hints if schema_hints is not None else _build_schema_hints()
+    for check, revision, _label in _SCHEMA_REVISION_HINTS:
+        if _schema_hint_exists(hints, check):
+            return revision
+    return None
+
+
+def _can_sync_pending(
+    pending: list[dict[str, Any]],
+    blockers: list[dict[str, Any]],
+    warnings: list[dict[str, Any]],
+    info: list[dict[str, Any]],
+) -> bool:
+    """True when pending migrations appear already applied (preflight is info-only)."""
+    if not pending or blockers:
+        return False
+    if warnings:
+        return False
+    if not info:
+        return False
+    idempotent_codes = {
+        'table_exists_idempotent',
+        'column_exists_idempotent',
+        'index_exists',
+        'fk_exists',
+    }
+    return all(item.get('code') in idempotent_codes for item in info)
+
+
+def get_health_recommendations(
+    status: dict[str, Any] | None = None,
+    diagnostics: dict[str, Any] | None = None,
+    preflight: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Analyze migration + schema alignment and return actionable recommendations."""
+    if status is None:
+        status = _read_migration_status()
+    if diagnostics is None:
+        diagnostics = get_diagnostics()
+    if preflight is None and status.get('pending_count', 0) > 0 and not status.get('needs_repair'):
+        preflight = get_preflight(status=status)
+
+    schema_hints = diagnostics.get('schema_hints') or _build_schema_hints()
+    missing = _missing_schema_hints(schema_hints)
+    inferred_schema = _infer_actual_schema_revision(schema_hints)
+    current = status.get('current_revision')
+    heads = [h.get('revision') if isinstance(h, dict) else h for h in (status.get('head_revisions') or [])]
+    head = heads[0] if len(heads) == 1 else None
+    pending_count = status.get('pending_count') or 0
+    chain_broken = bool(status.get('chain_broken') or status.get('needs_repair'))
+    recommendations: list[dict[str, Any]] = []
+
+    if chain_broken:
+        recommendations.append({
+            'severity': 'error',
+            'code': 'chain_broken',
+            'title': 'Repair the migration chain',
+            'message': status.get('error_detail') or 'Migration files and database revision are out of sync.',
+            'action': 'fix_migrations',
+        })
+
+    if missing:
+        missing_list = ', '.join(item['check'] for item in missing[:5])
+        if len(missing) > 5:
+            missing_list += f' (+{len(missing) - 5} more)'
+        if status.get('is_up_to_date') and current:
+            recommendations.append({
+                'severity': 'error',
+                'code': 'schema_behind_revision',
+                'title': 'Database revision is ahead of schema',
+                'message': (
+                    f'alembic_version is {current} but required schema is missing: {missing_list}. '
+                    'This often happens after stamping without running upgrades.'
+                ),
+                'action': 'apply_migrations',
+            })
+            if inferred_schema and inferred_schema != current:
+                recommendations.append({
+                    'severity': 'warning',
+                    'code': 'stamp_to_match_schema',
+                    'title': 'Align revision to match schema',
+                    'message': (
+                        f'Schema objects suggest revision {inferred_schema} '
+                        f'but alembic_version is {current}. Consider stamping to {inferred_schema} '
+                        'then applying pending migrations.'
+                    ),
+                    'action': 'repair_stamp',
+                    'target_revision': inferred_schema,
+                })
+        else:
+            recommendations.append({
+                'severity': 'warning',
+                'code': 'schema_incomplete',
+                'title': 'Schema is incomplete',
+                'message': f'Missing: {missing_list}. Apply pending migrations to add them.',
+                'action': 'apply_migrations',
+            })
+
+    if pending_count > 0 and not chain_broken:
+        can_sync = bool(preflight and preflight.get('can_sync'))
+        if preflight and not preflight.get('ready'):
+            blocker_msgs = [
+                item.get('message', '')
+                for item in (preflight.get('blockers') or [])[:3]
+            ]
+            recommendations.append({
+                'severity': 'error',
+                'code': 'preflight_blockers',
+                'title': 'Resolve preflight blockers before upgrading',
+                'message': '; '.join(msg for msg in blocker_msgs if msg) or 'Preflight found blocking issues.',
+                'action': 'run_preflight',
+            })
+        elif can_sync:
+            sync_target = head or (status.get('pending_revisions') or [{}])[-1].get('revision')
+            recommendations.append({
+                'severity': 'info',
+                'code': 'sync_available',
+                'title': 'Sync revision without re-running DDL',
+                'message': (
+                    'Preflight shows pending migrations would only skip existing schema. '
+                    'Use Sync revision to update alembic_version safely.'
+                ),
+                'action': 'sync_revision',
+                'target_revision': sync_target,
+            })
+        else:
+            next_rev = (status.get('pending_revisions') or [{}])[0].get('revision')
+            recommendations.append({
+                'severity': 'info',
+                'code': 'pending_migrations',
+                'title': 'Apply pending migrations',
+                'message': (
+                    f'{pending_count} migration(s) pending'
+                    + (f' (next: {next_rev})' if next_rev else '')
+                    + '. Run preflight, then apply next or all.'
+                ),
+                'action': 'apply_migrations',
+            })
+
+    can_downgrade = bool(current) and not chain_broken
+    down_revision = None
+    if can_downgrade:
+        try:
+            script = _get_script_directory()
+            rev = script.get_revision(current)
+            parent = rev.down_revision
+            if isinstance(parent, tuple):
+                down_revision = parent[0] if parent else None
+            else:
+                down_revision = parent
+            can_downgrade = down_revision is not None
+        except Exception:
+            can_downgrade = False
+
+    if can_downgrade and missing and status.get('is_up_to_date'):
+        recommendations.append({
+            'severity': 'warning',
+            'code': 'rollback_option',
+            'title': 'Rollback one revision (advanced)',
+            'message': (
+                f'If schema was stamped incorrectly, roll back to {down_revision} '
+                'then re-apply migrations. A database backup is created automatically.'
+            ),
+            'action': 'downgrade_one',
+            'target_revision': down_revision,
+        })
+
+    is_healthy = (
+        not chain_broken
+        and not missing
+        and pending_count == 0
+        and status.get('success', True)
+    )
+
+    return {
+        'is_healthy': is_healthy,
+        'missing_schema': missing,
+        'inferred_schema_revision': inferred_schema,
+        'can_sync': bool(preflight and preflight.get('can_sync')) if pending_count else False,
+        'can_downgrade': can_downgrade,
+        'down_revision': down_revision,
+        'recommendations': recommendations,
+    }
+
+
+def run_sync_revision(revision: str | None = None) -> dict[str, Any]:
+    """Stamp to target when schema already matches pending migrations (no DDL)."""
+    disabled = _check_web_migrations_enabled()
+    if disabled:
+        return disabled
+
+    if not _upgrade_lock.acquire(blocking=False):
+        return {
+            'success': False,
+            'error': 'Another migration operation is already in progress.',
+        }
+
+    steps: list[dict[str, Any]] = []
+    try:
+        before = get_status()
+        if before.get('needs_repair') or before.get('chain_broken'):
+            return {
+                'success': False,
+                'error': before.get('error_detail') or 'Migration chain is broken. Repair first.',
+            }
+
+        preflight = get_preflight()
+        if not preflight.get('success'):
+            return {
+                'success': False,
+                'error': preflight.get('error') or 'Could not run preflight.',
+            }
+        if not preflight.get('can_sync'):
+            return {
+                'success': False,
+                'error': (
+                    'Sync is not available: preflight must show only idempotent skips '
+                    '(no blockers or warnings). Try Apply migrations instead.'
+                ),
+            }
+
+        heads = [h.get('revision') for h in (before.get('head_revisions') or [])]
+        target = revision or (heads[0] if len(heads) == 1 else 'head')
+        if not target:
+            return {'success': False, 'error': 'No sync target revision found.'}
+
+        backup_result = _backup_sqlite_database()
+        if not backup_result.get('success'):
+            return backup_result
+        steps.append({'step': 'backup', 'success': True, 'detail': backup_result.get('backup_path')})
+
+        stamped_from = before.get('current_revision')
+        stamp_detail = _stamp_revision(target, stamped_from)
+        steps.append({'step': 'sync_stamp', 'success': True, 'detail': stamp_detail})
+
+        after = get_status()
+        return {
+            'success': True,
+            'message': 'Revision synced without re-running DDL.',
+            'steps': steps,
+            'backup_path': backup_result.get('backup_path'),
+            'stamped_from': stamped_from,
+            'stamped_to': after.get('current_revision'),
+            'pending_count': after.get('pending_count', 0),
+            'is_up_to_date': after.get('is_up_to_date', False),
+            'output': stamp_detail.get('output', ''),
+        }
+    except CommandError as exc:
+        logger.error('Migration sync failed: %s', exc)
+        return {'success': False, 'error': str(exc), 'steps': steps}
+    except Exception as exc:
+        logger.exception('Migration sync failed')
+        return {'success': False, 'error': str(exc), 'steps': steps}
+    finally:
+        _upgrade_lock.release()
+
+
+def run_downgrade(
+    revision: str | None = None,
+    mode: str = 'one',
+) -> dict[str, Any]:
+    """Roll back migrations (one step or to a specific revision)."""
+    disabled = _check_web_migrations_enabled()
+    if disabled:
+        return disabled
+
+    if not _upgrade_lock.acquire(blocking=False):
+        return {
+            'success': False,
+            'error': 'Another migration operation is already in progress.',
+        }
+
+    buffer = io.StringIO()
+    steps: list[dict[str, Any]] = []
+    before: dict[str, Any] = {}
+
+    try:
+        before = get_status()
+        if before.get('needs_repair') or before.get('chain_broken'):
+            return {
+                'success': False,
+                'error': before.get('error_detail') or 'Migration chain is broken. Repair first.',
+            }
+
+        current = before.get('current_revision')
+        if not current:
+            return {'success': False, 'error': 'Database has no current revision to roll back from.'}
+
+        script = _get_script_directory()
+        if mode == 'one':
+            rev = script.get_revision(current)
+            parent = rev.down_revision
+            if isinstance(parent, tuple):
+                target = parent[0] if parent else None
+            else:
+                target = parent
+            if not target:
+                return {'success': False, 'error': 'Cannot roll back: already at base revision.'}
+        else:
+            target = (revision or '').strip()
+            if not target:
+                return {'success': False, 'error': 'revision is required when mode is "to".'}
+
+        backup_result = _backup_sqlite_database()
+        if not backup_result.get('success'):
+            return backup_result
+        steps.append({'step': 'backup', 'success': True, 'detail': backup_result.get('backup_path')})
+
+        config = _get_alembic_config()
+        with redirect_stdout(buffer):
+            command.downgrade(config, target)
+        output = buffer.getvalue().strip()
+
+        after = get_status()
+        steps.append({
+            'step': 'downgrade',
+            'success': True,
+            'detail': {'from': current, 'to': after.get('current_revision'), 'target': target},
+        })
+
+        return {
+            'success': True,
+            'message': 'Migration rollback completed.',
+            'mode': mode,
+            'applied_from': current,
+            'applied_to': after.get('current_revision'),
+            'target_revision': target,
+            'backup_path': backup_result.get('backup_path'),
+            'output': output,
+            'steps': steps,
+            'warning': (
+                'Rollback runs downgrade() DDL which may drop columns or tables. '
+                'Verify application health after rolling back.'
+            ),
+        }
+    except CommandError as exc:
+        output = buffer.getvalue().strip()
+        logger.error('Migration downgrade failed: %s', exc)
+        return {
+            'success': False,
+            'error': str(exc),
+            'mode': mode,
+            'applied_from': before.get('current_revision'),
+            'output': output,
+            'steps': steps,
+        }
+    except Exception as exc:
+        output = buffer.getvalue().strip()
+        logger.exception('Migration downgrade failed')
+        return {
+            'success': False,
+            'error': str(exc),
+            'mode': mode,
+            'applied_from': before.get('current_revision'),
+            'output': output,
+            'steps': steps,
+        }
+    finally:
+        _upgrade_lock.release()
 
 
 def run_upgrade(

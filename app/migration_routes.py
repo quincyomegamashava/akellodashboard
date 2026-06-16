@@ -6,12 +6,15 @@ from flask_login import current_user, login_required
 from app.database_routes import admin_required
 from app.migration_service import (
     get_diagnostics,
+    get_health_recommendations,
     get_history,
     get_preflight,
     get_status,
+    run_downgrade,
     run_fix_migrations,
     run_merge_heads,
     run_repair,
+    run_sync_revision,
     run_upgrade,
 )
 
@@ -46,6 +49,89 @@ def migration_history():
 @admin_required
 def migration_preflight():
     return jsonify(get_preflight())
+
+
+@migration_bp.route('/api/admin/migrations/health', methods=['GET'])
+@login_required
+@admin_required
+def migration_health():
+    return jsonify(get_health_recommendations())
+
+
+@migration_bp.route('/api/admin/migrations/sync', methods=['POST'])
+@login_required
+@admin_required
+def migration_sync():
+    data = request.get_json(silent=True) or {}
+    if not data.get('confirm'):
+        return jsonify({
+            'success': False,
+            'error': 'Confirmation required. Send {"confirm": true}.',
+        }), 400
+
+    revision = (data.get('revision') or '').strip() or None
+    before = get_status()
+    result = run_sync_revision(revision=revision)
+
+    if result.get('success'):
+        current_app.logger.info(
+            'Migration sync by %s: %s -> %s',
+            current_user.username,
+            result.get('stamped_from'),
+            result.get('stamped_to'),
+        )
+    else:
+        current_app.logger.error(
+            'Migration sync failed for %s (from %s): %s',
+            current_user.username,
+            before.get('current_revision'),
+            result.get('error'),
+        )
+
+    status_code = 200 if result.get('success') else 500
+    return jsonify(result), status_code
+
+
+@migration_bp.route('/api/admin/migrations/downgrade', methods=['POST'])
+@login_required
+@admin_required
+def migration_downgrade():
+    data = request.get_json(silent=True) or {}
+    if not data.get('confirm'):
+        return jsonify({
+            'success': False,
+            'error': 'Confirmation required. Send {"confirm": true}.',
+        }), 400
+
+    mode = (data.get('mode') or 'one').strip().lower()
+    if mode not in ('one', 'to'):
+        return jsonify({
+            'success': False,
+            'error': 'Invalid mode. Use "one" or "to".',
+        }), 400
+
+    revision = (data.get('revision') or '').strip() or None
+    before = get_status()
+    result = run_downgrade(revision=revision, mode=mode)
+
+    if result.get('success'):
+        current_app.logger.info(
+            'Migration downgrade by %s: %s -> %s (mode=%s)',
+            current_user.username,
+            result.get('applied_from'),
+            result.get('applied_to'),
+            mode,
+        )
+    else:
+        current_app.logger.error(
+            'Migration downgrade failed for %s (from %s): %s',
+            current_user.username,
+            before.get('current_revision'),
+            result.get('error'),
+        )
+
+    status_code = 200 if result.get('success') else 500
+    return jsonify(result), status_code
 
 
 @migration_bp.route('/api/admin/migrations/upgrade', methods=['POST'])

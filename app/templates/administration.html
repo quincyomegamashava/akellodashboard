@@ -541,6 +541,15 @@
         Loading migration status...
       </div>
 
+      <div id="migrationsHealthPanel" class="hidden space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="text-sm font-bold text-slate-700 m-0">Health &amp; recommendations</h3>
+          <span id="migrationsHealthBadge"
+            class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-bold"></span>
+        </div>
+        <div id="migrationsHealthRecommendations" class="space-y-2 text-sm"></div>
+      </div>
+
       <div id="migrationsRepairPanel" class="hidden space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
         <div>
           <h3 class="text-sm font-bold text-amber-900 m-0">Migration actions required</h3>
@@ -677,6 +686,14 @@
         <button type="button" id="migrationsApplyNextBtn" onclick="applyMigrationsUpgradeNext()" disabled
           class="flex-1 min-w-[140px] px-4 py-3 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
           Apply next migration
+        </button>
+        <button type="button" id="migrationsSyncBtn" onclick="applyMigrationsSync()" disabled
+          class="hidden flex-1 min-w-[140px] px-4 py-3 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
+          Sync revision
+        </button>
+        <button type="button" id="migrationsDowngradeBtn" onclick="applyMigrationsDowngrade()" disabled
+          class="hidden flex-1 min-w-[140px] px-4 py-3 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
+          Roll back one
         </button>
         <button type="button" id="migrationsUpgradeBtn" onclick="applyMigrationsUpgrade()" disabled
           class="flex-1 min-w-[140px] px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
@@ -2347,6 +2364,19 @@
       return;
     }
 
+    if (status.is_healthy) {
+      label.textContent = 'Healthy';
+      iconWrap.className = 'kpi-icon-minimal bg-emerald-50 text-emerald-600 mb-4';
+      return;
+    }
+
+    if (status.health && status.health.recommendations && status.health.recommendations.length) {
+      const top = status.health.recommendations[0];
+      label.textContent = top.title || 'Needs attention';
+      iconWrap.className = 'kpi-icon-minimal bg-amber-50 text-amber-600 mb-4';
+      return;
+    }
+
     if (status.is_up_to_date) {
       label.textContent = 'Healthy';
       iconWrap.className = 'kpi-icon-minimal bg-emerald-50 text-emerald-600 mb-4';
@@ -2587,18 +2617,85 @@
       actions.map(function (action) { return labels[action] || action; }).join(' → ');
   }
 
+  function renderMigrationsHealth(status) {
+    const panel = document.getElementById('migrationsHealthPanel');
+    const badge = document.getElementById('migrationsHealthBadge');
+    const list = document.getElementById('migrationsHealthRecommendations');
+    const health = (status && status.health) || {};
+    const recommendations = health.recommendations || [];
+    const missing = health.missing_schema || [];
+
+    if (!panel || !list) return;
+
+    const showPanel = !status || !status.success || !health.is_healthy || recommendations.length > 0;
+    panel.classList.toggle('hidden', !showPanel);
+
+    if (badge) {
+      if (!status || !status.success) {
+        badge.textContent = 'Unknown';
+        badge.className = 'inline-flex items-center rounded-lg px-2 py-1 text-xs font-bold bg-slate-100 text-slate-600';
+      } else if (health.is_healthy) {
+        badge.textContent = 'Healthy';
+        badge.className = 'inline-flex items-center rounded-lg px-2 py-1 text-xs font-bold bg-emerald-50 text-emerald-700';
+      } else if (status.needs_repair || status.chain_broken) {
+        badge.textContent = 'Broken';
+        badge.className = 'inline-flex items-center rounded-lg px-2 py-1 text-xs font-bold bg-rose-50 text-rose-700';
+      } else {
+        badge.textContent = 'Unhealthy';
+        badge.className = 'inline-flex items-center rounded-lg px-2 py-1 text-xs font-bold bg-amber-50 text-amber-700';
+      }
+    }
+
+    let html = '';
+    if (missing.length) {
+      html += '<div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900 text-xs">' +
+        '<strong>Missing schema:</strong> ' +
+        escapeHtml(missing.map(function (m) { return m.check; }).join(', ')) +
+        '</div>';
+    }
+
+    if (!recommendations.length) {
+      if (health.is_healthy) {
+        list.innerHTML = '<div class="text-emerald-700 text-sm">Migration revision and schema are aligned.</div>';
+      } else {
+        list.innerHTML = html || '<div class="text-slate-500 text-sm">No specific recommendations.</div>';
+      }
+      return;
+    }
+
+    const severityStyles = {
+      error: 'border-rose-200 bg-rose-50 text-rose-900',
+      warning: 'border-amber-200 bg-amber-50 text-amber-900',
+      info: 'border-slate-200 bg-slate-50 text-slate-800'
+    };
+
+    html += recommendations.map(function (item) {
+      const style = severityStyles[item.severity] || severityStyles.info;
+      return '<div class="rounded-xl border px-3 py-2 ' + style + '">' +
+        '<div class="font-bold text-sm">' + escapeHtml(item.title || item.code || 'Recommendation') + '</div>' +
+        '<div class="text-xs mt-1">' + escapeHtml(item.message || '') + '</div>' +
+        '</div>';
+    }).join('');
+
+    list.innerHTML = html;
+  }
+
   function updateMigrationsActionButtons(status, diagnostics) {
     const fixBtn = document.getElementById('migrationsFixBtn');
     const mergeBtn = document.getElementById('migrationsMergeBtn');
     const repairBtn = document.getElementById('migrationsRepairBtn');
     const upgradeBtn = document.getElementById('migrationsUpgradeBtn');
     const applyNextBtn = document.getElementById('migrationsApplyNextBtn');
+    const syncBtn = document.getElementById('migrationsSyncBtn');
+    const downgradeBtn = document.getElementById('migrationsDowngradeBtn');
     const enabled = !!(status && status.web_migrations_enabled);
     const needsRepair = !!(status && (status.needs_repair || status.chain_broken));
     const multipleHeads = !!(status && status.multiple_heads) || !!(diagnostics && diagnostics.multiple_heads);
     const hasOrphans = !!(status && status.has_orphan_files) || !!(diagnostics && diagnostics.has_orphan_files);
     const pendingCount = (status && status.pending_count) || 0;
     const preflightReady = !migrationsPreflightCache || migrationsPreflightCache.ready !== false;
+    const canSync = !!(status && status.can_sync) || !!(migrationsPreflightCache && migrationsPreflightCache.can_sync);
+    const canDowngrade = !!(status && status.can_downgrade);
 
     if (fixBtn) {
       const showFix = needsRepair || multipleHeads || hasOrphans;
@@ -2630,6 +2727,20 @@
         ? 'Resolve preflight blockers or run preflight again before applying.'
         : '';
     }
+    if (syncBtn) {
+      syncBtn.classList.toggle('hidden', !canSync);
+      syncBtn.disabled = !enabled || !canSync || needsRepair;
+      syncBtn.title = canSync
+        ? 'Update alembic_version when schema already matches pending migrations.'
+        : 'Run preflight — sync is available when pending migrations would only skip existing schema.';
+    }
+    if (downgradeBtn) {
+      downgradeBtn.classList.toggle('hidden', !canDowngrade);
+      downgradeBtn.disabled = !enabled || !canDowngrade || needsRepair;
+      downgradeBtn.title = canDowngrade
+        ? 'Roll back one migration revision (creates backup; may drop schema).'
+        : '';
+    }
   }
 
   function formatMigrationsResultMessage(res, successMessage) {
@@ -2647,6 +2758,9 @@
       }
       if (data.pending_count != null) {
         message += '\nRemaining pending: ' + data.pending_count;
+      }
+      if (data.warning) {
+        message += '\n\n' + data.warning;
       }
       if (data.backup_path) {
         message += '\nBackup: ' + data.backup_path;
@@ -2709,6 +2823,8 @@
       'migrationsMergeBtn',
       'migrationsRepairBtn',
       'migrationsApplyNextBtn',
+      'migrationsSyncBtn',
+      'migrationsDowngradeBtn',
       'migrationsUpgradeBtn'
     ];
     buttons.forEach(function (id) {
@@ -2782,7 +2898,15 @@
         escapeHtml(status.error_detail) + '</div>';
     }
 
+    if (status.health) {
+      const healthLabel = status.is_healthy ? 'Healthy' : 'Unhealthy';
+      const healthClass = status.is_healthy ? 'text-emerald-700' : 'text-amber-700';
+      summaryHtml += '<div class="mt-2"><strong>Schema health:</strong> ' +
+        '<span class="' + healthClass + ' font-semibold">' + escapeHtml(healthLabel) + '</span></div>';
+    }
+
     summary.innerHTML = summaryHtml;
+    renderMigrationsHealth(status);
     updateMigrationsActionButtons(status, migrationsDiagnosticsCache);
   }
 
@@ -3113,6 +3237,100 @@
           result.classList.remove('hidden');
           result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800';
           result.textContent = 'Migration repair failed: ' + error;
+        }
+      });
+  }
+
+  function applyMigrationsSync() {
+    const status = migrationsStatusCache || {};
+    if (!status.can_sync && !(migrationsPreflightCache && migrationsPreflightCache.can_sync)) {
+      alert('Sync is not available. Run preflight first — it is only offered when schema already matches pending migrations.');
+      return;
+    }
+
+    const target = (status.health && status.health.recommendations || [])
+      .filter(function (r) { return r.action === 'sync_revision'; })[0];
+    const targetRev = (target && target.target_revision) || 'head';
+
+    if (!window.confirm(
+      'Sync alembic_version to match schema without re-running DDL?\n\nTarget: ' + targetRev +
+      '\n\nA database backup will be created first.'
+    )) {
+      return;
+    }
+
+    const syncBtn = document.getElementById('migrationsSyncBtn');
+    const result = document.getElementById('migrationsResult');
+    setMigrationsButtonsLoading(true, syncBtn, 'Syncing...');
+
+    fetch('/api/admin/migrations/sync', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: true, revision: targetRev === 'head' ? null : targetRev })
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, data: data };
+        });
+      })
+      .then(function (res) {
+        setMigrationsButtonsLoading(false);
+        showMigrationsResult(res, 'Revision synced successfully.');
+        return refreshMigrationsModal();
+      })
+      .catch(function (error) {
+        setMigrationsButtonsLoading(false);
+        if (result) {
+          result.classList.remove('hidden');
+          result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800';
+          result.textContent = 'Migration sync failed: ' + error;
+        }
+      });
+  }
+
+  function applyMigrationsDowngrade() {
+    const status = migrationsStatusCache || {};
+    if (!status.can_downgrade) {
+      alert('Rollback is not available from the current revision.');
+      return;
+    }
+
+    const downRev = (status.health && status.health.down_revision) || '(previous)';
+    if (!window.confirm(
+      'Roll back ONE migration revision?\n\nThis runs downgrade() DDL and may drop columns or tables.\n' +
+      'Target revision: ' + downRev +
+      '\n\nA database backup will be created first. Continue?'
+    )) {
+      return;
+    }
+
+    const downgradeBtn = document.getElementById('migrationsDowngradeBtn');
+    const result = document.getElementById('migrationsResult');
+    setMigrationsButtonsLoading(true, downgradeBtn, 'Rolling back...');
+
+    fetch('/api/admin/migrations/downgrade', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: true, mode: 'one' })
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, data: data };
+        });
+      })
+      .then(function (res) {
+        setMigrationsButtonsLoading(false);
+        showMigrationsResult(res, 'Migration rollback completed.');
+        return refreshMigrationsModal();
+      })
+      .catch(function (error) {
+        setMigrationsButtonsLoading(false);
+        if (result) {
+          result.classList.remove('hidden');
+          result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800';
+          result.textContent = 'Migration rollback failed: ' + error;
         }
       });
   }
