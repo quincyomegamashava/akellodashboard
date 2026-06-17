@@ -6,7 +6,18 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <label class="mn-filter-label">PDF format</label>
+        <label class="mn-filter-label">Export file type</label>
+        <div class="mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="mn-export-type" id="mn-export-type-pdf" value="pdf" checked />
+            <label class="form-check-label" for="mn-export-type-pdf">PDF</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="mn-export-type" id="mn-export-type-pptx" value="pptx" />
+            <label class="form-check-label" for="mn-export-type-pptx">PowerPoint (.pptx)</label>
+          </div>
+        </div>
+        <label class="mn-filter-label">Layout variant</label>
         <div class="mb-3">
           <div class="form-check">
             <input class="form-check-input" type="radio" name="mn-pdf-format" id="mn-pdf-format-minutes" value="minutes" checked />

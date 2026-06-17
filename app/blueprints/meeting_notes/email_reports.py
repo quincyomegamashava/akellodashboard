@@ -380,6 +380,7 @@ def send_meeting_report_email(
     body_text: str | None = None,
     attachment_bytes: bytes | None = None,
     attachment_filename: str | None = None,
+    attachment_mimetype: str | None = None,
     pdf_format: str = "minutes",
 ) -> dict:
     items = (
@@ -393,17 +394,17 @@ def send_meeting_report_email(
     html_body = body_html or "<p>Please find attached the latest meeting minutes.</p>"
     text_body = body_text or "Please find attached the latest meeting minutes."
 
-    pdf_bytes = attachment_bytes
-    if not pdf_bytes:
+    file_bytes = attachment_bytes
+    if not file_bytes:
         if pdf_format == "minutes":
             decisions = (
                 MeetingDecision.query.filter_by(meeting_note_id=meeting.id)
                 .order_by(MeetingDecision.sort_order, MeetingDecision.id)
                 .all()
             )
-            pdf_bytes = build_meeting_minutes_pdf(meeting, items, decisions)
+            file_bytes = build_meeting_minutes_pdf(meeting, items, decisions)
         else:
-            pdf_bytes = build_meeting_report_pdf(meeting, items)
+            file_bytes = build_meeting_report_pdf(meeting, items)
 
     safe_title = re.sub(r"[^\w\-]+", "_", (meeting.title or "meeting")).strip("_")[:40] or "meeting"
     date_part = meeting.meeting_date.isoformat() if meeting.meeting_date else "report"
@@ -419,8 +420,9 @@ def send_meeting_report_email(
             subject=email_subject,
             html_body=html_body,
             text_body=text_body,
-            attachment_bytes=pdf_bytes,
+            attachment_bytes=file_bytes,
             attachment_filename=filename,
+            attachment_mimetype=attachment_mimetype or "application/pdf",
         )
         if res.get("ok"):
             sent += 1

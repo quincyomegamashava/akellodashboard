@@ -1624,10 +1624,19 @@ def api_email_meeting_report(meeting_id: int):
     body_text = (payload.get("body_text") or "").strip() or None
     attachment_bytes = None
     attachment_filename = None
+    attachment_mimetype = None
+    if payload.get("attachment_base64"):
+        try:
+            attachment_bytes = base64.b64decode(str(payload.get("attachment_base64")), validate=True)
+            attachment_filename = (payload.get("attachment_filename") or "").strip() or None
+            attachment_mimetype = (payload.get("attachment_mime") or "").strip() or None
+        except Exception:
+            return jsonify({"error": "Invalid attachment_base64 payload"}), 400
     if payload.get("pdf_base64"):
         try:
             attachment_bytes = base64.b64decode(str(payload.get("pdf_base64")), validate=True)
             attachment_filename = (payload.get("pdf_filename") or "").strip() or None
+            attachment_mimetype = "application/pdf"
         except Exception:
             return jsonify({"error": "Invalid pdf_base64 payload"}), 400
     result = send_meeting_report_email(
@@ -1638,6 +1647,7 @@ def api_email_meeting_report(meeting_id: int):
         body_text=body_text,
         attachment_bytes=attachment_bytes,
         attachment_filename=attachment_filename,
+        attachment_mimetype=attachment_mimetype,
         pdf_format=(payload.get("pdf_format") or "minutes").strip().lower(),
     )
     _log_activity(

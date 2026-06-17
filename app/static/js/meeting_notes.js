@@ -2817,6 +2817,19 @@
     };
   }
 
+  function getExportFileType() {
+    const pptx = $("#mn-export-type-pptx");
+    return (pptx && pptx.checked) ? "pptx" : "pdf";
+  }
+
+  function getPptxConstructor() {
+    if (typeof window !== "undefined" && window.PptxGenJS) return window.PptxGenJS;
+    try {
+      if (typeof PptxGenJS !== "undefined") return PptxGenJS;
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+
   async function fetchDecisionsForPdf() {
     if (!meetingNoteId) return [];
     try {
@@ -3027,17 +3040,42 @@
     }
 
     if (!doc.autoTable) throw new Error("PDF table plugin not loaded.");
-    const body = items.map(function (it, idx) {
+    const body = items.map(function (it) {
       return [
-        pdfFirstLine(pdfTaskText(it), 120),
-        getPdfAssigneeNames(it) || "—",
-        it.due_date ? pdfFormatDisplayDate(it.due_date) : "—",
         pdfStatusLabel(it.status),
+        pdfPriorityLabel(it.priority),
+        it.start_date ? pdfFormatDisplayDate(it.start_date) : "—",
+        it.due_date ? pdfFormatDisplayDate(it.due_date) : "—",
+        pdfTaskDurationDays(it),
+        pdfFirstLine(pdfTaskText(it), 90),
+        getPdfAssigneeNames(it) || "—",
+        pdfTaskDescription(it),
       ];
     });
     const tableOpts = pdfBaseTableStyles();
+    tableOpts.styles = Object.assign({}, tableOpts.styles, { fontSize: 7, cellPadding: 3 });
+    tableOpts.headStyles = Object.assign({}, tableOpts.headStyles, { fontSize: 7 });
+    tableOpts.columnStyles = {
+      0: { cellWidth: 50 },
+      1: { cellWidth: 46 },
+      2: { cellWidth: 56 },
+      3: { cellWidth: 56 },
+      4: { cellWidth: 42, halign: "center" },
+      5: { cellWidth: 95 },
+      6: { cellWidth: 72 },
+      7: { cellWidth: "auto" },
+    };
     tableOpts.startY = y;
-    tableOpts.head = [["ACTION ITEM", "IN-CHARGE", "COMPLETION DATE", "STATUS"]];
+    tableOpts.head = [[
+      "STATUS",
+      "PRIORITY",
+      "START DATE",
+      "END DATE",
+      "DURATION",
+      "TASK NAME",
+      "ASSIGNEE",
+      "DESCRIPTION",
+    ]];
     tableOpts.body = body;
     tableOpts.margin = { left: bounds.left, right: PDF_MARGINS.right };
     tableOpts.tableWidth = bounds.width;
@@ -3263,6 +3301,23 @@
     return line;
   }
 
+  function pdfTaskDurationDays(it) {
+    const start = it && it.start_date ? new Date(it.start_date) : null;
+    const end = it && it.due_date ? new Date(it.due_date) : null;
+    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) return "—";
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / msPerDay));
+    return String(days);
+  }
+
+  function pdfTaskDescription(it) {
+    const parts = [it.expected_impact, it.challenges, it.comments]
+      .map(function (v) { return (v || "").trim(); })
+      .filter(Boolean);
+    if (!parts.length) return "—";
+    return pdfFirstLine(parts.join(" | "), 160);
+  }
+
   function drawPdfStatChip(doc, x, y, label, value, fillRgb) {
     const w = 108;
     const h = 42;
@@ -3380,6 +3435,388 @@
     return renderPdfDetailSection(doc, y.sorted, pdfOpts, meta, logoDataUrl, y.finalY);
   }
 
+  function pdfCountStatus(items, status) {
+    return items.filter(function (it) { return String(it.status || "open") === status; }).length;
+  }
+
+  function pdfPlatformGroups(items) {
+    const map = {};
+    items.forEach(function (it) {
+      const p = (it.platform || "General").trim() || "General";
+      if (!map[p]) map[p] = [];
+      map[p].push(it);
+    });
+    return Object.keys(map).sort().map(function (k) { return { platform: k, items: map[k] }; });
+  }
+
+  function drawPptFooter(doc, meta, slideNum, totalSlides) {
+    const pageH = doc.internal.pageSize.getHeight();
+    const bounds = getPdfContentBounds(doc);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    doc.text((meta.title || "Meeting report") + "  ·  Strategic Execution Report", bounds.left, pageH - 12);
+    doc.text(String(slideNum) + " / " + String(totalSlides), bounds.right, pageH - 12, { align: "right" });
+  }
+
+  function renderPdfPptLikeReport(doc, items, meta, logoDataUrl) {
+    const bounds = getPdfContentBounds(doc);
+    const totalSlides = 6;
+    const stats = computePdfStats(items);
+    const platformGroups = pdfPlatformGroups(items);
+    const attendees = formatAttendeesPdfLine() || "—";
+    const purpose = (typeof MN_MEETING_SUMMARY === "string" && MN_MEETING_SUMMARY.trim()) ? MN_MEETING_SUMMARY.trim() : "—";
+    const nearestDue = items
+      .filter(function (it) { return !!it.due_date; })
+      .sort(function (a, b) { return String(a.due_date).localeCompare(String(b.due_date)); })[0];
+
+    // Slide 1: cover
+    drawPdfPageChrome(doc, logoDataUrl, meta);
+    let y = 96;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(28);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("AKELLO", bounds.left, y);
+    y += 22;
+    doc.setFontSize(11);
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    doc.text("Read  ·  Learn  ·  Play", bounds.left, y);
+    y += 36;
+    doc.setFontSize(24);
+    doc.setTextColor(PDF_THEME.text[0], PDF_THEME.text[1], PDF_THEME.text[2]);
+    doc.text(meta.title || "Meeting Report", bounds.left, y);
+    y += 24;
+    doc.setFontSize(13);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("Strategic Meeting Execution Report", bounds.left, y);
+    y += 28;
+    const coverRows = [
+      ["MEETING DATE", meta.meetingDate ? pdfFormatDisplayDate(meta.meetingDate) : "—"],
+      ["ATTENDEE", attendees],
+      ["PURPOSE", pdfFirstLine(purpose, 160)],
+    ];
+    coverRows.forEach(function (row) {
+      pdfDrawBorderedRect(doc, bounds.left, y, bounds.width, 34);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+      doc.text(row[0], bounds.left + 8, y + 12);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(PDF_THEME.text[0], PDF_THEME.text[1], PDF_THEME.text[2]);
+      doc.text(String(row[1] || "—"), bounds.left + 150, y + 22);
+      y += 38;
+    });
+    drawPptFooter(doc, meta, 1, totalSlides);
+
+    // Slide 2: at-a-glance
+    doc.addPage();
+    drawPdfPageChrome(doc, logoDataUrl, meta);
+    y = 84;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("At a glance", bounds.left, y);
+    y += 16;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    doc.text("What this meeting tracked across the Akello product suite.", bounds.left, y);
+    y += 24;
+    drawPdfStatChip(doc, bounds.left, y, "Platforms", platformGroups.length, PDF_THEME.primaryLight);
+    drawPdfStatChip(doc, bounds.left + 118, y, "Work items", stats.total, [239, 246, 255]);
+    drawPdfStatChip(doc, bounds.left + 236, y, "Urgent items", items.filter(function (it) { return (it.priority || "") === "urgent"; }).length, [254, 242, 242]);
+    y += 64;
+    const statusBody = [
+      ["Open", "Not yet started, awaiting first action", String(pdfCountStatus(items, "open")) + " items"],
+      ["In progress", "Underway and actively tracked", String(pdfCountStatus(items, "in_progress")) + " items"],
+      ["Completed", "Done and closed", String(pdfCountStatus(items, "done")) + " items"],
+    ];
+    if (!doc.autoTable) throw new Error("PDF table plugin not loaded.");
+    const t2 = pdfBaseTableStyles();
+    t2.startY = y;
+    t2.head = [["STATUS OF WORK ITEMS", "DESCRIPTION", "COUNT"]];
+    t2.body = statusBody;
+    t2.margin = { left: bounds.left, right: PDF_MARGINS.right };
+    t2.tableWidth = bounds.width;
+    doc.autoTable(t2);
+    drawPptFooter(doc, meta, 2, totalSlides);
+
+    // Slide 3-4: platform deep-dive (up to first two platforms)
+    const deepDive = platformGroups.slice(0, 2);
+    while (deepDive.length < 2) deepDive.push({ platform: "General", items: [] });
+    deepDive.forEach(function (grp, idx) {
+      doc.addPage();
+      drawPdfPageChrome(doc, logoDataUrl, meta);
+      let py = 84;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+      doc.text("Platform: " + grp.platform, bounds.left, py);
+      py += 16;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+      doc.text((grp.items.length ? (grp.items.length + " work item(s) tracked.") : "No work items for this platform."), bounds.left, py);
+      py += 20;
+      const rows = grp.items.slice(0, 5).map(function (it) {
+        const subtasks = (it.subtasks || []).length;
+        const doneSubtasks = (it.subtasks || []).filter(function (st) { return !!st.done; }).length;
+        return [
+          pdfFirstLine(pdfTaskText(it), 70),
+          pdfPriorityLabel(it.priority),
+          pdfStatusLabel(it.status),
+          (it.start_date ? pdfFormatDisplayDate(it.start_date) : "—") + " → " + (it.due_date ? pdfFormatDisplayDate(it.due_date) : "—"),
+          getPdfAssigneeNames(it) || "—",
+          subtasks ? (doneSubtasks + "/" + subtasks) : "—",
+        ];
+      });
+      const t = pdfBaseTableStyles();
+      t.startY = py;
+      t.head = [["ACTION", "PRIORITY", "STATUS", "TIMELINE", "LED BY", "PROGRESS"]];
+      t.body = rows.length ? rows : [["—", "—", "—", "—", "—", "—"]];
+      t.margin = { left: bounds.left, right: PDF_MARGINS.right };
+      t.tableWidth = bounds.width;
+      t.styles = Object.assign({}, t.styles, { fontSize: 8 });
+      doc.autoTable(t);
+      drawPptFooter(doc, meta, 3 + idx, totalSlides);
+    });
+
+    // Slide 5: action register
+    doc.addPage();
+    drawPdfPageChrome(doc, logoDataUrl, meta);
+    y = 84;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("Action register", bounds.left, y);
+    y += 16;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    doc.text("All tracked actions in one view, ordered by due date.", bounds.left, y);
+    y += 18;
+    const regRows = items.slice().sort(function (a, b) {
+      const ad = String(a.due_date || "9999-12-31");
+      const bd = String(b.due_date || "9999-12-31");
+      return ad.localeCompare(bd);
+    }).map(function (it) {
+      return [
+        it.platform || "General",
+        pdfFirstLine(pdfTaskText(it), 64),
+        getPdfAssigneeNames(it) || "—",
+        it.due_date ? pdfFormatDisplayDate(it.due_date) : "—",
+        pdfPriorityLabel(it.priority),
+        pdfStatusLabel(it.status),
+      ];
+    });
+    const t5 = pdfBaseTableStyles();
+    t5.startY = y;
+    t5.head = [["Platform", "Action", "Owner", "Due", "Priority", "Status"]];
+    t5.body = regRows.length ? regRows : [["—", "—", "—", "—", "—", "—"]];
+    t5.margin = { left: bounds.left, right: PDF_MARGINS.right };
+    t5.tableWidth = bounds.width;
+    t5.styles = Object.assign({}, t5.styles, { fontSize: 7.8, cellPadding: 4 });
+    doc.autoTable(t5);
+    const y5 = Math.min((doc.lastAutoTable && doc.lastAutoTable.finalY + 16) || 620, 700);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(PDF_THEME.text[0], PDF_THEME.text[1], PDF_THEME.text[2]);
+    doc.text("Nearest deadline:", bounds.left, y5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    doc.text(nearestDue ? (pdfFirstLine(pdfTaskText(nearestDue), 84) + " due " + pdfFormatDisplayDate(nearestDue.due_date)) : "No dated action items.", bounds.left + 90, y5);
+    drawPptFooter(doc, meta, 5, totalSlides);
+
+    // Slide 6: next steps
+    doc.addPage();
+    drawPdfPageChrome(doc, logoDataUrl, meta);
+    y = 84;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("Next steps", bounds.left, y);
+    y += 16;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    doc.text("Three moves to keep this meeting's actions on track.", bounds.left, y);
+    y += 24;
+    const urgent = items.filter(function (it) { return (it.priority || "") === "urgent"; });
+    const nextSteps = [
+      "Close the urgent items: " + (urgent.length ? ("focus on " + pdfFirstLine(pdfTaskText(urgent[0]), 56)) : "no urgent items currently open."),
+      "Kick off not-yet-started work: assign owners and first updates for all open tasks.",
+      "Replace placeholder task language with concrete deliverables and acceptance checks.",
+    ];
+    nextSteps.forEach(function (step, i) {
+      pdfDrawBorderedRect(doc, bounds.left, y, bounds.width, 64);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+      doc.text(String(i + 1), bounds.left + 12, y + 24);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(PDF_THEME.text[0], PDF_THEME.text[1], PDF_THEME.text[2]);
+      doc.text(doc.splitTextToSize(step, bounds.width - 52), bounds.left + 36, y + 20);
+      y += 74;
+    });
+    drawPptFooter(doc, meta, 6, totalSlides);
+  }
+
+  async function buildExportPptxDocument() {
+    const PptxCtor = getPptxConstructor();
+    if (!PptxCtor) {
+      throw new Error("PowerPoint library not loaded. Hard refresh the page and try again.");
+    }
+    const pdfOpts = getPdfExportOptions();
+    let items = await fetchItemsForPdf(pdfOpts);
+    if (!pdfOpts.includeDone) {
+      items = items.filter(function (it) { return (it.status || "open") !== "done"; });
+    }
+    const title = meetingNoteId && typeof MN_MEETING_TITLE === "string" ? MN_MEETING_TITLE : "Meeting report";
+    const meetingDate = meetingNoteId && typeof MN_MEETING_DATE === "string" ? MN_MEETING_DATE : "";
+    const meta = { title: title, meetingDate: meetingDate };
+    const stats = computePdfStats(items);
+    const groups = pdfPlatformGroups(items);
+    const pptx = new PptxCtor();
+    pptx.layout = "LAYOUT_WIDE";
+    pptx.author = "Akello";
+    pptx.subject = "Meeting report";
+    pptx.title = title;
+    const safe = String(title).replace(/[^\w\-]+/g, "_").slice(0, 40) || "meeting";
+    const datePart = new Date().toISOString().slice(0, 10);
+    const format = pdfOpts.format || "report";
+    const filename = (format === "minutes" ? "meeting-minutes_" : "meeting-notes_") + safe + "_" + datePart + ".pptx";
+    let logoData = null;
+    try {
+      logoData = await loadPdfLogoDataUrl(typeof MN_PDF_LOGO_URL === "string" ? MN_PDF_LOGO_URL : "");
+    } catch (e) { logoData = null; }
+
+    function slideFooter(s, n, total) {
+      s.addText((meta.title || "Meeting report") + "  ·  Strategic Execution Report", { x: 0.5, y: 6.9, w: 8.5, h: 0.3, fontSize: 9, color: "64748B" });
+      s.addText(String(n) + " / " + String(total), { x: 11.0, y: 6.9, w: 2.0, h: 0.3, fontSize: 9, color: "64748B", align: "right" });
+    }
+    function addHeader(s) {
+      s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.333, h: 0.06, fill: { color: "00407D" }, line: { color: "00407D" } });
+      if (logoData) s.addImage({ data: logoData, x: 0.5, y: 0.15, w: 1.8, h: 0.52 });
+      else s.addText("Akello", { x: 0.5, y: 0.2, w: 2, h: 0.4, bold: true, fontSize: 20, color: "00407D" });
+    }
+
+    const totalSlides = 6;
+    // 1 cover
+    let s = pptx.addSlide();
+    addHeader(s);
+    s.addText("AKELLO", { x: 0.6, y: 1.1, w: 3.2, h: 0.5, bold: true, fontSize: 34, color: "00407D" });
+    s.addText("Read · Learn · Play", { x: 0.6, y: 1.6, w: 3.2, h: 0.3, fontSize: 12, color: "64748B" });
+    s.addText(meta.title || "Meeting report", { x: 0.6, y: 2.15, w: 8.8, h: 0.7, bold: true, fontSize: 30, color: "0F172A" });
+    s.addText("Strategic Meeting Execution Report", { x: 0.6, y: 2.88, w: 7.5, h: 0.4, bold: true, fontSize: 16, color: "00407D" });
+    const attendees = formatAttendeesPdfLine() || "—";
+    const purpose = (typeof MN_MEETING_SUMMARY === "string" && MN_MEETING_SUMMARY.trim()) ? pdfFirstLine(MN_MEETING_SUMMARY.trim(), 120) : "—";
+    const coverRows = [
+      ["MEETING DATE", meetingDate ? pdfFormatDisplayDate(meetingDate) : "—"],
+      ["ATTENDEE", attendees],
+      ["PURPOSE", purpose],
+    ];
+    let cy = 3.5;
+    coverRows.forEach(function (r) {
+      s.addShape(pptx.ShapeType.roundRect, { x: 0.6, y: cy, w: 12.1, h: 0.58, radius: 0.03, line: { color: "E2E8F0", pt: 1 }, fill: { color: "FFFFFF" } });
+      s.addText(r[0], { x: 0.8, y: cy + 0.08, w: 1.8, h: 0.2, bold: true, fontSize: 9, color: "64748B" });
+      s.addText(String(r[1] || "—"), { x: 2.3, y: cy + 0.22, w: 10.0, h: 0.2, fontSize: 11, color: "0F172A" });
+      cy += 0.7;
+    });
+    slideFooter(s, 1, totalSlides);
+
+    // 2 at a glance
+    s = pptx.addSlide(); addHeader(s);
+    s.addText("At a glance", { x: 0.6, y: 0.95, w: 3.5, h: 0.4, bold: true, fontSize: 26, color: "00407D" });
+    s.addText("What this meeting tracked across the Akello product suite.", { x: 0.6, y: 1.35, w: 6.5, h: 0.3, fontSize: 11, color: "64748B" });
+    const chips = [
+      ["Platforms", String(groups.length)],
+      ["Work items", String(stats.total)],
+      ["Urgent items", String(items.filter(function (it) { return (it.priority || "") === "urgent"; }).length)],
+    ];
+    chips.forEach(function (c, i) {
+      const x = 0.6 + i * 2.25;
+      s.addShape(pptx.ShapeType.roundRect, { x: x, y: 1.9, w: 2.0, h: 1.0, radius: 0.08, line: { color: "E2E8F0", pt: 1 }, fill: { color: "EFF6FF" } });
+      s.addText(c[1], { x: x + 0.22, y: 2.15, w: 1.6, h: 0.25, fontSize: 24, bold: true, color: "00407D" });
+      s.addText(c[0], { x: x + 0.22, y: 2.52, w: 1.6, h: 0.2, fontSize: 10, color: "64748B" });
+    });
+    s.addTable([
+      ["STATUS OF WORK ITEMS", "DESCRIPTION", "COUNT"],
+      ["Open", "Not yet started, awaiting first action", String(pdfCountStatus(items, "open")) + " items"],
+      ["In progress", "Underway and actively tracked", String(pdfCountStatus(items, "in_progress")) + " items"],
+      ["Completed", "Done and closed", String(pdfCountStatus(items, "done")) + " items"],
+    ], { x: 0.6, y: 3.2, w: 12.1, h: 2.1, fontSize: 10, border: { pt: 1, color: "E2E8F0" }, fill: "FFFFFF" });
+    slideFooter(s, 2, totalSlides);
+
+    const deep = groups.slice(0, 2);
+    while (deep.length < 2) deep.push({ platform: "General", items: [] });
+    deep.forEach(function (grp, idx) {
+      const slideNum = 3 + idx;
+      s = pptx.addSlide(); addHeader(s);
+      s.addText("Platform: " + grp.platform, { x: 0.6, y: 0.95, w: 5.0, h: 0.4, bold: true, fontSize: 24, color: "00407D" });
+      s.addText((grp.items.length ? grp.items.length + " work item(s) tracked." : "No work items for this platform."), { x: 0.6, y: 1.35, w: 8.0, h: 0.3, fontSize: 11, color: "64748B" });
+      const rows = [["ACTION", "PRIORITY", "STATUS", "TIMELINE", "LED BY", "PROGRESS"]];
+      grp.items.slice(0, 6).forEach(function (it) {
+        const subtasks = (it.subtasks || []).length;
+        const done = (it.subtasks || []).filter(function (st) { return !!st.done; }).length;
+        rows.push([
+          pdfFirstLine(pdfTaskText(it), 40),
+          pdfPriorityLabel(it.priority),
+          pdfStatusLabel(it.status),
+          (it.start_date ? pdfFormatDisplayDate(it.start_date) : "—") + " → " + (it.due_date ? pdfFormatDisplayDate(it.due_date) : "—"),
+          getPdfAssigneeNames(it) || "—",
+          subtasks ? (done + "/" + subtasks) : "—",
+        ]);
+      });
+      if (rows.length === 1) rows.push(["—", "—", "—", "—", "—", "—"]);
+      s.addTable(rows, { x: 0.6, y: 1.9, w: 12.1, h: 4.7, fontSize: 9, border: { pt: 1, color: "E2E8F0" }, fill: "FFFFFF" });
+      slideFooter(s, slideNum, totalSlides);
+    });
+
+    s = pptx.addSlide(); addHeader(s);
+    s.addText("Action register", { x: 0.6, y: 0.95, w: 4.5, h: 0.4, bold: true, fontSize: 24, color: "00407D" });
+    s.addText("All tracked actions in one view, ordered by due date.", { x: 0.6, y: 1.35, w: 7.0, h: 0.3, fontSize: 11, color: "64748B" });
+    const registerRows = [["Platform", "Action", "Owner", "Due", "Priority", "Status"]];
+    items.slice().sort(function (a, b) {
+      const ad = String(a.due_date || "9999-12-31");
+      const bd = String(b.due_date || "9999-12-31");
+      return ad.localeCompare(bd);
+    }).forEach(function (it) {
+      registerRows.push([
+        it.platform || "General",
+        pdfFirstLine(pdfTaskText(it), 35),
+        getPdfAssigneeNames(it) || "—",
+        it.due_date ? pdfFormatDisplayDate(it.due_date) : "—",
+        pdfPriorityLabel(it.priority),
+        pdfStatusLabel(it.status),
+      ]);
+    });
+    if (registerRows.length === 1) registerRows.push(["—", "—", "—", "—", "—", "—"]);
+    s.addTable(registerRows, { x: 0.6, y: 1.85, w: 12.1, h: 4.8, fontSize: 9, border: { pt: 1, color: "E2E8F0" }, fill: "FFFFFF" });
+    slideFooter(s, 5, totalSlides);
+
+    s = pptx.addSlide(); addHeader(s);
+    s.addText("Next steps", { x: 0.6, y: 0.95, w: 3.5, h: 0.4, bold: true, fontSize: 24, color: "00407D" });
+    s.addText("Three moves to keep this meeting's actions on track.", { x: 0.6, y: 1.35, w: 7.0, h: 0.3, fontSize: 11, color: "64748B" });
+    const urgent = items.filter(function (it) { return (it.priority || "") === "urgent"; });
+    const steps = [
+      "Close the urgent items: " + (urgent.length ? ("focus on " + pdfFirstLine(pdfTaskText(urgent[0]), 56)) : "no urgent items currently open."),
+      "Kick off not-yet-started work: assign owners and first updates for all open tasks.",
+      "Replace placeholder task language with concrete deliverables and acceptance checks.",
+    ];
+    let sy = 1.9;
+    steps.forEach(function (txt, i) {
+      s.addShape(pptx.ShapeType.roundRect, { x: 0.6, y: sy, w: 12.1, h: 1.35, radius: 0.06, line: { color: "E2E8F0", pt: 1 }, fill: { color: "FFFFFF" } });
+      s.addText(String(i + 1), { x: 0.9, y: sy + 0.35, w: 0.4, h: 0.4, bold: true, fontSize: 22, color: "00407D" });
+      s.addText(txt, { x: 1.4, y: sy + 0.32, w: 10.8, h: 0.8, fontSize: 11, color: "0F172A" });
+      sy += 1.55;
+    });
+    slideFooter(s, 6, totalSlides);
+
+    return { pptx: pptx, filename: filename, format: format };
+  }
+
   async function buildExportPdfDocument() {
     if (!window.jspdf || !window.jspdf.jsPDF) {
       throw new Error("PDF library not loaded.");
@@ -3424,30 +3861,27 @@
     const slug = String(title).replace(/[^\w\-]+/g, "_").slice(0, 40) || "export";
     const datePart = new Date().toISOString().slice(0, 10);
 
+    renderPdfPptLikeReport(doc, items, meta, logoDataUrl);
     if (pdfOpts.format === "minutes") {
-      renderPdfMinutesDocument(doc, items, pdfOpts, meta, logoDataUrl, decisions);
-      const filename = "meeting-minutes_" + slug + "_" + datePart + ".pdf";
-      return { doc: doc, filename: filename, format: "minutes" };
+      const minutesFilename = "meeting-minutes_" + slug + "_" + datePart + ".pdf";
+      return { doc: doc, filename: minutesFilename, format: "minutes" };
     }
-
-    const stats = computePdfStats(items);
-    let y = renderPdfCover(doc, logoDataUrl, pdfOpts, meta, stats);
-    doc.addPage();
-    drawPdfPageChrome(doc, logoDataUrl, meta);
-    const bodyEnd = renderPdfReportBody(doc, items, pdfOpts, meta, logoDataUrl, PDF_MARGINS.top);
-    if (pdfOpts.includeDecisions && decisions.length) {
-      renderPdfReportDecisionsAppendix(doc, decisions, meta, logoDataUrl, bodyEnd);
-    }
-    const filename = "meeting-notes_" + slug + "_" + datePart + ".pdf";
-    return { doc: doc, filename: filename, format: "report" };
+    const reportFilename = "meeting-notes_" + slug + "_" + datePart + ".pdf";
+    return { doc: doc, filename: reportFilename, format: "report" };
   }
 
   async function exportTablePdf() {
     try {
+      const fileType = getExportFileType();
+      if (fileType === "pptx") {
+        const builtPptx = await buildExportPptxDocument();
+        await builtPptx.pptx.writeFile({ fileName: builtPptx.filename });
+        return;
+      }
       const built = await buildExportPdfDocument();
       built.doc.save(built.filename);
     } catch (e) {
-      alert((e && e.message) ? e.message : "PDF export failed.");
+      alert((e && e.message) ? e.message : "Export failed.");
     }
   }
 
@@ -3463,8 +3897,26 @@
     }
     const subject = ((document.getElementById("mn-pdf-email-subject") || {}).value || "").trim();
     try {
-      const built = await buildExportPdfDocument();
-      const pdfBase64 = built.doc.output("datauristring").split(",")[1] || "";
+      const fileType = getExportFileType();
+      let payload = null;
+      if (fileType === "pptx") {
+        const builtPptx = await buildExportPptxDocument();
+        const pptxBase64 = await builtPptx.pptx.write({ outputType: "base64" });
+        payload = {
+          attachment_base64: pptxBase64,
+          attachment_filename: builtPptx.filename,
+          attachment_mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          pdf_format: builtPptx.format || getPdfExportOptions().format || "report",
+        };
+      } else {
+        const built = await buildExportPdfDocument();
+        const pdfBase64 = built.doc.output("datauristring").split(",")[1] || "";
+        payload = {
+          pdf_base64: pdfBase64,
+          pdf_filename: built.filename,
+          pdf_format: built.format || getPdfExportOptions().format || "minutes",
+        };
+      }
       const res = await fetch(API.emailReport(meetingNoteId), {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -3474,9 +3926,7 @@
           subject: subject,
           body_html: "<p>Please find attached the latest meeting report.</p>",
           body_text: "Please find attached the latest meeting report.",
-          pdf_base64: pdfBase64,
-          pdf_filename: built.filename,
-          pdf_format: built.format || getPdfExportOptions().format || "minutes",
+          ...payload,
         }),
       });
       const data = await res.json().catch(function () { return {}; });
