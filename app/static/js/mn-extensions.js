@@ -176,6 +176,7 @@
     const btn = $("#mn-btn-ai-extract");
     const modal = $("#mnAiExtractModal");
     const tbody = $("#mn-ai-tasks-body");
+    const decisionsBody = $("#mn-ai-decisions-body");
     const applyBtn = $("#mn-btn-ai-apply");
     const summarizeBtn = $("#mn-btn-ai-summarize");
     const meetingId = window.MN && window.MN.meetingNoteId;
@@ -211,6 +212,25 @@
             '<td class="small text-muted">' + escapeHtml(row.assignee_hint || "") + "</td>";
           tbody.appendChild(tr);
         });
+        if (decisionsBody) {
+          decisionsBody.innerHTML = "";
+          const decList = preview.decisions || [];
+          if (!decList.length) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = '<td colspan="3" class="small text-muted">No decisions suggested — add notes and try again.</td>';
+            decisionsBody.appendChild(tr);
+          }
+          decList.forEach(function (row, idx) {
+            const text = typeof row === "string" ? row : (row.body || row.title || "");
+            const excerpt = typeof row === "object" ? (row.source_excerpt || "") : "";
+            const tr = document.createElement("tr");
+            tr.innerHTML =
+              '<td><input type="checkbox" class="mn-ai-dec-pick" data-idx="' + idx + '" checked /></td>' +
+              '<td><input class="form-control form-control-sm mn-ai-dec-body" value="' + escapeHtml(text) + '" data-idx="' + idx + '" /></td>' +
+              '<td class="small text-muted">' + escapeHtml(excerpt) + "</td>";
+            decisionsBody.appendChild(tr);
+          });
+        }
         if (window.bootstrap) bootstrap.Modal.getOrCreateInstance(modal).show();
       } catch (e) {
         alert(e.message || String(e));
@@ -239,7 +259,6 @@
       applyBtn.addEventListener("click", async function () {
         const focusSel = $("#mn-ai-focus-row");
         const focusRowId = focusSel ? parseInt(focusSel.value, 10) : null;
-        if (!focusRowId) { alert("Select a focus row"); return; }
         const rows = [];
         $all(".mn-ai-pick:checked", tbody).forEach(function (chk) {
           const idx = parseInt(chk.getAttribute("data-idx"), 10);
@@ -257,12 +276,29 @@
             subtasks: src.subtasks || [],
           });
         });
+        const decisionRows = [];
+        if (decisionsBody) {
+          $all(".mn-ai-dec-pick:checked", decisionsBody).forEach(function (chk) {
+            const idx = parseInt(chk.getAttribute("data-idx"), 10);
+            const src = (preview.decisions || [])[idx];
+            const tr = chk.closest("tr");
+            const bodyIn = tr ? tr.querySelector(".mn-ai-dec-body") : null;
+            const body = bodyIn ? bodyIn.value : (typeof src === "string" ? src : (src && src.body) || "");
+            if (!body || !String(body).trim()) return;
+            decisionRows.push({
+              body: String(body).trim(),
+              source_excerpt: typeof src === "object" ? (src.source_excerpt || "") : "",
+            });
+          });
+        }
+        if (rows.length && !focusRowId) { alert("Select a focus row for action items"); return; }
         const res = await fetch(API.aiApply(meetingId), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             focus_row_id: focusRowId,
             items: rows,
+            decisions: decisionRows,
             apply_summary: preview.summary || "",
           }),
         });
@@ -270,6 +306,7 @@
         if (!res.ok) { alert(data.error || "Apply failed"); return; }
         if (window.bootstrap) bootstrap.Modal.getOrCreateInstance(modal).hide();
         if (window.MN && window.MN.refreshItems) window.MN.refreshItems();
+        if (window.MN_loadDecisions) window.MN_loadDecisions();
         if (preview.summary) {
           const ta = $("#mn-meta-summary");
           if (ta) ta.value = preview.summary;
@@ -325,21 +362,45 @@
     async function submit() {
       const raw = (input.value || "").trim();
       if (!raw) return;
+      if (/^(>>|decision:)/i.test(raw)) {
+        const body = raw.replace(/^(>>|decision:)\s*/i, "").trim();
+        if (!body) return;
+        try {
+          if (window.MN_createDecision) {
+            await window.MN_createDecision(body);
+          } else {
+            const res = await fetch("/meeting-notes/api/meetings/" + meetingId + "/decisions", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({ body: body }),
+            });
+            if (!res.ok) throw new Error("Failed");
+            if (window.MN_loadDecisions) await window.MN_loadDecisions();
+          }
+          input.value = "";
+        } catch (e) {
+          alert("Could not save decision");
+        }
+        return;
+      }
       const parsed = parseQuickCapture(raw);
       let focusRows = (window.MN && window.MN.focusRows) || [];
       let rowId = focusRows.length ? focusRows[0].id : null;
       if (!rowId) {
         const frRes = await fetch(API.focusRow(meetingId), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify({ platform: parsed.platform || "General", focus_area: "Quick capture" }),
         });
         const fr = await frRes.json();
         rowId = fr.id;
       }
-      await fetch(API.createItem(rowId), {
+      const itemRes = await fetch(API.createItem(rowId), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           call_to_action: parsed.title,
           priority: parsed.priority,
@@ -347,9 +408,55 @@
           assignee_ids: parsed.assignee_ids,
         }),
       });
+      if (!itemRes.ok) throw new Error("Could not create task");
       input.value = "";
       if (window.MN && window.MN.refreshItems) window.MN.refreshItems();
     }
+
+    window.MN_submitQuickCapture = async function (text, options) {
+      options = options || {};
+      const raw = (text || "").trim();
+      if (!raw) return;
+      if (/^(>>|decision:)/i.test(raw)) {
+        const body = raw.replace(/^(>>|decision:)\s*/i, "").trim();
+        if (!body) return;
+        if (window.MN_createDecision) await window.MN_createDecision(body);
+        return;
+      }
+      const parsed = parseQuickCapture(raw);
+      let focusRows = (window.MN && window.MN.focusRows) || [];
+      let rowId = options.focusRowId || null;
+      if (!rowId && parsed.platform) {
+        const match = focusRows.find(function (r) {
+          return (r.platform || "").toLowerCase() === parsed.platform.toLowerCase();
+        });
+        if (match) rowId = match.id;
+      }
+      if (!rowId) rowId = focusRows.length ? focusRows[0].id : null;
+      if (!rowId) {
+        const frRes = await fetch(API.focusRow(meetingId), {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ platform: parsed.platform || "General", focus_area: "Quick capture" }),
+        });
+        const fr = await frRes.json();
+        rowId = fr.id;
+      }
+      const itemRes = await fetch(API.createItem(rowId), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          call_to_action: parsed.title,
+          priority: parsed.priority,
+          due_date: parsed.due_date,
+          assignee_ids: parsed.assignee_ids,
+        }),
+      });
+      if (!itemRes.ok) throw new Error("Could not create task");
+      if (window.MN && window.MN.refreshItems) await window.MN.refreshItems();
+    };
 
     if (go) go.addEventListener("click", submit);
     input.addEventListener("keydown", function (e) {
@@ -373,11 +480,12 @@
   function initTemplates() {
     const sel = $("#mn-template-select");
     const selMobile = $("#mn-template-select-mobile");
+    const selMobileTab = $("#mn-template-select-mobile-tab");
     const btn = $("#mn-template-create");
-    if (!sel && !selMobile) return;
+    if (!sel && !selMobile && !selMobileTab) return;
     fetch(API.templates).then(function (r) { return r.json(); }).then(function (rows) {
       rows.forEach(function (t) {
-        [sel, selMobile].forEach(function (target) {
+        [sel, selMobile, selMobileTab].forEach(function (target) {
           if (!target) return;
           const opt = document.createElement("option");
           opt.value = String(t.id);

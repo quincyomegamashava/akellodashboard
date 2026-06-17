@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from calendar import monthrange
 from datetime import date, datetime, timedelta
@@ -65,6 +66,27 @@ def parse_guest_names(value: Optional[str]) -> List[str]:
     return names
 
 
+def parse_agenda_item_notes(value: Optional[str]) -> Dict[str, str]:
+    if not value:
+        return {}
+    try:
+        data = json.loads(value)
+        if isinstance(data, dict):
+            return {str(k): str(v or "") for k, v in data.items()}
+    except (json.JSONDecodeError, TypeError, ValueError):
+        pass
+    return {}
+
+
+def agenda_item_notes_to_text(notes: Optional[dict]) -> Optional[str]:
+    if not notes or not isinstance(notes, dict):
+        return None
+    cleaned = {str(k): str(v or "") for k, v in notes.items()}
+    if not cleaned:
+        return None
+    return json.dumps(cleaned)
+
+
 def guest_names_to_text(names: Optional[Sequence[str]]) -> Optional[str]:
     if not names:
         return None
@@ -92,11 +114,17 @@ def meeting_to_dict(mn: MeetingNote) -> dict:
     attendees = mn.attendees or []
     attendee_names = [user_display_name(u) for u in attendees]
     guest_names = parse_guest_names(mn.guest_attendees)
+    creator_name = user_display_name(mn.creator) if mn.creator else ""
     return {
         "id": mn.id,
         "title": mn.title,
         "meeting_date": mn.meeting_date.isoformat() if mn.meeting_date else None,
         "summary": mn.summary,
+        "location": mn.location or "",
+        "meeting_time": mn.meeting_time or "",
+        "agenda": mn.agenda or "",
+        "agenda_item_notes": parse_agenda_item_notes(mn.agenda_item_notes),
+        "minutes_taken_by": creator_name,
         "attendee_ids": [u.id for u in attendees],
         "attendee_names": attendee_names,
         "guest_names": guest_names,

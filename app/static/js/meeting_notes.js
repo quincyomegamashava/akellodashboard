@@ -43,11 +43,12 @@
   window.MN_API = API;
 
   function resolveMeetingNoteId() {
-    if (typeof MN_MEETING_NOTE_ID === "number" && !isNaN(MN_MEETING_NOTE_ID)) {
-      return MN_MEETING_NOTE_ID;
+    const raw = typeof MN_MEETING_NOTE_ID !== "undefined" ? MN_MEETING_NOTE_ID : window.MN_MEETING_NOTE_ID;
+    if (typeof raw === "number" && !isNaN(raw)) {
+      return raw;
     }
-    if (typeof MN_MEETING_NOTE_ID === "string" && /^\d+$/.test(MN_MEETING_NOTE_ID)) {
-      return parseInt(MN_MEETING_NOTE_ID, 10);
+    if (typeof raw === "string" && /^\d+$/.test(raw)) {
+      return parseInt(raw, 10);
     }
     return null;
   }
@@ -1881,7 +1882,27 @@
     hint.textContent = msg || "";
   }
 
-  function openTaskPanel(item, readOnly) {
+  function resolveTaskPanelItem(itemOrId) {
+    if (itemOrId && typeof itemOrId === "object" && itemOrId.id != null) return itemOrId;
+    const id = parseInt(itemOrId, 10);
+    if (!id) return null;
+    return lastItemsCache.find(function (it) { return it.id === id; }) || null;
+  }
+
+  async function openTaskPanelById(itemId, readOnly) {
+    const res = await fetch(API.actionItem(itemId), { headers: { Accept: "application/json" } });
+    if (!res.ok) return;
+    const data = await res.json();
+    openTaskPanel(data, readOnly);
+  }
+
+  function openTaskPanel(itemOrId, readOnly) {
+    const item = resolveTaskPanelItem(itemOrId);
+    if (!item) {
+      const id = parseInt(itemOrId, 10);
+      if (id) openTaskPanelById(id, readOnly);
+      return;
+    }
     const backdrop = $("#mn-task-panel-backdrop");
     const panel = $("#mn-task-panel");
     if (!panel) return;
@@ -2723,10 +2744,23 @@
 
   async function saveMeetingMeta() {
     if (!meetingNoteId) return;
+    const summaryEl = $("#mn-meta-summary");
+    const liveNotes = $("#mn-live-notes");
+    let summaryVal = "";
+    if (window.easyMDE && summaryEl && document.body.contains(summaryEl)) {
+      summaryVal = window.easyMDE.value().trim();
+    } else if (liveNotes && !liveNotes.classList.contains("d-none") && document.getElementById("mn-page-detail")?.classList.contains("mn-meeting-mode")) {
+      summaryVal = liveNotes.value.trim();
+    } else if (summaryEl) {
+      summaryVal = summaryEl.value.trim();
+    }
     const payload = {
       title: $("#mn-meta-title").value.trim(),
       meeting_date: $("#mn-meta-date").value,
-      summary: $("#mn-meta-summary").value.trim() || null,
+      summary: summaryVal || null,
+      location: ($("#mn-meta-location") || {}).value ? $("#mn-meta-location").value.trim() : null,
+      meeting_time: ($("#mn-meta-time") || {}).value ? $("#mn-meta-time").value.trim() : null,
+      agenda: ($("#mn-meta-agenda") || {}).value ? $("#mn-meta-agenda").value.trim() : null,
       attendee_ids: getAssigneeIdsFromPicker(attendeePickerEl),
       guest_names: getGuestNamesFromPicker(guestPickerEl),
     };
@@ -2740,25 +2774,299 @@
       const data = await res.json();
       if (Array.isArray(data.attendee_ids)) mnMeetingAttendeeIds = data.attendee_ids.slice();
       if (Array.isArray(data.guest_names)) mnMeetingGuestNames = data.guest_names.slice();
+      if (typeof data.summary === "string") {
+        window.MN_MEETING_SUMMARY = data.summary;
+        if (liveNotes) liveNotes.value = data.summary;
+        if (window.easyMDE) window.easyMDE.value(data.summary);
+        else if (summaryEl) summaryEl.value = data.summary;
+      }
+      if (typeof data.location === "string") window.MN_MEETING_LOCATION = data.location;
+      if (typeof data.meeting_time === "string") window.MN_MEETING_TIME = data.meeting_time;
+      if (typeof data.agenda === "string") window.MN_MEETING_AGENDA = data.agenda;
     } catch (e) { /* ignore */ }
     loadActivity();
   }
 
   function getPdfExportOptions() {
+    const formatMinutes = $("#mn-pdf-format-minutes");
+    const format = formatMinutes && formatMinutes.checked ? "minutes" : "report";
     const incDone = $("#mn-pdf-include-done");
     const incSummary = $("#mn-pdf-include-summary");
     const groupPlatform = $("#mn-pdf-group-platform");
     const incLabelsPriority = $("#mn-pdf-include-labels-priority");
     const incSubtasks = $("#mn-pdf-include-subtasks");
     const incDiscussion = $("#mn-pdf-include-discussion");
+    const incDecisionsReport = $("#mn-pdf-include-decisions");
+    const minutesIncDone = $("#mn-pdf-minutes-include-done");
+    const minutesIncDecisions = $("#mn-pdf-minutes-include-decisions");
+    const minutesAttendeeRoles = $("#mn-pdf-minutes-attendee-roles");
     return {
-      includeDone: incDone ? incDone.checked : true,
+      format: format,
+      includeDone: format === "minutes"
+        ? (minutesIncDone ? minutesIncDone.checked : false)
+        : (incDone ? incDone.checked : true),
       includeSummary: incSummary ? incSummary.checked : true,
       groupByPlatform: groupPlatform ? groupPlatform.checked : true,
       includeLabelsPriority: incLabelsPriority ? incLabelsPriority.checked : true,
       includeSubtasks: incSubtasks ? incSubtasks.checked : true,
       includeDiscussion: incDiscussion ? incDiscussion.checked : false,
+      includeDecisions: format === "minutes"
+        ? (minutesIncDecisions ? minutesIncDecisions.checked : true)
+        : (incDecisionsReport ? incDecisionsReport.checked : false),
+      includeAttendeeNames: minutesAttendeeRoles ? minutesAttendeeRoles.checked : true,
     };
+  }
+
+  async function fetchDecisionsForPdf() {
+    if (!meetingNoteId) return [];
+    try {
+      const url = (window.MN_API && window.MN_API.decisions)
+        ? window.MN_API.decisions(meetingNoteId)
+        : "/meeting-notes/api/meetings/" + meetingNoteId + "/decisions";
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function parseAgendaLines(agendaText) {
+    const raw = (agendaText || "").trim();
+    if (!raw) return [];
+    return raw.split("\n").map(function (line) {
+      return line.replace(/^\d+[\.\)]\s*/, "").trim();
+    }).filter(Boolean);
+  }
+
+  function pdfDrawBorderedRect(doc, x, y, w, h) {
+    doc.setDrawColor(PDF_THEME.border[0], PDF_THEME.border[1], PDF_THEME.border[2]);
+    doc.setLineWidth(0.5);
+    doc.rect(x, y, w, h);
+  }
+
+  function pdfDrawLabelValueCell(doc, x, y, w, h, label, value, opts) {
+    opts = opts || {};
+    pdfDrawBorderedRect(doc, x, y, w, h);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(opts.labelSize || 7);
+    doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+    doc.text(String(label || "").toUpperCase(), x + 6, y + 10);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(opts.valueSize || 9);
+    doc.setTextColor(PDF_THEME.text[0], PDF_THEME.text[1], PDF_THEME.text[2]);
+    const lines = doc.splitTextToSize(String(value || "—"), w - 12);
+    doc.text(lines.slice(0, opts.maxLines || 3), x + 6, y + 22);
+  }
+
+  function formatMinutesAttendeesList(includeNames) {
+    const users = getAssigneeLabels(mnMeetingAttendeeIds);
+    const guests = mnMeetingGuestNames || [];
+    const lines = [];
+    if (includeNames && users.length) {
+      users.forEach(function (name) { lines.push("• " + name); });
+    }
+    if (guests.length) {
+      guests.forEach(function (g) { lines.push("• " + g + " (Guest)"); });
+    }
+    return lines.join("\n");
+  }
+
+  function renderPdfDecisionsSection(doc, decisions, startY, bounds) {
+    if (!decisions || !decisions.length) return startY;
+    let y = startY;
+    if (y > bounds.maxY - 80) {
+      doc.addPage();
+      y = PDF_MARGINS.top;
+    }
+    const sectionH = 16;
+    pdfDrawBorderedRect(doc, bounds.left, y, bounds.width, sectionH);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("KEY DECISIONS", bounds.left + 6, y + 11);
+    y += sectionH;
+    decisions.forEach(function (d, idx) {
+      const owner = d.owner_name || "Team";
+      const body = (d.body || "").trim();
+      const text = (idx + 1) + ". " + body + (owner ? " — " + owner : "");
+      const lines = doc.splitTextToSize(text, bounds.width - 16);
+      const rowH = Math.max(22, lines.length * 11 + 10);
+      if (y + rowH > bounds.maxY) {
+        doc.addPage();
+        y = PDF_MARGINS.top;
+      }
+      pdfDrawBorderedRect(doc, bounds.left, y, bounds.width, rowH);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(PDF_THEME.text[0], PDF_THEME.text[1], PDF_THEME.text[2]);
+      doc.text(lines, bounds.left + 8, y + 14);
+      y += rowH;
+    });
+    return y + 8;
+  }
+
+  function renderPdfMinutesDocument(doc, items, pdfOpts, meta, logoDataUrl, decisions) {
+    const bounds = getPdfContentBounds(doc);
+    let y = 36;
+
+    if (logoDataUrl) {
+      try { doc.addImage(logoDataUrl, "PNG", bounds.right - 72, 24, 60, 24); } catch (e) { /* ignore */ }
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(PDF_THEME.text[0], PDF_THEME.text[1], PDF_THEME.text[2]);
+    doc.text("MEETING MINUTES", bounds.left + bounds.width / 2, y, { align: "center" });
+    y += 24;
+
+    const cellW = bounds.width / 2;
+    const cellH = 34;
+    const subject = meta.title || "—";
+    const place = typeof MN_MEETING_LOCATION === "string" ? MN_MEETING_LOCATION : "";
+    const dateStr = meta.meetingDate ? pdfFormatDisplayDate(meta.meetingDate) : "—";
+    const timeStr = typeof MN_MEETING_TIME === "string" ? MN_MEETING_TIME : "";
+    pdfDrawLabelValueCell(doc, bounds.left, y, cellW, cellH, "Subject", subject);
+    pdfDrawLabelValueCell(doc, bounds.left + cellW, y, cellW, cellH, "Place", place || "—");
+    y += cellH;
+    pdfDrawLabelValueCell(doc, bounds.left, y, cellW, cellH, "Date", dateStr);
+    pdfDrawLabelValueCell(doc, bounds.left + cellW, y, cellW, cellH, "Time", timeStr || "—");
+    y += cellH + 8;
+
+    const colH = 120;
+    const leftW = bounds.width * 0.48;
+    const rightW = bounds.width - leftW - 8;
+    const rightX = bounds.left + leftW + 8;
+
+    pdfDrawBorderedRect(doc, bounds.left, y, leftW, colH);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("AGENDA", bounds.left + 6, y + 11);
+    const agendaLines = parseAgendaLines(typeof MN_MEETING_AGENDA === "string" ? MN_MEETING_AGENDA : "");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(PDF_THEME.text[0], PDF_THEME.text[1], PDF_THEME.text[2]);
+    let ay = y + 22;
+    if (!agendaLines.length) {
+      for (let i = 0; i < 5; i++) {
+        doc.text(String(i + 1) + ". _________________________________", bounds.left + 8, ay);
+        ay += 14;
+      }
+    } else {
+      agendaLines.forEach(function (line, i) {
+        doc.text(String(i + 1) + ". " + line, bounds.left + 8, ay);
+        ay += 14;
+      });
+    }
+
+    pdfDrawBorderedRect(doc, rightX, y, rightW, colH);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("MINUTES TAKEN BY", rightX + 6, y + 11);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    const takenBy = typeof MN_MINUTES_TAKEN_BY === "string" ? MN_MINUTES_TAKEN_BY : "";
+    doc.text(takenBy || "—", rightX + 6, y + 24);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text("ATTENDEES", rightX + 6, y + 40);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    const attText = formatMinutesAttendeesList(pdfOpts.includeAttendeeNames !== false) || "—";
+    const attLines = doc.splitTextToSize(attText, rightW - 12);
+    doc.text(attLines, rightX + 6, y + 52);
+    y += colH + 8;
+
+    const notesH = 100;
+    pdfDrawBorderedRect(doc, bounds.left, y, bounds.width, notesH);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("MEETING NOTES", bounds.left + 6, y + 11);
+    const summary = typeof MN_MEETING_SUMMARY === "string" ? MN_MEETING_SUMMARY.trim() : "";
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    let ny = y + 22;
+    if (summary) {
+      const sumLines = doc.splitTextToSize(summary, bounds.width - 16);
+      doc.text(sumLines.slice(0, 8), bounds.left + 8, ny);
+    } else {
+      for (let i = 0; i < 5; i++) {
+        doc.setDrawColor(PDF_THEME.border[0], PDF_THEME.border[1], PDF_THEME.border[2]);
+        doc.line(bounds.left + 8, ny + 4, bounds.right - 8, ny + 4);
+        ny += 14;
+      }
+    }
+    y += notesH + 8;
+
+    if (pdfOpts.includeDecisions) {
+      y = renderPdfDecisionsSection(doc, decisions, y, bounds);
+    }
+
+    if (y > bounds.maxY - 60) {
+      doc.addPage();
+      y = PDF_MARGINS.top;
+    }
+
+    const sectionH = 16;
+    pdfDrawBorderedRect(doc, bounds.left, y, bounds.width, sectionH);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("ACTION ITEMS", bounds.left + 6, y + 11);
+    y += sectionH;
+
+    if (!items.length) {
+      pdfDrawBorderedRect(doc, bounds.left, y, bounds.width, 24);
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.text("No action items recorded.", bounds.left + 8, y + 15);
+      return;
+    }
+
+    if (!doc.autoTable) throw new Error("PDF table plugin not loaded.");
+    const body = items.map(function (it, idx) {
+      return [
+        pdfFirstLine(pdfTaskText(it), 120),
+        getPdfAssigneeNames(it) || "—",
+        it.due_date ? pdfFormatDisplayDate(it.due_date) : "—",
+        pdfStatusLabel(it.status),
+      ];
+    });
+    const tableOpts = pdfBaseTableStyles();
+    tableOpts.startY = y;
+    tableOpts.head = [["ACTION ITEM", "IN-CHARGE", "COMPLETION DATE", "STATUS"]];
+    tableOpts.body = body;
+    tableOpts.margin = { left: bounds.left, right: PDF_MARGINS.right };
+    tableOpts.tableWidth = bounds.width;
+    tableOpts.didDrawPage = function () {
+      const pageNum = doc.internal.getNumberOfPages();
+      const pageH = doc.internal.pageSize.getHeight();
+      doc.setFontSize(8);
+      doc.setTextColor(PDF_THEME.muted[0], PDF_THEME.muted[1], PDF_THEME.muted[2]);
+      doc.text("Page " + pageNum, bounds.left, pageH - 18);
+      doc.text("Generated " + pdfFormatGeneratedAt(), bounds.right, pageH - 18, { align: "right" });
+    };
+    doc.autoTable(tableOpts);
+  }
+
+  function renderPdfReportDecisionsAppendix(doc, decisions, meta, logoDataUrl, startY) {
+    if (!decisions || !decisions.length) return startY;
+    const bounds = getPdfContentBounds(doc);
+    let y = startY;
+    if (y > bounds.maxY - 80) {
+      doc.addPage();
+      drawPdfPageChrome(doc, logoDataUrl, meta);
+      y = PDF_MARGINS.top;
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(PDF_THEME.primary[0], PDF_THEME.primary[1], PDF_THEME.primary[2]);
+    doc.text("Key decisions", bounds.left, y);
+    y += 14;
+    return renderPdfDecisionsSection(doc, decisions, y, bounds);
   }
 
   async function fetchItemsForPdf(pdfOpts) {
@@ -3093,7 +3401,13 @@
     if (!pdfOpts.includeDone) {
       items = items.filter(function (it) { return (it.status || "open") !== "done"; });
     }
-    if (!items.length) {
+    const decisions = pdfOpts.includeDecisions ? await fetchDecisionsForPdf() : [];
+    const summaryText = typeof MN_MEETING_SUMMARY === "string" ? MN_MEETING_SUMMARY.trim() : "";
+    if (pdfOpts.format === "minutes") {
+      if (!items.length && !summaryText && !decisions.length) {
+        throw new Error("Nothing to export — add notes, decisions, or action items.");
+      }
+    } else if (!items.length) {
       throw new Error("No action items to export.");
     }
     const { jsPDF } = window.jspdf;
@@ -3107,14 +3421,25 @@
       meetingDate: meetingDate,
       hasAiItems: items.some(function (it) { return it.ai_extracted; }),
     };
+    const slug = String(title).replace(/[^\w\-]+/g, "_").slice(0, 40) || "export";
+    const datePart = new Date().toISOString().slice(0, 10);
+
+    if (pdfOpts.format === "minutes") {
+      renderPdfMinutesDocument(doc, items, pdfOpts, meta, logoDataUrl, decisions);
+      const filename = "meeting-minutes_" + slug + "_" + datePart + ".pdf";
+      return { doc: doc, filename: filename, format: "minutes" };
+    }
+
     const stats = computePdfStats(items);
     let y = renderPdfCover(doc, logoDataUrl, pdfOpts, meta, stats);
     doc.addPage();
     drawPdfPageChrome(doc, logoDataUrl, meta);
-    renderPdfReportBody(doc, items, pdfOpts, meta, logoDataUrl, PDF_MARGINS.top);
-    const slug = String(title).replace(/[^\w\-]+/g, "_").slice(0, 40) || "export";
-    const filename = "meeting-notes_" + slug + "_" + new Date().toISOString().slice(0, 10) + ".pdf";
-    return { doc: doc, filename: filename };
+    const bodyEnd = renderPdfReportBody(doc, items, pdfOpts, meta, logoDataUrl, PDF_MARGINS.top);
+    if (pdfOpts.includeDecisions && decisions.length) {
+      renderPdfReportDecisionsAppendix(doc, decisions, meta, logoDataUrl, bodyEnd);
+    }
+    const filename = "meeting-notes_" + slug + "_" + datePart + ".pdf";
+    return { doc: doc, filename: filename, format: "report" };
   }
 
   async function exportTablePdf() {
@@ -3151,6 +3476,7 @@
           body_text: "Please find attached the latest meeting report.",
           pdf_base64: pdfBase64,
           pdf_filename: built.filename,
+          pdf_format: built.format || getPdfExportOptions().format || "minutes",
         }),
       });
       const data = await res.json().catch(function () { return {}; });
@@ -3664,6 +3990,17 @@
     if (expModalBtn && document.getElementById("mnExportModal")) {
       expModalBtn.setAttribute("data-bs-toggle", "modal");
       expModalBtn.setAttribute("data-bs-target", "#mnExportModal");
+      function syncPdfFormatPanels() {
+        const isMinutes = $("#mn-pdf-format-minutes") && $("#mn-pdf-format-minutes").checked;
+        const minsOpts = $("#mn-pdf-minutes-options");
+        const reportOpts = $("#mn-pdf-report-options");
+        if (minsOpts) minsOpts.classList.toggle("d-none", !isMinutes);
+        if (reportOpts) reportOpts.classList.toggle("d-none", !!isMinutes);
+      }
+      $all('input[name="mn-pdf-format"]').forEach(function (radio) {
+        radio.addEventListener("change", syncPdfFormatPanels);
+      });
+      syncPdfFormatPanels();
       const confirmExp = $("#mn-btn-confirm-export");
       if (confirmExp) {
         confirmExp.addEventListener("click", function () {
@@ -3676,6 +4013,25 @@
       if (emailExp) {
         emailExp.addEventListener("click", emailMeetingReport);
       }
+    }
+
+    const agendaAutofill = $("#mn-btn-agenda-autofill");
+    if (agendaAutofill) {
+      agendaAutofill.addEventListener("click", async function () {
+        try {
+          const res = await fetch("/meeting-notes/api/meetings/" + meetingNoteId + "/agenda/from-focus-rows", {
+            method: "POST",
+            headers: { Accept: "application/json" },
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed");
+          const ta = $("#mn-meta-agenda");
+          if (ta) ta.value = data.agenda || "";
+          window.MN_MEETING_AGENDA = data.agenda || "";
+        } catch (e) {
+          alert((e && e.message) ? e.message : "Could not auto-fill agenda");
+        }
+      });
     }
   }
 
@@ -3705,5 +4061,6 @@
     syncFilterChips: syncFilterChips,
     getViewFromUrl: getViewFromUrl,
     setUrlView: setUrlView,
+    getItemsCache: function () { return lastItemsCache; },
   };
 })();

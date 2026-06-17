@@ -6,30 +6,62 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <p class="text-muted small mb-3">Professional report with a summary cover page, action-item table, and optional detail appendix.</p>
-        <div class="form-check mb-2">
-          <input class="form-check-input" type="checkbox" id="mn-pdf-include-summary" checked />
-          <label class="form-check-label" for="mn-pdf-include-summary">Include meeting summary</label>
+        <label class="mn-filter-label">PDF format</label>
+        <div class="mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="mn-pdf-format" id="mn-pdf-format-minutes" value="minutes" checked />
+            <label class="form-check-label" for="mn-pdf-format-minutes">Meeting Minutes — formal minutes layout</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="mn-pdf-format" id="mn-pdf-format-report" value="report" />
+            <label class="form-check-label" for="mn-pdf-format-report">Action Report — cover page + task table</label>
+          </div>
         </div>
-        <div class="form-check mb-2">
-          <input class="form-check-input" type="checkbox" id="mn-pdf-group-platform" checked />
-          <label class="form-check-label" for="mn-pdf-group-platform">Group by platform</label>
+        <div id="mn-pdf-minutes-options">
+          <p class="text-muted small mb-3">Formal meeting minutes with agenda, notes, decisions, and action items.</p>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="mn-pdf-minutes-include-decisions" checked />
+            <label class="form-check-label" for="mn-pdf-minutes-include-decisions">Include key decisions</label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="mn-pdf-minutes-include-done" />
+            <label class="form-check-label" for="mn-pdf-minutes-include-done">Include completed action items</label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="mn-pdf-minutes-attendee-roles" checked />
+            <label class="form-check-label" for="mn-pdf-minutes-attendee-roles">List attendees with names</label>
+          </div>
         </div>
-        <div class="form-check mb-2">
-          <input class="form-check-input" type="checkbox" id="mn-pdf-include-done" checked />
-          <label class="form-check-label" for="mn-pdf-include-done">Include completed items</label>
-        </div>
-        <div class="form-check mb-2">
-          <input class="form-check-input" type="checkbox" id="mn-pdf-include-labels-priority" checked />
-          <label class="form-check-label" for="mn-pdf-include-labels-priority">Include priority &amp; labels</label>
-        </div>
-        <div class="form-check mb-2">
-          <input class="form-check-input" type="checkbox" id="mn-pdf-include-subtasks" checked />
-          <label class="form-check-label" for="mn-pdf-include-subtasks">Include sub-tasks</label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="mn-pdf-include-discussion" />
-          <label class="form-check-label" for="mn-pdf-include-discussion">Include discussion threads</label>
+        <div id="mn-pdf-report-options" class="d-none">
+          <p class="text-muted small mb-3">Professional report with a summary cover page, action-item table, and optional detail appendix.</p>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="mn-pdf-include-summary" checked />
+            <label class="form-check-label" for="mn-pdf-include-summary">Include meeting summary</label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="mn-pdf-group-platform" checked />
+            <label class="form-check-label" for="mn-pdf-group-platform">Group by platform</label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="mn-pdf-include-done" checked />
+            <label class="form-check-label" for="mn-pdf-include-done">Include completed items</label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="mn-pdf-include-labels-priority" checked />
+            <label class="form-check-label" for="mn-pdf-include-labels-priority">Include priority &amp; labels</label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="mn-pdf-include-subtasks" checked />
+            <label class="form-check-label" for="mn-pdf-include-subtasks">Include sub-tasks</label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="mn-pdf-include-discussion" />
+            <label class="form-check-label" for="mn-pdf-include-discussion">Include discussion threads</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="mn-pdf-include-decisions" />
+            <label class="form-check-label" for="mn-pdf-include-decisions">Include decisions appendix</label>
+          </div>
         </div>
         <hr />
         <label class="mn-filter-label" for="mn-pdf-email-recipients">Email recipients</label>

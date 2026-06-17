@@ -28,6 +28,15 @@ from app.blueprints.meeting_notes.services import (
 )
 
 
+def _emit_decision_updated(meeting_id: int) -> None:
+    try:
+        from app.socketio_handlers import emit_meeting_item_event
+
+        emit_meeting_item_event(meeting_id, "decision_updated", {"meeting_id": meeting_id})
+    except Exception:
+        pass
+
+
 def decision_to_dict(d: MeetingDecision) -> dict:
     owner = d.owner
     return {
@@ -70,6 +79,7 @@ def api_meeting_decisions(meeting_id: int):
     )
     db.session.add(d)
     db.session.commit()
+    _emit_decision_updated(meeting_id)
     return jsonify(decision_to_dict(d)), 201
 
 
@@ -80,8 +90,10 @@ def api_decision_detail(decision_id: int):
     if not d:
         return jsonify({"error": "Not found"}), 404
     if request.method == "DELETE":
+        meeting_id = d.meeting_note_id
         db.session.delete(d)
         db.session.commit()
+        _emit_decision_updated(meeting_id)
         return jsonify({"ok": True})
     payload = request.get_json(silent=True) or {}
     if "body" in payload:
@@ -98,6 +110,7 @@ def api_decision_detail(decision_id: int):
     if "sort_order" in payload:
         d.sort_order = int(payload.get("sort_order") or 0)
     db.session.commit()
+    _emit_decision_updated(d.meeting_note_id)
     return jsonify(decision_to_dict(d))
 
 

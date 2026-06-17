@@ -43,6 +43,7 @@ from app.blueprints.meeting_notes.email_reports import (
 from app.blueprints.meeting_notes.services import (
     VALID_STATUSES,
     action_items_query,
+    agenda_item_notes_to_text,
     attendees_for_meeting,
     apply_subtask_parent_rollup,
     carry_forward_preview,
@@ -65,9 +66,11 @@ from app.blueprints.meeting_notes.services import (
     overdue_items_count,
     parse_guest_names,
     parse_mention_user_ids,
+    parse_agenda_item_notes,
     saved_view_to_dict,
     subtask_to_dict,
     template_to_dict,
+    user_display_name,
     validate_subtask_assignee,
 )
 
@@ -254,8 +257,15 @@ def detail(meeting_id: int):
         .all()
     )
     focus_row_opts = [
-        {"id": r.id, "platform": r.platform, "focus_area": r.focus_area} for r in focus_rows
+        {
+            "id": r.id,
+            "platform": r.platform,
+            "focus_area": r.focus_area,
+            "discussion_notes": r.discussion_notes or "",
+        }
+        for r in focus_rows
     ]
+    agenda_item_notes = parse_agenda_item_notes(mn.agenda_item_notes)
     attendee_ids = [u.id for u in (mn.attendees or [])]
     guest_names = parse_guest_names(mn.guest_attendees)
     is_admin = _is_admin()
@@ -292,6 +302,8 @@ def detail(meeting_id: int):
         prev_meeting_id=prev_meeting.id if prev_meeting else None,
         carry_forward_sources=carry_forward_sources,
         meeting_summary=mn.summary or "",
+        agenda_item_notes=agenda_item_notes,
+        minutes_taken_by=user_display_name(mn.creator) if mn.creator else "",
     )
 
 
@@ -772,6 +784,18 @@ def api_meeting(meeting_id: int):
             mn.meeting_date = d
     if "summary" in payload:
         mn.summary = (payload.get("summary") or "").strip() or None
+    if "location" in payload:
+        mn.location = (payload.get("location") or "").strip() or None
+    if "meeting_time" in payload:
+        mn.meeting_time = (payload.get("meeting_time") or "").strip() or None
+    if "agenda" in payload:
+        mn.agenda = (payload.get("agenda") or "").strip() or None
+    agenda_notes_updated = False
+    if "agenda_item_notes" in payload:
+        incoming = payload.get("agenda_item_notes")
+        if isinstance(incoming, dict):
+            mn.agenda_item_notes = agenda_item_notes_to_text(incoming)
+            agenda_notes_updated = True
     attendees_updated = False
     if "attendee_ids" in payload:
         mn.attendees = _assignees_from_ids(payload.get("attendee_ids"))
@@ -784,6 +808,7 @@ def api_meeting(meeting_id: int):
             mn.guest_attendees = guest_names_to_text(parse_guest_names(raw_guests))
         attendees_updated = True
     mn.updated_at = datetime.utcnow()
+    silent = _payload_silent(payload)
     if attendees_updated:
         n_users = len(mn.attendees or [])
         n_guests = len(parse_guest_names(mn.guest_attendees))
@@ -794,11 +819,48 @@ def api_meeting(meeting_id: int):
             mn.id,
             f"Updated attendees ({n_users} users, {n_guests} guests)",
         )
-    else:
+    elif not silent:
         _log_activity(mn.id, "update", "meeting_note", mn.id, f"Updated meeting: {mn.title}")
     db.session.commit()
     db.session.refresh(mn)
+    if "agenda" in payload or agenda_notes_updated:
+        try:
+            from app.socketio_handlers import emit_meeting_item_event
+
+            emit_meeting_item_event(
+                mn.id,
+                "agenda_updated",
+                {"meeting_id": mn.id, "agenda_item_notes": parse_agenda_item_notes(mn.agenda_item_notes)},
+            )
+        except Exception:
+            pass
     return jsonify(meeting_to_dict(mn))
+
+
+@bp.route("/api/meetings/<int:meeting_id>/agenda/from-focus-rows", methods=["POST"])
+@login_required
+def api_agenda_from_focus_rows(meeting_id: int):
+    mn = db.session.get(MeetingNote, meeting_id)
+    if not mn:
+        return jsonify({"error": "Not found"}), 404
+    rows = (
+        MeetingFocusRow.query.filter_by(meeting_note_id=meeting_id)
+        .order_by(MeetingFocusRow.sort_order, MeetingFocusRow.id)
+        .all()
+    )
+    seen = set()
+    lines = []
+    for r in rows:
+        area = normalize_bullet_text(r.focus_area).split("\n")[0].strip() if r.focus_area else ""
+        if not area:
+            area = (r.platform or "").strip() or "General discussion"
+        key = area.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        lines.append(area)
+    agenda = "\n".join(f"{i + 1}. {line}" for i, line in enumerate(lines))
+    return jsonify({"agenda": agenda, "lines": lines})
 
 
 # --- Focus rows ---
@@ -818,7 +880,13 @@ def api_meeting_focus_rows(meeting_id: int):
         )
         return jsonify(
             [
-                {"id": r.id, "platform": r.platform, "focus_area": r.focus_area, "sort_order": r.sort_order}
+                {
+                    "id": r.id,
+                    "platform": r.platform,
+                    "focus_area": r.focus_area,
+                    "sort_order": r.sort_order,
+                    "discussion_notes": r.discussion_notes or "",
+                }
                 for r in rows
             ]
         )
@@ -859,12 +927,27 @@ def api_focus_row(row_id: int):
         fr.platform = (payload.get("platform") or "").strip()
     if "focus_area" in payload:
         fr.focus_area = normalize_bullet_text(payload.get("focus_area")) or ""
+    if "discussion_notes" in payload:
+        fr.discussion_notes = (payload.get("discussion_notes") or "").strip() or None
     if "sort_order" in payload:
         fr.sort_order = int(payload.get("sort_order") or 0)
     if not _payload_silent(payload):
         _log_activity(mid, "update", "focus_row", fr.id, f"Updated focus row: {fr.platform} / {fr.focus_area}")
     db.session.commit()
-    return jsonify({"id": fr.id, "platform": fr.platform, "focus_area": fr.focus_area})
+    try:
+        from app.socketio_handlers import emit_meeting_item_event
+
+        emit_meeting_item_event(mid, "focus_row_updated", {"focus_row_id": fr.id, "meeting_id": mid})
+    except Exception:
+        pass
+    return jsonify(
+        {
+            "id": fr.id,
+            "platform": fr.platform,
+            "focus_area": fr.focus_area,
+            "discussion_notes": fr.discussion_notes or "",
+        }
+    )
 
 
 # --- Action items ---
@@ -1409,11 +1492,16 @@ def api_ai_apply_tasks(meeting_id: int):
     payload = request.get_json(silent=True) or {}
     focus_row_id = payload.get("focus_row_id")
     items = payload.get("items") or []
-    if not focus_row_id:
-        return jsonify({"error": "focus_row_id required"}), 400
-    fr = db.session.get(MeetingFocusRow, int(focus_row_id))
-    if not fr or fr.meeting_note_id != meeting_id:
-        return jsonify({"error": "Invalid focus row"}), 400
+    decisions = payload.get("decisions") or []
+    fr = None
+    if items:
+        if not focus_row_id:
+            return jsonify({"error": "focus_row_id required"}), 400
+        fr = db.session.get(MeetingFocusRow, int(focus_row_id))
+        if not fr or fr.meeting_note_id != meeting_id:
+            return jsonify({"error": "Invalid focus row"}), 400
+    elif not decisions:
+        return jsonify({"error": "No items or decisions to apply"}), 400
     created = []
     for row in items:
         if not isinstance(row, dict):
@@ -1458,8 +1546,8 @@ def api_ai_apply_tasks(meeting_id: int):
         if summary:
             mn.summary = summary
             mn.updated_at = datetime.utcnow()
-    decisions = payload.get("decisions") or []
     from app.blueprints.meeting_notes.models import MeetingDecision
+    decisions_created = 0
     for idx, dec in enumerate(decisions):
         if not isinstance(dec, dict):
             continue
@@ -1477,9 +1565,17 @@ def api_ai_apply_tasks(meeting_id: int):
                 sort_order=idx,
             )
         )
+        decisions_created += 1
     _log_activity(meeting_id, "create", "action_item", None, f"AI applied {len(created)} action items")
     db.session.commit()
-    return jsonify({"created": created, "count": len(created)})
+    if decisions_created:
+        try:
+            from app.socketio_handlers import emit_meeting_item_event
+
+            emit_meeting_item_event(meeting_id, "decision_updated", {"meeting_id": meeting_id})
+        except Exception:
+            pass
+    return jsonify({"created": created, "count": len(created), "decisions_created": decisions_created})
 
 
 @bp.route("/api/meetings/<int:meeting_id>/ai/summarize", methods=["POST"])
@@ -1542,6 +1638,7 @@ def api_email_meeting_report(meeting_id: int):
         body_text=body_text,
         attachment_bytes=attachment_bytes,
         attachment_filename=attachment_filename,
+        pdf_format=(payload.get("pdf_format") or "minutes").strip().lower(),
     )
     _log_activity(
         meeting_id,

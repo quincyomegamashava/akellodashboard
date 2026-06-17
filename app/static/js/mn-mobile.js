@@ -20,6 +20,10 @@
     if (newBtn) {
       newBtn.addEventListener("click", function () {
         if (path.match(/\/meeting-notes\/?$/)) {
+          if (typeof window.MN_showHubTab === "function") {
+            window.MN_showHubTab("new");
+            return;
+          }
           const sheet = document.getElementById("mn-new-meeting-sheet");
           if (sheet && window.bootstrap) {
             bootstrap.Offcanvas.getOrCreateInstance(sheet).show();
@@ -48,6 +52,15 @@
     if (active !== "tasks" && active !== "filters") active = "tasks";
 
     function showTab(name) {
+      if (name === "decisions" && typeof window.MN_showDecisionsTab === "function") {
+        window.MN_showDecisionsTab();
+        active = name;
+        sessionStorage.setItem(KEY, name);
+        $all("[data-mn-detail-tab]", tabs).forEach(function (btn) {
+          btn.classList.toggle("active", btn.getAttribute("data-mn-detail-tab") === name);
+        });
+        return;
+      }
       active = name;
       sessionStorage.setItem(KEY, name);
       $all("[data-mn-detail-tab]", tabs).forEach(function (btn) {

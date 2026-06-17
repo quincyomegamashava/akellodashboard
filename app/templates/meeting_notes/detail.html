@@ -57,11 +57,94 @@
     {% include "meeting_notes/_subnav.html" %}
     <div class="mn-detail-tabs d-md-none" id="mn-detail-tabs" role="tablist">
       <button type="button" class="mn-detail-tab active" data-mn-detail-tab="tasks">Tasks</button>
+      <button type="button" class="mn-detail-tab" data-mn-detail-tab="decisions">Decisions</button>
       <button type="button" class="mn-detail-tab" data-mn-detail-tab="filters">Filters</button>
     </div>
   </header>
 
   <div id="mn-carry-suggestions" class="alert alert-info py-2 small d-none mb-2"></div>
+
+  <div id="mn-meeting-mode-shell" class="mn-meeting-mode-shell d-none" aria-hidden="true">
+    <div class="mn-live-header">
+      <div class="mn-live-header-left">
+        <span class="mn-live-badge"><span class="mn-live-dot"></span> LIVE</span>
+        <span class="mn-live-timer" id="mn-live-timer">00:00:00</span>
+        <span class="mn-live-agenda-progress small" id="mn-live-agenda-progress"></span>
+      </div>
+      <div class="mn-live-header-right d-flex align-items-center gap-2">
+        <span id="mn-presence-avatars-live" class="d-inline-flex gap-1"></span>
+        <button type="button" class="btn btn-sm mn-btn-ghost text-white" id="mn-live-btn-save">Save</button>
+        <button type="button" class="btn btn-sm mn-btn-ghost text-white" id="mn-live-btn-exit" title="Exit meeting mode">Exit</button>
+      </div>
+    </div>
+    <div class="mn-live-body">
+      <aside class="mn-live-agenda-rail" id="mn-live-agenda-rail"></aside>
+      <div class="mn-live-main">
+        <div class="mn-live-actions d-flex flex-wrap gap-2 mb-2">
+          <button type="button" class="btn btn-sm mn-live-chip" id="mn-live-btn-task"><i class="fas fa-plus me-1"></i>Task</button>
+          <button type="button" class="btn btn-sm mn-live-chip" id="mn-live-btn-decision"><i class="fas fa-gavel me-1"></i>Decision</button>
+          <button type="button" class="btn btn-sm mn-live-chip" id="mn-live-btn-extract"><i class="fas fa-wand-magic-sparkles me-1"></i>Extract</button>
+          <button type="button" class="btn btn-sm mn-live-chip" id="mn-live-btn-pdf"><i class="fas fa-file-pdf me-1"></i>PDF</button>
+        </div>
+
+        <div id="mn-live-overview-panel">
+          <label class="mn-filter-label">Live notes</label>
+          <textarea class="form-control mb-2" id="mn-live-notes" rows="8" placeholder="Capture discussion notes…">{{ meeting.summary or '' }}</textarea>
+          <div class="mn-quick-capture mb-2" id="mn-live-quick-capture">
+            <input type="text" id="mn-live-quick-capture-input" placeholder="Quick capture: >> decision text or task @Jane due 2026-06-15" />
+            <button type="button" class="btn btn-sm mn-btn-primary" id="mn-live-quick-capture-go">Add</button>
+          </div>
+          <div class="mn-live-decisions-strip" id="mn-live-decisions-strip">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="small fw-semibold">Recent decisions</span>
+              <button type="button" class="btn btn-sm mn-btn-ghost py-0" id="mn-live-record-decision">Record</button>
+            </div>
+            <div id="mn-live-decisions-list" class="mn-live-decisions-list"></div>
+          </div>
+        </div>
+
+        <div id="mn-live-agenda-item-panel" class="d-none">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <button type="button" class="btn btn-sm mn-btn-ghost py-0 px-0" id="mn-live-back-overview">
+              <i class="fas fa-arrow-left me-1"></i>Meeting overview
+            </button>
+            <span class="small text-muted" id="mn-live-agenda-save-hint"></span>
+          </div>
+          <label class="mn-filter-label">Agenda item</label>
+          <input type="text" class="form-control form-control-sm mb-2" id="mn-live-agenda-title" placeholder="Agenda item title" />
+          <div id="mn-live-agenda-linked-fields">
+            <label class="mn-filter-label">Platform</label>
+            <input type="text" class="form-control form-control-sm mb-2" id="mn-live-agenda-platform" list="mn-platform-datalist" />
+            <label class="mn-filter-label">Focus area</label>
+            <textarea class="form-control form-control-sm mb-2 mn-cell-bullets" id="mn-live-agenda-focus" rows="3" placeholder="Key focus points…"></textarea>
+          </div>
+          <div id="mn-live-agenda-unlinked-actions" class="d-none mb-2">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <button type="button" class="btn btn-sm mn-btn-primary" id="mn-live-agenda-create-row">Create focus row from this item</button>
+              <select class="form-select form-select-sm" id="mn-live-agenda-link-select" style="width:auto; max-width:200px;">
+                <option value="">Link to existing…</option>
+                {% for r in focus_row_opts %}
+                <option value="{{ r.id }}">{{ r.platform }} — {{ (r.focus_area or '').split('\n')[0][:40] }}</option>
+                {% endfor %}
+              </select>
+              <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-live-agenda-link-go">Link</button>
+            </div>
+          </div>
+          <label class="mn-filter-label">Discussion notes</label>
+          <textarea class="form-control mb-2" id="mn-live-agenda-notes" rows="6" placeholder="Notes for this agenda topic…"></textarea>
+          <label class="mn-filter-label">Related action items</label>
+          <div id="mn-live-agenda-tasks" class="mn-live-agenda-tasks mb-2"></div>
+          <div class="mn-quick-capture mb-2" id="mn-live-agenda-capture">
+            <input type="text" id="mn-live-agenda-capture-input" placeholder="Quick capture for this topic: task @Jane due 2026-06-15" />
+            <button type="button" class="btn btn-sm mn-btn-primary" id="mn-live-agenda-capture-go">Add task</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mn-live-board-wrap">
+      <div id="mn-live-board" class="mn-board mn-live-board"></div>
+    </div>
+  </div>
 
   <div class="mn-view-pills mb-2 d-none d-md-flex" role="group">
     <button type="button" class="btn btn-sm active" data-mn-detail-tab="tasks">Tasks</button>
@@ -221,7 +304,7 @@
   <div class="mn-detail-tab-pane d-none mn-card p-3 mb-3" id="mn-tab-decisions">
     <h2 class="h6">Decision register</h2>
     <p class="small text-muted">Record decisions separately from action items. AI extract can populate these.</p>
-    <div id="mn-decisions-list" class="mb-3"></div>
+    <div id="mn-decisions-list" class="mb-3 mn-decisions-list"></div>
     <div class="d-flex gap-2">
       <input type="text" class="form-control form-control-sm" id="mn-decision-input" placeholder="Add a decision…" />
       <button type="button" class="btn btn-sm mn-btn-primary" id="mn-decision-add">Add</button>
@@ -339,6 +422,21 @@
         <input type="text" class="form-control form-control-sm mb-2" id="mn-meta-title" value="{{ meeting.title|e }}" />
         <label class="mn-filter-label">Meeting date</label>
         <input type="date" class="form-control form-control-sm mb-2" id="mn-meta-date" value="{{ meeting.meeting_date.strftime('%Y-%m-%d') }}" />
+        <div class="row g-2 mb-2">
+          <div class="col-md-6">
+            <label class="mn-filter-label">Place</label>
+            <input type="text" class="form-control form-control-sm" id="mn-meta-location" value="{{ meeting.location or '' }}" placeholder="Conference room / Zoom" />
+          </div>
+          <div class="col-md-6">
+            <label class="mn-filter-label">Time</label>
+            <input type="text" class="form-control form-control-sm" id="mn-meta-time" value="{{ meeting.meeting_time or '' }}" placeholder="10:00 AM" />
+          </div>
+        </div>
+        <label class="mn-filter-label">Agenda</label>
+        <div class="d-flex gap-2 mb-1">
+          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-agenda-autofill">Auto-fill from focus rows</button>
+        </div>
+        <textarea class="form-control form-control-sm mb-2" id="mn-meta-agenda" rows="4" placeholder="1. Welcome&#10;2. Project updates">{{ meeting.agenda or '' }}</textarea>
         <label class="mn-filter-label">Summary</label>
         <textarea class="form-control form-control-sm mb-2" id="mn-meta-summary" rows="3" placeholder="Discussion notes">{{ meeting.summary or '' }}</textarea>
         <label class="mn-filter-label">Attendees</label>
@@ -414,6 +512,13 @@
             <tbody id="mn-ai-tasks-body"></tbody>
           </table>
         </div>
+        <h6 class="mt-3 mb-2">Suggested decisions</h6>
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead><tr><th></th><th>Decision</th><th>Source excerpt</th></tr></thead>
+            <tbody id="mn-ai-decisions-body"></tbody>
+          </table>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-ai-summarize-modal">Polish summary</button>
@@ -430,18 +535,24 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
 <script>
-  const MN_MEETING_NOTE_ID = {{ meeting.id }};
-  const MN_MEETING_TITLE = {{ meeting.title|tojson }};
-  const MN_MEETING_DATE = {{ meeting.meeting_date.isoformat()|tojson }};
-  const MN_MEETING_SUMMARY = {{ (meeting.summary or '')|tojson }};
-  const MN_MEETING_ATTENDEE_IDS = {{ attendee_ids|tojson }};
-  const MN_MEETING_GUEST_NAMES = {{ guest_names|tojson }};
-  const MN_PREV_MEETING_ID = {{ prev_meeting_id|tojson }};
-  const MN_PLATFORMS = {{ platforms|tojson }};
-  const MN_USER_OPTS = {{ user_opts|tojson }};
-  const MN_FOCUS_ROWS = {{ focus_row_opts|tojson }};
-  const MN_IS_ADMIN = {{ is_admin|tojson }};
-  const MN_CAN_VIEW_ACTIVITY = {{ can_view_activity|tojson }};
+  window.MN_MEETING_NOTE_ID = {{ meeting.id }};
+  window.MN_MEETING_TITLE = {{ meeting.title|tojson }};
+  window.MN_MEETING_DATE = {{ meeting.meeting_date.isoformat()|tojson }};
+  window.MN_MEETING_SUMMARY = {{ (meeting.summary or '')|tojson }};
+  window.MN_MEETING_LOCATION = {{ (meeting.location or '')|tojson }};
+  window.MN_MEETING_TIME = {{ (meeting.meeting_time or '')|tojson }};
+  window.MN_MEETING_AGENDA = {{ (meeting.agenda or '')|tojson }};
+  window.MN_AGENDA_ITEM_NOTES = {{ agenda_item_notes|tojson }};
+  window.MN_MINUTES_TAKEN_BY = {{ minutes_taken_by|tojson }};
+  window.MN_MEETING_ATTENDEE_IDS = {{ attendee_ids|tojson }};
+  window.MN_MEETING_GUEST_NAMES = {{ guest_names|tojson }};
+  window.MN_PREV_MEETING_ID = {{ prev_meeting_id|tojson }};
+  window.MN_PLATFORMS = {{ platforms|tojson }};
+  window.MN_USER_OPTS = {{ user_opts|tojson }};
+  window.MN_FOCUS_ROWS = {{ focus_row_opts|tojson }};
+  window.MN_IS_ADMIN = {{ is_admin|tojson }};
+  window.MN_CAN_VIEW_ACTIVITY = {{ can_view_activity|tojson }};
+  window.MN_CURRENT_USER = {{ (current_user.username or '')|tojson }};
   const MN_PDF_LOGO_URL = "https://akello.co/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Flogo.294516ec.png&w=828&q=75";
 </script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>

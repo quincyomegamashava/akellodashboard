@@ -1,12 +1,12 @@
 {# Planner-style section nav. Set mn_active: hub | all_items | detail #}
 <nav class="mn-subnav" aria-label="Meeting notes sections">
-  <a href="{{ url_for('meeting_notes.index') }}" class="mn-subnav-link{% if mn_active == 'hub' %} active{% endif %}">
+  <a href="{{ url_for('meeting_notes.index') }}#tasks" class="mn-subnav-link{% if mn_active == 'hub' %} active{% endif %}">
     <i class="fas fa-house-user"></i><span>My tasks</span>
   </a>
   <a href="{{ url_for('meeting_notes.all_items') }}?mine=1" class="mn-subnav-link{% if mn_active == 'all_items' %} active{% endif %}">
     <i class="fas fa-list-check"></i><span>All tasks</span>
   </a>
-  <a href="{{ url_for('meeting_notes.index') }}#mn-meetings-section" class="mn-subnav-link{% if mn_active == 'meetings' %} active{% endif %}">
+  <a href="{{ url_for('meeting_notes.index') }}#meetings" class="mn-subnav-link{% if mn_active == 'meetings' %} active{% endif %}">
     <i class="fas fa-calendar-days"></i><span>Meetings</span>
   </a>
 </nav>

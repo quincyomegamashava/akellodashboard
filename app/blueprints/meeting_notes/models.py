@@ -63,6 +63,10 @@ class MeetingNote(db.Model):
     title = db.Column(db.String(255), nullable=False, default="")
     meeting_date = db.Column(db.Date, nullable=False, index=True)
     summary = db.Column(db.Text, nullable=True)
+    location = db.Column(db.String(255), nullable=True)
+    meeting_time = db.Column(db.String(32), nullable=True)
+    agenda = db.Column(db.Text, nullable=True)
+    agenda_item_notes = db.Column(db.Text, nullable=True)
     guest_attendees = db.Column(db.Text, nullable=True)
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -97,6 +101,7 @@ class MeetingFocusRow(db.Model):
     )
     platform = db.Column(db.String(120), nullable=False, default="", index=True)
     focus_area = db.Column(db.Text, nullable=False, default="")
+    discussion_notes = db.Column(db.Text, nullable=True)
     sort_order = db.Column(db.Integer, nullable=False, default=0)
 
     meeting_note = db.relationship("MeetingNote", back_populates="focus_rows")

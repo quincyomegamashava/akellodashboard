@@ -38,6 +38,7 @@ _SCHEMA_HINTS = (
     {'check': 'meeting_notes_action_items.source_excerpt', 'type': 'column', 'table': 'meeting_notes_action_items', 'column': 'source_excerpt'},
     {'check': 'meeting_notes_labels table', 'type': 'table', 'name': 'meeting_notes_labels'},
     {'check': 'notifications.meeting_note_id', 'type': 'column', 'table': 'notifications', 'column': 'meeting_note_id'},
+    {'check': 'meeting_notes.location', 'type': 'column', 'table': 'meeting_notes', 'column': 'location'},
     {'check': 'meeting_notes_decisions table', 'type': 'table', 'name': 'meeting_notes_decisions'},
     {'check': 'sales_marketing_events.slug', 'type': 'column', 'table': 'sales_marketing_events', 'column': 'slug'},
     {'check': 'sales_marketing_stakeholder_leads table', 'type': 'table', 'name': 'sales_marketing_stakeholder_leads'},
@@ -50,6 +51,7 @@ _SCHEMA_HINTS = (
 # Most specific schema signal first — used for stamp inference and recommendations.
 _SCHEMA_REVISION_HINTS = (
     ('sales_marketing_events.slug', 't2u3v4w5x6y7', 'Phase 1–3 meeting notes / sales marketing features'),
+    ('meeting_notes.location', 'u3v4w5x6y7z8', 'Meeting notes minutes metadata'),
     ('meeting_notes_decisions table', 't2u3v4w5x6y7', 'Meeting notes decisions'),
     ('meeting_notes_labels table', 'p6q7r8s9t0u1', 'Meeting notes planner upgrade'),
     ('meeting_notes_action_items.priority', 'p6q7r8s9t0u1', 'Meeting notes priority column'),
@@ -618,6 +620,8 @@ def get_status() -> dict[str, Any]:
     status['health'] = health
     status['is_healthy'] = health.get('is_healthy', False)
     status['can_sync'] = health.get('can_sync', False)
+    status['can_align_schema'] = health.get('can_align_schema', False)
+    status['align_stamp_revision'] = health.get('align_stamp_revision')
     status['can_downgrade'] = health.get('can_downgrade', False)
     return status
 
@@ -1369,29 +1373,41 @@ def get_health_recommendations(
         if len(missing) > 5:
             missing_list += f' (+{len(missing) - 5} more)'
         if status.get('is_up_to_date') and current:
-            recommendations.append({
-                'severity': 'error',
-                'code': 'schema_behind_revision',
-                'title': 'Database revision is ahead of schema',
-                'message': (
-                    f'alembic_version is {current} but required schema is missing: {missing_list}. '
-                    'This often happens after stamping without running upgrades.'
-                ),
-                'action': 'apply_migrations',
-            })
-            if inferred_schema and inferred_schema != current:
+            if pending_count == 0 and inferred_schema and inferred_schema != current:
                 recommendations.append({
-                    'severity': 'warning',
-                    'code': 'stamp_to_match_schema',
-                    'title': 'Align revision to match schema',
+                    'severity': 'error',
+                    'code': 'schema_behind_revision',
+                    'title': 'Align schema & re-apply migrations',
                     'message': (
-                        f'Schema objects suggest revision {inferred_schema} '
-                        f'but alembic_version is {current}. Consider stamping to {inferred_schema} '
-                        'then applying pending migrations.'
+                        f'alembic_version is {current} but required schema is missing: {missing_list}. '
+                        f'Use Align schema to stamp to {inferred_schema}, then re-run migrations to head.'
                     ),
-                    'action': 'repair_stamp',
+                    'action': 'align_schema',
                     'target_revision': inferred_schema,
                 })
+            else:
+                recommendations.append({
+                    'severity': 'error',
+                    'code': 'schema_behind_revision',
+                    'title': 'Database revision is ahead of schema',
+                    'message': (
+                        f'alembic_version is {current} but required schema is missing: {missing_list}. '
+                        'Apply pending migrations or use Align schema if none are pending.'
+                    ),
+                    'action': 'apply_migrations',
+                })
+                if inferred_schema and inferred_schema != current and pending_count == 0:
+                    recommendations.append({
+                        'severity': 'warning',
+                        'code': 'stamp_to_match_schema',
+                        'title': 'Align revision to match schema',
+                        'message': (
+                            f'Schema objects suggest revision {inferred_schema} '
+                            f'but alembic_version is {current}.'
+                        ),
+                        'action': 'align_schema',
+                        'target_revision': inferred_schema,
+                    })
         else:
             recommendations.append({
                 'severity': 'warning',
@@ -1477,15 +1493,166 @@ def get_health_recommendations(
         and status.get('success', True)
     )
 
+    can_align = _can_align_schema(
+        status=status,
+        missing=missing,
+        inferred_schema=inferred_schema,
+        chain_broken=chain_broken,
+        pending_count=pending_count,
+        heads=heads,
+    )
+
     return {
         'is_healthy': is_healthy,
         'missing_schema': missing,
         'inferred_schema_revision': inferred_schema,
+        'align_stamp_revision': inferred_schema if can_align else None,
         'can_sync': bool(preflight and preflight.get('can_sync')) if pending_count else False,
+        'can_align_schema': can_align,
         'can_downgrade': can_downgrade,
         'down_revision': down_revision,
         'recommendations': recommendations,
     }
+
+
+def _can_align_schema(
+    *,
+    status: dict[str, Any],
+    missing: list[dict[str, Any]],
+    inferred_schema: str | None,
+    chain_broken: bool,
+    pending_count: int,
+    heads: list[str],
+) -> bool:
+    """True when revision is at head but live schema is behind (re-stamp + upgrade helps)."""
+    if chain_broken or not missing:
+        return False
+    if pending_count > 0:
+        return False
+    current = status.get('current_revision')
+    if not current:
+        return False
+    if len(heads) != 1:
+        return False
+    if not inferred_schema or inferred_schema == current:
+        return False
+    return True
+
+
+def run_align_schema(stamp_revision: str | None = None) -> dict[str, Any]:
+    """Stamp to schema-inferred revision, then upgrade to head (fixes stamp-without-DDL drift)."""
+    disabled = _check_web_migrations_enabled()
+    if disabled:
+        return disabled
+
+    if not _upgrade_lock.acquire(blocking=False):
+        return {
+            'success': False,
+            'error': 'Another migration operation is already in progress.',
+        }
+
+    steps: list[dict[str, Any]] = []
+    try:
+        before = _read_migration_status()
+        if before.get('needs_repair') or before.get('chain_broken'):
+            return {
+                'success': False,
+                'error': before.get('error_detail') or 'Migration chain is broken. Repair first.',
+            }
+
+        diagnostics = get_diagnostics()
+        health = get_health_recommendations(status=before, diagnostics=diagnostics)
+        missing = health.get('missing_schema') or []
+        if not missing:
+            return {
+                'success': False,
+                'error': 'Schema alignment is not needed; no missing schema objects were detected.',
+            }
+
+        if (before.get('pending_count') or 0) > 0:
+            return {
+                'success': False,
+                'error': (
+                    'Pending migrations are already queued. Run Apply all migrations instead of align.'
+                ),
+            }
+
+        heads = [
+            h.get('revision') if isinstance(h, dict) else h
+            for h in (before.get('head_revisions') or [])
+        ]
+        if len(heads) != 1:
+            return {
+                'success': False,
+                'error': 'Multiple migration heads detected. Merge heads before aligning schema.',
+            }
+
+        stamp_target = (stamp_revision or '').strip() or health.get('align_stamp_revision')
+        if not stamp_target:
+            return {
+                'success': False,
+                'error': (
+                    'Could not infer a stamp target from schema probes. '
+                    'Choose an earlier revision in Repair stamp target, then try again.'
+                ),
+            }
+
+        known = {item['revision'] for item in diagnostics.get('available_revisions', [])}
+        if stamp_target not in known:
+            return {
+                'success': False,
+                'error': f'Unknown stamp revision: {stamp_target}',
+            }
+
+        current = before.get('current_revision')
+        if stamp_target == current:
+            return {
+                'success': False,
+                'error': (
+                    f'Stamp target {stamp_target} matches current revision but schema is still incomplete. '
+                    'Pick an earlier revision that matches the database schema.'
+                ),
+            }
+
+        backup_result = _backup_sqlite_database()
+        if not backup_result.get('success'):
+            return backup_result
+        steps.append({'step': 'backup', 'success': True, 'detail': backup_result.get('backup_path')})
+
+        stamp_detail = _stamp_revision(stamp_target, current)
+        steps.append({'step': 'stamp', 'success': True, 'detail': stamp_detail})
+
+        upgrade_detail = _upgrade_to_head()
+        steps.append({'step': 'upgrade', 'success': True, 'detail': upgrade_detail})
+
+        after = get_status()
+        still_missing = (after.get('health') or {}).get('missing_schema') or []
+        message = 'Schema aligned and migrations re-applied successfully.'
+        if still_missing:
+            message += f' Warning: {len(still_missing)} schema probe(s) still missing.'
+
+        return {
+            'success': True,
+            'message': message,
+            'steps': steps,
+            'backup_path': backup_result.get('backup_path'),
+            'stamped_from': current,
+            'stamped_to': stamp_target,
+            'current_revision': after.get('current_revision'),
+            'pending_count': after.get('pending_count', 0),
+            'is_up_to_date': after.get('is_up_to_date', False),
+            'is_healthy': after.get('is_healthy', False),
+            'missing_schema_after': still_missing,
+            'upgrade_output': upgrade_detail.get('output', ''),
+        }
+    except CommandError as exc:
+        logger.error('Schema align failed: %s', exc)
+        return {'success': False, 'error': str(exc), 'steps': steps}
+    except Exception as exc:
+        logger.exception('Schema align failed')
+        return {'success': False, 'error': str(exc), 'steps': steps}
+    finally:
+        _upgrade_lock.release()
 
 
 def run_sync_revision(revision: str | None = None) -> dict[str, Any]:

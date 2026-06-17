@@ -691,6 +691,10 @@
           class="hidden flex-1 min-w-[140px] px-4 py-3 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
           Sync revision
         </button>
+        <button type="button" id="migrationsAlignBtn" onclick="applyMigrationsAlignSchema()" disabled
+          class="hidden flex-1 min-w-[140px] px-4 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
+          Align schema &amp; re-apply
+        </button>
         <button type="button" id="migrationsDowngradeBtn" onclick="applyMigrationsDowngrade()" disabled
           class="hidden flex-1 min-w-[140px] px-4 py-3 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all active:scale-95">
           Roll back one
@@ -2687,6 +2691,7 @@
     const upgradeBtn = document.getElementById('migrationsUpgradeBtn');
     const applyNextBtn = document.getElementById('migrationsApplyNextBtn');
     const syncBtn = document.getElementById('migrationsSyncBtn');
+    const alignBtn = document.getElementById('migrationsAlignBtn');
     const downgradeBtn = document.getElementById('migrationsDowngradeBtn');
     const enabled = !!(status && status.web_migrations_enabled);
     const needsRepair = !!(status && (status.needs_repair || status.chain_broken));
@@ -2695,6 +2700,7 @@
     const pendingCount = (status && status.pending_count) || 0;
     const preflightReady = !migrationsPreflightCache || migrationsPreflightCache.ready !== false;
     const canSync = !!(status && status.can_sync) || !!(migrationsPreflightCache && migrationsPreflightCache.can_sync);
+    const canAlign = !!(status && status.can_align_schema);
     const canDowngrade = !!(status && status.can_downgrade);
 
     if (fixBtn) {
@@ -2733,6 +2739,13 @@
       syncBtn.title = canSync
         ? 'Update alembic_version when schema already matches pending migrations.'
         : 'Run preflight — sync is available when pending migrations would only skip existing schema.';
+    }
+    if (alignBtn) {
+      alignBtn.classList.toggle('hidden', !canAlign);
+      alignBtn.disabled = !enabled || !canAlign || needsRepair;
+      alignBtn.title = canAlign
+        ? 'Stamp to the revision that matches current schema, then re-run migrations to head.'
+        : 'Available when revision is at head but schema probes report missing tables/columns.';
     }
     if (downgradeBtn) {
       downgradeBtn.classList.toggle('hidden', !canDowngrade);
@@ -2824,6 +2837,7 @@
       'migrationsRepairBtn',
       'migrationsApplyNextBtn',
       'migrationsSyncBtn',
+      'migrationsAlignBtn',
       'migrationsDowngradeBtn',
       'migrationsUpgradeBtn'
     ];
@@ -2852,7 +2866,8 @@
     const needsRepair = !!(status && (status.needs_repair || status.chain_broken));
     const multipleHeads = !!(status && status.multiple_heads) || !!(diagnostics && diagnostics.multiple_heads);
     const hasOrphans = !!(status && status.has_orphan_files) || !!(diagnostics && diagnostics.has_orphan_files);
-    const showPanel = needsRepair || multipleHeads || hasOrphans;
+    const canAlign = !!(status && status.can_align_schema);
+    const showPanel = needsRepair || multipleHeads || hasOrphans || canAlign;
 
     if (panel) {
       panel.classList.toggle('hidden', !showPanel);
@@ -3237,6 +3252,68 @@
           result.classList.remove('hidden');
           result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800';
           result.textContent = 'Migration repair failed: ' + error;
+        }
+      });
+  }
+
+  function applyMigrationsAlignSchema() {
+    const status = migrationsStatusCache || {};
+    const health = status.health || {};
+    if (!status.can_align_schema) {
+      alert('Align schema is not available. Check Health & recommendations for missing schema.');
+      return;
+    }
+
+    const alignRec = (health.recommendations || []).filter(function (r) { return r.action === 'align_schema'; })[0];
+    const stampRev = status.align_stamp_revision
+      || health.align_stamp_revision
+      || health.inferred_schema_revision
+      || (alignRec && alignRec.target_revision);
+
+    const stampSelect = document.getElementById('migrationsStampSelect');
+    const manualStamp = stampSelect ? stampSelect.value : '';
+    const target = manualStamp || stampRev || '(inferred)';
+
+    if (!window.confirm(
+      'Align database schema with migrations?\n\n' +
+      'This will:\n' +
+      '- Backup the SQLite database\n' +
+      '- Stamp alembic_version to ' + target + ' (schema match)\n' +
+      '- Re-apply all migrations to head (adds missing columns/tables)\n\n' +
+      'Use this when revision shows head but pages fail with missing columns.\n\nContinue?'
+    )) {
+      return;
+    }
+
+    const alignBtn = document.getElementById('migrationsAlignBtn');
+    const result = document.getElementById('migrationsResult');
+    setMigrationsButtonsLoading(true, alignBtn, 'Aligning...');
+
+    fetch('/api/admin/migrations/align-schema', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        confirm: true,
+        stamp_revision: manualStamp || stampRev || null
+      })
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, data: data };
+        });
+      })
+      .then(function (res) {
+        setMigrationsButtonsLoading(false);
+        showMigrationsResult(res, 'Schema aligned and migrations re-applied.');
+        return refreshMigrationsModal();
+      })
+      .catch(function (error) {
+        setMigrationsButtonsLoading(false);
+        if (result) {
+          result.classList.remove('hidden');
+          result.className = 'rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800';
+          result.textContent = 'Schema align failed: ' + error;
         }
       });
   }

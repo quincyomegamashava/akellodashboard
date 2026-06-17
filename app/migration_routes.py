@@ -10,6 +10,7 @@ from app.migration_service import (
     get_history,
     get_preflight,
     get_status,
+    run_align_schema,
     run_downgrade,
     run_fix_migrations,
     run_merge_heads,
@@ -56,6 +57,41 @@ def migration_preflight():
 @admin_required
 def migration_health():
     return jsonify(get_health_recommendations())
+
+
+@migration_bp.route('/api/admin/migrations/align-schema', methods=['POST'])
+@login_required
+@admin_required
+def migration_align_schema():
+    data = request.get_json(silent=True) or {}
+    if not data.get('confirm'):
+        return jsonify({
+            'success': False,
+            'error': 'Confirmation required. Send {"confirm": true}.',
+        }), 400
+
+    stamp_revision = (data.get('stamp_revision') or '').strip() or None
+    before = get_status()
+    result = run_align_schema(stamp_revision=stamp_revision)
+
+    if result.get('success'):
+        current_app.logger.info(
+            'Migration schema align by %s: %s -> stamp %s -> %s',
+            current_user.username,
+            result.get('stamped_from'),
+            result.get('stamped_to'),
+            result.get('current_revision'),
+        )
+    else:
+        current_app.logger.error(
+            'Migration schema align failed for %s (from %s): %s',
+            current_user.username,
+            before.get('current_revision'),
+            result.get('error'),
+        )
+
+    status_code = 200 if result.get('success') else 500
+    return jsonify(result), status_code
 
 
 @migration_bp.route('/api/admin/migrations/sync', methods=['POST'])
