@@ -91,3 +91,6 @@ class Config:
 
     # Allow applying Alembic upgrades from /administration (disable via .env in Docker if needed)
     ALLOW_WEB_MIGRATIONS = os.environ.get('ALLOW_WEB_MIGRATIONS', 'true').lower() in ('true', '1', 't', 'yes', 'y')
+
+    # Allow DDL (create/alter/drop tables & columns) from Database Schema Studio
+    ALLOW_WEB_SCHEMA_CHANGES = os.environ.get('ALLOW_WEB_SCHEMA_CHANGES', 'true').lower() in ('true', '1', 't', 'yes', 'y')

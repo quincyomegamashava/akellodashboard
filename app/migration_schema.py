@@ -319,6 +319,23 @@ def evaluate_operation_preflight(
     return None
 
 
+def boolean_not_null_default(bind, column_name: str, *, default_false: bool = True) -> str:
+    """Dialect-safe BOOLEAN NOT NULL DEFAULT for raw ALTER TABLE DDL."""
+    if bind.dialect.name == "postgresql":
+        default = "FALSE" if default_false else "TRUE"
+        return f"{column_name} BOOLEAN NOT NULL DEFAULT {default}"
+    default = "0" if default_false else "1"
+    return f"{column_name} BOOLEAN NOT NULL DEFAULT {default}"
+
+
+def timestamp_column_ddl(bind, column_name: str, *, nullable: bool = True) -> str:
+    """Dialect-safe timestamp column DDL for raw ALTER TABLE."""
+    null_sql = "" if nullable else " NOT NULL"
+    if bind.dialect.name == "postgresql":
+        return f"{column_name} TIMESTAMP{null_sql}"
+    return f"{column_name} DATETIME{null_sql}"
+
+
 def add_column_if_missing(bind, table_name: str, column_name: str, ddl: str) -> bool:
     """Add a column via raw DDL when missing. Returns True if column was added."""
     if column_exists(bind, table_name, column_name):

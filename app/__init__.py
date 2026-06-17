@@ -50,6 +50,9 @@ app.register_blueprint(database_bp)
 from app.migration_routes import migration_bp
 app.register_blueprint(migration_bp)
 
+from app.schema_studio_routes import schema_studio_bp
+app.register_blueprint(schema_studio_bp)
+
 from app.blueprints.content_dev import bp as content_dev_bp
 app.register_blueprint(content_dev_bp)
 

@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/schema_studio.css') }}">
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+
+<div class="studio-wrap">
+  <header class="studio-header">
+    <h1><i class="fas fa-database"></i> Database Schema Studio</h1>
+    <div class="studio-header-actions">
+      <select id="dbSelector" class="studio-db-select" aria-label="Select database"></select>
+      <div class="studio-status">
+        <span id="connDot" class="studio-status-dot"></span>
+        <span id="connLabel">Connecting…</span>
+      </div>
+      <button type="button" id="refreshBtn" class="studio-btn" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);color:#fff">
+        <i class="fas fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+  </header>
+
+  <div id="externalWarning" class="studio-warning-banner">
+    <i class="fas fa-exclamation-triangle"></i>
+    You are managing an <strong>external production database</strong>. DDL changes are irreversible and may affect live systems.
+  </div>
+
+  <div class="studio-body">
+    <nav class="studio-nav">
+      <button type="button" class="studio-nav-item active" data-panel="overview"><i class="fas fa-chart-pie"></i> Overview</button>
+      <button type="button" class="studio-nav-item" data-panel="tables"><i class="fas fa-table"></i> Tables</button>
+      <button type="button" class="studio-nav-item" data-panel="sql"><i class="fas fa-terminal"></i> SQL Console</button>
+      <button type="button" class="studio-nav-item" data-panel="er"><i class="fas fa-project-diagram"></i> ER Diagram</button>
+      <button type="button" class="studio-nav-item" data-panel="migrations"><i class="fas fa-code-branch"></i> Migrations</button>
+      <button type="button" class="studio-nav-item" data-panel="activity"><i class="fas fa-history"></i> Activity</button>
+    </nav>
+
+    <main class="studio-main">
+      <!-- Overview -->
+      <section id="panel-overview" class="studio-panel active">
+        <div class="studio-kpi-row">
+          <div class="studio-kpi"><div class="studio-kpi-value" id="kpiTables">—</div><div class="studio-kpi-label">Tables</div></div>
+          <div class="studio-kpi"><div class="studio-kpi-value" id="kpiRows">—</div><div class="studio-kpi-label">Total Rows</div></div>
+          <div class="studio-kpi"><div class="studio-kpi-value" id="kpiIndexes">—</div><div class="studio-kpi-label">Indexes</div></div>
+          <div class="studio-kpi"><div class="studio-kpi-value" id="kpiFks">—</div><div class="studio-kpi-label">Foreign Keys</div></div>
+          <div class="studio-kpi"><div class="studio-kpi-value" id="kpiSize">—</div><div class="studio-kpi-label">DB Size</div></div>
+          <div class="studio-kpi" id="kpiMigrationRow"><div class="studio-kpi-value" id="kpiMigration">—</div><div class="studio-kpi-label">Migration Rev</div></div>
+        </div>
+        <h3 class="font-bold text-slate-700 mb-3">Connected Databases</h3>
+        <div id="dbCards" class="studio-db-cards"></div>
+      </section>
+
+      <!-- Tables -->
+      <section id="panel-tables" class="studio-panel">
+        <div class="studio-split">
+          <div class="studio-card">
+            <div class="studio-card-header">
+              <h3>Schema</h3>
+              <button type="button" id="btnCreateTable" class="studio-btn studio-btn-primary studio-btn-sm"><i class="fas fa-plus"></i> New Table</button>
+            </div>
+            <div style="padding:0.5rem">
+              <input type="search" id="tableSearch" class="studio-tree-search" placeholder="Search tables…">
+              <div id="tableTree" class="studio-tree"></div>
+            </div>
+          </div>
+          <div class="studio-card">
+            <div class="studio-card-header">
+              <h3 id="tableDetailTitle">Select a table</h3>
+              <div>
+                <button type="button" id="btnAddColumn" class="studio-btn studio-btn-sm"><i class="fas fa-columns"></i> Add Column</button>
+                <button type="button" id="btnDropTable" class="studio-btn studio-btn-sm studio-btn-danger"><i class="fas fa-trash"></i> Drop Table</button>
+              </div>
+            </div>
+            <div class="studio-tabs">
+              <button type="button" class="studio-tab active" data-tab="structure">Structure</button>
+              <button type="button" class="studio-tab" data-tab="data">Data</button>
+              <button type="button" class="studio-tab" data-tab="indexes">Indexes</button>
+              <button type="button" class="studio-tab" data-tab="fks">Foreign Keys</button>
+            </div>
+            <div id="tab-structure" class="studio-tab-pane active">
+              <table class="studio-table">
+                <thead><tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th><th>Actions</th></tr></thead>
+                <tbody id="structureBody"></tbody>
+              </table>
+            </div>
+            <div id="tab-data" class="studio-tab-pane">
+              <div style="padding:0.5rem 0">
+                <input type="text" id="dataOrderBy" class="studio-tree-search" placeholder="Order by e.g. id DESC" style="max-width:240px;display:inline-block">
+                <button type="button" class="studio-btn studio-btn-sm" onclick="SchemaStudio.loadData()">Reload</button>
+              </div>
+              <div style="overflow:auto;max-height:400px">
+                <table class="studio-table"><thead id="dataHead"></thead><tbody id="dataBody"></tbody></table>
+              </div>
+              <div id="dataPagination" class="studio-pagination"></div>
+            </div>
+            <div id="tab-indexes" class="studio-tab-pane">
+              <table class="studio-table">
+                <thead><tr><th>Name</th><th>Columns</th><th>Unique</th></tr></thead>
+                <tbody id="indexesBody"></tbody>
+              </table>
+            </div>
+            <div id="tab-fks" class="studio-tab-pane">
+              <table class="studio-table">
+                <thead><tr><th>Column</th><th>References Table</th><th>References Column</th></tr></thead>
+                <tbody id="fksBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SQL -->
+      <section id="panel-sql" class="studio-panel">
+        <div class="studio-card">
+          <div class="studio-card-header"><h3>SQL Console</h3></div>
+          <div style="padding:1rem">
+            <textarea id="sqlEditor" class="studio-sql-editor" placeholder="SELECT * FROM user LIMIT 10;"></textarea>
+            <div class="studio-checkbox-row">
+              <input type="checkbox" id="sqlAllowWrite">
+              <label for="sqlAllowWrite">Allow write operations (INSERT/UPDATE/DELETE/DDL)</label>
+            </div>
+            <button type="button" id="runSqlBtn" class="studio-btn studio-btn-primary"><i class="fas fa-play"></i> Run Query</button>
+            <div id="sqlResults" class="mt-4"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ER -->
+      <section id="panel-er" class="studio-panel">
+        <div class="studio-card">
+          <div class="studio-card-header"><h3>Entity Relationship Diagram</h3></div>
+          <div style="padding:1rem"><div id="erCanvas" class="studio-er-canvas"></div></div>
+        </div>
+      </section>
+
+      <!-- Migrations -->
+      <section id="panel-migrations" class="studio-panel">
+        <div class="studio-card">
+          <div class="studio-card-header"><h3>Migration Center</h3></div>
+          <div id="migrationsPanel" style="padding:1rem">
+            <div id="migrationsContent"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Activity -->
+      <section id="panel-activity" class="studio-panel">
+        <div class="studio-card">
+          <div class="studio-card-header"><h3>DDL Activity Log</h3></div>
+          <div id="activityList"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- Create Table Modal -->
+<div id="createTableModal" class="studio-modal-overlay">
+  <div class="studio-modal">
+    <div class="studio-modal-header"><h4>Create Table</h4></div>
+    <div class="studio-modal-body">
+      <div class="studio-form-group">
+        <label>Table name</label>
+        <input type="text" id="createTableName" placeholder="my_table">
+      </div>
+      <div class="studio-form-group">
+        <label>Columns</label>
+        <div id="createTableColumns"></div>
+        <button type="button" id="btnAddColumnRow" class="studio-btn studio-btn-sm mt-2"><i class="fas fa-plus"></i> Add column</button>
+      </div>
+      <div class="studio-form-group">
+        <label>SQL Preview</label>
+        <pre id="createTableSqlPreview" class="studio-sql-preview">Click Preview to see SQL</pre>
+      </div>
+    </div>
+    <div class="studio-modal-footer">
+      <button type="button" class="studio-btn" data-close-modal="createTableModal">Cancel</button>
+      <button type="button" id="btnPreviewCreateTable" class="studio-btn">Preview SQL</button>
+      <button type="button" id="btnSubmitCreateTable" class="studio-btn studio-btn-primary">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Column Modal -->
+<div id="addColumnModal" class="studio-modal-overlay">
+  <div class="studio-modal">
+    <div class="studio-modal-header"><h4>Add Column</h4></div>
+    <div class="studio-modal-body">
+      <div class="studio-form-group"><label>Name</label><input type="text" id="addColName"></div>
+      <div class="studio-form-group"><label>Type</label><select id="addColType"></select></div>
+      <div class="studio-checkbox-row"><input type="checkbox" id="addColNullable" checked><label for="addColNullable">Nullable</label></div>
+    </div>
+    <div class="studio-modal-footer">
+      <button type="button" class="studio-btn" data-close-modal="addColumnModal">Cancel</button>
+      <button type="button" id="btnSubmitAddColumn" class="studio-btn studio-btn-primary">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Column Modal -->
+<div id="editColumnModal" class="studio-modal-overlay">
+  <div class="studio-modal">
+    <div class="studio-modal-header"><h4>Edit Column</h4></div>
+    <div class="studio-modal-body">
+      <input type="hidden" id="editColName">
+      <div class="studio-form-group"><label>Column</label><input type="text" id="editColNewName" disabled></div>
+      <div class="studio-form-group"><label>Type</label><select id="editColType"></select></div>
+      <div class="studio-checkbox-row"><input type="checkbox" id="editColNullable"><label for="editColNullable">Nullable</label></div>
+    </div>
+    <div class="studio-modal-footer">
+      <button type="button" class="studio-btn" data-close-modal="editColumnModal">Cancel</button>
+      <button type="button" id="btnSubmitEditColumn" class="studio-btn studio-btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Danger Modal -->
+<div id="dangerModal" class="studio-modal-overlay">
+  <div class="studio-modal danger">
+    <div class="studio-modal-header"><h4 style="color:#dc2626"><i class="fas fa-exclamation-triangle"></i> Confirm Destructive Action</h4></div>
+    <div class="studio-modal-body">
+      <p class="text-sm mb-3">This action cannot be undone. Type the confirmation text exactly as shown:</p>
+      <p class="font-bold mb-2" id="dropTargetLabel"></p>
+      <input type="text" id="dropConfirmInput" class="w-full p-2 border rounded" placeholder="Type confirmation text" data-action="" data-column="">
+    </div>
+    <div class="studio-modal-footer">
+      <button type="button" class="studio-btn" data-close-modal="dangerModal">Cancel</button>
+      <button type="button" id="btnConfirmDanger" class="studio-btn studio-btn-danger">Confirm Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="studioToast" class="studio-toast"></div>
+
+<script src="{{ url_for('static', filename='js/schema_studio.js') }}"></script>
+{% endblock %}

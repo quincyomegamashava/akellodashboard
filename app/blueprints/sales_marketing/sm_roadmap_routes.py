@@ -39,6 +39,7 @@ from app.blueprints.sales_marketing.services import (
     saved_view_to_dict,
     sales_marketing_required,
     slugify_event_name,
+    stakeholder_db_guard,
     stakeholders_by_province,
     suggested_action_for_lead,
     template_to_dict,
@@ -180,6 +181,7 @@ def api_stakeholders_by_province():
 
 @bp.route("/api/stakeholders/funnel")
 @sales_marketing_required
+@stakeholder_db_guard
 def api_stakeholders_funnel():
     try:
         days = int(request.args.get("period") or "30")

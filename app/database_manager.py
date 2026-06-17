@@ -558,6 +558,71 @@ class DatabaseManager:
             self.logger.error(f"Export error: {e}")
             raise
 
+    def get_full_schema(self, db_key: str) -> List[Dict[str, Any]]:
+        """Full schema introspection including foreign keys and indexes."""
+        if db_key not in self.engines:
+            raise ValueError(f"Database {db_key} not connected")
+
+        engine = self.engines[db_key]
+        inspector = inspect(engine)
+        tables: List[Dict[str, Any]] = []
+
+        with engine.connect() as conn:
+            for table_name in inspector.get_table_names():
+                columns = []
+                for col in inspector.get_columns(table_name):
+                    col_type = str(col.get('type', 'unknown'))
+                    default = col.get('default')
+                    if default is not None and hasattr(default, 'arg'):
+                        default = str(default.arg)
+                    elif default is not None:
+                        default = str(default)
+                    columns.append({
+                        'name': col['name'],
+                        'type': col_type,
+                        'nullable': col.get('nullable', True),
+                        'default': default,
+                        'primary_key': col.get('primary_key', False),
+                    })
+
+                pks = inspector.get_pk_constraint(table_name).get('constrained_columns') or []
+                try:
+                    row_count = conn.execute(
+                        text(f"SELECT COUNT(*) FROM `{table_name}`")
+                    ).scalar() or 0
+                except Exception:
+                    row_count = 0
+
+                tables.append({
+                    'name': table_name,
+                    'columns': columns,
+                    'primary_keys': pks,
+                    'indexes': inspector.get_indexes(table_name),
+                    'foreign_keys': inspector.get_foreign_keys(table_name),
+                    'row_count': row_count,
+                })
+
+        return tables
+
+    def execute_ddl(self, db_key: str, sql: str) -> Dict[str, Any]:
+        """Execute raw DDL/DML on an external database."""
+        if db_key not in self.engines:
+            raise ValueError(f"Database {db_key} not connected")
+
+        try:
+            engine = self.engines[db_key]
+            with engine.begin() as conn:
+                result = conn.execute(text(sql))
+                affected = result.rowcount if result.rowcount is not None else 0
+            return {
+                'success': True,
+                'affected_rows': affected,
+                'message': 'Statement executed successfully',
+            }
+        except SQLAlchemyError as e:
+            self.logger.error(f"DDL execution error for {db_key}: {e}")
+            return {'success': False, 'error': str(e)}
+
 # Global database manager instance - lazy initialization
 _db_manager = None
 
@@ -583,6 +648,10 @@ def get_db_manager():
                     return {'success': False, 'error': 'Not available during migrations'}
                 def build_query(self, db_key, data):
                     return ""
+                def get_full_schema(self, db_key):
+                    return []
+                def execute_ddl(self, db_key, sql):
+                    return {'success': False, 'error': 'Not available during migrations'}
             _db_manager = DummyManager()
         else:
             _db_manager = DatabaseManager()

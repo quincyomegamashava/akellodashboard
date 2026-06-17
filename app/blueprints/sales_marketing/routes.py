@@ -51,6 +51,7 @@ from app.blueprints.sales_marketing.services import (
     record_rate_limit_hit,
     sales_marketing_required,
     seed_interest_options_if_empty,
+    stakeholder_db_guard,
     stakeholders_stats,
     user_options,
     validate_email,
@@ -418,6 +419,7 @@ def api_event_detail(event_id: int):
 
 @bp.route("/api/stakeholders/stats")
 @sales_marketing_required
+@stakeholder_db_guard
 def api_stakeholders_stats():
     base = stakeholders_stats()
     event_id = request.args.get("event_id")
@@ -449,6 +451,7 @@ def api_stakeholders_preview_count():
 
 @bp.route("/api/stakeholders")
 @sales_marketing_required
+@stakeholder_db_guard
 def api_stakeholders_list():
     page = max(1, int(request.args.get("page") or 1))
     per_page = min(100, max(10, int(request.args.get("per_page") or 25)))

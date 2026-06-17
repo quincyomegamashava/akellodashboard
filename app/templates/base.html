@@ -246,6 +246,12 @@
         class="nav-item {{ 'active' if title == 'Database Query Tool' else '' }}">
         <i class="fas fa-server"></i> <span class="nav-text">Database Tool</span>
       </a>
+      {% if current_user.has_privilege('Super-admin') %}
+      <a href="{{ url_for('schema_studio.schema_studio_page') }}"
+        class="nav-item {{ 'active' if title == 'Database Studio' else '' }}">
+        <i class="fas fa-database"></i> <span class="nav-text">Database Studio</span>
+      </a>
+      {% endif %}
       <a href="{{ url_for('logs_dashboard') }}" class="nav-item {{ 'active' if title == 'Application Logs' else '' }}">
         <i class="fas fa-file-alt"></i> <span class="nav-text">App Logs</span>
       </a>

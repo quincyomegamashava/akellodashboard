@@ -8,9 +8,10 @@ from datetime import date, datetime, timedelta
 from functools import wraps
 from typing import Any, Dict, List, Optional, Sequence
 
-from flask import abort, jsonify, render_template, request
+from flask import abort, current_app, jsonify, render_template, request
 from flask_login import current_user, login_required
 from sqlalchemy import func, or_
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import joinedload
 
 from app import db
@@ -85,6 +86,35 @@ def sales_marketing_required(f):
                 403,
             )
         return f(*args, **kwargs)
+
+    return wrapped
+
+
+def stakeholder_db_guard(f):
+    """Return a clear 503 when stakeholder queries hit an out-of-date schema."""
+
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except (OperationalError, ProgrammingError) as exc:
+            current_app.logger.exception("Stakeholder API database error")
+            orig = getattr(exc, "orig", None)
+            msg = str(orig or exc).lower()
+            if "no such column" in msg or "does not exist" in msg or "unknown column" in msg:
+                return (
+                    jsonify(
+                        {
+                            "error": "Database schema out of date",
+                            "detail": (
+                                "Apply pending migrations in Administration → System State, "
+                                "then reload this page."
+                            ),
+                        }
+                    ),
+                    503,
+                )
+            return jsonify({"error": "Database error"}), 500
 
     return wrapped
 
@@ -170,6 +200,16 @@ def interest_option_to_dict(opt: InterestOption) -> dict:
     }
 
 
+def _lead_notes_count(lead: StakeholderLead) -> int:
+    notes = getattr(lead, "notes", None)
+    if not notes:
+        return 0
+    try:
+        return notes.count()
+    except (OperationalError, ProgrammingError):
+        return 0
+
+
 def lead_to_dict(lead: StakeholderLead) -> dict:
     ev = lead.event
     io = lead.interest_option
@@ -196,7 +236,7 @@ def lead_to_dict(lead: StakeholderLead) -> dict:
         "duplicate_dismissed": bool(getattr(lead, "duplicate_dismissed", False)),
         "follow_up_status": getattr(lead, "follow_up_status", None) or "new",
         "lead_score": getattr(lead, "lead_score", None),
-        "notes_count": lead.notes.count() if getattr(lead, "notes", None) else 0,
+        "notes_count": _lead_notes_count(lead),
         "submitted_at": lead.submitted_at.isoformat() if lead.submitted_at else None,
         "created_by": lead.created_by,
     }

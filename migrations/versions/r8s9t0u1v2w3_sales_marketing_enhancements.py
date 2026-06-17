@@ -3,7 +3,12 @@
 from alembic import op
 import sqlalchemy as sa
 
-from app.migration_schema import add_column_if_missing, create_index_if_missing, table_exists
+from app.migration_schema import (
+    add_column_if_missing,
+    boolean_not_null_default,
+    create_index_if_missing,
+    table_exists,
+)
 
 
 revision = "r8s9t0u1v2w3"
@@ -29,7 +34,7 @@ def upgrade():
             bind,
             "sales_marketing_stakeholder_leads",
             "duplicate_dismissed",
-            "duplicate_dismissed BOOLEAN NOT NULL DEFAULT 0",
+            boolean_not_null_default(bind, "duplicate_dismissed"),
         )
         create_index_if_missing(
             bind,
