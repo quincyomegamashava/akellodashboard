@@ -2,7 +2,12 @@
 
 {% block title %}Audit Log{% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin_hub.css') }}">
+{% endblock %}
+
 {% block content %}
+<div class="admin-hub">
 <style>
   .audit-wrapper {
     max-width: 1400px;
@@ -11,10 +16,6 @@
   }
 
   .audit-card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     padding: 20px 24px;
   }
 
@@ -330,5 +331,6 @@
       </div>
     {% endif %}
   </div>
+</div>
 </div>
 {% endblock %}

@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin_hub.css') }}">
+{% endblock %}
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,9 +29,7 @@
 </head>
 {% block content %}
 
-
-
-
+<div class="admin-hub">
 
 <div class="w3-full w3-hide-medium w3-hide-small w3-small w3-small w3-container w3-margin-top">
     <!-- row padding below -->
@@ -968,5 +970,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 
 
+
+</div>
 
             {% endblock %}

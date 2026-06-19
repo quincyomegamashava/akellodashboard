@@ -1,8 +1,18 @@
 {% extends "base.html" %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin_hub.css') }}">
+{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-  <h2>User Privileges Management</h2>
-  <table class="table table-bordered">
+<div class="admin-hub">
+<div class="container mt-4 px-3">
+  <header class="page-header px-2 mb-4" style="margin-bottom: 1.5rem; padding: 1.5rem 0;">
+    <h2 class="text-2xl font-bold text-slate-800">User Privileges Management</h2>
+    <p class="text-slate-500 mt-1">Toggle super-admin and role privileges per user.</p>
+  </header>
+  <div class="minimal-card p-4">
+  <table class="table table-bordered table-minimal mb-0">
     <thead>
       <tr>
         <th>User</th>
@@ -34,6 +44,8 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
+</div>
 </div>
 
 <script>

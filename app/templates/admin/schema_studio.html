@@ -1,9 +1,17 @@
 {% extends 'base.html' %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin_hub.css') }}">
+{% endblock %}
+
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/schema_studio.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/ace.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/mode-sql.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/theme-github.js"></script>
 <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
 
+<div class="admin-hub">
 <div class="studio-wrap">
   <header class="studio-header">
     <h1><i class="fas fa-database"></i> Database Schema Studio</h1>
@@ -21,8 +29,20 @@
 
   <div id="externalWarning" class="studio-warning-banner">
     <i class="fas fa-exclamation-triangle"></i>
-    You are managing an <strong>external production database</strong>. DDL changes are irreversible and may affect live systems.
   </div>
+  <div id="externalDdlBlocked" class="studio-warning-banner" style="background:#fee2e2;border-color:#fecaca;color:#991b1b;">
+    <i class="fas fa-lock"></i>
+    External database DDL is <strong>disabled</strong>. Set <code>ALLOW_EXTERNAL_SCHEMA_CHANGES=true</code> in .env to enable schema changes on Ruzivo/Library.
+  </div>
+
+  <nav class="studio-mobile-nav" aria-label="Studio sections">
+    <button type="button" class="studio-nav-item active" data-panel="overview"><i class="fas fa-chart-pie"></i></button>
+    <button type="button" class="studio-nav-item" data-panel="tables"><i class="fas fa-table"></i></button>
+    <button type="button" class="studio-nav-item" data-panel="sql"><i class="fas fa-terminal"></i></button>
+    <button type="button" class="studio-nav-item" data-panel="er"><i class="fas fa-project-diagram"></i></button>
+    <button type="button" class="studio-nav-item" data-panel="migrations"><i class="fas fa-code-branch"></i></button>
+    <button type="button" class="studio-nav-item" data-panel="activity"><i class="fas fa-history"></i></button>
+  </nav>
 
   <div class="studio-body">
     <nav class="studio-nav">
@@ -55,7 +75,7 @@
           <div class="studio-card">
             <div class="studio-card-header">
               <h3>Schema</h3>
-              <button type="button" id="btnCreateTable" class="studio-btn studio-btn-primary studio-btn-sm"><i class="fas fa-plus"></i> New Table</button>
+              <button type="button" id="btnCreateTable" class="studio-btn studio-btn-primary studio-btn-sm studio-ddl-action"><i class="fas fa-plus"></i> New Table</button>
             </div>
             <div style="padding:0.5rem">
               <input type="search" id="tableSearch" class="studio-tree-search" placeholder="Search tables…">
@@ -66,8 +86,9 @@
             <div class="studio-card-header">
               <h3 id="tableDetailTitle">Select a table</h3>
               <div>
-                <button type="button" id="btnAddColumn" class="studio-btn studio-btn-sm"><i class="fas fa-columns"></i> Add Column</button>
-                <button type="button" id="btnDropTable" class="studio-btn studio-btn-sm studio-btn-danger"><i class="fas fa-trash"></i> Drop Table</button>
+                <button type="button" id="btnRenameTable" class="studio-btn studio-btn-sm studio-ddl-action"><i class="fas fa-i-cursor"></i> Rename</button>
+                <button type="button" id="btnAddColumn" class="studio-btn studio-btn-sm studio-ddl-action"><i class="fas fa-columns"></i> Add Column</button>
+                <button type="button" id="btnDropTable" class="studio-btn studio-btn-sm studio-btn-danger studio-ddl-action"><i class="fas fa-trash"></i> Drop</button>
               </div>
             </div>
             <div class="studio-tabs">
@@ -83,9 +104,11 @@
               </table>
             </div>
             <div id="tab-data" class="studio-tab-pane">
-              <div style="padding:0.5rem 0">
-                <input type="text" id="dataOrderBy" class="studio-tree-search" placeholder="Order by e.g. id DESC" style="max-width:240px;display:inline-block">
+              <div style="padding:0.5rem 0;display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
+                <input type="text" id="dataOrderBy" class="studio-tree-search" placeholder="Order by e.g. id DESC" style="max-width:180px">
+                <input type="text" id="dataFilter" class="studio-tree-search" placeholder="Filter col:value" style="max-width:180px">
                 <button type="button" class="studio-btn studio-btn-sm" onclick="SchemaStudio.loadData()">Reload</button>
+                <button type="button" id="btnExportCsv" class="studio-btn studio-btn-sm"><i class="fas fa-download"></i> Export CSV</button>
               </div>
               <div style="overflow:auto;max-height:400px">
                 <table class="studio-table"><thead id="dataHead"></thead><tbody id="dataBody"></tbody></table>
@@ -93,12 +116,14 @@
               <div id="dataPagination" class="studio-pagination"></div>
             </div>
             <div id="tab-indexes" class="studio-tab-pane">
+              <div class="p-2"><button type="button" id="btnAddIndex" class="studio-btn studio-btn-sm studio-btn-primary studio-ddl-action"><i class="fas fa-plus"></i> Add Index</button></div>
               <table class="studio-table">
-                <thead><tr><th>Name</th><th>Columns</th><th>Unique</th></tr></thead>
+                <thead><tr><th>Name</th><th>Columns</th><th>Unique</th><th></th></tr></thead>
                 <tbody id="indexesBody"></tbody>
               </table>
             </div>
             <div id="tab-fks" class="studio-tab-pane">
+              <div class="p-2"><button type="button" id="btnAddFk" class="studio-btn studio-btn-sm studio-btn-primary studio-ddl-action"><i class="fas fa-link"></i> Add Foreign Key</button></div>
               <table class="studio-table">
                 <thead><tr><th>Column</th><th>References Table</th><th>References Column</th></tr></thead>
                 <tbody id="fksBody"></tbody>
@@ -113,7 +138,8 @@
         <div class="studio-card">
           <div class="studio-card-header"><h3>SQL Console</h3></div>
           <div style="padding:1rem">
-            <textarea id="sqlEditor" class="studio-sql-editor" placeholder="SELECT * FROM user LIMIT 10;"></textarea>
+            <div id="sqlEditorAce" class="studio-sql-editor"></div>
+            <textarea id="sqlEditor" class="hidden" style="display:none"></textarea>
             <div class="studio-checkbox-row">
               <input type="checkbox" id="sqlAllowWrite">
               <label for="sqlAllowWrite">Allow write operations (INSERT/UPDATE/DELETE/DDL)</label>
@@ -127,7 +153,10 @@
       <!-- ER -->
       <section id="panel-er" class="studio-panel">
         <div class="studio-card">
-          <div class="studio-card-header"><h3>Entity Relationship Diagram</h3></div>
+          <div class="studio-card-header">
+            <h3>Entity Relationship Diagram</h3>
+            <input type="text" id="erPrefixFilter" class="studio-tree-search" placeholder="Filter by table prefix e.g. learn_" style="max-width:200px">
+          </div>
           <div style="padding:1rem"><div id="erCanvas" class="studio-er-canvas"></div></div>
         </div>
       </section>
@@ -145,7 +174,10 @@
       <!-- Activity -->
       <section id="panel-activity" class="studio-panel">
         <div class="studio-card">
-          <div class="studio-card-header"><h3>DDL Activity Log</h3></div>
+          <div class="studio-card-header">
+            <h3>DDL Activity Log</h3>
+            <a id="auditLogLink" href="#" class="studio-btn studio-btn-sm">Full audit log</a>
+          </div>
           <div id="activityList"></div>
         </div>
       </section>
@@ -213,6 +245,85 @@
   </div>
 </div>
 
+<!-- Rename Table Modal -->
+<div id="renameTableModal" class="studio-modal-overlay">
+  <div class="studio-modal">
+    <div class="studio-modal-header"><h4>Rename Table</h4></div>
+    <div class="studio-modal-body">
+      <div class="studio-form-group"><label>New table name</label><input type="text" id="renameTableNewName"></div>
+    </div>
+    <div class="studio-modal-footer">
+      <button type="button" class="studio-btn" data-close-modal="renameTableModal">Cancel</button>
+      <button type="button" id="btnSubmitRenameTable" class="studio-btn studio-btn-primary">Rename</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Index Modal -->
+<div id="addIndexModal" class="studio-modal-overlay">
+  <div class="studio-modal">
+    <div class="studio-modal-header"><h4>Add Index</h4></div>
+    <div class="studio-modal-body">
+      <div class="studio-form-group"><label>Index name</label><input type="text" id="indexName" placeholder="idx_mytable_col"></div>
+      <div class="studio-form-group"><label>Columns (comma-separated)</label><input type="text" id="indexColumns" placeholder="user_id,created_at"></div>
+      <div class="studio-checkbox-row"><input type="checkbox" id="indexUnique"><label for="indexUnique">Unique</label></div>
+    </div>
+    <div class="studio-modal-footer">
+      <button type="button" class="studio-btn" data-close-modal="addIndexModal">Cancel</button>
+      <button type="button" id="btnSubmitAddIndex" class="studio-btn studio-btn-primary">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add FK Modal -->
+<div id="addFkModal" class="studio-modal-overlay">
+  <div class="studio-modal">
+    <div class="studio-modal-header"><h4>Add Foreign Key</h4></div>
+    <div class="studio-modal-body">
+      <div class="studio-form-group"><label>Constraint name</label><input type="text" id="fkName" placeholder="fk_orders_user"></div>
+      <div class="studio-form-group"><label>Local columns (comma-separated)</label><input type="text" id="fkLocalCols"></div>
+      <div class="studio-form-group"><label>Referenced table</label><input type="text" id="fkRefTable"></div>
+      <div class="studio-form-group"><label>Referenced columns (comma-separated)</label><input type="text" id="fkRefCols"></div>
+      <div class="studio-form-group"><label>On delete</label>
+        <select id="fkOnDelete"><option>NO ACTION</option><option>CASCADE</option><option>SET NULL</option><option>RESTRICT</option></select>
+      </div>
+    </div>
+    <div class="studio-modal-footer">
+      <button type="button" class="studio-btn" data-close-modal="addFkModal">Cancel</button>
+      <button type="button" id="btnSubmitAddFk" class="studio-btn studio-btn-primary">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Migration confirm modal -->
+<div id="migConfirmModal" class="studio-modal-overlay">
+  <div class="studio-modal danger">
+    <div class="studio-modal-header"><h4 id="migConfirmTitle">Confirm migration action</h4></div>
+    <div class="studio-modal-body">
+      <p id="migConfirmMessage" class="text-sm mb-3"></p>
+      <input type="text" id="migConfirmInput" class="w-full p-2 border rounded" placeholder="Type MIGRATE to confirm">
+    </div>
+    <div class="studio-modal-footer">
+      <button type="button" class="studio-btn" data-close-modal="migConfirmModal">Cancel</button>
+      <button type="button" id="btnMigConfirm" class="studio-btn studio-btn-danger">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Post-DDL migration nudge -->
+<div id="migrationNudgeModal" class="studio-modal-overlay">
+  <div class="studio-modal">
+    <div class="studio-modal-header"><h4>Generate Alembic migration?</h4></div>
+    <div class="studio-modal-body">
+      <p class="text-sm">Schema changed on the application database. Generate a migration file to keep Alembic in sync?</p>
+    </div>
+    <div class="studio-modal-footer">
+      <button type="button" class="studio-btn" data-close-modal="migrationNudgeModal">Later</button>
+      <button type="button" id="btnNudgeGenerate" class="studio-btn studio-btn-primary">Generate migration</button>
+    </div>
+  </div>
+</div>
+
 <!-- Danger Modal -->
 <div id="dangerModal" class="studio-modal-overlay">
   <div class="studio-modal danger">
@@ -230,6 +341,7 @@
 </div>
 
 <div id="studioToast" class="studio-toast"></div>
+</div>
 
 <script src="{{ url_for('static', filename='js/schema_studio.js') }}"></script>
 {% endblock %}

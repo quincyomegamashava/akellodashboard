@@ -94,3 +94,11 @@ class Config:
 
     # Allow DDL (create/alter/drop tables & columns) from Database Schema Studio
     ALLOW_WEB_SCHEMA_CHANGES = os.environ.get('ALLOW_WEB_SCHEMA_CHANGES', 'true').lower() in ('true', '1', 't', 'yes', 'y')
+
+    # Allow DDL on external MySQL databases (Ruzivo/Library) — keep false in production unless needed
+    ALLOW_EXTERNAL_SCHEMA_CHANGES = os.environ.get(
+        'ALLOW_EXTERNAL_SCHEMA_CHANGES', 'false'
+    ).lower() in ('true', '1', 't', 'yes', 'y')
+
+    # Schema metadata cache TTL (seconds) for Database Schema Studio list/overview endpoints
+    SCHEMA_STUDIO_CACHE_TTL = int(os.environ.get('SCHEMA_STUDIO_CACHE_TTL', '45'))

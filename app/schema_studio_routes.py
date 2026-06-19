@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import io
 import sys
-from functools import wraps
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
-from flask_login import current_user, login_required
+from flask_login import login_required
 
+from app.auth_decorators import is_super_admin, super_admin_required
 from app.ddl_service import (
     execute_ddl_operation,
     execute_sql_query,
@@ -30,7 +30,7 @@ from app.migration_service import (
     run_upgrade,
 )
 from app.schema_studio_service import (
-    APP_DB_KEY,
+    export_table_csv,
     get_column_types_for_dialect,
     get_engine,
     get_overview,
@@ -44,28 +44,6 @@ from app.schema_studio_service import (
 schema_studio_bp = Blueprint('schema_studio', __name__)
 
 
-def super_admin_required(f):
-    """Require Admin role and Super-admin privilege."""
-
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not current_user.is_authenticated:
-            return jsonify({'error': 'Authentication required'}), 401
-        if current_user.userRole != 'Admin' or not current_user.has_privilege('Super-admin'):
-            return jsonify({'error': 'Super-admin access required'}), 403
-        return f(*args, **kwargs)
-
-    return decorated
-
-
-def _is_super_admin() -> bool:
-    return (
-        current_user.is_authenticated
-        and current_user.userRole == 'Admin'
-        and current_user.has_privilege('Super-admin')
-    )
-
-
 def _json_error(message: str, status: int = 400):
     return jsonify({'success': False, 'error': message}), status
 
@@ -73,7 +51,7 @@ def _json_error(message: str, status: int = 400):
 @schema_studio_bp.route('/admin/schema-studio')
 @login_required
 def schema_studio_page():
-    if not _is_super_admin():
+    if not is_super_admin():
         flash('Super-admin access is required for Database Schema Studio.', 'danger')
         return redirect(url_for('overview'))
     return render_template('admin/schema_studio.html', title='Database Studio')
@@ -94,8 +72,9 @@ def api_list_databases():
 @login_required
 @super_admin_required
 def api_overview(db_key):
+    exact = request.args.get('exact_counts', 'false').lower() in ('1', 'true', 'yes')
     try:
-        return jsonify({'success': True, 'overview': get_overview(db_key)})
+        return jsonify({'success': True, 'overview': get_overview(db_key, exact_counts=exact)})
     except Exception as exc:
         return _json_error(str(exc), 500)
 
@@ -105,8 +84,12 @@ def api_overview(db_key):
 @super_admin_required
 def api_tables(db_key):
     search = request.args.get('search', '')
+    include_counts = request.args.get('include_counts', 'false').lower() in ('1', 'true', 'yes')
     try:
-        return jsonify({'success': True, 'tables': list_tables(db_key, search=search)})
+        return jsonify({
+            'success': True,
+            'tables': list_tables(db_key, search=search, include_counts=include_counts),
+        })
     except Exception as exc:
         return _json_error(str(exc), 500)
 
@@ -131,9 +114,36 @@ def api_table_rows(db_key, table_name):
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
     order_by = request.args.get('order_by')
+    column_filter = request.args.get('filter')
     try:
-        data = get_table_rows(db_key, table_name, page=page, per_page=per_page, order_by=order_by)
+        data = get_table_rows(
+            db_key,
+            table_name,
+            page=page,
+            per_page=per_page,
+            order_by=order_by,
+            column_filter=column_filter,
+        )
         return jsonify({'success': True, **data})
+    except Exception as exc:
+        return _json_error(str(exc), 500)
+
+
+@schema_studio_bp.route('/api/admin/schema-studio/<db_key>/tables/<table_name>/export')
+@login_required
+@super_admin_required
+def api_export_table(db_key, table_name):
+    limit = request.args.get('limit', 10000, type=int)
+    try:
+        csv_data = export_table_csv(db_key, table_name, limit=limit)
+        from flask import Response
+        return Response(
+            csv_data,
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename={table_name}.csv',
+            },
+        )
     except Exception as exc:
         return _json_error(str(exc), 500)
 
@@ -142,8 +152,9 @@ def api_table_rows(db_key, table_name):
 @login_required
 @super_admin_required
 def api_relations(db_key):
+    prefix = request.args.get('prefix', '')
     try:
-        return jsonify({'success': True, **get_relations(db_key)})
+        return jsonify({'success': True, **get_relations(db_key, table_prefix=prefix)})
     except Exception as exc:
         return _json_error(str(exc), 500)
 
@@ -250,6 +261,43 @@ def api_drop_column(db_key, table_name, column_name):
     return jsonify(result), status
 
 
+@schema_studio_bp.route('/api/admin/schema-studio/<db_key>/tables/<table_name>/indexes', methods=['POST'])
+@login_required
+@super_admin_required
+def api_create_index(db_key, table_name):
+    data = request.get_json(silent=True) or {}
+    data['table'] = table_name
+    result = execute_ddl_operation('create_index', db_key, data)
+    status = 200 if result.get('success') else 400
+    return jsonify(result), status
+
+
+@schema_studio_bp.route(
+    '/api/admin/schema-studio/<db_key>/tables/<table_name>/indexes/<index_name>',
+    methods=['DELETE'],
+)
+@login_required
+@super_admin_required
+def api_drop_index(db_key, table_name, index_name):
+    data = request.get_json(silent=True) or {}
+    data['table'] = table_name
+    data['index_name'] = index_name
+    result = execute_ddl_operation('drop_index', db_key, data)
+    status = 200 if result.get('success') else 400
+    return jsonify(result), status
+
+
+@schema_studio_bp.route('/api/admin/schema-studio/<db_key>/tables/<table_name>/foreign-keys', methods=['POST'])
+@login_required
+@super_admin_required
+def api_add_foreign_key(db_key, table_name):
+    data = request.get_json(silent=True) or {}
+    data['table'] = table_name
+    result = execute_ddl_operation('add_foreign_key', db_key, data)
+    status = 200 if result.get('success') else 400
+    return jsonify(result), status
+
+
 @schema_studio_bp.route('/api/admin/schema-studio/<db_key>/query', methods=['POST'])
 @login_required
 @super_admin_required
@@ -268,7 +316,12 @@ def api_query(db_key):
 @super_admin_required
 def api_activity():
     limit = request.args.get('limit', 50, type=int)
-    return jsonify({'success': True, 'activity': get_schema_activity(limit=limit)})
+    activity = get_schema_activity(limit=limit)
+    return jsonify({
+        'success': True,
+        'activity': activity,
+        'audit_log_url': url_for('admin_audit_log'),
+    })
 
 
 # --- App DB migrations (proxied for studio UI) ---

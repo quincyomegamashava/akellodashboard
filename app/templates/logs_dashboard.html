@@ -2,7 +2,12 @@
 
 {% block title %}Application Logs{% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin_hub.css') }}">
+{% endblock %}
+
 {% block content %}
+<div class="admin-hub">
 <div class="p-4">
   <div class="flex items-center justify-between mb-6">
     <div>
@@ -97,6 +102,7 @@
       </div>
     </div>
   </div>
+</div>
 </div>
 
 <style>

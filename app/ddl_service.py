@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any
 
@@ -12,9 +13,17 @@ from sqlalchemy.engine import Engine
 
 from app import db
 from app.migration_schema import column_exists, table_exists
-from app.migration_service import _backup_sqlite_database
+from app.migration_service import backup_app_database
 from app.models import AuditLog
-from app.schema_studio_service import APP_DB_KEY, get_engine
+from app.schema_studio_service import APP_DB_KEY, get_engine, invalidate_schema_cache
+
+IDENTIFIER_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+DANGEROUS_SQL_PATTERNS = re.compile(
+    r'\b(DROP\s+DATABASE|DROP\s+SCHEMA|TRUNCATE\s+DATABASE|'
+    r'GRANT\s+|REVOKE\s+|CREATE\s+USER|DROP\s+USER|'
+    r'LOAD\s+DATA|INTO\s+OUTFILE|INTO\s+DUMPFILE)\b',
+    re.IGNORECASE,
+)
 
 
 def _quote_ident(name: str, dialect: str) -> str:
@@ -36,12 +45,49 @@ def _format_default(default: Any, dialect: str) -> str:
     return f" DEFAULT '{escaped}'"
 
 
-def _check_schema_changes_enabled() -> dict[str, Any] | None:
+def validate_identifier(name: str, label: str = 'Identifier') -> str:
+    name = (name or '').strip()
+    if not name or not IDENTIFIER_RE.match(name):
+        raise ValueError(f'{label} must match [A-Za-z_][A-Za-z0-9_]*')
+    return name
+
+
+def _check_schema_changes_enabled(db_key: str | None = None) -> dict[str, Any] | None:
     if not current_app.config.get('ALLOW_WEB_SCHEMA_CHANGES', True):
         return {
             'success': False,
             'error': 'Web schema changes are disabled (ALLOW_WEB_SCHEMA_CHANGES=false).',
         }
+    if db_key and db_key != APP_DB_KEY:
+        if not current_app.config.get('ALLOW_EXTERNAL_SCHEMA_CHANGES', False):
+            return {
+                'success': False,
+                'error': (
+                    'External database DDL is disabled (ALLOW_EXTERNAL_SCHEMA_CHANGES=false). '
+                    'Enable only when you intend to modify production MySQL databases.'
+                ),
+            }
+    return None
+
+
+def _validate_sql_query(query: str, db_key: str, *, allow_write: bool) -> dict[str, Any] | None:
+    stripped = query.strip().rstrip(';')
+    if ';' in stripped:
+        return {
+            'success': False,
+            'error': 'Multiple SQL statements are not allowed. Run one statement at a time.',
+        }
+    if DANGEROUS_SQL_PATTERNS.search(query):
+        return {'success': False, 'error': 'This query pattern is blocked for safety.'}
+    if db_key != APP_DB_KEY and allow_write:
+        upper = query.upper()
+        if any(kw in upper for kw in ('DROP TABLE', 'DROP COLUMN', 'TRUNCATE', 'ALTER TABLE')):
+            ext_ok = current_app.config.get('ALLOW_EXTERNAL_SCHEMA_CHANGES', False)
+            if not ext_ok:
+                return {
+                    'success': False,
+                    'error': 'DDL on external databases requires ALLOW_EXTERNAL_SCHEMA_CHANGES=true.',
+                }
     return None
 
 
@@ -98,7 +144,7 @@ def _audit_ddl(
 def _maybe_backup_app_db(db_key: str) -> dict[str, Any] | None:
     if db_key != APP_DB_KEY:
         return None
-    return _backup_sqlite_database()
+    return backup_app_database()
 
 
 def _execute_statements(engine: Engine, statements: list[str]) -> None:
@@ -110,9 +156,7 @@ def _execute_statements(engine: Engine, statements: list[str]) -> None:
 def build_create_table_sql(db_key: str, payload: dict[str, Any]) -> list[str]:
     engine = get_engine(db_key)
     dialect = engine.dialect.name
-    table_name = (payload.get('name') or '').strip()
-    if not table_name:
-        raise ValueError('Table name is required')
+    table_name = validate_identifier(payload.get('name'), 'Table name')
     if table_exists(engine, table_name):
         raise ValueError(f'Table {table_name} already exists')
 
@@ -123,10 +167,10 @@ def build_create_table_sql(db_key: str, payload: dict[str, Any]) -> list[str]:
     col_defs: list[str] = []
     pk_cols: list[str] = []
     for col in columns:
-        name = (col.get('name') or '').strip()
-        if not name:
-            raise ValueError('Column name is required')
+        name = validate_identifier(col.get('name'), 'Column name')
         col_type = (col.get('type') or 'TEXT').strip()
+        if not re.match(r'^[A-Za-z0-9_(),.\s]+$', col_type):
+            raise ValueError(f'Invalid column type: {col_type}')
         parts = [f'{_quote_ident(name, dialect)} {col_type}']
         if col.get('primary_key'):
             pk_cols.append(name)
@@ -146,9 +190,8 @@ def build_create_table_sql(db_key: str, payload: dict[str, Any]) -> list[str]:
 def build_rename_table_sql(db_key: str, table_name: str, new_name: str) -> list[str]:
     engine = get_engine(db_key)
     dialect = engine.dialect.name
-    new_name = (new_name or '').strip()
-    if not new_name:
-        raise ValueError('New table name is required')
+    table_name = validate_identifier(table_name, 'Table name')
+    new_name = validate_identifier(new_name, 'New table name')
     if not table_exists(engine, table_name):
         raise ValueError(f'Table {table_name} does not exist')
     if table_exists(engine, new_name):
@@ -166,6 +209,7 @@ def build_rename_table_sql(db_key: str, table_name: str, new_name: str) -> list[
 def build_drop_table_sql(db_key: str, table_name: str) -> list[str]:
     engine = get_engine(db_key)
     dialect = engine.dialect.name
+    table_name = validate_identifier(table_name, 'Table name')
     if not table_exists(engine, table_name):
         raise ValueError(f'Table {table_name} does not exist')
     qt = _quote_ident(table_name, dialect)
@@ -175,12 +219,11 @@ def build_drop_table_sql(db_key: str, table_name: str) -> list[str]:
 def build_add_column_sql(db_key: str, table_name: str, col: dict[str, Any]) -> list[str]:
     engine = get_engine(db_key)
     dialect = engine.dialect.name
+    table_name = validate_identifier(table_name, 'Table name')
     if not table_exists(engine, table_name):
         raise ValueError(f'Table {table_name} does not exist')
 
-    name = (col.get('name') or '').strip()
-    if not name:
-        raise ValueError('Column name is required')
+    name = validate_identifier(col.get('name'), 'Column name')
     if column_exists(engine, table_name, name):
         raise ValueError(f'Column {name} already exists')
 
@@ -202,6 +245,8 @@ def build_alter_column_sql(
 ) -> list[str]:
     engine = get_engine(db_key)
     dialect = engine.dialect.name
+    table_name = validate_identifier(table_name, 'Table name')
+    column_name = validate_identifier(column_name, 'Column name')
     if not column_exists(engine, table_name, column_name):
         raise ValueError(f'Column {column_name} does not exist')
 
@@ -288,6 +333,8 @@ def _sqlite_rebuild_column(
 def build_drop_column_sql(db_key: str, table_name: str, column_name: str) -> list[str]:
     engine = get_engine(db_key)
     dialect = engine.dialect.name
+    table_name = validate_identifier(table_name, 'Table name')
+    column_name = validate_identifier(column_name, 'Column name')
     if not column_exists(engine, table_name, column_name):
         raise ValueError(f'Column {column_name} does not exist')
 
@@ -330,6 +377,58 @@ def _sqlite_rebuild_drop_column(engine: Engine, table_name: str, column_name: st
     ]
 
 
+def build_create_index_sql(db_key: str, table_name: str, payload: dict[str, Any]) -> list[str]:
+    engine = get_engine(db_key)
+    dialect = engine.dialect.name
+    table_name = validate_identifier(table_name, 'Table name')
+    index_name = validate_identifier(payload.get('name') or f'idx_{table_name}', 'Index name')
+    columns = payload.get('columns') or []
+    if not columns:
+        raise ValueError('At least one column is required for an index')
+    for col in columns:
+        validate_identifier(col, 'Column name')
+    unique = 'UNIQUE ' if payload.get('unique') else ''
+    cols = ', '.join(_quote_ident(c, dialect) for c in columns)
+    qt = _quote_ident(table_name, dialect)
+    qi = _quote_ident(index_name, dialect)
+    return [f'CREATE {unique}INDEX {qi} ON {qt} ({cols})']
+
+
+def build_drop_index_sql(db_key: str, table_name: str, index_name: str) -> list[str]:
+    engine = get_engine(db_key)
+    dialect = engine.dialect.name
+    table_name = validate_identifier(table_name, 'Table name')
+    index_name = validate_identifier(index_name, 'Index name')
+    qt = _quote_ident(table_name, dialect)
+    qi = _quote_ident(index_name, dialect)
+    if dialect == 'mysql':
+        return [f'DROP INDEX {qi} ON {qt}']
+    return [f'DROP INDEX {qi}']
+
+
+def build_add_foreign_key_sql(db_key: str, table_name: str, payload: dict[str, Any]) -> list[str]:
+    engine = get_engine(db_key)
+    dialect = engine.dialect.name
+    table_name = validate_identifier(table_name, 'Table name')
+    fk_name = validate_identifier(payload.get('name') or 'fk_studio', 'Foreign key name')
+    local_cols = payload.get('columns') or []
+    ref_table = validate_identifier(payload.get('referred_table'), 'Referenced table')
+    ref_cols = payload.get('referred_columns') or []
+    if not local_cols or not ref_cols:
+        raise ValueError('Local and referenced columns are required')
+    for col in local_cols + ref_cols:
+        validate_identifier(col, 'Column name')
+    on_delete = (payload.get('on_delete') or 'NO ACTION').upper()
+    qt = _quote_ident(table_name, dialect)
+    local = ', '.join(_quote_ident(c, dialect) for c in local_cols)
+    ref = _quote_ident(ref_table, dialect)
+    remote = ', '.join(_quote_ident(c, dialect) for c in ref_cols)
+    return [
+        f'ALTER TABLE {qt} ADD CONSTRAINT {_quote_ident(fk_name, dialect)} '
+        f'FOREIGN KEY ({local}) REFERENCES {ref} ({remote}) ON DELETE {on_delete}'
+    ]
+
+
 def preview_ddl(operation: str, db_key: str, payload: dict[str, Any]) -> dict[str, Any]:
     builders = {
         'create_table': lambda: build_create_table_sql(db_key, payload),
@@ -342,6 +441,11 @@ def preview_ddl(operation: str, db_key: str, payload: dict[str, Any]) -> dict[st
             db_key, payload['table'], payload['column'], payload.get('changes', {})
         ),
         'drop_column': lambda: build_drop_column_sql(db_key, payload['table'], payload['column']),
+        'create_index': lambda: build_create_index_sql(db_key, payload['table'], payload),
+        'drop_index': lambda: build_drop_index_sql(
+            db_key, payload['table'], payload['index_name']
+        ),
+        'add_foreign_key': lambda: build_add_foreign_key_sql(db_key, payload['table'], payload),
     }
     if operation not in builders:
         raise ValueError(f'Unknown operation: {operation}')
@@ -361,7 +465,7 @@ def execute_ddl_operation(
     *,
     require_confirmation: bool = True,
 ) -> dict[str, Any]:
-    disabled = _check_schema_changes_enabled()
+    disabled = _check_schema_changes_enabled(db_key)
     if disabled:
         return disabled
 
@@ -374,6 +478,10 @@ def execute_ddl_operation(
         confirm_key = f'DROP {db_key}.{table}'
     elif operation == 'drop_column':
         confirm_key = f'DROP {db_key}.{table}.{payload.get("column", "")}'
+    elif operation == 'drop_index':
+        confirm_key = f'DROP INDEX {db_key}.{table}.{payload.get("index_name", "")}'
+    elif operation == 'rename_table':
+        confirm_key = f'RENAME {db_key}.{table}'
 
     err = _validate_confirmation(payload, confirm_key, require_confirm=require_confirmation)
     if err:
@@ -396,12 +504,16 @@ def execute_ddl_operation(
                 'backup_path': backup.get('backup_path') if backup else None,
             },
         )
-        return {
+        invalidate_schema_cache(db_key)
+        result: dict[str, Any] = {
             'success': True,
             'operation': operation,
             'sql': preview['sql'],
             'backup_path': backup.get('backup_path') if backup else None,
         }
+        if db_key == APP_DB_KEY:
+            result['suggest_generate_migration'] = True
+        return result
     except Exception as exc:
         current_app.logger.exception('DDL operation failed: %s', operation)
         return {'success': False, 'error': str(exc), 'sql': preview.get('sql')}
@@ -413,32 +525,43 @@ def execute_sql_query(
     *,
     allow_write: bool = False,
     limit: int = 1000,
+    timeout_seconds: int = 30,
 ) -> dict[str, Any]:
     query = (query or '').strip()
     if not query:
         return {'success': False, 'error': 'Query is required'}
 
+    sql_err = _validate_sql_query(query, db_key, allow_write=allow_write)
+    if sql_err:
+        return sql_err
+
+    limit = max(1, min(int(limit), 5000))
     upper = query.upper().lstrip()
     is_select = upper.startswith('SELECT') or upper.startswith('WITH') or upper.startswith('PRAGMA')
     is_read = is_select or upper.startswith('SHOW') or upper.startswith('DESCRIBE')
 
     if not is_read and not allow_write:
-        disabled = _check_schema_changes_enabled()
+        disabled = _check_schema_changes_enabled(db_key)
         if disabled:
             return disabled
 
-    if db_key == APP_DB_KEY:
-        engine = get_engine(db_key)
-    else:
+    if db_key != APP_DB_KEY:
         from app.database_manager import get_db_manager
+        if not is_read and allow_write:
+            ext = _check_schema_changes_enabled(db_key)
+            if ext:
+                return ext
         return get_db_manager().execute_query(db_key, query, limit=limit)
 
     start = datetime.utcnow()
     try:
+        engine = get_engine(db_key)
         with engine.begin() as conn:
+            conn.execute(sa.text(f'PRAGMA busy_timeout = {timeout_seconds * 1000}'))
+            exec_query = query
             if is_select and 'LIMIT' not in upper:
-                query = f'{query.rstrip(";")} LIMIT {limit}'
-            result = conn.execute(sa.text(query))
+                exec_query = f'{query.rstrip(";")} LIMIT {limit}'
+            result = conn.execute(sa.text(exec_query))
             if is_read or result.returns_rows:
                 columns = list(result.keys())
                 rows = []

@@ -11,6 +11,11 @@
   let dataPage = 1;
   let columnTypes = [];
   let network = null;
+  let aceEditor = null;
+  let externalDdlAllowed = true;
+  let migStatusCache = null;
+  let migDiagnosticsCache = null;
+  let migConfirmCallback = null;
 
   const $ = (sel, ctx) => (ctx || document).querySelector(sel);
   const $$ = (sel, ctx) => [...(ctx || document).querySelectorAll(sel)];
@@ -50,10 +55,36 @@
   function switchPanel(name) {
     $$('.studio-nav-item').forEach((b) => b.classList.toggle('active', b.dataset.panel === name));
     $$('.studio-panel').forEach((p) => p.classList.toggle('active', p.id === 'panel-' + name));
+    if (name === 'sql') initAceEditor();
     if (name === 'migrations' && currentDb === 'app') loadMigrations();
     if (name === 'activity') loadActivity();
     if (name === 'er') loadERDiagram();
     if (name === 'overview') loadOverview();
+  }
+
+  function initAceEditor() {
+    if (aceEditor || typeof ace === 'undefined') return;
+    const el = $('#sqlEditorAce');
+    if (!el) return;
+    aceEditor = ace.edit('sqlEditorAce');
+    aceEditor.setTheme('ace/theme/github');
+    aceEditor.session.setMode('ace/mode/sql');
+    aceEditor.setValue('SELECT * FROM user LIMIT 10;', -1);
+    aceEditor.setOptions({ fontSize: '14px', showPrintMargin: false });
+  }
+
+  function getSqlQuery() {
+    if (aceEditor) return aceEditor.getValue();
+    return $('#sqlEditor')?.value || '';
+  }
+
+  function applyDdlUiState() {
+    const wrap = $('#panel-tables');
+    const blocked = currentDb !== 'app' && !externalDdlAllowed;
+    if (wrap) wrap.classList.toggle('studio-ddl-disabled', blocked);
+    $$('.studio-ddl-action').forEach((el) => {
+      el.disabled = blocked;
+    });
   }
 
   $$('.studio-nav-item').forEach((btn) => {
@@ -97,7 +128,10 @@
       });
     }
     updateConnectionStatus(data.databases.find((d) => d.key === currentDb));
+    const cur = data.databases.find((d) => d.key === currentDb);
+    externalDdlAllowed = cur ? cur.external_ddl_allowed !== false : true;
     updateExternalWarning();
+    applyDdlUiState();
   }
 
   function selectDatabase(key) {
@@ -105,7 +139,15 @@
     currentTable = null;
     const sel = $('#dbSelector');
     if (sel) sel.value = key;
-    updateExternalWarning();
+    api('/databases').then((data) => {
+      if (data.success) {
+        const cur = data.databases.find((d) => d.key === currentDb);
+        updateConnectionStatus(cur);
+        externalDdlAllowed = cur ? cur.external_ddl_allowed !== false : true;
+        updateExternalWarning();
+        applyDdlUiState();
+      }
+    });
     loadOverview();
     loadTableTree();
     clearTableDetail();
@@ -124,7 +166,15 @@
 
   function updateExternalWarning() {
     const banner = $('#externalWarning');
-    if (banner) banner.classList.toggle('visible', currentDb !== 'app');
+    const blocked = $('#externalDdlBlocked');
+    if (banner) {
+      banner.classList.toggle('visible', currentDb !== 'app');
+      if (currentDb !== 'app') {
+        banner.innerHTML =
+          '<i class="fas fa-exclamation-triangle"></i> You are viewing an <strong>external production database</strong>. DDL changes are irreversible.';
+      }
+    }
+    if (blocked) blocked.classList.toggle('visible', currentDb !== 'app' && !externalDdlAllowed);
   }
 
   $('#dbSelector')?.addEventListener('change', (e) => selectDatabase(e.target.value));
@@ -142,7 +192,10 @@
     if (!data.success) return;
     const o = data.overview;
     $('#kpiTables').textContent = formatNum(o.table_count);
-    $('#kpiRows').textContent = formatNum(o.total_rows);
+    const rowsEl = $('#kpiRows');
+    if (rowsEl) {
+      rowsEl.textContent = o.total_rows == null ? '—' : (o.row_count_approximate ? '~' : '') + formatNum(o.total_rows);
+    }
     $('#kpiIndexes').textContent = formatNum(o.index_count);
     $('#kpiFks').textContent = formatNum(o.fk_count);
     $('#kpiSize').textContent = o.size_bytes != null ? formatBytes(o.size_bytes) : '—';
@@ -155,7 +208,7 @@
 
   async function loadTableTree() {
     const search = $('#tableSearch')?.value || '';
-    const data = await api(`/${currentDb}/tables?search=${encodeURIComponent(search)}`);
+    const data = await api(`/${currentDb}/tables?search=${encodeURIComponent(search)}&include_counts=false`);
     const tree = $('#tableTree');
     if (!tree) return;
     if (!data.success) {
@@ -172,7 +225,7 @@
       <div class="studio-tree-item ${t.name === currentTable ? 'selected' : ''}" data-table="${escapeAttr(t.name)}">
         <i class="fas fa-table text-indigo-400"></i>
         <span>${escapeHtml(t.name)}</span>
-        <span class="row-count">${formatNum(t.row_count)}</span>
+        <span class="row-count">${t.row_count != null ? formatNum(t.row_count) : ''}</span>
       </div>`
       )
       .join('');
@@ -251,6 +304,7 @@
         <td>${escapeHtml(idx.name || '—')}</td>
         <td>${(idx.column_names || []).join(', ')}</td>
         <td>${idx.unique ? 'Yes' : 'No'}</td>
+        <td>${idx.name ? `<button class="studio-btn studio-btn-sm studio-btn-danger studio-ddl-action" onclick="SchemaStudio.dropIndex('${escapeAttr(idx.name)}')">Drop</button>` : ''}</td>
       </tr>`
       )
       .join('');
@@ -278,9 +332,10 @@
   async function loadTableData() {
     if (!currentTable) return;
     const orderBy = $('#dataOrderBy')?.value || '';
-    const data = await api(
-      `/${currentDb}/tables/${encodeURIComponent(currentTable)}/rows?page=${dataPage}&per_page=50&order_by=${encodeURIComponent(orderBy)}`
-    );
+    const filter = $('#dataFilter')?.value || '';
+    let url = `/${currentDb}/tables/${encodeURIComponent(currentTable)}/rows?page=${dataPage}&per_page=50&order_by=${encodeURIComponent(orderBy)}`;
+    if (filter) url += `&filter=${encodeURIComponent(filter)}`;
+    const data = await api(url);
     if (!data.success) return;
     const head = $('#dataHead');
     const body = $('#dataBody');
@@ -314,7 +369,7 @@
   // --- SQL Console ---
 
   $('#runSqlBtn')?.addEventListener('click', async () => {
-    const query = $('#sqlEditor')?.value || '';
+    const query = getSqlQuery();
     const allowWrite = $('#sqlAllowWrite')?.checked || false;
     const result = await api(`/${currentDb}/query`, {
       method: 'POST',
@@ -342,7 +397,8 @@
   // --- ER Diagram ---
 
   async function loadERDiagram() {
-    const data = await api(`/${currentDb}/relations`);
+    const prefix = $('#erPrefixFilter')?.value || '';
+    const data = await api(`/${currentDb}/relations?prefix=${encodeURIComponent(prefix)}`);
     const container = $('#erCanvas');
     if (!container || !data.success) return;
 
@@ -393,33 +449,104 @@
 
   // --- Migrations ---
 
-  async function loadMigrations() {
-    if (currentDb !== 'app') {
-      $('#migrationsPanel').innerHTML = '<div class="studio-empty">Migrations are only available for the application database.</div>';
+  $('#erPrefixFilter')?.addEventListener('input', debounce(loadERDiagram, 400));
+
+  $('#btnExportCsv')?.addEventListener('click', () => {
+    if (!currentTable) return toast('Select a table first', 'error');
+    window.location.href = `${API}/${currentDb}/tables/${encodeURIComponent(currentTable)}/export`;
+  });
+
+  function showMigConfirm(title, message, callback) {
+    $('#migConfirmTitle').textContent = title;
+    $('#migConfirmMessage').textContent = message;
+    $('#migConfirmInput').value = '';
+    migConfirmCallback = callback;
+    openModal('migConfirmModal');
+  }
+
+  $('#btnMigConfirm')?.addEventListener('click', async () => {
+    if ($('#migConfirmInput')?.value?.trim() !== 'MIGRATE') {
+      toast('Type MIGRATE to confirm', 'error');
       return;
     }
-    const status = await api('/app/migrations/status');
+    closeModal('migConfirmModal');
+    if (migConfirmCallback) await migConfirmCallback();
+    migConfirmCallback = null;
+  });
+
+  function afterDdlSuccess(res) {
+    if (res.suggest_generate_migration) openModal('migrationNudgeModal');
+    loadTableTree();
+    loadOverview();
+  }
+
+  $('#btnNudgeGenerate')?.addEventListener('click', () => {
+    closeModal('migrationNudgeModal');
+    migGenerate();
+  });
+
+  async function loadMigrations() {
+    if (currentDb !== 'app') {
+      $('#migrationsContent').innerHTML = '<div class="studio-empty">Migrations are only available for the application database.</div>';
+      return;
+    }
+    const [status, diagnostics, health] = await Promise.all([
+      api('/app/migrations/status'),
+      api('/app/migrations/diagnostics'),
+      api('/app/migrations/health'),
+    ]);
+    migStatusCache = status;
+    migDiagnosticsCache = diagnostics;
     const panel = $('#migrationsContent');
     if (!panel) return;
 
     const healthy = status.is_healthy;
+    const pending = status.pending_revisions || [];
     panel.innerHTML = `
       <div class="studio-mig-status ${healthy ? 'healthy' : 'unhealthy'}">
         <strong>Revision:</strong> ${escapeHtml(status.current_revision || 'none')}
-        · <strong>Heads:</strong> ${(status.head_revisions || []).join(', ') || '—'}
-        · <strong>Pending:</strong> ${(status.pending_revisions || []).length}
+        · <strong>Pending:</strong> ${pending.length}
+        · <strong>Healthy:</strong> ${healthy ? 'Yes' : 'No'}
       </div>
+      <div id="migHealthRecs" class="text-sm mb-3"></div>
       <div class="flex flex-wrap gap-2 mb-4">
-        <button class="studio-btn studio-btn-primary" onclick="SchemaStudio.migUpgrade('all')">Upgrade all</button>
-        <button class="studio-btn" onclick="SchemaStudio.migUpgrade('next')">Apply next</button>
-        <button class="studio-btn" onclick="SchemaStudio.migGenerate()">Generate migration</button>
-        <button class="studio-btn" onclick="SchemaStudio.migPreflight()">Preflight</button>
-        <button class="studio-btn studio-btn-danger" onclick="SchemaStudio.migDowngrade()">Downgrade one</button>
+        <button class="studio-btn studio-btn-primary" id="migBtnUpgradeAll">Upgrade all</button>
+        <button class="studio-btn" id="migBtnUpgradeNext">Apply next</button>
+        <button class="studio-btn" id="migBtnGenerate">Generate migration</button>
+        <button class="studio-btn" id="migBtnPreflight">Preflight</button>
+        <button class="studio-btn" id="migBtnFix">Fix migrations</button>
+        <button class="studio-btn" id="migBtnMerge">Merge heads</button>
+        <button class="studio-btn" id="migBtnRepair">Repair chain</button>
+        <button class="studio-btn" id="migBtnAlign">Align schema</button>
+        <button class="studio-btn" id="migBtnSync">Sync revision</button>
+        <button class="studio-btn studio-btn-danger" id="migBtnDowngrade">Downgrade one</button>
       </div>
       <h4 class="font-bold text-sm mb-2">Pending migrations</h4>
       <table class="studio-table mb-4"><thead><tr><th>Revision</th><th>Message</th></tr></thead>
-      <tbody>${(status.pending_revisions || []).map((r) => `<tr><td><code>${escapeHtml(r.revision)}</code></td><td>${escapeHtml(r.message || '')}</td></tr>`).join('') || '<tr><td colspan="2">None</td></tr>'}</tbody></table>
-      <div id="migPreflightResult"></div>`;
+      <tbody>${pending.map((r) => `<tr><td><code>${escapeHtml(r.revision)}</code></td><td>${escapeHtml(r.message || '')}</td></tr>`).join('') || '<tr><td colspan="2">None</td></tr>'}</tbody></table>
+      <div id="migPreflightResult"></div>
+      <div id="migResult" class="studio-sql-preview mt-3 hidden"></div>`;
+
+    const recs = health.recommendations || [];
+    const recEl = $('#migHealthRecs');
+    if (recEl && recs.length) {
+      recEl.innerHTML = recs.map((r) => `<div class="mb-1"><strong>${escapeHtml(r.title || '')}</strong>: ${escapeHtml(r.message || '')}</div>`).join('');
+    }
+
+    $('#migBtnUpgradeAll')?.addEventListener('click', () => showMigConfirm('Upgrade all', 'Apply all pending migrations to the application database.', () => migUpgrade('all')));
+    $('#migBtnUpgradeNext')?.addEventListener('click', () => showMigConfirm('Apply next', 'Apply the next pending migration only.', () => migUpgrade('next')));
+    $('#migBtnGenerate')?.addEventListener('click', () => migGenerate());
+    $('#migBtnPreflight')?.addEventListener('click', () => migPreflight());
+    $('#migBtnDowngrade')?.addEventListener('click', () => showMigConfirm('Downgrade', 'Roll back one migration revision.', () => migDowngrade()));
+    $('#migBtnFix')?.addEventListener('click', () => showMigConfirm('Fix migrations', 'Run full migration recovery (backup, orphans, merge, upgrade).', () => migFix()));
+    $('#migBtnMerge')?.addEventListener('click', () => showMigConfirm('Merge heads', 'Merge multiple Alembic heads into one.', () => migMerge()));
+    $('#migBtnRepair')?.addEventListener('click', () => {
+      const rev = prompt('Stamp revision for repair:', diagnostics.current_revision || '');
+      if (!rev) return;
+      showMigConfirm('Repair chain', `Repair migration chain and stamp to ${rev}.`, () => migRepair(rev));
+    });
+    $('#migBtnAlign')?.addEventListener('click', () => showMigConfirm('Align schema', 'Stamp DB to match current schema then upgrade.', () => migAlign()));
+    $('#migBtnSync')?.addEventListener('click', () => showMigConfirm('Sync revision', 'Update alembic_version when schema already matches.', () => migSync()));
 
     const hist = await api('/app/migrations/history?limit=10');
     if (hist.revisions) {
@@ -430,25 +557,45 @@
     }
   }
 
-  async function migUpgrade(mode) {
-    if (!confirm('Apply migrations? This modifies the application database.')) return;
-    const res = await api('/app/migrations/upgrade', {
-      method: 'POST',
-      body: JSON.stringify({ confirm: true, mode }),
-    });
-    toast(res.success ? res.message || 'Upgrade complete' : res.error, res.success ? 'success' : 'error');
+  async function migPost(path, body, okMsg) {
+    const res = await api(path, { method: 'POST', body: JSON.stringify({ confirm: true, ...body }) });
+    const el = $('#migResult');
+    if (el) {
+      el.classList.remove('hidden');
+      el.textContent = res.success ? (res.message || okMsg) : (res.error || 'Failed');
+    }
+    toast(res.success ? (res.message || okMsg) : res.error, res.success ? 'success' : 'error');
     loadMigrations();
     loadOverview();
+    return res;
+  }
+
+  async function migUpgrade(mode) {
+    await migPost('/app/migrations/upgrade', { mode }, 'Upgrade complete');
   }
 
   async function migDowngrade() {
-    if (!confirm('Downgrade one migration step?')) return;
-    const res = await api('/app/migrations/downgrade', {
-      method: 'POST',
-      body: JSON.stringify({ confirm: true, mode: 'one' }),
-    });
-    toast(res.success ? 'Downgrade complete' : res.error, res.success ? 'success' : 'error');
-    loadMigrations();
+    await migPost('/app/migrations/downgrade', { mode: 'one' }, 'Downgrade complete');
+  }
+
+  async function migFix() {
+    await migPost('/app/migrations/fix', { merge_heads: true, run_upgrade_after: true }, 'Fix complete');
+  }
+
+  async function migMerge() {
+    await migPost('/app/migrations/merge', {}, 'Merge complete');
+  }
+
+  async function migRepair(stampRevision) {
+    await migPost('/app/migrations/repair', { stamp_revision: stampRevision }, 'Repair complete');
+  }
+
+  async function migAlign() {
+    await migPost('/app/migrations/align-schema', {}, 'Align complete');
+  }
+
+  async function migSync() {
+    await migPost('/app/migrations/sync', {}, 'Sync complete');
   }
 
   async function migGenerate() {
@@ -484,13 +631,21 @@
     }
     el.innerHTML = data.activity
       .map(
-        (a) => `
-      <div class="studio-activity-item">
+        (a, i) => `
+      <div class="studio-activity-item" data-idx="${i}" style="cursor:pointer">
         <div><strong>${escapeHtml(a.action)}</strong> on <code>${escapeHtml(a.db_key)}</code> — ${escapeHtml(a.label || '')}</div>
         <div class="time">${escapeHtml(a.occurred_at || '')} · ${escapeHtml(a.actor || 'system')}</div>
+        <pre class="studio-activity-sql">${escapeHtml((a.snapshot && (a.snapshot.sql || a.snapshot.query)) || '')}</pre>
       </div>`
       )
       .join('');
+    if (data.audit_log_url) {
+      const link = $('#auditLogLink');
+      if (link) link.href = data.audit_log_url + '?entity_type=schema_ddl';
+    }
+    $$('.studio-activity-item', el).forEach((item) => {
+      item.addEventListener('click', () => item.classList.toggle('expanded'));
+    });
   }
 
   // --- Modals / DDL ---
@@ -507,6 +662,7 @@
   });
 
   $('#btnCreateTable')?.addEventListener('click', () => {
+    if (!externalDdlAllowed && currentDb !== 'app') return toast('External DDL disabled', 'error');
     $('#createTableName').value = '';
     $('#createTableColumns').innerHTML = '';
     addColumnRow();
@@ -557,8 +713,7 @@
     toast(res.success ? 'Table created' : res.error, res.success ? 'success' : 'error');
     if (res.success) {
       closeModal('createTableModal');
-      loadTableTree();
-      loadOverview();
+      afterDdlSuccess(res);
     }
   });
 
@@ -605,6 +760,93 @@
     if (res.success) {
       closeModal('addColumnModal');
       loadTableDetail(currentTable);
+      if (res.suggest_generate_migration) openModal('migrationNudgeModal');
+    }
+  });
+
+  $('#btnRenameTable')?.addEventListener('click', () => {
+    if (!currentTable) return toast('Select a table first', 'error');
+    $('#renameTableNewName').value = currentTable;
+    openModal('renameTableModal');
+  });
+
+  $('#btnSubmitRenameTable')?.addEventListener('click', async () => {
+    const newName = $('#renameTableNewName')?.value?.trim();
+    const res = await api(`/${currentDb}/tables/${encodeURIComponent(currentTable)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        new_name: newName,
+        confirm: true,
+        confirmation_text: `RENAME ${currentDb}.${currentTable}`,
+      }),
+    });
+    toast(res.success ? 'Table renamed' : res.error, res.success ? 'success' : 'error');
+    if (res.success) {
+      closeModal('renameTableModal');
+      currentTable = newName;
+      afterDdlSuccess(res);
+      loadTableDetail(currentTable);
+    }
+  });
+
+  $('#btnAddIndex')?.addEventListener('click', () => {
+    if (!currentTable) return;
+    $('#indexName').value = '';
+    $('#indexColumns').value = '';
+    openModal('addIndexModal');
+  });
+
+  $('#btnSubmitAddIndex')?.addEventListener('click', async () => {
+    const columns = ($('#indexColumns')?.value || '').split(',').map((s) => s.trim()).filter(Boolean);
+    const res = await api(`/${currentDb}/tables/${encodeURIComponent(currentTable)}/indexes`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name: $('#indexName')?.value?.trim(),
+        columns,
+        unique: $('#indexUnique')?.checked || false,
+        confirm: true,
+        confirmation_text: `${currentDb}.${currentTable}`,
+      }),
+    });
+    toast(res.success ? 'Index created' : res.error, res.success ? 'success' : 'error');
+    if (res.success) {
+      closeModal('addIndexModal');
+      loadTableDetail(currentTable);
+      afterDdlSuccess(res);
+    }
+  });
+
+  function dropIndex(name) {
+    $('#dropTargetLabel').textContent = `DROP INDEX ${currentDb}.${currentTable}.${name}`;
+    $('#dropConfirmInput').value = '';
+    $('#dropConfirmInput').dataset.action = 'drop_index';
+    $('#dropConfirmInput').dataset.indexName = name;
+    openModal('dangerModal');
+  }
+
+  $('#btnAddFk')?.addEventListener('click', () => {
+    if (!currentTable) return;
+    openModal('addFkModal');
+  });
+
+  $('#btnSubmitAddFk')?.addEventListener('click', async () => {
+    const res = await api(`/${currentDb}/tables/${encodeURIComponent(currentTable)}/foreign-keys`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name: $('#fkName')?.value?.trim(),
+        columns: ($('#fkLocalCols')?.value || '').split(',').map((s) => s.trim()).filter(Boolean),
+        referred_table: $('#fkRefTable')?.value?.trim(),
+        referred_columns: ($('#fkRefCols')?.value || '').split(',').map((s) => s.trim()).filter(Boolean),
+        on_delete: $('#fkOnDelete')?.value || 'NO ACTION',
+        confirm: true,
+        confirmation_text: `${currentDb}.${currentTable}`,
+      }),
+    });
+    toast(res.success ? 'Foreign key added' : res.error, res.success ? 'success' : 'error');
+    if (res.success) {
+      closeModal('addFkModal');
+      loadTableDetail(currentTable);
+      afterDdlSuccess(res);
     }
   });
 
@@ -638,6 +880,7 @@
     if (res.success) {
       closeModal('editColumnModal');
       loadTableDetail(currentTable);
+      if (res.suggest_generate_migration) openModal('migrationNudgeModal');
     }
   });
 
@@ -671,6 +914,15 @@
         method: 'DELETE',
         body: JSON.stringify({ confirm: true, confirmation_text: `DROP ${currentDb}.${currentTable}` }),
       });
+    } else if (action === 'drop_index') {
+      const idx = $('#dropConfirmInput')?.dataset.indexName;
+      res = await api(`/${currentDb}/tables/${encodeURIComponent(currentTable)}/indexes/${encodeURIComponent(idx)}`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          confirm: true,
+          confirmation_text: `DROP INDEX ${currentDb}.${currentTable}.${idx}`,
+        }),
+      });
     } else {
       const col = $('#dropConfirmInput')?.dataset.column;
       res = await api(
@@ -687,10 +939,13 @@
     toast(res.success ? 'Done' : res.error, res.success ? 'success' : 'error');
     if (res.success) {
       closeModal('dangerModal');
-      currentTable = null;
-      clearTableDetail();
-      loadTableTree();
-      loadOverview();
+      if (action === 'drop_table') {
+        currentTable = null;
+        clearTableDetail();
+      } else if (currentTable) {
+        loadTableDetail(currentTable);
+      }
+      afterDdlSuccess(res);
     }
   });
 
@@ -726,6 +981,7 @@
   window.SchemaStudio = {
     editColumn,
     dropColumn,
+    dropIndex,
     prevPage,
     nextPage,
     loadData: loadTableData,
@@ -739,5 +995,6 @@
   loadDatabases().then(() => {
     loadOverview();
     loadTableTree();
+    applyDdlUiState();
   });
 })();

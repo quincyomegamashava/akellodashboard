@@ -27,9 +27,11 @@
   z-index: 1020;
   margin: -1.25rem -1rem 1rem;
   padding: 0.75rem 1rem 0;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid #e8ecf1;
+  background: var(--hub-glass-bg, rgba(255, 255, 255, 0.72));
+  backdrop-filter: blur(var(--hub-glass-blur, 14px));
+  -webkit-backdrop-filter: blur(var(--hub-glass-blur, 14px));
+  border-bottom: 1px solid var(--hub-card-border, #e8ecf1);
+  box-shadow: var(--hub-glass-shadow, 0 4px 24px rgba(15, 23, 42, 0.06));
 }
 
 .mn-subheader .mn-hero-title {
@@ -61,8 +63,10 @@
   font-size: 0.8125rem;
   text-decoration: none;
   color: #475569;
-  background: #f1f5f9;
-  border: 1px solid transparent;
+  background: var(--hub-chip-bg, rgba(241, 245, 249, 0.75));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.45);
   white-space: nowrap;
   min-height: 44px;
 }
@@ -71,7 +75,8 @@
 .mn-subnav-link:hover {
   color: #00407d;
   border-color: #cbd5e1;
-  background: #fff;
+  background: var(--hub-glass-bg, rgba(255, 255, 255, 0.85));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .mn-detail-tabs {
@@ -426,7 +431,11 @@
   max-width: 1440px;
   margin: 0 auto;
   padding: 1.25rem 1rem 2.5rem;
-  background: linear-gradient(165deg, #fafbfc 0%, #ffffff 45%, #f8fafc 100%);
+  background-color: #fafbfc;
+  background-image:
+    var(--hub-page-glow, radial-gradient(900px 420px at 12% -8%, rgba(0, 64, 125, 0.07), transparent 55%)),
+    var(--hub-page-glow-secondary, radial-gradient(700px 380px at 92% 0%, rgba(0, 64, 125, 0.04), transparent 50%)),
+    linear-gradient(165deg, #fafbfc 0%, #ffffff 45%, #f8fafc 100%);
   min-height: calc(100vh - 80px);
 }
 
@@ -465,10 +474,12 @@
 }
 
 .mn-card {
-  background: #fff;
-  border: 1px solid #e8ecf1;
+  background: var(--hub-glass-bg, rgba(255, 255, 255, 0.72));
+  backdrop-filter: blur(var(--hub-glass-blur, 14px));
+  -webkit-backdrop-filter: blur(var(--hub-glass-blur, 14px));
+  border: 1px solid var(--hub-glass-border, rgba(255, 255, 255, 0.55));
   border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--hub-glass-shadow, var(--mn-shadow));
   margin-bottom: 1.25rem;
   overflow: hidden;
 }
@@ -1056,26 +1067,29 @@
 }
 
 .mn-board-column {
-  background: var(--mn-lane-open, #f0f7ff);
-  border: 1px solid #e8ecf1;
+  background: color-mix(in srgb, var(--mn-lane-open, #f0f7ff) 60%, rgba(255, 255, 255, 0.5));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--hub-glass-border, rgba(255, 255, 255, 0.55));
   border-radius: 14px;
   display: flex;
   flex-direction: column;
   min-height: 200px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .mn-board-column[data-status="open"] {
-  background: var(--mn-lane-open);
+  background: color-mix(in srgb, var(--mn-lane-open) 65%, rgba(255, 255, 255, 0.45));
   border-top: 3px solid var(--mn-lane-open-border);
 }
 
 .mn-board-column[data-status="in_progress"] {
-  background: var(--mn-lane-progress);
+  background: color-mix(in srgb, var(--mn-lane-progress) 65%, rgba(255, 255, 255, 0.45));
   border-top: 3px solid var(--mn-lane-progress-border);
 }
 
 .mn-board-column[data-status="done"] {
-  background: var(--mn-lane-done);
+  background: color-mix(in srgb, var(--mn-lane-done) 65%, rgba(255, 255, 255, 0.45));
   border-top: 3px solid var(--mn-lane-done-border);
 }
 
@@ -1133,9 +1147,12 @@
 }
 
 .mn-board-platform-section {
-  border: 1px solid #e8ecf1;
+  border: 1px solid var(--hub-glass-border, rgba(255, 255, 255, 0.55));
   border-radius: 16px;
-  background: #fff;
+  background: var(--hub-glass-bg, rgba(255, 255, 255, 0.72));
+  backdrop-filter: blur(var(--hub-glass-blur, 14px));
+  -webkit-backdrop-filter: blur(var(--hub-glass-blur, 14px));
+  box-shadow: var(--hub-glass-shadow);
   overflow: hidden;
 }
 
@@ -1300,12 +1317,14 @@
 }
 
 .mn-task-card {
-  background: #fff;
-  border: 1px solid #e8ecf1;
+  background: var(--hub-glass-bg, rgba(255, 255, 255, 0.72));
+  backdrop-filter: blur(var(--hub-glass-blur, 14px));
+  -webkit-backdrop-filter: blur(var(--hub-glass-blur, 14px));
+  border: 1px solid var(--hub-glass-border, rgba(255, 255, 255, 0.55));
   border-radius: 14px;
   padding: 0.75rem 0.75rem 0.75rem 0.85rem;
   border-left: 4px solid #cbd5e1;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--hub-glass-shadow, 0 2px 8px rgba(15, 23, 42, 0.04));
   cursor: grab;
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
@@ -1475,7 +1494,10 @@
   left: 50%;
   width: min(920px, calc(100vw - 2rem));
   max-height: min(88vh, 920px);
-  background: #fff;
+  background: var(--hub-glass-bg, rgba(255, 255, 255, 0.82));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--hub-glass-border, rgba(255, 255, 255, 0.6));
   z-index: 1050;
   border-radius: 16px;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.25);
@@ -1576,15 +1598,18 @@
   font-size: 0.8125rem;
   text-decoration: none;
   color: #475569;
-  background: #f1f5f9;
-  border: 1px solid transparent;
+  background: var(--hub-chip-bg, rgba(241, 245, 249, 0.75));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 .mn-hub-nav a.active,
 .mn-hub-nav a:hover {
   color: #00407d;
   border-color: #cbd5e1;
-  background: #fff;
+  background: var(--hub-glass-bg, rgba(255, 255, 255, 0.85));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .mn-analytics-chip {
@@ -1678,11 +1703,13 @@
 }
 
 .mn-meeting-card {
-  border: 1px solid #e8ecf1;
+  border: 1px solid var(--hub-glass-border, rgba(255, 255, 255, 0.55));
   border-radius: 14px;
   padding: 1rem;
-  background: #fff;
-  box-shadow: var(--mn-shadow);
+  background: var(--hub-glass-bg, rgba(255, 255, 255, 0.72));
+  backdrop-filter: blur(var(--hub-glass-blur, 14px));
+  -webkit-backdrop-filter: blur(var(--hub-glass-blur, 14px));
+  box-shadow: var(--hub-glass-shadow, var(--mn-shadow));
   transition: box-shadow 0.15s ease, transform 0.15s ease;
   min-height: 44px;
 }
@@ -1986,12 +2013,15 @@
 
 /* Decision register */
 .mn-decision-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--hub-glass-bg, rgba(255, 255, 255, 0.72));
+  backdrop-filter: blur(var(--hub-glass-blur, 14px));
+  -webkit-backdrop-filter: blur(var(--hub-glass-blur, 14px));
+  border: 1px solid var(--hub-glass-border, rgba(255, 255, 255, 0.55));
   border-left: 4px solid #00407d;
   border-radius: 12px;
   padding: 0.65rem 0.75rem;
   margin-bottom: 0.5rem;
+  box-shadow: var(--hub-glass-shadow);
   transition: box-shadow 0.15s;
 }
 

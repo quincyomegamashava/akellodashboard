@@ -1,0 +1,250 @@
+/* Admin hub glass morphism — indigo/sky theme */
+:root {
+  --admin-primary: #4f46e5;
+  --admin-secondary: #0ea5e9;
+  --admin-bg: #f8fafc;
+  --admin-card-bg: #ffffff;
+  --admin-card-border: #e2e8f0;
+  --admin-text-main: #1e293b;
+  --admin-text-muted: #64748b;
+  --admin-glass-bg: rgba(255, 255, 255, 0.75);
+  --admin-glass-border: rgba(255, 255, 255, 0.6);
+  --admin-glass-blur: 14px;
+  --admin-glass-shadow: 0 4px 20px rgba(79, 70, 229, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --admin-page-glow-indigo: radial-gradient(900px 420px at 8% -6%, rgba(79, 70, 229, 0.09), transparent 55%);
+  --admin-page-glow-sky: radial-gradient(700px 380px at 94% 2%, rgba(14, 165, 233, 0.07), transparent 50%);
+}
+
+.admin-hub {
+  background-color: var(--admin-bg);
+  background-image: var(--admin-page-glow-indigo), var(--admin-page-glow-sky);
+  min-height: calc(100vh - 80px);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--admin-text-main);
+}
+
+.admin-glass {
+  background: var(--admin-glass-bg);
+  backdrop-filter: blur(var(--admin-glass-blur));
+  -webkit-backdrop-filter: blur(var(--admin-glass-blur));
+  border: 1px solid var(--admin-glass-border);
+  box-shadow: var(--admin-glass-shadow);
+}
+
+.admin-hub .minimal-card,
+.admin-hub .audit-card {
+  background: var(--admin-glass-bg);
+  backdrop-filter: blur(var(--admin-glass-blur));
+  -webkit-backdrop-filter: blur(var(--admin-glass-blur));
+  border: 1px solid var(--admin-glass-border);
+  border-radius: 16px;
+  box-shadow: var(--admin-glass-shadow);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.admin-hub .minimal-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 28px rgba(79, 70, 229, 0.1);
+}
+
+.admin-hub .page-header {
+  padding: 32px 0;
+  border-bottom: 1px solid var(--admin-card-border);
+  margin-bottom: 40px;
+  background: var(--admin-glass-bg);
+  backdrop-filter: blur(var(--admin-glass-blur));
+  -webkit-backdrop-filter: blur(var(--admin-glass-blur));
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.admin-hub .kpi-icon-minimal {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.admin-hub .table-minimal {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+.admin-hub .table-minimal th {
+  background: rgba(241, 245, 249, 0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--admin-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--admin-card-border);
+}
+
+.admin-hub .table-minimal td {
+  padding: 16px;
+  border-bottom: 1px solid var(--admin-card-border);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.admin-hub .table-minimal tr:hover td {
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.admin-hub .table-minimal tr:last-child td:first-child {
+  border-bottom-left-radius: 12px;
+}
+
+.admin-hub .table-minimal tr:last-child td:last-child {
+  border-bottom-right-radius: 12px;
+}
+
+.admin-hub .modal-minimal .w3-modal-content {
+  background: var(--admin-glass-bg);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-radius: 16px;
+  border: 1px solid var(--admin-glass-border);
+  box-shadow: 0 25px 50px -12px rgba(79, 70, 229, 0.18);
+  overflow: hidden;
+}
+
+.admin-hub .search-input-minimal {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--admin-card-border);
+  border-radius: 10px;
+  padding: 8px 12px 8px 36px;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.admin-hub .search-input-minimal:focus {
+  outline: none;
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.admin-hub .btn-minimal {
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 8px 16px;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-hub .btn-minimal:active {
+  transform: translateY(1px);
+}
+
+/* Monitoring / logs shared glass panels */
+.admin-hub .dashboard-hero {
+  background: var(--admin-glass-bg);
+  backdrop-filter: blur(var(--admin-glass-blur));
+  -webkit-backdrop-filter: blur(var(--admin-glass-blur));
+  border: 1px solid var(--admin-glass-border);
+  box-shadow: var(--admin-glass-shadow);
+}
+
+.admin-hub .glass {
+  background: var(--admin-glass-bg);
+  backdrop-filter: blur(var(--admin-glass-blur));
+  -webkit-backdrop-filter: blur(var(--admin-glass-blur));
+  border: 1px solid var(--admin-glass-border);
+  box-shadow: var(--admin-glass-shadow);
+}
+
+.admin-hub .monitoring-container .stat-card,
+.admin-hub .monitoring-container .filters-section,
+.admin-hub .monitoring-container .data-section {
+  background: var(--admin-glass-bg);
+  backdrop-filter: blur(var(--admin-glass-blur));
+  -webkit-backdrop-filter: blur(var(--admin-glass-blur));
+  border-color: var(--admin-glass-border);
+}
+
+/* Audit log specifics */
+.admin-hub .audit-wrapper {
+  max-width: 1400px;
+  margin: 32px auto;
+  padding: 0 24px;
+}
+
+.admin-hub .audit-header h1 {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0;
+  color: #111827;
+}
+
+.admin-hub .audit-header p {
+  color: #6b7280;
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+/* Scrollbar */
+.admin-hub ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.admin-hub ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-hub ::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 4px;
+}
+
+.admin-hub ::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --admin-glass-bg: var(--admin-card-bg);
+    --admin-glass-blur: 0px;
+  }
+
+  .admin-hub .minimal-card,
+  .admin-hub .audit-card,
+  .admin-hub .page-header,
+  .admin-hub .modal-minimal .w3-modal-content,
+  .admin-hub .dashboard-hero,
+  .admin-hub .glass,
+  .admin-hub .monitoring-container .stat-card,
+  .admin-hub .monitoring-container .filters-section,
+  .admin-hub .monitoring-container .data-section {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--admin-card-bg);
+  }
+
+  .admin-hub .table-minimal th {
+    background: #f1f5f9;
+  }
+
+  .admin-hub .table-minimal td {
+    background: #fff;
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .admin-hub .minimal-card,
+  .admin-hub .audit-card,
+  .admin-hub .page-header,
+  .admin-hub .dashboard-hero,
+  .admin-hub .glass {
+    background: var(--admin-card-bg);
+  }
+}

@@ -717,6 +717,11 @@ def _backup_sqlite_database() -> dict[str, Any]:
     }
 
 
+def backup_app_database() -> dict[str, Any]:
+    """Public wrapper for SQLite backup before schema-studio DDL."""
+    return _backup_sqlite_database()
+
+
 def _check_web_migrations_enabled() -> dict[str, Any] | None:
     if not current_app.config.get('ALLOW_WEB_MIGRATIONS', True):
         return {
