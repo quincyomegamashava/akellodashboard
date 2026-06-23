@@ -818,8 +818,401 @@
     }
   }
 
+  async function fetchPortfolioExportDetail(ctx) {
+    const API = global.PM_API_BASE || '/api';
+    const params = new URLSearchParams();
+    if (ctx && ctx.programId) params.set('program_id', ctx.programId);
+    let health = ctx && ctx.health;
+    if (ctx && ctx.scope === 'at_risk') health = 'red';
+    else if (ctx && ctx.scope === 'executive_summary') {
+      params.set('executive_summary', '1');
+    }
+    else if (health) params.set('health', health);
+    const q = params.toString();
+    return pmApiGET(`${API}/pm/portfolio/export-detail${q ? '?' + q : ''}`);
+  }
+
+  function portfolioHealthRgb(health) {
+    if (health === 'red') return [220, 38, 38];
+    if (health === 'yellow') return [217, 119, 6];
+    return [5, 150, 105];
+  }
+
+  function portfolioProjectKpiLine(p) {
+    const parts = [
+      `${p.pct_complete}% complete`,
+      `${p.open_task_count || 0} open`,
+      `${p.overdue_count || 0} overdue`,
+      `${p.blocked_count || 0} blocked`,
+    ];
+    if (p.owner_name) parts.push(`Owner: ${p.owner_name}`);
+    if ((p.program_names || []).length) parts.push(`Programs: ${p.program_names.join(', ')}`);
+    return parts.join('  ·  ');
+  }
+
+  async function exportPortfolioPdf(detail, title, options) {
+    if (!global.jspdf || !global.jspdf.jsPDF) throw new Error('jsPDF not loaded');
+    const rows = detail || [];
+    const logo = await loadExportLogo();
+    const doc = new global.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const meta = {
+      title: title || 'Portfolio Executive Report',
+      generatedAt: new Date().toLocaleString(),
+      dateStr,
+      stats: pmPortfolioSummaryFromStats(rows),
+    };
+
+    // Cover page
+    drawPdfPageChrome(doc, logo, meta);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(...THEME.primary);
+    doc.text('Portfolio Executive Report', PDF_MARGINS.left, 70);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...THEME.text);
+    doc.text(`Generated ${meta.generatedAt}`, PDF_MARGINS.left, 82);
+    const sum = meta.stats;
+    let y = 96;
+    doc.text(`Portfolio overview: ${sum.total} projects — ${sum.red} at risk, ${sum.yellow} watch, ${sum.green} on track`, PDF_MARGINS.left, y);
+    y += 6;
+    doc.text(`Aggregate overdue tasks: ${sum.overdue}  |  Blocked tasks: ${sum.blocked}`, PDF_MARGINS.left, y);
+
+    // Summary table page
+    doc.addPage();
+    drawPdfPageChrome(doc, logo, meta);
+    y = 58;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Portfolio summary', PDF_MARGINS.left, y);
+    y += 4;
+    const tableBody = rows.map((s) => [
+      s.project_name || '',
+      (s.health || '').toUpperCase(),
+      s.owner_name || '—',
+      `${s.pct_complete}%`,
+      `${s.completed_tasks}/${s.total_tasks}`,
+      String(s.open_task_count || 0),
+      String(s.overdue_count || 0),
+      String(s.blocked_count || 0),
+      s.next_milestone ? truncateCell(`${s.next_milestone}${s.next_milestone_date ? ' (' + formatDate(s.next_milestone_date) + ')' : ''}`, 36) : '—',
+    ]);
+    if (doc.autoTable) {
+      doc.autoTable({
+        startY: y + 2,
+        head: [['Project', 'Health', 'Owner', '%', 'Done/Total', 'Open', 'Overdue', 'Blocked', 'Next milestone']],
+        body: tableBody,
+        styles: { fontSize: 7.5, cellPadding: 2 },
+        headStyles: { fillColor: THEME.primary },
+        margin: { left: PDF_MARGINS.left, right: PDF_MARGINS.right },
+      });
+    }
+
+    // Per-project detail pages
+    rows.forEach((p) => {
+      doc.addPage();
+      drawPdfPageChrome(doc, logo, { ...meta, title: p.project_name });
+      y = 58;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(...portfolioHealthRgb(p.health));
+      doc.text(p.project_name || 'Project', PDF_MARGINS.left, y);
+      doc.setFontSize(9);
+      doc.setTextColor(...THEME.muted);
+      doc.text((p.health || '').toUpperCase(), PDF_MARGINS.left + 2, y + 6);
+      y += 12;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(...THEME.text);
+      const kpiLines = doc.splitTextToSize(portfolioProjectKpiLine(p), 260);
+      doc.text(kpiLines, PDF_MARGINS.left, y);
+      y += kpiLines.length * 4 + 4;
+
+      if ((p.milestones || []).length) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.text('Milestones', PDF_MARGINS.left, y);
+        y += 3;
+        if (doc.autoTable) {
+          doc.autoTable({
+            startY: y,
+            head: [['Milestone', 'Due date', 'Linked tasks']],
+            body: (p.milestones || []).map((m) => [
+              m.title || '',
+              m.due_date ? formatDate(m.due_date) : '—',
+              String((m.task_ids || []).length),
+            ]),
+            styles: { fontSize: 7.5 },
+            headStyles: { fillColor: [99, 102, 241] },
+            margin: { left: PDF_MARGINS.left, right: PDF_MARGINS.right },
+          });
+          y = doc.lastAutoTable.finalY + 6;
+        }
+      }
+
+      if ((p.columns || []).length) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.text('Workflow by column', PDF_MARGINS.left, y);
+        y += 3;
+        if (doc.autoTable) {
+          doc.autoTable({
+            startY: y,
+            head: [['Column', 'Tasks']],
+            body: (p.columns || []).map((c) => [c.title || '', String(c.count || 0)]),
+            styles: { fontSize: 7.5 },
+            headStyles: { fillColor: THEME.muted },
+            margin: { left: PDF_MARGINS.left, right: PDF_MARGINS.right },
+          });
+          y = doc.lastAutoTable.finalY + 6;
+        }
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('All tasks — status & timeline', PDF_MARGINS.left, y);
+      y += 3;
+      const taskBody = (p.tasks || []).map((t) => [
+        truncateCell(t.title, 42),
+        t.column || '',
+        t.status || '',
+        `${t.progress != null ? t.progress : 0}%`,
+        t.priority || '',
+        t.start_date ? formatDate(t.start_date) : '—',
+        t.end_date ? formatDate(t.end_date) : '—',
+        (t.assignees || []).join(', ') || 'Unassigned',
+      ]);
+      if (doc.autoTable && taskBody.length) {
+        doc.autoTable({
+          startY: y,
+          head: [['Task', 'Column', 'Status', '%', 'Priority', 'Start', 'Due', 'Assignees']],
+          body: taskBody,
+          styles: { fontSize: 6.5, cellPadding: 1.5 },
+          headStyles: { fillColor: THEME.primary },
+          margin: { left: PDF_MARGINS.left, right: PDF_MARGINS.right },
+          didParseCell: (data) => {
+            if (data.section === 'body' && data.column.index === 2) {
+              const st = String(data.cell.raw || '');
+              if (st === 'Overdue') data.cell.styles.textColor = [220, 38, 38];
+              else if (st === 'Blocked') data.cell.styles.textColor = [217, 119, 6];
+              else if (st === 'Complete') data.cell.styles.textColor = [5, 150, 105];
+            }
+          },
+        });
+      } else if (!taskBody.length) {
+        doc.setFontSize(8);
+        doc.setTextColor(...THEME.muted);
+        doc.text('No tasks in this project.', PDF_MARGINS.left, y + 4);
+      }
+    });
+
+    doc.save(`portfolio-executive-${dateStr}.pdf`);
+  }
+
+  function pmPortfolioSummaryFromStats(stats) {
+    const s = stats || [];
+    return {
+      total: s.length,
+      red: s.filter((x) => x.health === 'red').length,
+      yellow: s.filter((x) => x.health === 'yellow').length,
+      green: s.filter((x) => x.health === 'green').length,
+      overdue: s.reduce((n, x) => n + (x.overdue_count || 0), 0),
+      blocked: s.reduce((n, x) => n + (x.blocked_count || 0), 0),
+    };
+  }
+
+  function buildPortfolioExcelRows(detail, scope) {
+    const rows = detail || [];
+    const summary = [
+      ['Portfolio Executive Report'],
+      ['Generated', new Date().toLocaleString()],
+      ['Projects', rows.length],
+      [],
+      ['Project', 'Health', 'Owner', 'Type', '% Complete', 'Done/Total', 'Open', 'Overdue', 'Blocked', 'Next milestone', 'Milestone date', 'Programs'],
+    ];
+    const summaryData = rows.map((s) => [
+      s.project_name, s.health, s.owner_name || '', s.project_type, s.pct_complete,
+      `${s.completed_tasks}/${s.total_tasks}`, s.open_task_count || 0, s.overdue_count, s.blocked_count,
+      s.next_milestone || '', s.next_milestone_date ? formatDate(s.next_milestone_date) : '',
+      (s.program_names || []).join(', '),
+    ]);
+    const allTasks = [['Project', 'Task', 'Column', 'Status', 'Progress', 'Priority', 'Start', 'Due', 'Assignees']];
+    const schedule = [['Project', 'Task', 'Column', 'Status', 'Start', 'Due', 'Days est.', 'Assignees']];
+    const milestones = [['Project', 'Milestone', 'Due date', 'Linked tasks']];
+    const overdue = [['Project', 'Task', 'Column', 'Due', 'Assignees', 'Progress']];
+    rows.forEach((p) => {
+      (p.milestones || []).forEach((m) => {
+        milestones.push([p.project_name, m.title, m.due_date ? formatDate(m.due_date) : '', (m.task_ids || []).length]);
+      });
+      (p.tasks || []).forEach((t) => {
+        allTasks.push([
+          p.project_name, t.title, t.column, t.status, `${t.progress}%`, t.priority,
+          t.start_date ? formatDate(t.start_date) : '',
+          t.end_date ? formatDate(t.end_date) : '',
+          (t.assignees || []).join(', '),
+        ]);
+        if (t.status === 'Overdue') {
+          overdue.push([p.project_name, t.title, t.column, formatDate(t.end_date), (t.assignees || []).join(', '), `${t.progress}%`]);
+        }
+        if (t.start_date && t.end_date) {
+          schedule.push([
+            p.project_name, t.title, t.column, t.status,
+            formatDate(t.start_date), formatDate(t.end_date), '', (t.assignees || []).join(', '),
+          ]);
+        }
+      });
+    });
+    return {
+      summary: summary.concat(summaryData),
+      allTasks,
+      schedule,
+      milestones,
+      overdue,
+    };
+  }
+
+  async function exportPortfolioExcel(detail, options) {
+    const sheets = buildPortfolioExcelRows(detail, (options || {}).scope);
+    if (typeof XLSX === 'undefined') throw new Error('SheetJS not loaded');
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheets.summary), 'Summary');
+    if ((options || {}).scope !== 'executive_summary') {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheets.allTasks), 'All tasks');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheets.schedule), 'Timeline');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheets.overdue), 'Overdue');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheets.milestones), 'Milestones');
+    }
+    XLSX.writeFile(wb, `portfolio-executive-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
+  async function exportPortfolioPptx(detail, title, options) {
+    const PptxGenJS = global.PptxGenJS;
+    if (!PptxGenJS) throw new Error('PptxGenJS not loaded');
+    const rows = detail || [];
+    const sum = pmPortfolioSummaryFromStats(rows);
+    const pptx = new PptxGenJS();
+    pptx.author = 'Akello PM';
+    const titleSlide = pptx.addSlide();
+    titleSlide.addText(title || 'Portfolio Executive Report', { x: 0.5, y: 1.0, w: 9, fontSize: 28, color: '00407D', bold: true });
+    titleSlide.addText(`Generated ${new Date().toLocaleString()}`, { x: 0.5, y: 2.0, fontSize: 12, color: '64748B' });
+    titleSlide.addText(
+      `${sum.total} projects  ·  ${sum.red} at risk  ·  ${sum.yellow} watch  ·  ${sum.green} on track`,
+      { x: 0.5, y: 2.5, w: 9, fontSize: 14, color: '334155' }
+    );
+
+    const sumSlide = pptx.addSlide();
+    sumSlide.addText('Portfolio summary', { x: 0.5, y: 0.35, fontSize: 20, color: '00407D', bold: true });
+    const sumRows = [
+      [{ text: 'Project', options: { bold: true, fill: '00407D', color: 'FFFFFF' } }, 'Health', 'Owner', '%', 'Open', 'Overdue', 'Blocked'],
+      ...rows.slice(0, 14).map((s) => [
+        s.project_name,
+        (s.health || '').toUpperCase(),
+        s.owner_name || '—',
+        `${s.pct_complete}%`,
+        String(s.open_task_count || 0),
+        String(s.overdue_count || 0),
+        String(s.blocked_count || 0),
+      ]),
+    ];
+    sumSlide.addTable(sumRows, { x: 0.3, y: 1.0, w: 9.2, fontSize: 10, border: { pt: 0.5, color: 'E2E8F0' } });
+
+    rows.forEach((p) => {
+      const hdr = pptx.addSlide();
+      const hColor = p.health === 'red' ? 'DC2626' : (p.health === 'yellow' ? 'D97706' : '059669');
+      hdr.addText(p.project_name, { x: 0.5, y: 0.4, fontSize: 24, color: hColor, bold: true });
+      hdr.addText(portfolioProjectKpiLine(p), { x: 0.5, y: 1.2, w: 9, fontSize: 11, color: '475569' });
+      if ((p.milestones || []).length) {
+        hdr.addText(
+          'Milestones: ' + (p.milestones || []).map((m) => `${m.title} (${m.due_date ? formatDate(m.due_date) : 'no date'})`).join(' · '),
+          { x: 0.5, y: 2.0, w: 9, fontSize: 10, color: '6366F1' }
+        );
+      }
+
+      const tasks = p.tasks || [];
+      for (let i = 0; i < tasks.length; i += 10) {
+        const chunk = tasks.slice(i, i + 10);
+        const sl = pptx.addSlide();
+        sl.addText(`${p.project_name} — tasks (${i + 1}–${i + chunk.length} of ${tasks.length})`, {
+          x: 0.4, y: 0.3, w: 9.2, fontSize: 14, color: '00407D', bold: true,
+        });
+        const tRows = [
+          [{ text: 'Task', options: { bold: true, fill: '00407D', color: 'FFFFFF' } }, 'Column', 'Status', 'Due', 'Assignees'],
+          ...chunk.map((t) => [
+            truncateCell(t.title, 48),
+            t.column || '',
+            t.status || '',
+            t.end_date ? formatDate(t.end_date) : '—',
+            truncateCell((t.assignees || []).join(', ') || 'Unassigned', 28),
+          ]),
+        ];
+        sl.addTable(tRows, { x: 0.3, y: 0.9, w: 9.2, fontSize: 9, border: { pt: 0.5, color: 'E2E8F0' } });
+      }
+    });
+
+    await pptx.writeFile({ fileName: `portfolio-executive-${new Date().toISOString().slice(0, 10)}.pptx` });
+  }
+
+  async function runPortfolioExport({ format, detail, scope, title, ctx }) {
+    let payload = detail;
+    if (!payload) {
+      payload = await fetchPortfolioExportDetail({ ...(ctx || {}), scope: scope || 'all' });
+    }
+    const options = { scope: scope || 'all' };
+    if (format === 'pdf') return exportPortfolioPdf(payload, title, options);
+    if (format === 'xlsx') return exportPortfolioExcel(payload, options);
+    if (format === 'pptx') return exportPortfolioPptx(payload, title, options);
+    throw new Error('Unknown format');
+  }
+
+  function wirePortfolioExportModal(getContext) {
+    const btn = document.getElementById('pmPortfolioExportBtn');
+    const backdrop = document.getElementById('pmPortfolioExportBackdrop');
+    const cancel = document.getElementById('pmPortfolioExportCancel');
+    const confirm = document.getElementById('pmPortfolioExportConfirm');
+    if (!btn || !backdrop) return;
+    const open = () => { backdrop.classList.remove('hidden'); backdrop.setAttribute('aria-hidden', 'false'); };
+    const close = () => { backdrop.classList.add('hidden'); backdrop.setAttribute('aria-hidden', 'true'); };
+    btn.onclick = open;
+    if (cancel) cancel.onclick = close;
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    if (confirm) {
+      confirm.onclick = async () => {
+        const formatEl = document.querySelector('input[name="pm-portfolio-format"]:checked');
+        const scopeEl = document.querySelector('input[name="pm-portfolio-scope"]:checked');
+        const format = formatEl ? formatEl.value : 'pdf';
+        const scope = scopeEl ? scopeEl.value : 'all';
+        const ctx = typeof getContext === 'function' ? getContext() : {};
+        confirm.disabled = true;
+        const prevText = confirm.textContent;
+        confirm.textContent = 'Preparing…';
+        try {
+          await runPortfolioExport({
+            format,
+            scope,
+            title: 'Portfolio Executive Report',
+            ctx: {
+              programId: ctx.programId || null,
+              health: ctx.health || null,
+              scope,
+            },
+          });
+          close();
+        } catch (e) {
+          alert(e.message || e);
+        } finally {
+          confirm.disabled = false;
+          confirm.textContent = prevText;
+        }
+      };
+    }
+  }
+
   global.PmExport = {
     runExport,
+    exportPortfolioPdf,
+    runPortfolioExport,
+    wirePortfolioExportModal,
     openExportModal,
     closeExportModal,
     wireExportModal,

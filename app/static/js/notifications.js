@@ -1,10 +1,10 @@
-// Notification system
+/**
+ * Notification system — includes PM deep links.
+ */
 document.addEventListener('DOMContentLoaded', function () {
     loadNotificationCount();
-    // Refresh every 30 seconds
     setInterval(loadNotificationCount, 30000);
 
-    // Close dropdown when clicking outside
     document.addEventListener('click', function (e) {
         const container = document.getElementById('notificationBadgeContainer');
         const dropdown = document.getElementById('notificationsDropdown');
@@ -14,13 +14,33 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Attach toggle function to global scope so onclick works
     window.toggleNotificationsDropdown = toggleNotificationsDropdown;
     window.markNotificationRead = markNotificationRead;
 });
 
 let notificationDropdownOpen = false;
 window.notificationDropdownOpen = false;
+
+function pmNotificationIcon(type) {
+    if (type === 'pm_assignment') return 'user-plus';
+    if (type === 'pm_mention') return 'at';
+    if (type === 'pm_comment') return 'comment';
+    if (type === 'pm_due_soon') return 'clock-o';
+    if (type && type.startsWith('sm_')) return 'bullhorn';
+    if (type && type.startsWith('meeting_')) return 'clipboard-list';
+    if (type === 'assignment') return 'user-plus';
+    if (type === 'resolution') return 'check-circle';
+    return 'bell';
+}
+
+function pmNotificationHref(notif) {
+    const t = notif.notification_type || '';
+    if (t.startsWith('pm_') && notif.pm_project_id && notif.task_id) {
+        return `/projectmanagement?project=${notif.pm_project_id}&task=${notif.task_id}`;
+    }
+    if (notif.query_id) return `/help-desk?query=${notif.query_id}`;
+    return null;
+}
 
 async function loadNotificationCount() {
     try {
@@ -61,12 +81,17 @@ async function loadNotifications() {
         if (notifications.length === 0) {
             listDiv.innerHTML = '<div class="px-4 py-8 text-center text-slate-500">No notifications</div>';
         } else {
-            listDiv.innerHTML = notifications.map(notif => `
-        <div class="px-4 py-3 hover:bg-slate-50 border-b border-slate-100 cursor-pointer ${notif.read ? '' : 'bg-blue-50'}" 
-             onclick="markNotificationRead(${notif.id})">
+            listDiv.innerHTML = notifications.map(notif => {
+                const href = pmNotificationHref(notif);
+                const icon = pmNotificationIcon(notif.notification_type);
+                const click = href
+                    ? `onclick="handleNotificationClick(${notif.id}, '${href.replace(/'/g, "\\'")}')"`
+                    : `onclick="markNotificationRead(${notif.id})"`;
+                return `
+        <div class="px-4 py-3 hover:bg-slate-50 border-b border-slate-100 cursor-pointer ${notif.read ? '' : 'bg-blue-50'}" ${click}>
           <div class="flex items-start gap-3">
             <div class="flex-shrink-0 mt-1">
-              <i class="fa fa-${notif.notification_type === 'assignment' ? 'user-plus' : notif.notification_type && notif.notification_type.startsWith('sm_') ? 'bullhorn' : notif.notification_type && notif.notification_type.startsWith('meeting_') ? 'clipboard-list' : 'check-circle'} text-indigo-600"></i>
+              <i class="fa fa-${icon} text-indigo-600"></i>
             </div>
             <div class="flex-grow min-w-0">
               <p class="text-sm text-slate-900 ${notif.read ? '' : 'font-semibold'}">${escapeHtml(notif.message)}</p>
@@ -74,13 +99,23 @@ async function loadNotifications() {
             </div>
             ${!notif.read ? '<div class="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2"></div>' : ''}
           </div>
-        </div>
-      `).join('');
+        </div>`;
+            }).join('');
         }
     } catch (error) {
         console.error('Error loading notifications:', error);
         const listDiv = document.getElementById('notificationsList');
         if (listDiv) listDiv.innerHTML = '<div class="px-4 py-8 text-center text-red-500">Error loading notifications</div>';
+    }
+}
+
+async function handleNotificationClick(notificationId, href) {
+    try {
+        await fetch(`/api/notifications/${notificationId}/read`, { method: 'PATCH' });
+        loadNotificationCount();
+        if (href) window.location.href = href;
+    } catch (error) {
+        console.error('Error handling notification click:', error);
     }
 }
 
@@ -117,3 +152,5 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+window.handleNotificationClick = handleNotificationClick;

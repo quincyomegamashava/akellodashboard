@@ -279,6 +279,28 @@ def refresh_meeting_report_email_schedule(app):
     logger.info("Meeting report email scheduler set to %02d:%02d", hour, minute)
 
 
+def _scheduled_pm_due_soon(app):
+    with app.app_context():
+        try:
+            from app.pm_service import run_pm_due_soon_job
+            n = run_pm_due_soon_job()
+            if n:
+                logger.info("PM due-soon job: created %d notification(s)", n)
+        except Exception as e:
+            logger.exception("PM due-soon scheduler job failed: %s", e)
+
+
+def _scheduled_pm_stats_snapshot(app):
+    with app.app_context():
+        try:
+            from app.pm_service import run_pm_stats_snapshot_job
+            n = run_pm_stats_snapshot_job()
+            if n:
+                logger.info("PM stats snapshot job: captured %d project(s)", n)
+        except Exception as e:
+            logger.exception("PM stats snapshot scheduler job failed: %s", e)
+
+
 def start_scheduler(app):
     """
     Start the background scheduler with a 60-second email fetch job.
@@ -311,6 +333,25 @@ def start_scheduler(app):
         hour=8,
         minute=0,
         id="weekly_hub_digest",
+    )
+    _scheduler.add_job(
+        func=_scheduled_pm_due_soon,
+        args=[app],
+        trigger="cron",
+        hour=8,
+        minute=0,
+        id="pm_due_soon_notifications",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        func=_scheduled_pm_stats_snapshot,
+        args=[app],
+        trigger="cron",
+        day_of_week="mon",
+        hour=7,
+        minute=0,
+        id="pm_stats_snapshot_weekly",
+        replace_existing=True,
     )
     with app.app_context():
         refresh_revenue_report_schedule(app)

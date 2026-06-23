@@ -5,6 +5,19 @@
   <script src="{{ url_for('static', filename='js/pm/pm-api.js') }}"></script>
   <script src="{{ url_for('static', filename='js/pm/pm-url.js') }}"></script>
   <script src="{{ url_for('static', filename='js/pm/pm-board.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-capabilities.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-labels.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-dependencies.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-bulk.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-custom-fields.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-search.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-collab.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-activity.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-mentions.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-milestones.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-baselines.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-admin.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-portfolio.js') }}"></script>
   <script src="{{ url_for('static', filename='js/vendor/pptxgen.bundle.js') }}"></script>
   <script src="{{ url_for('static', filename='js/pm/pm-export.js') }}"></script>
 
@@ -61,7 +74,9 @@
 
     /* Searchable assignee picker */
     .pm-assignee-picker { position: relative; }
-    .pm-assignee-picker--compact .pm-assignee-search-input { font-size: 0.75rem; padding: 0.35rem 0.5rem; }
+    .pm-assignee-picker--compact .pm-assignee-search-input { font-size: 0.8125rem; padding: 0.45rem 0.6rem; min-height: 2.25rem; }
+    .pm-assignee-picker--compact .pm-assignee-results { max-height: 14rem; }
+    .pm-assignee-picker--compact .pm-assignee-result-item { padding: 0.5rem 0.75rem; }
     .pm-assignee-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; min-height: 1.5rem; margin-bottom: 0.5rem; }
     .pm-assignee-chip {
       display: inline-flex; align-items: center; gap: 0.25rem;
@@ -129,9 +144,73 @@
     .pm-priority-medium { color: #d97706; }
     .pm-priority-low { color: #6b7280; }
     .pm-label-chip { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 9999px; color: #fff; margin-right: 0.25rem; }
+    .pm-mention { font-weight: 600; color: #4338ca; }
+    .gantt-bar.is-blocked { outline: 2px solid #f59e0b; outline-offset: 1px; }
+    .gantt-bar.baseline-ok { box-shadow: inset 0 -3px 0 #22c55e; }
+    .gantt-bar.baseline-late { box-shadow: inset 0 -3px 0 #ef4444; }
+    .gantt-bar.baseline-none { opacity: 0.85; }
+    .gantt-bar.gantt-critical { outline: 2px solid #1e293b; outline-offset: 1px; }
+    #pmGlobalSearchResults { position: absolute; z-index: 50; top: 100%; left: 0; right: 0; max-height: 16rem; overflow-y: auto; background: #fff; border: 1px solid #e4e4e7; border-radius: 0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    #pmBulkBar { position: sticky; top: 0; z-index: 20; }
+
+    /* Board column header — title + actions on separate rows */
+    .column-header { margin-bottom: 0.5rem; }
+    .column-header-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #27272a;
+      line-height: 1.3;
+      word-break: break-word;
+      margin: 0 0 0.375rem;
+    }
+    .column-header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      align-items: center;
+    }
+    .column-btn {
+      font-size: 0.6875rem;
+      line-height: 1;
+      padding: 0.3rem 0.45rem;
+      border-radius: 0.375rem;
+      border: 1px solid #e4e4e7;
+      background: #fff;
+      color: #52525b;
+      white-space: nowrap;
+    }
+    .column-btn:hover { background: #fafafa; }
+    .column-btn--icon {
+      width: 1.625rem;
+      height: 1.625rem;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+    }
+    .column-btn--danger { color: #dc2626; }
+    .column-btn--danger:hover { background: #fef2f2; }
 
     kbd.pm-kbd { font-size: 0.65rem; padding: 0.1rem 0.35rem; border: 1px solid #d4d4d8; border-radius: 0.25rem; background: #fafafa; }
     .pm-subtask-body { padding: 0.75rem; display: grid; gap: 0.75rem; }
+    .pm-subtask-assignee-mount { min-height: 4.5rem; overflow: visible; }
+    .pm-subtask-assignees-field {
+      min-height: 5.5rem;
+      padding-bottom: 0.75rem;
+      overflow: visible;
+      position: relative;
+    }
+    #pm-subtask-assignees-wrap {
+      min-height: 4.5rem;
+      overflow: visible;
+    }
+    #pm-subtask-assignees-wrap .pm-assignee-results,
+    .pm-subtask-assignee-mount .pm-assignee-results {
+      max-height: 14rem;
+      z-index: 60;
+    }
+    .pm-subtask-acc[open] { overflow: visible; }
     .pm-subtask-pill {
       font-size: 0.6875rem; padding: 0.1rem 0.45rem; border-radius: 9999px;
       background: #f4f4f5; color: #52525b; white-space: nowrap;
@@ -170,7 +249,7 @@
     #modalBackdrop.task-details-modal #modalContent {
       width: min(80vw, 56rem);
       max-width: min(80vw, 56rem);
-      max-height: 60vh;
+      max-height: 80vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -891,7 +970,17 @@
         </div>
 
         <div class="header-actions flex flex-wrap items-center gap-2 justify-end">
+          <div class="relative min-w-[10rem] max-w-xs flex-1">
+            <input type="search" id="pmGlobalSearch" class="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm" placeholder="Search all tasks…" aria-label="Search all tasks" />
+            <div id="pmGlobalSearchResults" class="hidden"></div>
+          </div>
+          <a href="{{ url_for('pm_portfolio_page') }}" class="text-sm text-indigo-600 hover:underline shrink-0">Portfolio</a>
           <select id="projectSelect" class="min-w-[180px] max-w-[min(100%,280px)] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"></select>
+          <span id="pmReadOnlyBadge" class="hidden text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5 shrink-0">View only</span>
+          <label id="pmSubscribeWrap" class="hidden text-xs text-zinc-600 flex items-center gap-1.5 shrink-0 cursor-pointer">
+            <input type="checkbox" id="pmSubscribeToggle" class="rounded border-zinc-300" />
+            <span>Notify me</span>
+          </label>
 
           <button id="pmExportBtn" type="button" class="hidden items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-700 transition-colors" title="Export project report" aria-label="Export project report">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
@@ -945,6 +1034,7 @@
           <button type="button" id="tab-gantt" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-gantt">Schedule</button>
           <button type="button" id="tab-calendar" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-calendar">Calendar</button>
           <button type="button" id="tab-documents" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-documents">Documents</button>
+          <button type="button" id="tab-activity" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-activity">Activity</button>
         </div>
       </div>
 
@@ -956,11 +1046,33 @@
             <input type="search" id="pmBoardSearch" placeholder="Search tasks…" class="min-w-[10rem] flex-1 max-w-xs" aria-label="Search tasks" />
             <select id="pmBoardFilterColumn" aria-label="Filter by column"><option value="">All columns</option></select>
             <select id="pmBoardFilterAssignee" aria-label="Filter by assignee"><option value="">All assignees</option></select>
+            <select id="pmBoardFilterLabel" aria-label="Filter by label"><option value="">All labels</option></select>
+            <select id="pmSavedViewsSelect" aria-label="Saved views" class="text-xs border border-zinc-200 rounded px-2 py-1"><option value="">Saved views…</option></select>
+            <button type="button" id="pmSaveViewBtn" class="text-xs text-indigo-600 hover:underline">Save view</button>
+            <button type="button" id="pmBulkToggleBtn" class="text-xs border border-zinc-200 rounded px-2 py-1 hover:bg-zinc-50">Select</button>
+            <button type="button" id="pmManageLabelsBtn" class="text-xs text-indigo-600 hover:underline">Labels</button>
             <label class="text-xs text-zinc-600 flex items-center gap-1"><input type="checkbox" id="pmBoardFilterMine" /> My tasks</label>
             <label class="text-xs text-zinc-600 flex items-center gap-1"><input type="checkbox" id="pmBoardFilterSubtasks" /> Has sub-tasks</label>
             <label class="text-xs text-zinc-600 flex items-center gap-1"><input type="checkbox" id="pmBoardFilterFiles" /> Has files</label>
             <button type="button" id="pmBoardViewToggle" class="text-xs px-2 py-1 border border-zinc-200 rounded-lg md:hidden" title="Toggle stacked view">Stack</button>
             <button type="button" id="pmShortcutsHelp" class="text-xs px-2 py-1 border border-zinc-200 rounded-lg text-zinc-500" title="Keyboard shortcuts">?</button>
+          </div>
+          <div id="pmBulkBar" class="hidden flex flex-wrap items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-sm">
+            <span><span id="pmBulkCount">0</span> selected</span>
+            <select id="pmBulkMoveCol" class="text-xs border rounded px-2 py-1"><option value="">Move to…</option></select>
+            <select id="pmBulkPriority" class="text-xs border rounded px-2 py-1">
+              <option value="">Set priority…</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+            <select id="pmBulkAssignee" class="text-xs border rounded px-2 py-1 max-w-[10rem]"><option value="">Assign to…</option></select>
+            <input type="date" id="pmBulkDueDate" class="text-xs border rounded px-2 py-1" title="Set due date" />
+            <button type="button" id="pmBulkDueBtn" class="text-xs border rounded px-2 py-1">Set due</button>
+            <select id="pmBulkLabel" class="text-xs border rounded px-2 py-1 max-w-[8rem]"><option value="">Add label…</option></select>
+            <button type="button" id="pmBulkDeleteBtn" class="text-xs text-red-600">Delete</button>
+            <button type="button" id="pmBulkCancelBtn" class="text-xs text-zinc-600">Cancel</button>
           </div>
           <p class="text-sm text-zinc-500 mb-3">Drag columns and cards. Add tasks from each column. <span class="hidden sm:inline text-xs text-zinc-400">Shortcuts: <kbd class="pm-kbd">/</kbd> search <kbd class="pm-kbd">Esc</kbd> close</span></p>
           <div id="board" class="board flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-zinc-100/50 flex-1 min-h-[280px]"></div>
@@ -972,6 +1084,16 @@
             <div>
               <h2 class="text-lg font-semibold text-zinc-900">Open Tasks</h2>
               <p class="text-sm text-zinc-500 mt-1">Tasks that are not yet 100% complete.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 mb-3">
+              <select id="pmIncompleteFilterAssignee" class="text-xs border border-zinc-200 rounded-lg px-2 py-1.5 bg-white">
+                <option value="">All assignees</option>
+              </select>
+              <select id="pmIncompleteFilterMilestone" class="text-xs border border-zinc-200 rounded-lg px-2 py-1.5 bg-white">
+                <option value="">All milestones</option>
+              </select>
+              <label class="text-xs flex items-center gap-1"><input type="checkbox" id="pmIncompleteFilterOverdue" /> Overdue only</label>
+              <label class="text-xs flex items-center gap-1"><input type="checkbox" id="pmIncompleteFilterBlocked" /> Blocked only</label>
             </div>
             <div class="rounded-xl border border-zinc-200 bg-white overflow-hidden">
               <div class="p-4 overflow-auto max-h-[min(70vh,100%)]">
@@ -1020,8 +1142,14 @@
                 <option value="assignee">Assignee</option>
               </select>
               <button type="button" id="ganttFitBtn" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50">Scroll to start</button>
+              <button type="button" id="pmBaselineSaveBtn" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50">Save baseline</button>
+              <select id="pmBaselineSelect" class="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm bg-white max-w-[12rem]"><option value="">Compare to baseline…</option></select>
             </div>
           </div>
+          <details class="mb-3 rounded-lg border border-zinc-200 bg-white">
+            <summary class="px-3 py-2 text-sm font-medium text-zinc-700 cursor-pointer">Milestones</summary>
+            <div id="pmMilestonesMount" class="px-3 pb-3"></div>
+          </details>
           <div id="ganttDescPreview" class="mb-3 overflow-hidden" aria-live="polite">
             <div class="px-3 py-2 border-b border-zinc-100 bg-zinc-50/80">
               <span class="gantt-desc-preview__label">Description preview</span>
@@ -1067,6 +1195,27 @@
               <p class="text-sm text-zinc-500 mt-1">Tasks with attachments in this project.</p>
             </div>
             <div id="documentsPanelBody" class="rounded-xl border border-zinc-200 bg-white overflow-hidden"></div>
+          </div>
+        </div>
+
+        <div id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" class="hidden flex-1 flex-col min-h-0 overflow-auto" aria-hidden="true">
+          <div class="space-y-4">
+            <div>
+              <h2 class="text-lg font-semibold text-zinc-900">Project activity</h2>
+              <p class="text-sm text-zinc-500 mt-1">Recent changes across this project.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <select id="pmActivityFilterActor" class="text-sm border border-zinc-200 rounded-lg px-2 py-1.5 bg-white"><option value="">All actors</option></select>
+              <select id="pmActivityFilterAction" class="text-sm border border-zinc-200 rounded-lg px-2 py-1.5 bg-white">
+                <option value="">All actions</option>
+                <option value="created">created</option>
+                <option value="moved">moved</option>
+                <option value="comment">comment</option>
+                <option value="dependency">dependency</option>
+                <option value="updated">updated</option>
+              </select>
+            </div>
+            <div id="pmActivityFeed" class="rounded-xl border border-zinc-200 bg-white min-h-[320px]"></div>
           </div>
         </div>
 
@@ -1179,9 +1328,11 @@ let colorMode = 'column'; // 'column' | 'assignee'
 let colorMaps = { column: {}, assignee: {} };
 let ganttFilterOwner = ''; // '' = All
 let ganttDueFilter = 'all'; // all | week | month
-let pmBoardFilters = { q: '', column: '', assignee: '', mine: false, subtasks: false, files: false };
+let pmBoardFilters = { q: '', column: '', assignee: '', label: '', mine: false, subtasks: false, files: false };
 let pmPendingDeepLinkTask = null;
 let pmAllProjectsList = [];
+let pmProgramsSidebarCache = null;
+let pmIncompleteFilters = { assignee: '', milestone: '', overdue: false, blocked: false };
 let pmProjectLabelsCache = [];
 
 function pmUpdateUrl() {
@@ -1229,6 +1380,11 @@ function pmTaskMatchesBoardFilters(task, col) {
   }
   if (f.subtasks && !(task.subtask_total > 0)) return false;
   if (f.files && !(task.attachments && task.attachments.length)) return false;
+  if (f.label) {
+    const lids = (task.labels || []).map((l) => String(l.id));
+    const lnames = (task.labels || []).map((l) => l.name);
+    if (!lids.includes(String(f.label)) && !lnames.includes(f.label)) return false;
+  }
   return true;
 }
 
@@ -1259,9 +1415,11 @@ function pmApplyBoardFilters() {
 function pmPopulateBoardFilterDropdowns(boardData) {
   const colSel = $('pmBoardFilterColumn');
   const asgSel = $('pmBoardFilterAssignee');
+  const lblSel = $('pmBoardFilterLabel');
   if (!colSel || !asgSel) return;
   const prevCol = colSel.value;
   const prevAsg = asgSel.value;
+  const prevLbl = lblSel ? lblSel.value : '';
   colSel.innerHTML = '<option value="">All columns</option>';
   (boardData?.columns || []).forEach((c) => {
     colSel.appendChild(new Option(c.title || `Column ${c.id}`, String(c.id)));
@@ -1274,12 +1432,27 @@ function pmPopulateBoardFilterDropdowns(boardData) {
   Array.from(nameSet).sort().forEach((n) => asgSel.appendChild(new Option(n, n)));
   if (prevCol && Array.from(colSel.options).some((o) => o.value === prevCol)) colSel.value = prevCol;
   if (prevAsg && Array.from(asgSel.options).some((o) => o.value === prevAsg)) asgSel.value = prevAsg;
+  if (lblSel) {
+    lblSel.innerHTML = '<option value="">All labels</option>';
+    (window.pmProjectLabels || []).forEach((lb) => {
+      lblSel.appendChild(new Option(lb.name, String(lb.id)));
+    });
+    if (prevLbl && Array.from(lblSel.options).some((o) => o.value === prevLbl)) lblSel.value = prevLbl;
+  }
+  const bulkCol = $('pmBulkMoveCol');
+  if (bulkCol) {
+    bulkCol.innerHTML = '<option value="">Move to…</option>';
+    (boardData?.columns || []).forEach((c) => {
+      bulkCol.appendChild(new Option(c.title, String(c.id)));
+    });
+  }
 }
 
 function pmWireBoardFilters() {
   const search = $('pmBoardSearch');
   const colSel = $('pmBoardFilterColumn');
   const asgSel = $('pmBoardFilterAssignee');
+  const lblSel = $('pmBoardFilterLabel');
   const mine = $('pmBoardFilterMine');
   const sub = $('pmBoardFilterSubtasks');
   const files = $('pmBoardFilterFiles');
@@ -1287,6 +1460,7 @@ function pmWireBoardFilters() {
     pmBoardFilters.q = search ? search.value : '';
     pmBoardFilters.column = colSel ? colSel.value : '';
     pmBoardFilters.assignee = asgSel ? asgSel.value : '';
+    pmBoardFilters.label = lblSel ? lblSel.value : '';
     pmBoardFilters.mine = mine ? mine.checked : false;
     pmBoardFilters.subtasks = sub ? sub.checked : false;
     pmBoardFilters.files = files ? files.checked : false;
@@ -1294,7 +1468,7 @@ function pmWireBoardFilters() {
     pmApplyBoardFilters();
   };
   if (search) search.oninput = pmDebounce ? pmDebounce(sync, 200) : sync;
-  [colSel, asgSel, mine, sub, files].forEach((el) => { if (el) el.onchange = sync; });
+  [colSel, asgSel, lblSel, mine, sub, files].forEach((el) => { if (el) el.onchange = sync; });
   if (search) search.value = pmBoardFilters.q || '';
   if (mine) mine.checked = !!pmBoardFilters.mine;
   if (sub) sub.checked = !!pmBoardFilters.subtasks;
@@ -1305,16 +1479,74 @@ async function pmRefreshIncompleteView() {
   if (lastBoardData) renderIncompleteTasks(lastBoardData);
 }
 
+function pmPopulateIncompleteFilterDropdowns(boardData) {
+  const aSel = $('pmIncompleteFilterAssignee');
+  const mSel = $('pmIncompleteFilterMilestone');
+  if (aSel) {
+    const names = new Set();
+    (boardData?.columns || []).forEach((col) => {
+      (col.tasks || []).forEach((t) => {
+        (t.assignees || []).forEach((a) => { if (a.name) names.add(a.name); });
+      });
+    });
+    const prev = aSel.value;
+    aSel.innerHTML = '<option value="">All assignees</option>';
+    [...names].sort().forEach((n) => aSel.appendChild(new Option(n, n)));
+    if (prev && names.has(prev)) aSel.value = prev;
+  }
+  if (mSel) {
+    const ms = window.pmProjectMilestones || [];
+    const prev = mSel.value;
+    mSel.innerHTML = '<option value="">All milestones</option>';
+    ms.forEach((m) => mSel.appendChild(new Option(m.title, String(m.id))));
+    if (prev) mSel.value = prev;
+  }
+}
+
+function pmWireIncompleteFilters() {
+  const ids = ['pmIncompleteFilterAssignee', 'pmIncompleteFilterMilestone', 'pmIncompleteFilterOverdue', 'pmIncompleteFilterBlocked'];
+  ids.forEach((id) => {
+    const el = $(id);
+    if (!el) return;
+    const handler = () => {
+      pmIncompleteFilters.assignee = ($('pmIncompleteFilterAssignee') || {}).value || '';
+      pmIncompleteFilters.milestone = ($('pmIncompleteFilterMilestone') || {}).value || '';
+      pmIncompleteFilters.overdue = !!($('pmIncompleteFilterOverdue') || {}).checked;
+      pmIncompleteFilters.blocked = !!($('pmIncompleteFilterBlocked') || {}).checked;
+      if (lastBoardData) renderIncompleteTasks(lastBoardData);
+    };
+    if (el.type === 'checkbox') el.onchange = handler;
+    else el.onchange = handler;
+  });
+}
+
 function renderIncompleteTasks(boardData) {
   const tbody = $('incompleteTasksBody');
   const emptyEl = $('incompleteTasksEmpty');
   if (!tbody) return;
+  pmPopulateIncompleteFilterDropdowns(boardData);
+  const f = pmIncompleteFilters;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const msTaskIds = new Set();
+  if (f.milestone) {
+    const ms = (window.pmProjectMilestones || []).find((m) => String(m.id) === String(f.milestone));
+    (ms?.task_ids || []).forEach((id) => msTaskIds.add(String(id)));
+  }
   const rows = [];
   (boardData?.columns || []).forEach((col) => {
     (col.tasks || []).forEach((t) => {
       const prog = typeof t.progress === 'number' ? t.progress : 0;
       if (prog >= 100) return;
       const names = (t.assignees || []).map((a) => a.name).filter(Boolean).join(', ') || '—';
+      if (f.assignee && !(t.assignees || []).some((a) => a.name === f.assignee)) return;
+      if (f.milestone && !msTaskIds.has(String(t.id))) return;
+      if (f.overdue) {
+        if (!t.end_date) return;
+        const due = new Date(t.end_date.slice(0, 10));
+        if (due >= today) return;
+      }
+      if (f.blocked && typeof pmIsTaskBlocked === 'function' && !pmIsTaskBlocked(t, boardData)) return;
       rows.push({
         task: t,
         colTitle: col.title || `Column ${col.id}`,
@@ -1675,7 +1907,7 @@ function closeModal() {
 }
 
 /* ---------- Tabbed workspace ---------- */
-const PM_TAB_IDS = ['board', 'incomplete', 'gantt', 'calendar', 'documents'];
+const PM_TAB_IDS = ['board', 'incomplete', 'gantt', 'calendar', 'documents', 'activity'];
 
 function setActiveTab(tab) {
   if (tab === 'timeline') tab = 'incomplete';
@@ -1686,14 +1918,16 @@ function setActiveTab(tab) {
     incomplete: $('panel-incomplete'),
     gantt: $('panel-gantt'),
     calendar: $('panel-calendar'),
-    documents: $('panel-documents')
+    documents: $('panel-documents'),
+    activity: $('panel-activity')
   };
   const tabs = {
     board: $('tab-board'),
     incomplete: $('tab-incomplete'),
     gantt: $('tab-gantt'),
     calendar: $('tab-calendar'),
-    documents: $('tab-documents')
+    documents: $('tab-documents'),
+    activity: $('tab-activity')
   };
   Object.keys(panels).forEach((key) => {
     const panel = panels[key];
@@ -1719,6 +1953,18 @@ function setActiveTab(tab) {
   }
   if (next === 'documents') {
     requestAnimationFrame(() => renderDocumentsPanel(lastBoardData));
+  }
+  if (next === 'activity') {
+    requestAnimationFrame(() => {
+      if (typeof pmRenderActivityPanel === 'function' && currentProjectId) {
+        const actorSel = $('pmActivityFilterActor');
+        const actionSel = $('pmActivityFilterAction');
+        pmRenderActivityPanel($('pmActivityFeed'), currentProjectId, {
+          actor: actorSel ? actorSel.value : '',
+          action: actionSel ? actionSel.value : '',
+        });
+      }
+    });
   }
   pmUpdateUrl();
 }
@@ -1882,704 +2128,11 @@ function calScheduleBarColor(task) {
   return ganttProgressColor(pct);
 }
 
-/** When a day has multiple tasks, prefer showing the most urgent hue on the year mini-dot. */
-function calDayWorstBarColor(items) {
-  if (!items || !items.length) return null;
-  for (const it of items) {
-    if (calIsOverdue(it.task)) return '#ef4444';
-  }
-  for (const it of items) {
-    if (calScheduleBarColor(it.task) === '#f59e0b') return '#f59e0b';
-  }
-  return calScheduleBarColor(items[0].task);
-}
-
-function calTaskChipMarkup(item) {
-  const { task, columnTitle } = item;
-  const tid = item.parentTaskId || task.id;
-  const rawTitle = (task.title || '').slice(0, 80);
-  const barColor = calScheduleBarColor(task);
-  const done = calIsDone(task);
-  const nAsg = Array.isArray(task.assignees) ? task.assignees.length : 0;
-  const badge = nAsg ? `<span class="pm-cal-asg">${nAsg > 9 ? '9+' : String(nAsg)}</span>` : '';
-  const cls = ['pm-cal-chip'];
-  if (done) cls.push('pm-cal-chip--done');
-  if (task.item_type === 'subtask') cls.push('pm-cal-chip--subtask');
-  const tip = escapeHtml([task.title || '', columnTitle].filter(Boolean).join(' — ').slice(0, 220));
-  return `<button type="button" class="${cls.join(' ')}" data-cal-task-id="${tid}" title="${tip}" style="--chip-bar:${barColor}"><span class="pm-cal-chip-dot" aria-hidden="true"></span>${badge}<span class="pm-cal-chip-t">${escapeHtml(rawTitle)}</span></button>`;
-}
-
-function calWeekStartSunday(d) {
-  const t = ganttStripTime(d);
-  const w = t.getDay();
-  const s = new Date(t);
-  s.setDate(s.getDate() - w);
-  return s;
-}
-
-function calSameLocalDay(a, b) {
-  return calDayKey(a) === calDayKey(b);
-}
-
-function syncCalViewToggleButtons() {
-  document.querySelectorAll('#panel-calendar .cal-view-btn').forEach((b) => {
-    const mode = b.getAttribute('data-cal-mode');
-    const on = mode === calendarViewMode;
-    b.setAttribute('aria-pressed', on ? 'true' : 'false');
-  });
-}
-
-function calNavigateToday() {
-  calendarCursor = ganttStripTime(new Date());
-  renderCalendar(lastBoardData);
-}
-
-function calNavigatePrev() {
-  const c = calendarCursor;
-  if (calendarViewMode === 'month') {
-    calendarCursor = new Date(c.getFullYear(), c.getMonth() - 1, 1);
-  } else if (calendarViewMode === 'week') {
-    const ws = calWeekStartSunday(c);
-    ws.setDate(ws.getDate() - 7);
-    calendarCursor = ws;
-  } else {
-    calendarCursor = new Date(c.getFullYear() - 1, 0, 1);
-  }
-  renderCalendar(lastBoardData);
-}
-
-function calNavigateNext() {
-  const c = calendarCursor;
-  if (calendarViewMode === 'month') {
-    calendarCursor = new Date(c.getFullYear(), c.getMonth() + 1, 1);
-  } else if (calendarViewMode === 'week') {
-    const ws = calWeekStartSunday(c);
-    ws.setDate(ws.getDate() + 7);
-    calendarCursor = ws;
-  } else {
-    calendarCursor = new Date(c.getFullYear() + 1, 0, 1);
-  }
-  renderCalendar(lastBoardData);
-}
-
-function calSetViewMode(mode) {
-  if (mode !== 'year' && mode !== 'month' && mode !== 'week') return;
-  calendarViewMode = mode;
-  const c = calendarCursor;
-  if (mode === 'month') {
-    calendarCursor = new Date(c.getFullYear(), c.getMonth(), 1);
-  } else if (mode === 'year') {
-    calendarCursor = new Date(c.getFullYear(), 0, 1);
-  }
-  renderCalendar(lastBoardData);
-}
-
-function renderCalendarMonth(mount, boardData, idx) {
-  const c = calendarCursor;
-  const y = c.getFullYear();
-  const m = c.getMonth();
-  const first = new Date(y, m, 1);
-  const gridStart = new Date(first);
-  gridStart.setDate(first.getDate() - first.getDay());
-  const today = ganttStripTime(new Date());
-  const titleEl = $('calNavTitle');
-  if (titleEl) titleEl.textContent = first.toLocaleString(undefined, { month: 'long', year: 'numeric' });
-
-  const dows = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  let h = '<div class="pm-cal-month-grid">';
-  dows.forEach((label, i) => {
-    const wk = i === 0 || i === 6;
-    h += `<div class="pm-cal-dow${wk ? ' pm-cal-dow--weekend' : ''}">${label}</div>`;
-  });
-  for (let i = 0; i < 42; i++) {
-    const cellDate = new Date(gridStart);
-    cellDate.setDate(gridStart.getDate() + i);
-    const inMonth = cellDate.getMonth() === m;
-    const wk = cellDate.getDay();
-    const isWeekend = wk === 0 || wk === 6;
-    const isToday = calSameLocalDay(cellDate, today);
-    const k = calDayKey(cellDate);
-    const items = (idx.byDay.get(k) || []).slice();
-    items.sort((a, b) => String(a.task.title || '').localeCompare(String(b.task.title || '')));
-    const maxShow = 3;
-    const shown = items.slice(0, maxShow);
-    const more = items.length - shown.length;
-    let cls = 'pm-cal-cell';
-    if (!inMonth) cls += ' pm-cal-cell--muted';
-    if (isWeekend) cls += ' pm-cal-cell--weekend';
-    if (isToday) cls += ' pm-cal-cell--today';
-    if (items.length) cls += ' pm-cal-cell--has-tasks';
-    h += `<div class="${cls}">`;
-    const dnCls = ['pm-cal-daynum'];
-    if (!inMonth) dnCls.push('pm-cal-daynum--muted');
-    if (isToday) dnCls.push('pm-cal-daynum--pill');
-    h += `<div class="pm-cal-daynum-row"><span class="${dnCls.join(' ')}">${cellDate.getDate()}</span></div>`;
-    h += '<div class="pm-cal-chips">';
-    h += shown.map((it) => calTaskChipMarkup(it)).join('');
-    if (more > 0) h += `<div class="pm-cal-more">+${more} more</div>`;
-    h += '</div></div>';
-  }
-  h += '</div>';
-  mount.innerHTML = h;
-}
-
-function renderCalendarWeek(mount, boardData, idx) {
-  const ws = calWeekStartSunday(calendarCursor);
-  const titleEl = $('calNavTitle');
-  const we = new Date(ws);
-  we.setDate(we.getDate() + 6);
-  if (titleEl) {
-    titleEl.textContent = ws.getFullYear() === we.getFullYear()
-      ? `${ws.toLocaleString(undefined, { month: 'short', day: 'numeric' })} – ${we.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
-      : `${ws.toLocaleDateString()} – ${we.toLocaleDateString()}`;
-  }
-  const today = ganttStripTime(new Date());
-  const dows = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  let h = '<div class="pm-cal-month-grid">';
-  dows.forEach((label, i) => {
-    const wk = i === 0 || i === 6;
-    h += `<div class="pm-cal-dow${wk ? ' pm-cal-dow--weekend' : ''}">${label}</div>`;
-  });
-  for (let i = 0; i < 7; i++) {
-    const cellDate = new Date(ws);
-    cellDate.setDate(ws.getDate() + i);
-    const wk = cellDate.getDay();
-    const isWeekend = wk === 0 || wk === 6;
-    const isToday = calSameLocalDay(cellDate, today);
-    const k = calDayKey(cellDate);
-    const items = (idx.byDay.get(k) || []).slice();
-    items.sort((a, b) => String(a.task.title || '').localeCompare(String(b.task.title || '')));
-    let cls = 'pm-cal-cell pm-cal-week-cell';
-    if (isWeekend) cls += ' pm-cal-cell--weekend';
-    if (isToday) cls += ' pm-cal-cell--today';
-    if (items.length) cls += ' pm-cal-cell--has-tasks';
-    h += `<div class="${cls}">`;
-    const label = cellDate.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-    const dnCls = ['pm-cal-daynum'];
-    if (isToday) dnCls.push('pm-cal-daynum--pill');
-    h += `<div class="pm-cal-daynum-row"><span class="${dnCls.join(' ')}">${escapeHtml(label)}</span></div>`;
-    h += '<div class="pm-cal-chips">';
-    items.forEach((it) => { h += calTaskChipMarkup(it); });
-    if (!items.length) h += '<span class="pm-cal-week-empty">No dated tasks</span>';
-    h += '</div></div>';
-  }
-  h += '</div>';
-  mount.innerHTML = h;
-}
-
-function renderCalendarYear(mount, boardData, idx) {
-  const y = calendarCursor.getFullYear();
-  const titleEl = $('calNavTitle');
-  if (titleEl) titleEl.textContent = String(y);
-  const today = ganttStripTime(new Date());
-  let html = '<div class="pm-cal-year-grid">';
-  for (let m = 0; m < 12; m++) {
-    const first = new Date(y, m, 1);
-    const gridStart = new Date(first);
-    gridStart.setDate(first.getDate() - first.getDay());
-    html += '<div class="pm-cal-mini-wrap">';
-    html += `<div class="pm-cal-mini-title">${first.toLocaleString(undefined, { month: 'long' })}</div>`;
-    html += '<div class="pm-cal-mini-grid">';
-    ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach((d) => {
-      html += `<div class="pm-cal-mini-dh">${d}</div>`;
-    });
-    for (let i = 0; i < 42; i++) {
-      const cellDate = new Date(gridStart);
-      cellDate.setDate(gridStart.getDate() + i);
-      const inMonth = cellDate.getMonth() === m;
-      const k = calDayKey(cellDate);
-      const list = idx.byDay.get(k) || [];
-      const firstTask = list[0];
-      let dot = '';
-      if (list.length && firstTask) {
-        const bar = calDayWorstBarColor(list);
-        dot = `<span class="pm-cal-mini-dot" style="--chip-bar:${bar}"></span>`;
-      }
-      let dcls = 'pm-cal-mini-day';
-      if (inMonth) dcls += ' pm-cal-mini-day--in';
-      if (calSameLocalDay(cellDate, today)) dcls += ' pm-cal-mini-day--today';
-      const label = inMonth ? String(cellDate.getDate()) : '';
-      const tip = list.map((x) => x.task.title).join(', ');
-      const openFirst = list.length ? ` data-cal-task-id="${list[0].parentTaskId || list[0].task.id}" style="cursor:pointer"` : '';
-      html += `<div class="${dcls}" title="${escapeHtml(tip.slice(0, 200))}"${openFirst}>${label}${dot}</div>`;
-    }
-    html += '</div></div>';
-  }
-  html += '</div>';
-  mount.innerHTML = html;
-}
-
-function renderCalendar(boardData) {
-  const mount = $('calendarMount');
-  if (!mount) return;
-  if (!(calendarCursor instanceof Date) || isNaN(calendarCursor.getTime())) {
-    calendarCursor = ganttStripTime(new Date());
-  }
-  const note = $('calNoteUndated');
-  if (!currentProjectId || !boardData || !boardData.columns) {
-    mount.innerHTML = '<p class="pm-cal-empty">Select a project to view the calendar.</p>';
-    const titleEl = $('calNavTitle');
-    if (titleEl) titleEl.textContent = '—';
-    if (note) note.classList.add('hidden');
-    syncCalViewToggleButtons();
-    return;
-  }
-  const idx = buildCalendarTaskIndex(boardData);
-  if (note) {
-    if (idx.undated > 0) {
-      note.classList.remove('hidden');
-      note.textContent = `${idx.undated} task${idx.undated === 1 ? '' : 's'} have no start/end date and are not shown on the calendar. Open the Board tab to add dates.`;
-    } else {
-      note.classList.add('hidden');
-    }
-  }
-  if (calendarViewMode === 'month') {
-    renderCalendarMonth(mount, boardData, idx);
-  } else if (calendarViewMode === 'week') {
-    renderCalendarWeek(mount, boardData, idx);
-  } else {
-    renderCalendarYear(mount, boardData, idx);
-  }
-  syncCalViewToggleButtons();
-}
-
-const GANTT_DAY_W = 20;
-const GANTT_LEFT_COLS = 'minmax(0, 1.1fr) minmax(0, 0.88fr) 0.58fr 0.62fr 0.62fr 0.34fr 0.48fr';
-
-function ganttStripTime(d) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function ganttParseLocal(iso) {
-  if (!iso) return null;
-  const s = String(iso).slice(0, 10);
-  const p = s.split('-').map(Number);
-  if (p.length < 3 || !p[0]) return null;
-  return new Date(p[0], p[1] - 1, p[2]);
-}
-
-function ganttEnumerateWorkdays(minD, maxD) {
-  const out = [];
-  let cur = ganttStripTime(minD);
-  const end = ganttStripTime(maxD);
-  while (cur <= end) {
-    const wd = cur.getDay();
-    if (wd !== 0 && wd !== 6) out.push(new Date(cur));
-    cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
-  }
-  return out;
-}
-
-function ganttCountBizInclusive(s, e) {
-  let n = 0;
-  let c = ganttStripTime(s);
-  const end = ganttStripTime(e);
-  if (c > end) return 0;
-  while (c <= end) {
-    const wd = c.getDay();
-    if (wd !== 0 && wd !== 6) n++;
-    c = new Date(c.getFullYear(), c.getMonth(), c.getDate() + 1);
-  }
-  return Math.max(n, 0);
-}
-
-function ganttFormatMMDDYY(d) {
-  if (!d || isNaN(d.getTime())) return '—';
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const y = String(d.getFullYear()).slice(-2);
-  return `${m}/${day}/${y}`;
-}
-
-function ganttProgressColor(pct) {
-  const n = typeof pct === 'number' ? pct : 0;
-  if (n >= 100) return '#16a34a'; // green
-  if (n > 0) return '#f59e0b'; // amber
-  return '#9ca3af'; // grey
-}
-
-function ganttDayLetter(d) {
-  return ['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getDay()];
-}
-
-function ganttOwnerShort(name) {
-  if (!name || name === 'Unassigned') return '—';
-  const parts = String(name).trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 12);
-  return `${parts[0].slice(0, 8)} ${parts[parts.length - 1].charAt(0)}`.trim();
-}
-
-function ganttAssigneeLabel(task) {
-  if (Array.isArray(task.assignees) && task.assignees.length) {
-    return (task.assignees[0].name || String(task.assignees[0]));
-  }
-  return 'Unassigned';
-}
-
-function ganttLocalDayStart(d) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function ganttDueInThisWeek(d) {
-  const today = ganttLocalDayStart(new Date());
-  const dow = today.getDay();
-  const monOffset = dow === 0 ? -6 : 1 - dow;
-  const weekStart = new Date(today);
-  weekStart.setDate(weekStart.getDate() + monOffset);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 6);
-  const dd = ganttLocalDayStart(d);
-  return dd >= weekStart && dd <= weekEnd;
-}
-
-function ganttDueInThisMonth(d) {
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-}
-
-function ganttCollectDatedTasks(boardData) {
-  const out = [];
-  pmFlattenBoardScheduleEntries(boardData).forEach((entry) => {
-    const task = pmScheduleTaskLike(entry);
-    if (!task.start_date || !task.end_date) return;
-    const a = ganttParseLocal(task.start_date);
-    const b = ganttParseLocal(task.end_date);
-    if (!a || !b || isNaN(a.getTime()) || isNaN(b.getTime())) return;
-    if (b < a) return;
-    out.push({ task, col: entry.col });
-  });
-  return out;
-}
-
-function ganttMatchesFilters(task, dueEnd) {
-  if (ganttFilterOwner && ganttAssigneeLabel(task) !== ganttFilterOwner) return false;
-  if (ganttDueFilter === 'week' && !ganttDueInThisWeek(dueEnd)) return false;
-  if (ganttDueFilter === 'month' && !ganttDueInThisMonth(dueEnd)) return false;
-  return true;
-}
-
-function populateGanttOwnerOptions(boardData) {
-  const sel = $('ganttFilterOwner');
-  if (!sel || !boardData) return;
-  const allDated = ganttCollectDatedTasks(boardData);
-  const owners = [...new Set(allDated.map(({ task }) => ganttAssigneeLabel(task)))].sort((a, b) => a.localeCompare(b));
-  const prev = ganttFilterOwner;
-  sel.innerHTML = '<option value="">All</option>'
-    + owners.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
-  if (prev && owners.includes(prev)) {
-    sel.value = prev;
-    ganttFilterOwner = prev;
-  } else {
-    sel.value = '';
-    ganttFilterOwner = '';
-  }
-}
-
-function ganttWeekClusters(workDays) {
-  const clusters = [];
-  let cur = [];
-  let curKey = null;
-  workDays.forEach((d, i) => {
-    const mon = new Date(d);
-    const day = mon.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    mon.setDate(mon.getDate() + diff);
-    const key = mon.getTime();
-    if (curKey === null) {
-      curKey = key;
-      cur = [{ d, i }];
-    } else if (key === curKey) {
-      cur.push({ d, i });
-    } else {
-      clusters.push(cur);
-      cur = [{ d, i }];
-      curKey = key;
-    }
-  });
-  if (cur.length) clusters.push(cur);
-  return clusters;
-}
-
-const GANTT_MONTH_COLORS = ['#1e3a5f', '#0d9488'];
-
-function ganttMonthClusters(workDays) {
-  const clusters = [];
-  let cur = [];
-  let curKey = null;
-  workDays.forEach((d) => {
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    if (key !== curKey) {
-      if (cur.length) clusters.push(cur);
-      cur = [];
-      curKey = key;
-    }
-    cur.push(d);
-  });
-  if (cur.length) clusters.push(cur);
-  return clusters;
-}
-
-function ganttMonthLabel(d) {
-  const name = d.toLocaleString('en-US', { month: 'long' }).toUpperCase();
-  return `${name} ${d.getFullYear()}`;
-}
-
-const GANTT_DESC_PREVIEW_PLACEHOLDER = 'Hover a description cell in the table to read the full text.';
-
-function resetGanttDescPreview() {
-  const body = $('ganttDescPreviewBody');
-  if (!body) return;
-  body.textContent = GANTT_DESC_PREVIEW_PLACEHOLDER;
-  body.classList.add('text-zinc-400');
-  body.classList.remove('text-zinc-700');
-}
-
-function ganttDescDecodedFromTrigger(trigger) {
-  const enc = trigger.getAttribute('data-gantt-desc');
-  if (enc == null) return null;
-  try {
-    const raw = decodeURIComponent(enc);
-    return raw.trim() ? raw : null;
-  } catch (e) {
-    return null;
-  }
-}
-
-function bindGanttDescPreviewTriggers(container) {
-  if (!container) return;
-  container.querySelectorAll('[data-gantt-desc-trigger]').forEach((el) => {
-    el.addEventListener('mouseenter', () => {
-      const raw = ganttDescDecodedFromTrigger(el);
-      if (raw == null) return;
-      const body = $('ganttDescPreviewBody');
-      if (!body) return;
-      body.textContent = raw;
-      body.classList.remove('text-zinc-400');
-      body.classList.add('text-zinc-700');
-    });
-  });
-}
-
-function destroyVisGantt() {
-  resetGanttDescPreview();
-  const container = $('ganttSheetMount');
-  if (container && container._ganttClickHandler) {
-    container.removeEventListener('click', container._ganttClickHandler);
-    container._ganttClickHandler = null;
-  }
-  if (container) container.innerHTML = '';
-}
-
-function renderVisGantt(boardData) {
-  destroyVisGantt();
-  const container = $('ganttSheetMount');
-  const emptyEl = $('ganttEmptyState');
-  if (!container) return;
-
-  if (!boardData || !boardData.columns) {
-    if (emptyEl) {
-      emptyEl.classList.remove('hidden');
-      emptyEl.textContent = 'Select a project to view the schedule.';
-    }
-    return;
-  }
-
-  const ganttDueEl = $('ganttFilterDue');
-  if (ganttDueEl) ganttDueFilter = ganttDueEl.value || 'all';
-  const ganttOwnerEl = $('ganttFilterOwner');
-  if (ganttOwnerEl) ganttFilterOwner = ganttOwnerEl.value || '';
-  populateGanttOwnerOptions(boardData);
-
-  const allDated = ganttCollectDatedTasks(boardData);
-  if (!allDated.length) {
-    if (emptyEl) {
-      emptyEl.classList.remove('hidden');
-      emptyEl.textContent = 'Add tasks with both start and end dates to see them on the schedule.';
-    }
-    return;
-  }
-
-  const filteredDated = allDated.filter(({ task }) => {
-    const e = ganttParseLocal(task.end_date);
-    return e && ganttMatchesFilters(task, e);
-  });
-  if (!filteredDated.length) {
-    if (emptyEl) {
-      emptyEl.classList.remove('hidden');
-      emptyEl.textContent = 'No tasks match the filters. Try All owners or a different due range.';
-    }
-    return;
-  }
-
-  ensureColorMaps(boardData);
-  const rows = [];
-  let gMin = null;
-  let gMax = null;
-
-  (boardData.columns || []).forEach((col) => {
-    const inCol = filteredDated.filter((x) => x.col.id === col.id);
-    if (!inCol.length) return;
-    rows.push({ type: 'group', title: col.title || `Column ${col.id}`, col });
-    inCol.forEach(({ task }) => {
-      const s = ganttParseLocal(task.start_date);
-      const e = ganttParseLocal(task.end_date);
-      if (!s || !e) return;
-      rows.push({ type: 'task', task, col });
-      const t0 = ganttStripTime(s).getTime();
-      const t1 = ganttStripTime(e).getTime();
-      if (gMin === null || t0 < gMin) gMin = t0;
-      if (gMax === null || t1 > gMax) gMax = t1;
-    });
-  });
-
-  if (!rows.length || gMin === null) {
-    if (emptyEl) {
-      emptyEl.classList.remove('hidden');
-      emptyEl.textContent = 'No tasks match the filters. Try All owners or a different due range.';
-    }
-    return;
-  }
-  if (emptyEl) emptyEl.classList.add('hidden');
-
-  const minD = new Date(gMin);
-  const maxD = new Date(gMax);
-  const workDays = ganttEnumerateWorkdays(minD, maxD);
-  if (!workDays.length) {
-    if (emptyEl) {
-      emptyEl.classList.remove('hidden');
-      emptyEl.textContent = 'No working days in range.';
-    }
-    return;
-  }
-
-  const totalW = workDays.length * GANTT_DAY_W;
-  const idxFor = (date) => {
-    const t = ganttStripTime(date).getTime();
-    for (let i = 0; i < workDays.length; i++) {
-      if (ganttStripTime(workDays[i]).getTime() === t) return i;
-    }
-    for (let i = 0; i < workDays.length; i++) {
-      if (ganttStripTime(workDays[i]).getTime() >= t) return i;
-    }
-    return workDays.length - 1;
-  };
-  const lastIdxOnOrBefore = (date) => {
-    const t = ganttStripTime(date).getTime();
-    let last = -1;
-    for (let i = 0; i < workDays.length; i++) {
-      if (ganttStripTime(workDays[i]).getTime() <= t) last = i;
-      else break;
-    }
-    return Math.max(0, last);
-  };
-
-  const weekClusters = ganttWeekClusters(workDays);
-  const monthClusters = ganttMonthClusters(workDays);
-  let phaseHtml = '';
-  monthClusters.forEach((cl, mi) => {
-    const wPx = cl.length * GANTT_DAY_W;
-    const color = GANTT_MONTH_COLORS[mi % GANTT_MONTH_COLORS.length];
-    const label = ganttMonthLabel(cl[0]);
-    phaseHtml += `<div class="flex items-center justify-center text-[10px] font-bold text-white shrink-0 border-r border-white/20" style="width:${wPx}px;background:${color}">${label}</div>`;
-  });
-
-  let weekHtml = '';
-  weekClusters.forEach((cl, wi) => {
-    const wPx = cl.length * GANTT_DAY_W;
-    const label = `WEEK ${wi + 1}`;
-    weekHtml += `<div class="flex items-center justify-center text-[10px] font-semibold text-zinc-600 bg-zinc-100 border-r border-zinc-200 shrink-0" style="width:${wPx}px">${label}</div>`;
-  });
-
-  let dayHtml = '';
-  workDays.forEach((d) => {
-    dayHtml += `<div class="gantt-grid-line flex items-center justify-center text-[10px] text-zinc-500 shrink-0 border-r border-zinc-200/90" style="width:${GANTT_DAY_W}px">${ganttDayLetter(d)}</div>`;
-  });
-
-  const leftW = 520;
-  let bodyHtml = '';
-  rows.forEach((row) => {
-    if (row.type === 'group') {
-      bodyHtml += `<div class="flex items-center min-h-[30px] bg-zinc-300 border-b border-r border-zinc-300 font-semibold text-zinc-900 px-2 text-[11px]">${escapeHtml(row.title)}</div>`;
-      bodyHtml += `<div class="min-h-[30px] bg-zinc-200/70 border-b border-zinc-200" style="width:${totalW}px"></div>`;
-      return;
-    }
-    const task = row.task;
-    const col = row.col;
-    const s = ganttParseLocal(task.start_date);
-    const e = ganttParseLocal(task.end_date);
-    const assName = ganttAssigneeLabel(task);
-    const dur = ganttCountBizInclusive(s, e);
-    const pct = typeof task.progress === 'number' ? Math.max(0, Math.min(100, task.progress)) : 0;
-    const today0 = ganttLocalDayStart(new Date());
-    const end0 = e ? ganttStripTime(e) : null;
-    const isOverdue = !!(end0 && end0 < today0);
-    const barColor = (isOverdue && pct < 100) ? '#ef4444' : ganttProgressColor(pct);
-    const isSubtask = task.item_type === 'subtask';
-    const barOpacity = isSubtask ? '0.72' : '1';
-    const si = idxFor(s);
-    const ei = lastIdxOnOrBefore(e);
-    const barLeft = si * GANTT_DAY_W;
-    const barW = Math.max(GANTT_DAY_W, (ei - si + 1) * GANTT_DAY_W);
-
-    const gridLines = workDays.map(() => `<div class="gantt-grid-line shrink-0" style="width:${GANTT_DAY_W}px"></div>`).join('');
-
-    const rawDesc = task.description != null ? String(task.description) : '';
-    const descOneLine = rawDesc.replace(/\s+/g, ' ').trim();
-    const descCell = descOneLine
-      ? `<div class="gantt-desc-trigger px-1 py-1.5 border-r border-zinc-100 truncate text-zinc-600 min-w-0 cursor-default" data-gantt-desc-trigger="1" data-gantt-desc="${encodeURIComponent(rawDesc)}">${escapeHtml(descOneLine)}</div>`
-      : `<div class="px-1 py-1.5 border-r border-zinc-100 text-zinc-400 min-w-0">—</div>`;
-
-    const openId = task.id;
-    bodyHtml += `<div class="grid gap-0 border-b border-r border-zinc-200 bg-white hover:bg-zinc-50/90 cursor-pointer text-[11px] leading-tight${isSubtask ? ' bg-zinc-50/40' : ''}" style="grid-template-columns:${GANTT_LEFT_COLS}" data-gantt-task-id="${openId}">`;
-    bodyHtml += `<div class="px-1.5 py-1.5 border-r border-zinc-100 truncate min-w-0${isSubtask ? ' pl-4 text-zinc-700' : ''}" title="${escapeHtml(task.title || '')}">${escapeHtml(task.title || '')}</div>`;
-    bodyHtml += descCell;
-    bodyHtml += `<div class="px-1 py-1.5 border-r border-zinc-100 truncate text-zinc-700 min-w-0">${escapeHtml(ganttOwnerShort(assName))}</div>`;
-    bodyHtml += `<div class="px-1 py-1.5 border-r border-zinc-100 text-center text-zinc-600">${ganttFormatMMDDYY(s)}</div>`;
-    bodyHtml += `<div class="px-1 py-1.5 border-r border-zinc-100 text-center text-zinc-600">${ganttFormatMMDDYY(e)}</div>`;
-    bodyHtml += `<div class="px-1 py-1.5 border-r border-zinc-100 text-center text-zinc-600">${dur}</div>`;
-    bodyHtml += `<div class="px-1 py-1 flex items-center"><div class="gantt-pct-cell w-full"><div class="gantt-pct-fill" style="width:${pct}%"></div><span class="relative z-[1] flex w-full justify-center text-[10px] font-medium text-zinc-800">${pct}%</span></div></div>`;
-    bodyHtml += `</div>`;
-
-    bodyHtml += `<div class="relative border-b border-zinc-200 bg-white min-h-[34px]" style="width:${totalW}px">`;
-    bodyHtml += `<div class="absolute inset-0 flex pointer-events-none opacity-60">${gridLines}</div>`;
-    bodyHtml += `<div class="gantt-bar absolute bg-blue-600 pointer-events-auto" data-gantt-task-id="${openId}" style="left:${barLeft}px;width:${barW}px;background:${barColor};opacity:${barOpacity};border:1px solid rgba(0,0,0,0.12)"></div>`;
-    bodyHtml += `</div>`;
-  });
-
-  const gridStyle = `display:grid;grid-template-columns:${leftW}px ${totalW}px;`;
-  container.innerHTML = `
-    <div class="gantt-scroll-x rounded-lg border border-zinc-200 bg-white" id="ganttRightScroll">
-      <div class="min-w-max" style="${gridStyle}">
-        <div class="bg-zinc-100 border-b border-r border-zinc-200 px-2 py-1.5 text-[11px] font-semibold text-zinc-800">Task details</div>
-        <div class="flex border-b border-zinc-200 min-h-[28px] overflow-hidden">${phaseHtml}</div>
-        <div class="grid gap-0 border-b border-r border-zinc-200 bg-zinc-50 text-[10px] font-semibold text-zinc-700" style="grid-template-columns:${GANTT_LEFT_COLS}">
-          <div class="px-1.5 py-1 border-r border-zinc-200">TASK TITLE</div>
-          <div class="px-1 py-1 border-r border-zinc-200">DESCRIPTION</div>
-          <div class="px-1 py-1 border-r border-zinc-200">TASK OWNER</div>
-          <div class="px-1 py-1 border-r border-zinc-200 text-center">START</div>
-          <div class="px-1 py-1 border-r border-zinc-200 text-center">DUE</div>
-          <div class="px-1 py-1 border-r border-zinc-200 text-center">DAYS</div>
-          <div class="px-1 py-1 text-center">% DONE</div>
-        </div>
-        <div class="flex border-b border-zinc-200 bg-zinc-50/80 min-h-[26px]">${weekHtml}</div>
-        <div class="h-[22px] border-b border-r border-zinc-200 bg-zinc-50"></div>
-        <div class="flex border-b border-zinc-200 bg-white min-h-[22px]">${dayHtml}</div>
-        ${bodyHtml}
-      </div>
-    </div>`;
-
-  const ganttClickHandler = (ev) => {
-    const el = ev.target.closest('[data-gantt-task-id]');
-    if (el) {
-      const id = el.getAttribute('data-gantt-task-id');
-      if (id) openTaskFromTimeline(id);
-    }
-  };
-  container._ganttClickHandler = ganttClickHandler;
-  container.addEventListener('click', ganttClickHandler);
-  bindGanttDescPreviewTriggers(container);
-}
-
+</script>
+<script src="{{ url_for('static', filename='js/pm/pm-calendar.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pm/pm-gantt-helpers.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pm/pm-gantt.js') }}"></script>
+<script>
 /* ---------- Load users for member selection ---------- */
 async function loadUsers() {
   if (usersCache.length) return usersCache;
@@ -2861,6 +2414,9 @@ async function renderProjectSidebar(projects) {
   const list = document.getElementById('projectList');
   if (!list) return;
   pmAllProjectsList = projects || [];
+  if (!pmProgramsSidebarCache && typeof pmLoadPrograms === 'function') {
+    try { pmProgramsSidebarCache = await pmLoadPrograms(); } catch (e) { pmProgramsSidebarCache = []; }
+  }
   const q = (($('pmSidebarSearch') || {}).value || '').trim().toLowerCase();
   const recent = typeof pmGetRecentProjects === 'function' ? pmGetRecentProjects() : [];
   let filtered = pmAllProjectsList;
@@ -2873,8 +2429,8 @@ async function renderProjectSidebar(projects) {
     if (ai >= 0 && bi >= 0) return ai - bi;
     return String(a.name).localeCompare(String(b.name));
   });
-  list.innerHTML = '';
-  filtered.forEach(p => {
+
+  const appendProjectBtn = (p) => {
     const item = document.createElement('button');
     item.type = 'button';
     item.className = 'w-full min-w-0 text-left rounded-md border px-2 py-1.5 transition ' + (String(p.id)===String(currentProjectId) ? 'border-indigo-200 bg-indigo-50/90 shadow-sm' : 'border-transparent hover:border-zinc-200 hover:bg-zinc-50');
@@ -2891,8 +2447,53 @@ async function renderProjectSidebar(projects) {
       await loadBoard(currentProjectId);
       renderProjectSidebar(pmAllProjectsList);
     };
-    list.appendChild(item);
-  });
+    return item;
+  };
+
+  list.innerHTML = '';
+  const progs = pmProgramsSidebarCache || [];
+  const groupedIds = new Set();
+  const hasPrograms = progs.some((pr) => (pr.project_ids || []).length);
+
+  if (hasPrograms) {
+    progs.forEach((pr) => {
+      const groupProjects = filtered.filter((p) => (pr.project_ids || []).some((id) => String(id) === String(p.id)));
+      if (!groupProjects.length) return;
+      groupProjects.forEach((p) => groupedIds.add(p.id));
+      const section = document.createElement('details');
+      section.className = 'mb-1';
+      section.open = true;
+      const summary = document.createElement('summary');
+      summary.className = 'text-[10px] font-semibold uppercase tracking-wide text-zinc-500 px-1 py-1 cursor-pointer';
+      summary.textContent = pr.name;
+      section.appendChild(summary);
+      const inner = document.createElement('div');
+      inner.className = 'space-y-0.5 pl-1';
+      groupProjects.forEach((p) => inner.appendChild(appendProjectBtn(p)));
+      section.appendChild(inner);
+      list.appendChild(section);
+    });
+    const other = filtered.filter((p) => !groupedIds.has(p.id));
+    if (other.length) {
+      const section = document.createElement('details');
+      section.className = 'mb-1';
+      section.open = true;
+      const summary = document.createElement('summary');
+      summary.className = 'text-[10px] font-semibold uppercase tracking-wide text-zinc-500 px-1 py-1 cursor-pointer';
+      summary.textContent = 'Other projects';
+      section.appendChild(summary);
+      const inner = document.createElement('div');
+      inner.className = 'space-y-0.5 pl-1';
+      other.forEach((p) => inner.appendChild(appendProjectBtn(p)));
+      section.appendChild(inner);
+      list.appendChild(section);
+    }
+  } else {
+    filtered.forEach((p) => list.appendChild(appendProjectBtn(p)));
+  }
+  if (!list.children.length && filtered.length) {
+    filtered.forEach((p) => list.appendChild(appendProjectBtn(p)));
+  }
 }
 
 function assignColor(map, key){
@@ -3101,223 +2702,6 @@ async function resolveProjectInfo(projectId, boardData = {}) {
   return { members: members || [], type: type || 'public' };
 }
 
-/* ---------- Board rendering and column/task creation ---------- */
-async function loadBoard(projectId) {
-  if (!projectId) return;
-  try {
-const data = await apiGET(`${API_BASE}/projects/${projectId}/board`);
-    lastBoardData = data;
-    const board = $('board');
-    board.innerHTML = '';
-
-    // Resolve members and type robustly
-    const projectInfo = await resolveProjectInfo(projectId, data);
-    const timelineSection = document.getElementById('timelineSection');
-    const timelineAxisEl = document.getElementById('timelineAxis');
-    const milestoneBodyEl = document.getElementById('milestoneBody');
-    const timelineItemsBodyEl = document.getElementById('timelineItemsBody');
-    const timelineItemsEmptyEl = document.getElementById('timelineItemsEmpty');
-    const ganttBtn = document.getElementById('showGanttBtn');
-
-    // Show members list
-    // const membersBox = $('projectMembers'); // This element does not exist
-    // if (projectInfo.members && projectInfo.members.length) {
-    //   // show up to 8 names then "+ N"
-    //   const MAX_SHOW = 8;
-    //   const names = projectInfo.members.slice(0, MAX_SHOW).map(n => escapeHtml(n));
-    //   const rest = projectInfo.members.length - names.length;
-    //   membersBox.innerHTML = `👥 Members: <span class="font-medium">${names.join(', ')}${rest>0? `, +${rest}` : ''}</span>`;
-    // } else {
-    //   membersBox.innerHTML = "👥 Members: <span class='italic text-gray-500'>No members assigned</span>";
-    // }
-
-    if (ganttBtn) { ganttBtn.disabled = false; ganttBtn.title = ''; }
-
-    
-    // render columns (data.columns expected)
-    (data.columns || []).forEach(col => {
-const colDiv = el('div', {class:'column flex-none w-[272px] flex flex-col rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 shadow-sm', id:`column-${col.id}`});
-      const header = el('div', {class:'flex items-center justify-between mb-2 gap-2'});
-      const title = el('h3', {class:'text-sm font-semibold text-zinc-800 truncate', text:col.title});
-      const controls = el('div', {class:'flex items-center space-x-2'});
-
-      // Quick add input (hidden by default)
-      const quickAddWrap = el('div', {class:'mt-2 hidden', id:`qa-${col.id}`});
-      quickAddWrap.innerHTML = `<input class="w-full border p-2 rounded text-sm" placeholder="Type task title and hit Enter" />`;
-      quickAddWrap.querySelector('input').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          const val = e.target.value.trim();
-          if (val) {
-            apiPOST(`${API_BASE}/columns/${col.id}/tasks`, {title: val}).then(()=>{
-              e.target.value='';
-              loadBoard(projectId);
-            });
-          }
-        }
-      });
-
-const addBtn = el('button', {class:'text-xs px-2 py-1 rounded-md bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200', text:'+ Task'});
-      addBtn.onclick = () => {
-        const qa = document.getElementById(`qa-${col.id}`);
-        qa.classList.toggle('hidden');
-        if (!qa.classList.contains('hidden')) qa.querySelector('input').focus();
-      };
-const renameBtn = el('button', {class:'text-xs px-2 py-1 rounded-md bg-white hover:bg-zinc-50 text-zinc-600 border border-zinc-200', text:'Rename'});
-      renameBtn.onclick = () => promptRenameColumn(projectId, col.id, col.title);
-      controls.appendChild(addBtn);
-      controls.appendChild(renameBtn);
-      if ((data.columns || []).length > 1) {
-        const delColBtn = el('button', {class:'text-xs px-2 py-1 rounded-md bg-white hover:bg-red-50 text-red-600 border border-zinc-200', text:'Delete'});
-        delColBtn.onclick = () => promptDeleteColumn(projectId, col, data.columns);
-        controls.appendChild(delColBtn);
-      }
-      header.appendChild(title);
-      header.appendChild(controls);
-
-      const taskList = el('div', {class:'task-list flex-1 min-h-[48px] space-y-2 mt-2', id:`col-tasks-${col.id}`});
-      (col.tasks || []).forEach(task => renderTask(task, taskList));
-
-      colDiv.appendChild(header);
-      colDiv.appendChild(quickAddWrap);
-      colDiv.appendChild(taskList);
-      board.appendChild(colDiv);
-    });
-
-    // Add "Add Column" button
-const addColBtn = el('button', {class:'flex-none h-fit self-start px-4 py-2.5 rounded-xl border border-dashed border-zinc-300 bg-white text-sm font-medium text-zinc-600 hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors', text:'+ Add column'});
-    addColBtn.onclick = () => promptAddColumn(projectId);
-    board.appendChild(addColBtn);
-
-    // Refresh open-tasks list (timeline UI removed)
-    try {
-      renderIncompleteTasks(data);
-    } catch(e){ console.warn('Open tasks render failed', e); }
-
-    // initialize Sortable for columns (reorder)
-    new Sortable(board, {
-      animation: 150,
-      ghostClass: 'ghost',
-      draggable: '.column',
-      onEnd: async (evt) => {
-        // gather new order of column ids (ignore add column button)
-        const colEls = Array.from(board.children).filter(ch => ch.id && ch.id.startsWith('column-'));
-        const newOrder = colEls.map(el => parseInt(el.id.replace('column-','')));
-        try {
-          await apiPOST(`${API_BASE}/projects/${projectId}/columns/reorder`, {order: newOrder});
-        } catch (err) {
-          console.error('Failed to reorder columns:', err);
-          // reload board to restore authoritative order
-          await loadBoard(projectId);
-        }
-      }
-    });
-
-    // initialize Sortable for each task-list
-    const lists = board.querySelectorAll('.task-list');
-    lists.forEach(list => {
-      new Sortable(list, {
-        group: 'tasks',
-        animation: 150,
-        ghostClass: 'ghost',
-        onAdd: async (evt) => {
-          // moved from another column
-          const taskId = evt.item.dataset.taskId;
-          const newColumnId = parseInt(evt.to.id.replace('col-tasks-',''));
-          const newPos = evt.newIndex;
-          try {
-            await apiPATCH(`${API_BASE}/tasks/${taskId}`, {column_id: newColumnId, position: newPos});
-            await loadBoard(projectId);
-          } catch (err) {
-            console.error('Move task failed', err);
-            await loadBoard(projectId);
-          }
-        },
-        onUpdate: async (evt) => {
-          // reordering within same column
-          const taskId = evt.item.dataset.taskId;
-          const newPos = evt.newIndex;
-          try {
-            await apiPATCH(`${API_BASE}/tasks/${taskId}`, {position: newPos});
-            await loadBoard(projectId);
-          } catch (err) {
-            console.error('Reorder failed', err);
-            await loadBoard(projectId);
-          }
-        }
-      });
-    });
-
-    if (activePmTab === 'incomplete') {
-      requestAnimationFrame(() => renderIncompleteTasks(data));
-    }
-    if (activePmTab === 'gantt') {
-      requestAnimationFrame(() => renderVisGantt(data));
-    }
-    if (activePmTab === 'calendar') {
-      requestAnimationFrame(() => renderCalendar(data));
-    }
-    if (activePmTab === 'documents') {
-      requestAnimationFrame(() => renderDocumentsPanel(data));
-    }
-
-    updateProjectManageButtons();
-    pmPopulateBoardFilterDropdowns(data);
-    pmWireBoardFilters();
-    pmApplyBoardFilters();
-    if (typeof pmPushRecentProject === 'function') pmPushRecentProject(projectId);
-    pmUpdateUrl();
-
-    if (pmPendingDeepLinkTask) {
-      const tid = pmPendingDeepLinkTask;
-      pmPendingDeepLinkTask = null;
-      const t = findTaskOnBoard(tid);
-      if (t) {
-        requestAnimationFrame(() => openTaskDetails(t));
-      } else {
-        try {
-          const full = await apiGET(`${API_BASE}/tasks/${tid}`);
-          openTaskDetails(full);
-        } catch (e) { /* task not in board */ }
-      }
-    }
-  } catch (err) {
-    console.error('Error loading board', err);
-    const msg = err && err.message ? escapeHtml(err.message) : 'Unknown error';
-    $('board').innerHTML = `<p class='text-red-500'>Failed to load board.${msg ? ` (${msg})` : ''}</p>`;
-    // $('projectMembers').innerHTML = "";
-  }
-}
-
-/* ---------- Column helpers ---------- */
-async function promptAddColumn(projectId) {
-  openModal('Create Column', (c) => {
-    c.innerHTML = `<input id="col_title" class="w-full border p-2 rounded" placeholder="Column title" />`;
-  }, async () => {
-    const title = $('col_title').value.trim() || 'New Column';
-    await apiPOST(`${API_BASE}/projects/${projectId}/columns`, {title});
-    await loadBoard(projectId);
-  });
-}
-
-async function promptDeleteColumn(projectId, column, allColumns) {
-  const others = (allColumns || []).filter((c) => String(c.id) !== String(column.id));
-  if (!others.length) {
-    alert('Cannot delete the only column.');
-    return;
-  }
-  const opts = others.map((c) => `<option value="${c.id}">${escapeHtml(c.title)}</option>`).join('');
-  openModal('Delete Column', (c) => {
-    c.innerHTML = `
-      <p class="text-sm text-zinc-700 mb-3">Move all tasks from <strong>${escapeHtml(column.title)}</strong> to:</p>
-      <select id="col_move_to" class="w-full border p-2 rounded">${opts}</select>
-    `;
-  }, async () => {
-    const moveTo = parseInt($('col_move_to').value, 10);
-    await apiDELETE(`${API_BASE}/columns/${column.id}`, { move_to_column_id: moveTo });
-    await loadBoard(projectId);
-  });
-}
-
 /* ---------- Updated: Robust Rename Column ---------- */
 async function promptRenameColumn(projectId, columnId, currentTitle) {
   openModal('Rename Column', (c) => {
@@ -3379,6 +2763,9 @@ function renderTask(task, container) {
   // task: expected to be task_to_dict shape (id, title, description, progress, start_date, end_date, position, assignees)
   const div = el('div', {class:'task rounded-xl border border-zinc-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md'});
   div.dataset.taskId = task.id;
+  if (typeof pmAttachBulkCheckbox === 'function' && (typeof pmCanEditTasks !== 'function' || pmCanEditTasks())) {
+    pmAttachBulkCheckbox(div, task.id);
+  }
   div.onclick = () => openTaskDetails(task);
 
   const attCount = (task.attachments && task.attachments.length) ? task.attachments.length : 0;
@@ -3438,7 +2825,7 @@ function renderTask(task, container) {
     openTaskDetails(task);
   };
   controls.appendChild(editBtn);
-  if (task.can_delete) {
+  if (task.can_delete && (typeof pmCanEditTasks !== 'function' || pmCanEditTasks())) {
     const delBtn = el('button',{class:'text-xs font-medium text-zinc-500 hover:text-red-600', text:'Delete'});
     delBtn.onclick = (e) => {
       e.stopPropagation();
@@ -3466,6 +2853,7 @@ function formatDate(iso) {
 }
 
 async function promptAddTask(columnId) {
+  let labelPicker = null;
   openModal('Create Task', (c) => {
     c.innerHTML = `
       <div class="grid gap-2">
@@ -3492,9 +2880,16 @@ async function promptAddTask(columnId) {
           <label class="text-sm text-gray-600">Assignees:</label>
           <div id="task_assignees_pick"></div>
         </div>
+        <div class="grid gap-1">
+          <label class="text-sm text-gray-600">Labels:</label>
+          <div id="task_labels_pick"></div>
+        </div>
       </div>
     `;
     pmMountAssigneePicker(c.querySelector('#task_assignees_pick'), { selected: [] });
+    if (typeof pmMountLabelPicker === 'function') {
+      labelPicker = pmMountLabelPicker(c.querySelector('#task_labels_pick'), { selected: [] });
+    }
   }, async () => {
     const title = $('task_title').value.trim();
     if (!title) throw new Error('Title required');
@@ -3504,9 +2899,10 @@ async function promptAddTask(columnId) {
     const progress = parseInt($('task_progress').value || 0, 10);
     const priority = ($('task_priority') || {}).value || 'medium';
     const assignees = pmGetAssigneeIdsFromMount('task_assignees_pick');
+    const labels = labelPicker ? labelPicker.getSelectedIds() : [];
 
     await apiPOST(`${API_BASE}/columns/${columnId}/tasks`, {
-      title, description, start_date: start_date || undefined, end_date: end_date || undefined, progress, priority, assignees
+      title, description, start_date: start_date || undefined, end_date: end_date || undefined, progress, priority, assignees, labels
     });
     await loadBoard(currentProjectId);
   });
@@ -3651,286 +3047,17 @@ function renderPmSubtaskRows(container, task, users, onChange) {
   });
 }
 
-async function syncTaskAfterSubtaskChange(taskId) {
-  try {
-    const full = await apiGET(`${API_BASE}/tasks/${taskId}`);
-    for (const col of (lastBoardData?.columns || [])) {
-      const idx = (col.tasks || []).findIndex((t) => String(t.id) === String(taskId));
-      if (idx >= 0) {
-        col.tasks[idx] = full;
-        break;
-      }
-    }
-    pmUpdateTaskCardOnBoard(taskId, full);
-    await pmRefreshTimelineViews();
-    openTaskDetails(full);
-  } catch (e) {
-    if (currentProjectId) await loadBoard(currentProjectId);
-    const updated = findTaskOnBoard(taskId);
-    if (updated) openTaskDetails(updated);
-  }
-}
-
-async function pmLoadTaskCommentsAndActivity(taskId) {
-  const commentsEl = document.getElementById('pm-task-comments-list');
-  const activityEl = document.getElementById('pm-task-activity-list');
-  if (!commentsEl && !activityEl) return;
-  try {
-    const [comments, activities] = await Promise.all([
-      apiGET(`${API_BASE}/tasks/${taskId}/comments`),
-      apiGET(`${API_BASE}/tasks/${taskId}/activities`),
-    ]);
-    if (commentsEl) {
-      commentsEl.innerHTML = (comments || []).length
-        ? comments.map((c) => `<div class="border border-zinc-100 rounded-lg px-2.5 py-2 bg-white"><div class="text-xs text-zinc-500">${escapeHtml(c.author_name || 'User')} · ${c.created_at ? formatDate(c.created_at) : ''}</div><div class="mt-0.5 text-zinc-800">${escapeHtml(c.body)}</div></div>`).join('')
-        : '<p class="text-zinc-500 italic text-xs">No comments yet</p>';
-    }
-    if (activityEl) {
-      activityEl.innerHTML = (activities || []).length
-        ? activities.map((a) => `<div><span class="font-medium">${escapeHtml(a.actor_name || 'System')}</span> ${escapeHtml(a.action)}${a.detail ? `: ${escapeHtml(a.detail)}` : ''}</div>`).join('')
-        : '<p class="text-zinc-500 italic">No activity recorded</p>';
-    }
-  } catch (e) {
-    if (commentsEl) commentsEl.innerHTML = '<p class="text-red-500 text-xs">Failed to load comments</p>';
-  }
-}
-
-function pmTaskSection(title, bodyHtml, extraClass = '') {
-  return `<section class="pm-task-section ${extraClass}">
-    <div class="pm-task-section__head">${escapeHtml(title)}</div>
-    <div class="pm-task-section__body">${bodyHtml}</div>
-  </section>`;
-}
-
-async function openTaskDetails(task) {
-  if (!task) return;
-  task.attachments = task.attachments || [];
-  const users = await loadUsers();
-  const userMap = new Map((users || []).map((u) => [String(u.id), u.name]));
-  const createdByName = task.created_by != null
-    ? (userMap.get(String(task.created_by)) || `User #${task.created_by}`)
-    : '';
-  const assigneesLabel = (Array.isArray(task.assignees) && task.assignees.length)
-    ? task.assignees.map((a) => a.name).join(', ')
-    : 'Unassigned';
-  const startFmt = task.start_date ? formatDate(task.start_date) : '—';
-  const endFmt = task.end_date ? formatDate(task.end_date) : '—';
-  const progress = typeof task.progress === 'number' ? Math.max(0, Math.min(100, task.progress)) : 0;
-  const subTotal = task.subtask_total || (task.subtasks || []).length;
-  const subDone = task.subtask_done_count != null
-    ? task.subtask_done_count
-    : (task.subtasks || []).filter((s) => s.is_done).length;
-  const s = ganttParseLocal(task.start_date);
-  const e = ganttParseLocal(task.end_date);
-  const duration = (s && e) ? ganttCountBizInclusive(s, e) : null;
-  const columnTitle = (() => {
-    const src = lastBoardData || boardData;
-    for (const col of (src?.columns || [])) {
-      if (String(col.id) === String(task.column_id)) return col.title || '';
-    }
-    return '';
-  })();
-  const attachmentsHtml = task.attachments.length
-    ? `<ul class="divide-y divide-zinc-100 border border-zinc-200/80 rounded-xl bg-white/80 backdrop-blur-sm">
-        ${task.attachments.map((a) => `
-          <li class="px-3.5 py-2.5 flex flex-wrap items-center gap-2">
-            <button type="button" class="text-left text-indigo-700 hover:text-indigo-900 hover:underline text-sm min-w-0 truncate flex-1 transition-colors" data-details-preview-aid="${a.id}">
-              ${escapeHtml(a.original_name || 'Attachment')}
-            </button>
-            <a class="text-xs text-zinc-500 hover:text-zinc-900 underline underline-offset-2" href="${taskAttachmentFileUrl(a.id, 'attachment')}" target="_blank" rel="noopener">Download</a>
-            <button type="button" class="text-xs text-red-600 hover:text-red-700 underline underline-offset-2" data-details-remove-aid="${a.id}">Remove</button>
-          </li>
-        `).join('')}
-      </ul>`
-    : '<div class="text-sm text-zinc-500 italic border border-dashed border-zinc-300 rounded-xl px-3 py-3 bg-zinc-50/70">No attachments</div>';
-
-  openModal('Task details', (c) => {
-    const overviewBody = `
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <h3 class="text-lg font-semibold tracking-tight text-zinc-900 break-words">${escapeHtml(task.title || 'Untitled task')}</h3>
-          ${columnTitle ? `<div class="mt-1.5 inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100/70 px-2.5 py-0.5 text-[11px] font-medium text-zinc-600">Column: <span class="ml-1 text-zinc-800">${escapeHtml(columnTitle)}</span></div>` : ''}
-        </div>
-        <div class="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full shrink-0">${progress}% complete</div>
-      </div>
-      <div class="mt-2">
-        <div class="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-          <div class="h-full bg-indigo-500 rounded-full transition-all duration-300" style="width:${progress}%"></div>
-        </div>
-      </div>`;
-
-    const descriptionBody = `
-      <div class="text-sm text-zinc-700 whitespace-pre-wrap break-words leading-snug">${escapeHtml(task.description || 'No description')}</div>`;
-
-    const scheduleBody = `
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-        <div class="border border-zinc-200 bg-zinc-50/50 rounded-lg p-2"><div class="text-[10px] uppercase tracking-wide text-zinc-500">Start</div><div class="mt-0.5 font-semibold text-zinc-800">${escapeHtml(startFmt)}</div></div>
-        <div class="border border-zinc-200 bg-zinc-50/50 rounded-lg p-2"><div class="text-[10px] uppercase tracking-wide text-zinc-500">Due</div><div class="mt-0.5 font-semibold text-zinc-800">${escapeHtml(endFmt)}</div></div>
-        <div class="border border-zinc-200 bg-zinc-50/50 rounded-lg p-2"><div class="text-[10px] uppercase tracking-wide text-zinc-500">Duration</div><div class="mt-0.5 font-semibold text-zinc-800">${duration != null ? `${duration} day${duration === 1 ? '' : 's'}` : '—'}</div></div>
-        <div class="border border-zinc-200 bg-zinc-50/50 rounded-lg p-2"><div class="text-[10px] uppercase tracking-wide text-zinc-500">Assignees</div><div class="mt-0.5 font-semibold text-zinc-800 break-words">${escapeHtml(assigneesLabel)}</div></div>
-      </div>
-      ${createdByName ? `<div class="mt-2 text-xs text-zinc-500">Created by <span class="font-medium text-zinc-700">${escapeHtml(createdByName)}</span></div>` : ''}`;
-
-    const subtasksBody = `
-      ${subTotal ? `<div class="flex items-center justify-between gap-2 mb-2"><span class="text-xs text-zinc-500">${subDone}/${subTotal} complete</span></div><div class="h-1.5 bg-zinc-100 rounded-full overflow-hidden mb-2"><div class="h-full bg-emerald-500 rounded-full transition-all duration-300" style="width:${Math.round(100 * subDone / subTotal)}%"></div></div>` : ''}
-      <div id="pm-subtask-list" class="space-y-1.5"></div>
-      <div class="grid gap-2 mt-2">
-        <div class="flex flex-wrap gap-2">
-          <input type="text" id="pm-subtask-input" class="flex-1 min-w-[10rem] border border-zinc-200 rounded-lg px-3 py-1.5 text-sm" placeholder="Add a sub-task…" />
-          <input type="date" id="pm-subtask-start" class="border border-zinc-200 rounded-lg px-2 py-1.5 text-sm" title="Start date" />
-          <input type="date" id="pm-subtask-end" class="border border-zinc-200 rounded-lg px-2 py-1.5 text-sm" title="Due date" />
-          <button type="button" id="pm-subtask-add" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">Add</button>
-        </div>
-        <div>
-          <label class="text-xs text-zinc-500 block mb-1">Assignees (optional)</label>
-          <div id="pm-subtask-assignees-wrap"></div>
-        </div>
-      </div>`;
-
-    const commentsBody = `
-      <div id="pm-task-comments-list" class="space-y-2 max-h-40 overflow-y-auto text-sm mb-2"></div>
-      <div class="flex gap-2">
-        <input type="text" id="pm-task-comment-input" class="flex-1 border border-zinc-200 rounded-lg px-3 py-1.5 text-sm" placeholder="Add a comment…" />
-        <button type="button" id="pm-task-comment-add" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">Post</button>
-      </div>`;
-
-    const activityBody = `
-      <details class="rounded-lg border border-zinc-200 bg-zinc-50/50">
-        <summary class="px-3 py-1.5 text-sm font-medium text-zinc-700 cursor-pointer">Show activity log</summary>
-        <div id="pm-task-activity-list" class="px-3 pb-2 text-xs text-zinc-600 space-y-1 max-h-48 overflow-y-auto"></div>
-      </details>`;
-
-    const actionsBody = `
-      <div class="flex flex-wrap items-center justify-end gap-2">
-        <button type="button" class="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 transition-colors text-sm" data-details-act="close">Close</button>
-        <button type="button" class="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-600 text-white hover:bg-indigo-700 transition-colors text-sm" data-details-act="edit">Edit</button>
-        ${task.can_delete ? '<button type="button" class="px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors text-sm" data-details-act="delete">Delete</button>' : ''}
-      </div>`;
-
-    c.innerHTML = [
-      pmTaskSection('Overview', overviewBody, 'pm-task-section--overview'),
-      pmTaskSection('Description', descriptionBody, 'pm-task-section--description'),
-      pmTaskSection('Schedule & people', scheduleBody, 'pm-task-section--schedule'),
-      pmTaskSection('Sub-tasks', subtasksBody, 'pm-task-section--subtasks'),
-      pmTaskSection('Comments', commentsBody, 'pm-task-section--comments'),
-      pmTaskSection('Activity', activityBody, 'pm-task-section--activity'),
-      pmTaskSection('Attachments', attachmentsHtml, 'pm-task-section--attachments'),
-      pmTaskSection('Actions', actionsBody, 'pm-task-section--actions'),
-    ].join('');
-
-    c.querySelectorAll('[data-details-preview-aid]').forEach((btn) => {
-      btn.onclick = () => {
-        const id = parseInt(btn.getAttribute('data-details-preview-aid'), 10);
-        const found = (task.attachments || []).find((x) => x.id === id);
-        if (found) openAttachmentPreview(found);
-      };
-    });
-    c.querySelectorAll('[data-details-remove-aid]').forEach((btn) => {
-      btn.onclick = async () => {
-        const id = parseInt(btn.getAttribute('data-details-remove-aid'), 10);
-        if (!id) return;
-        if (!confirm('Remove this attachment?')) return;
-        try {
-          await apiDELETE(`${API_BASE}/task-attachments/${id}`);
-          task.attachments = (task.attachments || []).filter((x) => x.id !== id);
-          // Re-open to refresh the details attachment list UI.
-          openTaskDetails(task);
-          if (currentProjectId) await loadBoard(currentProjectId);
-        } catch (e) {
-          alert(e.message || e);
-        }
-      };
-    });
-
-    const closeBtn = c.querySelector('[data-details-act="close"]');
-    if (closeBtn) closeBtn.onclick = closeModal;
-
-    const editBtn = c.querySelector('[data-details-act="edit"]');
-    if (editBtn) {
-      editBtn.onclick = () => {
-        closeModal();
-        promptEditTask(task);
-      };
-    }
-
-    const delBtn = c.querySelector('[data-details-act="delete"]');
-    if (delBtn) {
-      delBtn.onclick = () => {
-        closeModal();
-        confirmDeleteTask(task.id);
-      };
-    }
-
-    const subtaskList = c.querySelector('#pm-subtask-list');
-    const refreshSubtasks = () => syncTaskAfterSubtaskChange(task.id);
-    renderPmSubtaskRows(subtaskList, task, users, refreshSubtasks);
-
-    const asgWrap = c.querySelector('#pm-subtask-assignees-wrap');
-    if (asgWrap) {
-      pmMountAssigneePicker(asgWrap, { selected: [], compact: true });
-    }
-
-    const subAddBtn = c.querySelector('#pm-subtask-add');
-    const subInput = c.querySelector('#pm-subtask-input');
-    const addSubtask = async () => {
-      const title = (subInput?.value || '').trim();
-      if (!title) return;
-      const startVal = ($('pm-subtask-start') || {}).value || null;
-      const endVal = ($('pm-subtask-end') || {}).value || null;
-      const assignees = pmGetAssigneeIdsFromMount(asgWrap);
-      try {
-        await apiPOST(`${API_BASE}/tasks/${task.id}/subtasks`, {
-          title,
-          start_date: startVal || undefined,
-          end_date: endVal || undefined,
-          assignees,
-        });
-        if (subInput) subInput.value = '';
-        if ($('pm-subtask-start')) $('pm-subtask-start').value = '';
-        if ($('pm-subtask-end')) $('pm-subtask-end').value = '';
-        if (asgWrap) pmMountAssigneePicker(asgWrap, { selected: [], compact: true });
-        await refreshSubtasks();
-      } catch (e) {
-        alert(e.message || e);
-      }
-    };
-    if (subAddBtn) subAddBtn.onclick = addSubtask;
-    if (subInput) {
-      subInput.onkeydown = (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          addSubtask();
-        }
-      };
-    }
-
-    pmLoadTaskCommentsAndActivity(task.id);
-    const commentAdd = c.querySelector('#pm-task-comment-add');
-    const commentInput = c.querySelector('#pm-task-comment-input');
-    if (commentAdd && commentInput) {
-      const postComment = async () => {
-        const body = (commentInput.value || '').trim();
-        if (!body) return;
-        try {
-          await apiPOST(`${API_BASE}/tasks/${task.id}/comments`, { body });
-          commentInput.value = '';
-          await pmLoadTaskCommentsAndActivity(task.id);
-        } catch (e) {
-          alert(e.message || e);
-        }
-      };
-      commentAdd.onclick = postComment;
-      commentInput.onkeydown = (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); postComment(); }
-      };
-    }
-  }, null, false);
-  modalBackdrop.classList.add('task-details-modal');
-}
-
+</script>
+<script src="{{ url_for('static', filename='js/pm/pm-board-render.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pm/pm-task-modal.js') }}"></script>
+<script>
 async function promptEditTask(task) {
   // task argument is the object returned by project board
   if (!task.attachments) task.attachments = [];
+  let labelPicker = null;
+  let cfCollector = null;
+  await pmLoadProjectLabels(currentProjectId);
+  if (typeof pmLoadCustomFields === 'function') await pmLoadCustomFields(currentProjectId);
   openModal('Edit Task', (c) => {
     const startVal = task.start_date ? task.start_date.slice(0,10) : '';
     const endVal = task.end_date ? task.end_date.slice(0,10) : '';
@@ -3959,6 +3086,15 @@ async function promptEditTask(task) {
           <label class="text-sm text-gray-600">Assignees:</label>
           <div id="task_assignees_pick"></div>
         </div>
+        <div class="grid gap-1">
+          <label class="text-sm text-gray-600">Labels:</label>
+          <div id="task_labels_pick"></div>
+        </div>
+        <div class="grid gap-1">
+          <label class="text-sm text-gray-600">Dependencies:</label>
+          <div id="task_deps_pick"></div>
+        </div>
+        <div id="task_custom_fields_wrap" class="grid gap-2 border-t border-zinc-200 pt-2"></div>
         <div class="grid gap-2 border-t border-zinc-200 pt-3 mt-1">
           <label class="text-sm text-gray-600">Attachments</label>
           <input type="file" id="task_attachment_input" class="hidden" />
@@ -3968,6 +3104,15 @@ async function promptEditTask(task) {
       </div>
     `;
     pmMountAssigneePicker(c.querySelector('#task_assignees_pick'), { selected: task.assignees || [] });
+    if (typeof pmMountLabelPicker === 'function') {
+      labelPicker = pmMountLabelPicker(c.querySelector('#task_labels_pick'), { selected: task.labels || [] });
+    }
+    if (typeof pmMountDependenciesEditor === 'function') {
+      pmMountDependenciesEditor(c.querySelector('#task_deps_pick'), task, lastBoardData);
+    }
+    if (typeof pmRenderCustomFieldsForm === 'function') {
+      cfCollector = pmRenderCustomFieldsForm(c.querySelector('#task_custom_fields_wrap'), task, currentProjectId);
+    }
     const pickBtn = $('task_attachment_pick');
     const fileInput = $('task_attachment_input');
     if (pickBtn && fileInput) {
@@ -4001,16 +3146,19 @@ async function promptEditTask(task) {
     const progress = parseInt($('task_progress').value || 0, 10);
     const priority = ($('task_priority') || {}).value || 'medium';
     const assignees = pmGetAssigneeIdsFromMount('task_assignees_pick');
-
-    await apiPATCH(`${API_BASE}/tasks/${task.id}`, {
+    const labels = labelPicker ? labelPicker.getSelectedIds() : [];
+    const payload = {
       title,
       description,
       start_date: start_date || undefined,
       end_date: end_date || undefined,
       progress,
       priority,
-      assignees
-    });
+      assignees,
+      labels,
+    };
+    if (cfCollector) payload.custom_fields = cfCollector.collect();
+    await apiPATCH(`${API_BASE}/tasks/${task.id}`, payload);
     await loadBoard(currentProjectId);
   });
 }
@@ -4056,10 +3204,29 @@ $('deleteProjectBtn').onclick = () => {
 $('showGanttBtn').onclick = showGanttChart;
 $('showMyTasksBtn').onclick = showMyTasks;
 
+async function promptDuplicateProject() {
+  if (!currentProjectId) return alert('Select a project first');
+  const name = prompt('Name for duplicated project:', 'Copy of project');
+  if (!name || !name.trim()) return;
+  const created = await apiPOST(`${API_BASE}/projects`, {
+    name: name.trim(),
+    clone_from_id: parseInt(currentProjectId, 10),
+    include_tasks: false,
+  });
+  await loadProjects();
+  currentProjectId = created.id;
+  const sel = $('projectSelect');
+  if (sel) sel.value = String(created.id);
+  updatePmWorkspaceVisibility();
+  await loadBoard(created.id);
+}
+
 
 /* ---------- Project create/edit/delete flows (unchanged except robust member handling) ---------- */
 async function promptCreateProject() {
   const users = await loadUsers();
+  let projects = [];
+  try { projects = await apiGET(`${API_BASE}/projects`); } catch (e) { /* ignore */ }
   openModal('Create Project', (container) => {
     const nameInput = el('input',{class:' border p-2 rounded mb-3',id:'proj_name', placeholder:'Project name'});
     const typeSelect = el('select',{class:'w-full border p-2 rounded mb-3', id:'proj_type'});
@@ -4067,6 +3234,14 @@ async function promptCreateProject() {
       const o = new Option(t,t);
       typeSelect.appendChild(o);
     });
+    const tplWrap = el('div', {class:'mb-3'});
+    tplWrap.innerHTML = '<div class="text-sm text-gray-600 mb-1">Create from template (optional)</div>';
+    const tplSel = el('select', {class:'w-full border p-2 rounded', id:'proj_template'});
+    tplSel.appendChild(new Option('— Blank project —', ''));
+    projects.forEach((p) => tplSel.appendChild(new Option(p.name, String(p.id))));
+    tplWrap.appendChild(tplSel);
+    const incTasks = el('label', {class:'flex items-center gap-2 text-sm text-gray-600 mt-2'});
+    incTasks.innerHTML = '<input type="checkbox" id="proj_include_tasks" /> Include tasks from template';
 
     const membersWrap = el('div', {class:'mb-3'});
     membersWrap.appendChild(el('div',{class:'text-sm text-gray-600 mb-1', text:'Members (optional)'}));
@@ -4083,12 +3258,21 @@ async function promptCreateProject() {
 
     container.appendChild(nameInput);
     container.appendChild(typeSelect);
+    container.appendChild(tplWrap);
+    tplWrap.appendChild(incTasks);
     container.appendChild(membersWrap);
   }, async () => {
     const name = $('proj_name').value.trim();
     const type = $('proj_type').value;
     if (!name) throw new Error('Project name required');
-    const created = await apiPOST(`${API_BASE}/projects`, {name, project_type: type});
+    const tpl = ($('proj_template') || {}).value;
+    const include_tasks = ($('proj_include_tasks') || {}).checked;
+    const payload = { name, project_type: type };
+    if (tpl) {
+      payload.clone_from_id = parseInt(tpl, 10);
+      payload.include_tasks = include_tasks;
+    }
+    const created = await apiPOST(`${API_BASE}/projects`, payload);
     // add members if any
     const selected = Array.from(modalBody.querySelectorAll('input[type=checkbox]:checked')).map(cb => parseInt(cb.dataset.uid));
     if (selected.length) {
@@ -4147,6 +3331,9 @@ async function promptEditProject(projectId) {
       const label = el('label',{class:'flex items-center space-x-2 border p-2 rounded'});
       label.appendChild(cb);
       label.appendChild(el('span',{text:u.name}));
+      const roleSel = el('select', {class:'text-xs border rounded px-1 py-0.5 ml-auto', 'data-member-role': String(u.id)});
+      ['viewer', 'contributor', 'admin'].forEach((r) => roleSel.appendChild(new Option(r, r)));
+      label.appendChild(roleSel);
       list.appendChild(label);
     });
     membersWrap.appendChild(list);
@@ -4154,6 +3341,22 @@ async function promptEditProject(projectId) {
     container.appendChild(nameInput);
     container.appendChild(typeSelect);
     container.appendChild(membersWrap);
+    const adminMount = el('div', {id: 'pm-edit-proj-admin'});
+    container.appendChild(adminMount);
+    if (typeof pmRenderCustomFieldsAdmin === 'function') pmRenderCustomFieldsAdmin(adminMount, projectId);
+    if (typeof pmRenderWebhooksAdmin === 'function') pmRenderWebhooksAdmin(adminMount, projectId);
+    const subLabel = el('label', {class: 'flex items-center gap-2 text-sm mt-2'});
+    const subCb = el('input', {type: 'checkbox', id: 'pmEditProjSubscribe'});
+    subLabel.appendChild(subCb);
+    subLabel.appendChild(el('span', {text: 'Notify me about project activity'}));
+    container.appendChild(subLabel);
+    if (typeof pmLoadSubscribeState === 'function') {
+      pmLoadSubscribeState(projectId).then((on) => { if (subCb) subCb.checked = on; });
+    }
+    if (typeof pmRenderMemberRoles === 'function') pmRenderMemberRoles(list, projectId);
+    const dupBtn = el('button', {type:'button', class:'text-sm text-indigo-600 hover:underline mt-2', text:'Duplicate this project…'});
+    dupBtn.onclick = () => { closeModal(); promptDuplicateProject(); };
+    container.appendChild(dupBtn);
   }, async () => {
     const name = $('proj_name').value.trim();
     const type = $('proj_type').value;
@@ -4169,6 +3372,10 @@ async function promptEditProject(projectId) {
     };
 
     await apiPATCH(`${API_BASE}/projects/${projectId}`, payload);
+    const editSub = $('pmEditProjSubscribe');
+    if (editSub && typeof pmSubscribeProject === 'function') {
+      await pmSubscribeProject(projectId, editSub.checked);
+    }
     await loadProjects();
   });
   // Ensure the edit project modal uses its custom dimensions
@@ -5175,6 +4382,19 @@ window.onload = async () => {
   if (tabGantt) tabGantt.onclick = () => setActiveTab('gantt');
   if (tabCalendar) tabCalendar.onclick = () => setActiveTab('calendar');
   if (tabDocuments) tabDocuments.onclick = () => setActiveTab('documents');
+  const tabActivity = $('tab-activity');
+  if (tabActivity) tabActivity.onclick = () => setActiveTab('activity');
+  if (typeof pmWireActivityTab === 'function') pmWireActivityTab(() => currentProjectId);
+
+  window.pmPopulateBulkAssignees = async function() {
+    const sel = $('pmBulkAssignee');
+    if (!sel) return;
+    const users = await getAssignableUsers();
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">Assign to…</option>';
+    (users || []).forEach((u) => sel.appendChild(new Option(u.name, String(u.id))));
+    if (prev) sel.value = prev;
+  };
 
   const calBtnToday = $('calBtnToday');
   if (calBtnToday) calBtnToday.onclick = () => calNavigateToday();
@@ -5248,6 +4468,58 @@ window.onload = async () => {
 
   await loadUsers();
   pmWireKeyboardShortcuts();
+  if (typeof pmMountGlobalSearch === 'function') {
+    pmMountGlobalSearch($('pmGlobalSearch'), $('pmGlobalSearchResults'));
+  }
+  const bulkToggle = $('pmBulkToggleBtn');
+  if (bulkToggle) bulkToggle.onclick = () => pmToggleBulkMode(!window.pmBulkMode);
+  const bulkCancel = $('pmBulkCancelBtn');
+  if (bulkCancel) bulkCancel.onclick = () => pmToggleBulkMode(false);
+  const bulkMove = $('pmBulkMoveCol');
+  if (bulkMove) bulkMove.onchange = () => { if (bulkMove.value) pmBulkMove(bulkMove.value); };
+  const bulkPri = $('pmBulkPriority');
+  if (bulkPri) bulkPri.onchange = () => { if (bulkPri.value) pmBulkSetPriority(bulkPri.value); };
+  const bulkDel = $('pmBulkDeleteBtn');
+  if (bulkDel) bulkDel.onclick = () => pmBulkDelete();
+  const bulkAssign = $('pmBulkAssignee');
+  if (bulkAssign) {
+    bulkAssign.onchange = async () => {
+      if (!bulkAssign.value) return;
+      await pmBulkAssign([parseInt(bulkAssign.value, 10)]);
+      bulkAssign.value = '';
+    };
+  }
+  const lblMgr = $('pmManageLabelsBtn');
+  if (lblMgr) lblMgr.onclick = () => pmOpenLabelManager(currentProjectId, () => loadBoard(currentProjectId));
+  const saveViewBtn = $('pmSaveViewBtn');
+  if (saveViewBtn) saveViewBtn.onclick = async () => {
+    const name = prompt('Name for this view:');
+    if (!name || !currentProjectId) return;
+    await pmSaveCurrentBoardView(currentProjectId, name.trim());
+    await pmRefreshSavedViewsSelect();
+  };
+  const savedSel = $('pmSavedViewsSelect');
+  if (savedSel) {
+    savedSel.onchange = async () => {
+      if (!savedSel.value) return;
+      try {
+        const views = await pmLoadSavedViews(currentProjectId);
+        const v = views.find((x) => String(x.id) === String(savedSel.value));
+        if (v) pmApplySavedView(v.filter_json);
+      } catch (e) { /* ignore */ }
+    };
+  }
+  window.pmRefreshSavedViewsSelect = async function() {
+    const sel = $('pmSavedViewsSelect');
+    if (!sel || !currentProjectId) return;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">Saved views…</option>';
+    try {
+      const views = await pmLoadSavedViews(currentProjectId);
+      (views || []).forEach((v) => sel.appendChild(new Option(v.name, String(v.id))));
+      if (prev) sel.value = prev;
+    } catch (e) { /* ignore */ }
+  };
   const boardToggle = $('pmBoardViewToggle');
   if (boardToggle) {
     boardToggle.onclick = () => {

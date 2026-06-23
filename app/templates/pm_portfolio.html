@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}PM Portfolio{% endblock %}
+{% block head_extra %}
+<style>
+  .pm-portfolio-modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:100; display:flex; align-items:center; justify-content:center; }
+  .pm-portfolio-modal-backdrop.hidden { display:none; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto p-4 space-y-4">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold text-zinc-900">Portfolio</h1>
+      <p class="text-sm text-zinc-500 mt-0.5">Health and progress across your projects</p>
+    </div>
+    <div class="flex flex-wrap gap-2 items-center">
+      <select id="pmPortfolioOwner" class="border border-zinc-200 rounded-lg px-3 py-2 text-sm">
+        <option value="">All owners</option>
+      </select>
+      <label class="text-sm flex items-center gap-1 border border-zinc-200 rounded-lg px-3 py-2">
+        <input type="checkbox" id="pmPortfolioMyProjects" /> My projects
+      </label>
+      <select id="pmPortfolioProgram" class="border border-zinc-200 rounded-lg px-3 py-2 text-sm">
+        <option value="">All programs</option>
+      </select>
+      <select id="pmPortfolioHealth" class="border border-zinc-200 rounded-lg px-3 py-2 text-sm">
+        <option value="">All health</option>
+        <option value="red">At risk</option>
+        <option value="yellow">Watch</option>
+        <option value="green">On track</option>
+      </select>
+      <select id="pmPortfolioSort" class="border border-zinc-200 rounded-lg px-3 py-2 text-sm">
+        <option value="health">Sort: health</option>
+        <option value="pct">Sort: % complete</option>
+        <option value="overdue">Sort: overdue</option>
+        <option value="name">Sort: name</option>
+      </select>
+      <button type="button" id="pmPortfolioViewCards" class="text-sm px-3 py-2 border border-indigo-200 bg-indigo-50 text-indigo-700 rounded-lg">Cards</button>
+      <button type="button" id="pmPortfolioViewTable" class="text-sm px-3 py-2 border border-zinc-200 rounded-lg">Table</button>
+      <button type="button" id="pmPortfolioExportBtn" class="text-sm px-3 py-2 border border-indigo-600 bg-indigo-600 text-white rounded-lg">Export</button>
+      <button type="button" id="pmPortfolioSnapshotBtn" class="text-sm px-3 py-2 border border-zinc-200 rounded-lg" title="Capture stats snapshot for visible projects">Snapshot</button>
+      <button type="button" id="pmManageProgramsBtn" class="text-sm px-3 py-2 border border-zinc-200 rounded-lg">Programs</button>
+      <a href="/pm/workload" class="text-sm px-3 py-2 border border-zinc-200 rounded-lg">Workload</a>
+      <a href="{{ url_for('projectmanagement') }}" class="text-sm text-indigo-600 hover:underline">Back</a>
+    </div>
+  </div>
+
+  <div id="pmPortfolioSummary"></div>
+  <div id="pmPortfolioGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+  <div id="pmPortfolioTable" class="hidden"></div>
+</div>
+
+<div id="pmPortfolioExportBackdrop" class="pm-portfolio-modal-backdrop hidden" aria-hidden="true">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-5 m-4" role="dialog">
+    <h2 class="text-lg font-semibold text-zinc-900 mb-3">Export portfolio</h2>
+    <div class="space-y-3 text-sm">
+      <div>
+        <div class="font-medium text-zinc-700 mb-1">Format</div>
+        <label class="flex items-center gap-2"><input type="radio" name="pm-portfolio-format" value="pdf" checked /> PDF</label>
+        <label class="flex items-center gap-2"><input type="radio" name="pm-portfolio-format" value="xlsx" /> Excel</label>
+        <label class="flex items-center gap-2"><input type="radio" name="pm-portfolio-format" value="pptx" /> PowerPoint</label>
+      </div>
+      <div>
+        <div class="font-medium text-zinc-700 mb-1">Scope</div>
+        <label class="flex items-center gap-2"><input type="radio" name="pm-portfolio-scope" value="all" checked /> All shown projects</label>
+        <label class="flex items-center gap-2"><input type="radio" name="pm-portfolio-scope" value="at_risk" /> At-risk only (red)</label>
+        <label class="flex items-center gap-2"><input type="radio" name="pm-portfolio-scope" value="executive_summary" /> Executive summary only</label>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-4">
+      <button type="button" id="pmPortfolioExportCancel" class="px-3 py-1.5 border rounded-lg text-sm">Cancel</button>
+      <button type="button" id="pmPortfolioExportConfirm" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">Download</button>
+    </div>
+  </div>
+</div>
+
+<div id="pmProgramsModalBackdrop" class="pm-portfolio-modal-backdrop hidden">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-5 m-4 max-h-[80vh] overflow-y-auto">
+    <h2 class="text-lg font-semibold mb-3">Manage programs</h2>
+    <div id="pmProgramsList" class="space-y-2 mb-4 text-sm"></div>
+    <div class="border-t pt-3 grid gap-2">
+      <input id="pmNewProgramName" class="border rounded px-2 py-1.5 text-sm" placeholder="New program name" />
+      <button type="button" id="pmCreateProgramBtn" class="text-sm px-3 py-1.5 bg-indigo-600 text-white rounded-lg w-fit">Create program</button>
+    </div>
+    <button type="button" id="pmProgramsModalClose" class="mt-3 text-sm text-zinc-600">Close</button>
+  </div>
+</div>
+
+<script>
+  const PM_EXPORT_LOGO_URL = "{{ url_for('static', filename='Logo.png') }}";
+  const PM_USER = { id: {{ current_user.id }}, name: {{ current_user.username|tojson }} };
+</script>
+<script src="{{ url_for('static', filename='js/vendor/pptxgen.bundle.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pm/pm-api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pm/pm-portfolio.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pm/pm-export.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pm/pm-admin.js') }}"></script>
+<script>
+(async function() {
+  const grid = document.getElementById('pmPortfolioGrid');
+  const table = document.getElementById('pmPortfolioTable');
+  const summary = document.getElementById('pmPortfolioSummary');
+  const progSel = document.getElementById('pmPortfolioProgram');
+  const healthSel = document.getElementById('pmPortfolioHealth');
+  const ownerSel = document.getElementById('pmPortfolioOwner');
+  const myProjCb = document.getElementById('pmPortfolioMyProjects');
+  const sortSel = document.getElementById('pmPortfolioSort');
+  let viewMode = 'cards';
+
+  function filteredStats() {
+    return pmFilterPortfolioStats(pmGetLastPortfolioStats() || [], {
+      ownerId: ownerSel && ownerSel.value ? ownerSel.value : null,
+      myProjects: myProjCb && myProjCb.checked,
+      userId: window.PM_USER && PM_USER.id,
+    });
+  }
+
+  async function refresh() {
+    try {
+      await pmLoadPortfolio(progSel.value || null, healthSel.value || null);
+      const stats = filteredStats();
+      if (ownerSel && ownerSel.options.length <= 1) {
+        const owners = [...new Map((pmGetLastPortfolioStats() || []).filter((s) => s.owner_id).map((s) => [s.owner_id, s.owner_name])).entries()];
+        owners.sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+        owners.forEach(([id, name]) => ownerSel.appendChild(new Option(name || ('User #' + id), String(id))));
+      }
+      pmRenderPortfolioSummary(summary, stats);
+      if (viewMode === 'table') {
+        pmRenderPortfolioTable(table, stats, sortSel.value);
+      } else {
+        pmRenderPortfolioGrid(grid, stats, sortSel.value);
+      }
+    } catch (e) {
+      console.error('Portfolio refresh failed:', e);
+      summary.innerHTML = `<p class="text-red-600 text-sm">Failed to load portfolio: ${String(e.message || e)}</p>`;
+      if (viewMode === 'table' && table) table.innerHTML = '';
+      else if (grid) grid.innerHTML = '';
+    }
+  }
+
+  document.getElementById('pmPortfolioViewCards').onclick = () => {
+    viewMode = 'cards';
+    grid.classList.remove('hidden');
+    table.classList.add('hidden');
+    refresh();
+  };
+  document.getElementById('pmPortfolioViewTable').onclick = () => {
+    viewMode = 'table';
+    table.classList.remove('hidden');
+    grid.classList.add('hidden');
+    refresh();
+  };
+  [progSel, healthSel, sortSel, ownerSel, myProjCb].forEach((el) => { if (el) el.onchange = refresh; });
+
+  const snapBtn = document.getElementById('pmPortfolioSnapshotBtn');
+  if (snapBtn) {
+    snapBtn.onclick = async () => {
+      const stats = filteredStats();
+      for (const s of stats) {
+        try {
+          await pmApiPOST(`/api/projects/${s.project_id}/stats/snapshots`, {});
+        } catch (e) { /* skip forbidden */ }
+      }
+      alert('Snapshots captured for visible projects.');
+      refresh();
+    };
+  }
+
+  try {
+    const progs = await pmLoadPrograms();
+    (progs || []).forEach((p) => progSel.appendChild(new Option(p.name, String(p.id))));
+  } catch (e) { /* ignore */ }
+
+  await refresh();
+
+  if (window.PmExport && PmExport.wirePortfolioExportModal) {
+    PmExport.wirePortfolioExportModal(() => ({
+      programId: progSel.value || null,
+      health: healthSel.value || null,
+    }));
+  }
+  if (typeof pmWireProgramsModal === 'function') pmWireProgramsModal();
+})();
+</script>
+{% endblock %}

@@ -15,7 +15,7 @@ from docx import Document
 import re
 from app import app, db, csrf
 from app.forms import EventForm, LoginForm, PerfomanceTargetsForm, RegistrationForm, BookAllocationForm, ReportForm, WorkspaceForm, ProjectForm, TaskForm, CSVUploadForm, ChampionCSVUploadForm, ChampionSchoolForm, AkelloSimEventForm
-from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, SchoolVisitLog, Event, WeeklyReport, TaskA, TaskASubtask, ColumnA, ProjectA, TaskAttachment, TaskAComment, TaskAActivity, TaskALabel, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket, AuditLog, AppSetting
+from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, SchoolVisitLog, Event, WeeklyReport, TaskA, TaskASubtask, ColumnA, ProjectA, TaskAttachment, TaskAComment, TaskAActivity, TaskALabel, TaskACustomFieldValue, ProjectACustomField, TaskADependency, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket, AuditLog, AppSetting, taska_comment_mentions
 from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from collections import defaultdict
@@ -1536,6 +1536,7 @@ def task_to_dict(t, summary=False):
         "assignees": [{"id": u.id, "name": u.username} for u in getattr(t, "assignees", [])],
         "labels": _safe_task_labels(t),
         "blocked_by_task_id": getattr(t, "blocked_by_task_id", None),
+        "blocked_by_title": (t.blocked_by.title if getattr(t, "blocked_by", None) else None),
         "source_action_item_id": getattr(t, "source_action_item_id", None),
         "subtask_done_count": subtask_done_count,
         "subtask_total": subtask_total,
@@ -1549,14 +1550,23 @@ def task_to_dict(t, summary=False):
     base["description"] = t.description
     base["attachments"] = [attachment_to_dict(a) for a in atts]
     base["subtasks"] = [subtask_a_to_dict(s) for s in subtasks]
+    cfvs = TaskACustomFieldValue.query.filter_by(task_id=t.id).all()
+    base["custom_fields"] = {str(v.field_id): v.value_text for v in cfvs}
     return base
 
 
 def column_to_dict(col, summary=False):
+    rules = None
+    if col.workflow_rules:
+        try:
+            rules = json.loads(col.workflow_rules)
+        except (TypeError, ValueError):
+            rules = {}
     return {
         "id": col.id,
         "title": col.title,
         "position": col.position,
+        "workflow_rules": rules or {},
         "tasks": [task_to_dict(t, summary=summary) for t in sorted(col.tasks, key=lambda x: x.position)]
     }
 
@@ -1695,6 +1705,38 @@ def user_can_access_project_a(p):
     return False
 
 
+def user_project_role_a(p):
+    from app.pm_service import get_member_role
+    if can_manage_project_a(p):
+        return "admin"
+    return get_member_role(p, current_user.id) or ("contributor" if getattr(p, "project_type", None) == "public" else None)
+
+
+def user_can_edit_tasks_a(p):
+    role = user_project_role_a(p)
+    return role in ("admin", "contributor")
+
+
+def user_can_comment_a(p):
+    role = user_project_role_a(p)
+    return role in ("admin", "contributor", "viewer")
+
+
+def user_can_manage_project_a(p):
+    """Project owner, app admin, or project member role admin."""
+    if can_manage_project_a(p):
+        return True
+    return user_project_role_a(p) == "admin"
+
+
+def project_edit_denied():
+    return jsonify({"error": "You do not have permission to edit tasks in this project."}), 403
+
+
+def project_manage_denied():
+    return jsonify({"error": "You do not have permission to manage this project."}), 403
+
+
 def projects_visible_to_user():
     return [p for p in ProjectA.query.order_by(ProjectA.name).all() if user_can_access_project_a(p)]
 
@@ -1719,6 +1761,41 @@ def _log_task_activity(task, action, detail=None):
         detail=detail,
     )
     db.session.add(act)
+    _notify_pm_project_subscribers(task, action, detail)
+
+
+def _notify_pm_project_subscribers(task, action, detail=None):
+    """Notify project subscribers of activity (dedupe one per user per project per hour)."""
+    from datetime import timedelta
+
+    from app.models import ProjectASubscription
+
+    p = _project_for_task(task)
+    if not p:
+        return
+    subs = ProjectASubscription.query.filter_by(project_id=p.id).all()
+    if not subs:
+        return
+    hour_ago = datetime.utcnow() - timedelta(hours=1)
+    link = url_for("projectmanagement", _external=False) + f"?project={p.id}&task={task.id}"
+    summary = f"{action}" + (f": {detail}" if detail else "")
+    for sub in subs:
+        if sub.user_id == current_user.id:
+            continue
+        recent = Notification.query.filter(
+            Notification.user_id == sub.user_id,
+            Notification.notification_type == "pm_project_activity",
+            Notification.created_at >= hour_ago,
+            Notification.message.contains(f"project={p.id}"),
+        ).first()
+        if recent:
+            continue
+        db.session.add(Notification(
+            user_id=sub.user_id,
+            task_id=task.id,
+            message=f"Project activity ({p.name}): {summary}. {link}",
+            notification_type="pm_project_activity",
+        ))
 
 
 def _notify_pm_assignees(task, new_user_ids, project):
@@ -1931,6 +2008,18 @@ def projectsA():
     data = request.get_json()
     if not data or "name" not in data:
         abort(400)
+    clone_from = data.get("clone_from_id") or data.get("template_project_id")
+    if clone_from:
+        from app.pm_service import clone_project
+        source = ProjectA.query.get_or_404(int(clone_from))
+        if not user_can_access_project_a(source):
+            return project_access_denied()
+        include_tasks = bool(data.get("include_tasks"))
+        p, _, _ = clone_project(source, data["name"], current_user.id, include_tasks=include_tasks)
+        if data.get("project_type"):
+            p.project_type = data["project_type"]
+        db.session.commit()
+        return jsonify({"id": p.id, "name": p.name, "type": p.project_type, "owner_id": p.owner_id}), 201
     p = ProjectA(
         name=data["name"],
         project_type=data.get("project_type", "private"),
@@ -2059,6 +2148,8 @@ def project_board(project_id):
     cols = (
         ColumnA.query.options(
             joinedload(ColumnA.tasks).joinedload(TaskA.assignees),
+            joinedload(ColumnA.tasks).joinedload(TaskA.labels),
+            joinedload(ColumnA.tasks).joinedload(TaskA.blocked_by),
             joinedload(ColumnA.tasks).joinedload(TaskA.subtasks).joinedload(TaskASubtask.assignees),
         )
         .filter_by(project_id=p.id)
@@ -2068,7 +2159,11 @@ def project_board(project_id):
     return jsonify({
         "id": p.id,
         "name": p.name,
-        "columns": [column_to_dict(c, summary=summary) for c in cols]
+        "columns": [column_to_dict(c, summary=summary) for c in cols],
+        "current_user_role": user_project_role_a(p),
+        "can_edit_tasks": user_can_edit_tasks_a(p),
+        "can_manage_project": user_can_manage_project_a(p),
+        "can_comment": user_can_comment_a(p),
     })
 
 # Create column in project
@@ -2078,6 +2173,8 @@ def create_column(project_id):
     p = ProjectA.query.get_or_404(project_id)
     if not user_can_access_project_a(p):
         return project_access_denied()
+    if not user_can_manage_project_a(p):
+        return project_manage_denied()
     data = request.get_json()
     title = data.get("title","New Column")
     # set position to end
@@ -2097,6 +2194,8 @@ def patch_column(column_id):
     p = _project_for_column(c)
     if not user_can_access_project_a(p):
         return project_access_denied()
+    if not user_can_manage_project_a(p):
+        return project_manage_denied()
     data = request.get_json() or {}
     if "title" in data:
         c.title = data["title"]
@@ -2113,6 +2212,8 @@ def create_taskA(column_id):
     p = _project_for_column(col)
     if not user_can_access_project_a(p):
         return project_access_denied()
+    if not user_can_edit_tasks_a(p):
+        return project_edit_denied()
     data = request.get_json()
     title = data.get("title", "New Task")
     desc = data.get("description", "")
@@ -2167,6 +2268,8 @@ def create_taskA(column_id):
     _log_task_activity(t, "created", f"Task created in column {col.title}")
     _notify_pm_assignees(t, new_assignee_ids, p)
     db.session.commit()
+    from app.pm_service import fire_webhooks
+    fire_webhooks(p.id, "task.created", {"task_id": t.id, "column_id": col.id})
     return jsonify(task_to_dict(t)), 201
 
 
@@ -2197,6 +2300,8 @@ def update_taskA(task_id):
     p = _project_for_task(t)
     if not user_can_access_project_a(p):
         return project_access_denied()
+    if not user_can_edit_tasks_a(p):
+        return jsonify({"error": "You do not have permission to edit tasks in this project."}), 403
     data = request.get_json()
     old_assignee_ids = {u.id for u in (t.assignees or [])}
     old_col_id = t.column_id
@@ -2237,6 +2342,21 @@ def update_taskA(task_id):
                 return jsonify({"error": "Invalid blocked_by task."}), 400
             t.blocked_by_task_id = bid
 
+    if "custom_fields" in data and isinstance(data["custom_fields"], dict):
+        for fid, val in data["custom_fields"].items():
+            try:
+                field_id = int(fid)
+            except (TypeError, ValueError):
+                continue
+            cf = ProjectACustomField.query.filter_by(id=field_id, project_id=p.id).first()
+            if not cf:
+                continue
+            existing = TaskACustomFieldValue.query.filter_by(task_id=t.id, field_id=field_id).first()
+            if existing:
+                existing.value_text = str(val) if val is not None else None
+            else:
+                db.session.add(TaskACustomFieldValue(task_id=t.id, field_id=field_id, value_text=str(val) if val is not None else None))
+
     # handle dates
     if "start_date" in data:
         t.start_date = datetime.fromisoformat(data["start_date"]) if data["start_date"] else None
@@ -2252,6 +2372,18 @@ def update_taskA(task_id):
         new_col_id = data.get("column_id", t.column_id)
         new_pos = data.get("position", None)
         if new_col_id != t.column_id:
+            dest_col = ColumnA.query.get(new_col_id)
+            if dest_col:
+                from app.pm_service import validate_column_workflow, task_is_complete
+                wf_err = validate_column_workflow(t, dest_col)
+                if wf_err:
+                    return jsonify({"error": wf_err}), 400
+                if t.blocked_by_task_id:
+                    blocker = TaskA.query.get(t.blocked_by_task_id)
+                    if blocker and not task_is_complete(blocker):
+                        title_lower = (dest_col.title or "").lower()
+                        if "done" in title_lower or "complete" in title_lower:
+                            pass  # soft warning only — allow move
             old_tasks = TaskA.query.filter(
                 TaskA.column_id == t.column_id,
                 TaskA.id != t.id
@@ -2283,6 +2415,11 @@ def update_taskA(task_id):
         _notify_pm_assignees(t, new_assignee_ids, p)
     apply_task_a_subtask_date_rollup(t)
     db.session.commit()
+    from app.pm_service import fire_webhooks
+    if "column_id" in data:
+        fire_webhooks(p.id, "task.moved", {"task_id": t.id, "column_id": t.column_id})
+    if "progress" in data and (t.progress or 0) >= 100:
+        fire_webhooks(p.id, "task.completed", {"task_id": t.id})
     return jsonify(task_to_dict(t))
 
 
@@ -2293,6 +2430,8 @@ def upload_task_attachment(task_id):
     p = t.column.project
     if not user_can_access_project_a(p):
         return jsonify({"error": "You do not have permission to attach files to this task."}), 403
+    if not user_can_edit_tasks_a(p):
+        return project_edit_denied()
 
     upload = request.files.get("file")
     if not upload or not upload.filename:
@@ -2387,6 +2526,8 @@ def reorder_columns(project_id):
     p = ProjectA.query.get_or_404(project_id)
     if not user_can_access_project_a(p):
         return project_access_denied()
+    if not user_can_manage_project_a(p):
+        return project_manage_denied()
     data = request.get_json()
     order = data.get("order", [])  # list of column ids in new order
     if not isinstance(order, list):
@@ -2406,6 +2547,8 @@ def delete_column(column_id):
     p = _project_for_column(c)
     if not user_can_access_project_a(p):
         return project_access_denied()
+    if not user_can_manage_project_a(p):
+        return project_manage_denied()
     col_count = ColumnA.query.filter_by(project_id=p.id).count()
     if col_count <= 1:
         return jsonify({"error": "Cannot delete the only column in a project."}), 400
@@ -2435,6 +2578,8 @@ def delete_taskA(task_id):
     p = t.column.project
     if not user_can_access_project_a(p):
         return jsonify({"error": "Forbidden"}), 403
+    if not user_can_edit_tasks_a(p):
+        return jsonify({"error": "You do not have permission to delete tasks in this project."}), 403
     if not can_delete_task_a(t):
         return jsonify({"error": "Only the task creator or an admin can delete this task."}), 403
     col_id = t.column_id
@@ -2484,6 +2629,9 @@ def task_a_subtasks(task_id):
         subtasks = sorted(t.subtasks or [], key=lambda s: (s.sort_order, s.id))
         return jsonify([subtask_a_to_dict(s) for s in subtasks])
 
+    if not user_can_edit_tasks_a(p):
+        return project_edit_denied()
+
     data = request.get_json() or {}
     title = (data.get("title") or "").strip()
     if not title:
@@ -2515,6 +2663,8 @@ def task_a_subtask(subtask_id):
     p = t.column.project
     if not user_can_access_project_a(p):
         return jsonify({"error": "Forbidden"}), 403
+    if not user_can_edit_tasks_a(p):
+        return project_edit_denied()
 
     if request.method == "DELETE":
         db.session.delete(st)
@@ -2560,17 +2710,24 @@ def my_tasks_a():
             return "week"
         return "later"
 
+    def task_progress_value(task, subtask=None):
+        if subtask:
+            return 100 if subtask.is_done else 0
+        subtasks = list(task.subtasks or [])
+        if subtasks:
+            done = sum(1 for s in subtasks if s.is_done)
+            return int(round(100 * done / len(subtasks)))
+        return task.progress or 0
+
     def append_row(item_type, task, col, project, subtask=None):
         end_dt = subtask.end_date if subtask else task.end_date
         bucket = due_bucket(end_dt)
-        is_overdue = bucket == "overdue"
+        progress = task_progress_value(task, subtask)
+        is_overdue = bucket == "overdue" and progress < 100
         if due_filter == "overdue" and not is_overdue:
             return
         if due_filter == "week" and bucket not in ("overdue", "week"):
             return
-        progress = task.progress or 0
-        if subtask:
-            progress = 100 if subtask.is_done else 0
         rows.append({
             "item_type": item_type,
             "task_id": task.id,
@@ -2645,8 +2802,35 @@ def task_a_comments(task_id):
     body = (data.get("body") or "").strip()
     if not body:
         return jsonify({"error": "body is required"}), 400
+    if not user_can_comment_a(_project_for_task(t)):
+        return jsonify({"error": "Forbidden"}), 403
     c = TaskAComment(task_id=t.id, user_id=current_user.id, body=body)
     db.session.add(c)
+    db.session.flush()
+    from app.pm_service import parse_mentions, highlight_mentions_html
+    p = _project_for_task(t)
+    mentioned = parse_mentions(body, p)
+    for mu in mentioned:
+        db.session.execute(
+            taska_comment_mentions.insert().values(comment_id=c.id, user_id=mu.id)
+        )
+        if mu.id != current_user.id:
+            link = url_for("projectmanagement", _external=False) + f"?project={p.id}&task={t.id}"
+            db.session.add(Notification(
+                user_id=mu.id,
+                task_id=t.id,
+                message=f"{current_user.username} mentioned you on: {t.title}. {link}",
+                notification_type="pm_mention",
+            ))
+    for u in (t.assignees or []):
+        if u.id != current_user.id and u not in mentioned:
+            link = url_for("projectmanagement", _external=False) + f"?project={p.id}&task={t.id}"
+            db.session.add(Notification(
+                user_id=u.id,
+                task_id=t.id,
+                message=f"New comment on: {t.title}. {link}",
+                notification_type="pm_comment",
+            ))
     _log_task_activity(t, "comment", body[:200])
     db.session.commit()
     return jsonify(comment_to_dict(c)), 201
@@ -14521,74 +14705,25 @@ def view_workspace(workspace_id):
 @app.route('/workspace/<int:workspace_id>/project/create', methods=['GET', 'POST'])
 @login_required
 def create_project(workspace_id):
-    workspace = Workspace.query.get_or_404(workspace_id)
-    form = ProjectForm()
-    if form.validate_on_submit():
-        project = Project(
-            title=form.title.data,
-            description=form.description.data,
-            start_date=form.start_date.data,
-            end_date=form.end_date.data,
-            workspace_id=workspace_id,
-            status=form.status.data,
-        )
-        db.session.add(project)
-        db.session.commit()
-        flash('Project created successfully!', 'success')
-    return redirect(url_for('view_workspace',workspace=workspace, workspace_id=workspace_id))
+    return redirect(url_for('projectmanagement'))
 
 
 @app.route('/project/<int:project_id>/edit', methods=['POST'])
 @login_required
 def edit_project(project_id):
-    project = Project.query.get_or_404(project_id)
-    form = ProjectForm()
-    if form.validate_on_submit():
-        project.title = form.title.data
-        project.description = form.description.data
-        project.status = form.status.data  # <-- Include status update
-        project.start_date = form.start_date.data
-        project.end_date = form.end_date.data
-        db.session.commit()
-        flash('Project updated successfully!', 'success')
-    return redirect(url_for('view_workspace', workspace_id=project.workspace_id))
+    return redirect(url_for('projectmanagement', project=project_id))
 
 
 @app.route('/project/<int:project_id>/delete', methods=['POST'])
 @login_required
 def delete_project(project_id):
-    project = Project.query.get_or_404(project_id)
-    workspace_id = project.workspace_id
-    db.session.delete(project)
-    db.session.commit()
-    flash('Project deleted successfully!', 'success')
-    return redirect(url_for('view_workspace', workspace_id=workspace_id))
+    return redirect(url_for('projectmanagement'))
 
 
 @app.route('/project/<int:project_id>/task/create', methods=['GET', 'POST'])
 @login_required
 def create_task(project_id):
-    project = Project.query.get_or_404(project_id)
-    form = TaskForm()
-    if form.validate_on_submit():
-        task = Task(
-            title=form.title.data,
-            description=form.description.data,
-            start_date=form.start_date.data,
-            due_date=form.due_date.data,
-            status=form.status.data,
-            progress=form.progress.data,  # must be included in the Task()
-            project_id=project_id,
-            assigned_to=current_user.id
-        )
-        db.session.add(task)
-        db.session.commit()
-    return redirect(url_for('view_workspace', workspace_id=project.workspace_id))
-    
-    # 🔥 This line fixes the problem when the form is invalid
-    # project = Project.query.get_or_404(project_id)
-    # return redirect(url_for('view_workspace', workspace_id=project.workspace_id))
-
+    return redirect(url_for('projectmanagement', project=project_id))
 
 
 @app.route('/task/<int:task_id>/update_dates', methods=['POST'])
@@ -21622,9 +21757,19 @@ def get_notifications():
         
         notifications_data = []
         for notif in notifications:
+            pm_project_id = None
+            if getattr(notif, 'task_id', None):
+                from app.models import TaskA, ColumnA
+                t = TaskA.query.get(notif.task_id)
+                if t and t.column_id:
+                    col = ColumnA.query.get(t.column_id)
+                    if col:
+                        pm_project_id = col.project_id
             notifications_data.append({
                 'id': notif.id,
                 'query_id': notif.query_id,
+                'task_id': getattr(notif, 'task_id', None),
+                'pm_project_id': pm_project_id,
                 'meeting_note_id': getattr(notif, 'meeting_note_id', None),
                 'action_item_id': getattr(notif, 'action_item_id', None),
                 'stakeholder_lead_id': getattr(notif, 'stakeholder_lead_id', None),

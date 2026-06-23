@@ -20,7 +20,8 @@ workspace_membership = db.Table('workspace_membership',
 project_membersA = db.Table(
     "project_membersa",
     db.Column("user_id", db.Integer, db.ForeignKey("user.id"), primary_key=True),
-    db.Column("project_id", db.Integer, db.ForeignKey("projectsa.id"), primary_key=True)
+    db.Column("project_id", db.Integer, db.ForeignKey("projectsa.id"), primary_key=True),
+    db.Column("role", db.String(20), nullable=False, server_default="contributor"),
 )
 
 # Association table for task assignees (ProjectA/TaskA system)
@@ -700,6 +701,7 @@ class ColumnA(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey("projectsa.id"), nullable=False)
     title = db.Column(db.String(120), nullable=False)
     position = db.Column(db.Integer, nullable=False, default=0)  # ordering
+    workflow_rules = db.Column(db.Text, nullable=True)  # JSON: require_assignee, require_due_date, min_progress
 
     tasks = db.relationship(
         "TaskA",
@@ -828,6 +830,150 @@ class TaskAActivity(db.Model):
     detail = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     actor = db.relationship("User", foreign_keys=[user_id])
+
+
+taska_comment_mentions = db.Table(
+    "taska_comment_mentions",
+    db.Column("comment_id", db.Integer, db.ForeignKey("taska_comments.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("user_id", db.Integer, db.ForeignKey("user.id"), primary_key=True),
+)
+
+milestone_tasks_assoc = db.Table(
+    "milestone_tasks_assoc",
+    db.Column("milestone_id", db.Integer, db.ForeignKey("milestonesa.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("task_id", db.Integer, db.ForeignKey("tasksa.id", ondelete="CASCADE"), primary_key=True),
+)
+
+program_projects_assoc = db.Table(
+    "program_projects_assoc",
+    db.Column("program_id", db.Integer, db.ForeignKey("programsa.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("project_id", db.Integer, db.ForeignKey("projectsa.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class ProjectACustomField(db.Model):
+    __tablename__ = "projecta_custom_fields"
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("projectsa.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = db.Column(db.String(80), nullable=False)
+    field_type = db.Column(db.String(20), nullable=False, default="text")  # text, number, date, select
+    options_json = db.Column(db.Text, nullable=True)
+    required_on_close = db.Column(db.Boolean, nullable=False, default=False)
+    position = db.Column(db.Integer, nullable=False, default=0)
+
+
+class TaskACustomFieldValue(db.Model):
+    __tablename__ = "taska_custom_field_values"
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey("tasksa.id", ondelete="CASCADE"), nullable=False, index=True)
+    field_id = db.Column(db.Integer, db.ForeignKey("projecta_custom_fields.id", ondelete="CASCADE"), nullable=False, index=True)
+    value_text = db.Column(db.Text, nullable=True)
+    __table_args__ = (db.UniqueConstraint("task_id", "field_id", name="uq_taska_custom_field_value"),)
+
+
+class ProjectASavedView(db.Model):
+    __tablename__ = "projecta_saved_views"
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("projectsa.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    name = db.Column(db.String(120), nullable=False)
+    filter_json = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class TaskADependency(db.Model):
+    __tablename__ = "taska_dependencies"
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey("tasksa.id", ondelete="CASCADE"), nullable=False, index=True)
+    depends_on_task_id = db.Column(db.Integer, db.ForeignKey("tasksa.id", ondelete="CASCADE"), nullable=False, index=True)
+    dep_type = db.Column(db.String(20), nullable=False, default="finish_to_start")
+    __table_args__ = (db.UniqueConstraint("task_id", "depends_on_task_id", name="uq_taska_dependency"),)
+
+
+class MilestoneA(db.Model):
+    __tablename__ = "milestonesa"
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("projectsa.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = db.Column(db.String(200), nullable=False)
+    due_date = db.Column(db.DateTime, nullable=True)
+    color = db.Column(db.String(20), nullable=False, default="#8b5cf6")
+    position = db.Column(db.Integer, nullable=False, default=0)
+    tasks = db.relationship("TaskA", secondary=milestone_tasks_assoc, backref="milestones")
+
+
+class ProjectABaseline(db.Model):
+    __tablename__ = "projecta_baselines"
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("projectsa.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = db.Column(db.String(120), nullable=False)
+    snapshot_json = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
+
+class ProgramA(db.Model):
+    __tablename__ = "programsa"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(140), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    projects = db.relationship("ProjectA", secondary=program_projects_assoc, backref="programs")
+
+
+class ProjectAStatsSnapshot(db.Model):
+    __tablename__ = "projecta_stats_snapshots"
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("projectsa.id", ondelete="CASCADE"), nullable=False, index=True)
+    snapshot_date = db.Column(db.Date, nullable=False, index=True)
+    total_tasks = db.Column(db.Integer, nullable=False, default=0)
+    completed_tasks = db.Column(db.Integer, nullable=False, default=0)
+    overdue_tasks = db.Column(db.Integer, nullable=False, default=0)
+
+
+class TaskATimeEntry(db.Model):
+    __tablename__ = "taska_time_entries"
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey("tasksa.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    minutes = db.Column(db.Integer, nullable=False, default=0)
+    entry_date = db.Column(db.Date, nullable=False)
+    note = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ProjectAWebhook(db.Model):
+    __tablename__ = "projecta_webhooks"
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("projectsa.id", ondelete="CASCADE"), nullable=False, index=True)
+    url = db.Column(db.String(512), nullable=False)
+    events_json = db.Column(db.Text, nullable=False, default='["task.moved"]')
+    secret = db.Column(db.String(64), nullable=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    deliveries = db.relationship(
+        "ProjectAWebhookDelivery",
+        backref="webhook",
+        cascade="all,delete-orphan",
+    )
+
+
+class ProjectAWebhookDelivery(db.Model):
+    __tablename__ = "projecta_webhook_deliveries"
+    id = db.Column(db.Integer, primary_key=True)
+    webhook_id = db.Column(
+        db.Integer, db.ForeignKey("projecta_webhooks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    event = db.Column(db.String(40), nullable=False)
+    status_code = db.Column(db.Integer, nullable=True)
+    error = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+
+class ProjectASubscription(db.Model):
+    __tablename__ = "projecta_subscriptions"
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("projectsa.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    __table_args__ = (db.UniqueConstraint("project_id", "user_id", name="uq_projecta_subscription"),)
 
 
 # ----------------------

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}PM Workload{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto p-4 space-y-4">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold text-zinc-900">Team workload</h1>
+      <p class="text-sm text-zinc-500 mt-0.5">Open, overdue, and blocked tasks across projects</p>
+    </div>
+    <a href="{{ url_for('projectmanagement') }}" class="text-sm text-indigo-600 hover:underline">Back to PM</a>
+  </div>
+  <div id="pmWorkloadMount" class="text-sm text-zinc-500">Loading…</div>
+</div>
+<script src="{{ url_for('static', filename='js/pm/pm-api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pm/pm-workload.js') }}"></script>
+<script>
+  pmRenderWorkloadPage(document.getElementById('pmWorkloadMount'));
+</script>
+{% endblock %}

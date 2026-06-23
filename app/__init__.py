@@ -35,6 +35,7 @@ logger = setup_logging(app)
 
 from app import routes, models, monitoring_routes
 from app import mobile_meeting_sales_routes  # noqa: F401 — /api/mobile/meeting-notes & sales-marketing
+from app import pm_routes  # noqa: F401 — extended PM platform routes
 
 # Register the global deletion-audit listener (after models are loaded).
 from app.audit import init_audit
