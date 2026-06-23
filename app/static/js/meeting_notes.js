@@ -2352,6 +2352,45 @@
         loadActivity();
       });
     }
+    const pmTaskBtn = $("#mn-panel-create-pm-task");
+    if (pmTaskBtn) {
+      pmTaskBtn.addEventListener("click", async function () {
+        if (!panelItemId) return;
+        try {
+          const projectsRes = await fetch("/api/projects");
+          const projects = await projectsRes.json();
+          if (!projects.length) { alert("No projects available."); return; }
+          const projList = projects.map((p, i) => `${i + 1}. ${p.name} (id ${p.id})`).join("\n");
+          const pick = prompt(`Enter project number:\n${projList}`);
+          if (!pick) return;
+          const idx = parseInt(pick, 10) - 1;
+          const project = projects[idx];
+          if (!project) { alert("Invalid selection"); return; }
+          const boardRes = await fetch(`/api/projects/${project.id}/board`);
+          const board = await boardRes.json();
+          const cols = board.columns || [];
+          if (!cols.length) { alert("Project has no columns."); return; }
+          const colList = cols.map((c, i) => `${i + 1}. ${c.title}`).join("\n");
+          const colPick = prompt(`Enter column number:\n${colList}`);
+          if (!colPick) return;
+          const colIdx = parseInt(colPick, 10) - 1;
+          const col = cols[colIdx];
+          if (!col) { alert("Invalid column"); return; }
+          const res = await fetch(`/api/meeting-notes/action-items/${panelItemId}/create-pm-task`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: project.id, column_id: col.id }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed");
+          if (confirm(`PM task created (id ${data.id}). Open project management?`)) {
+            window.location.href = `/projectmanagement?project=${project.id}&task=${data.id}`;
+          }
+        } catch (e) {
+          alert(e.message || "Could not create PM task");
+        }
+      });
+    }
     const taskTitleEl = $("#mn-panel-task-title");
     if (taskTitleEl) {
       taskTitleEl.addEventListener("input", function () { schedulePanelSave(); });

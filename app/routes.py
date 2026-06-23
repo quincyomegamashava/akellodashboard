@@ -15,12 +15,13 @@ from docx import Document
 import re
 from app import app, db, csrf
 from app.forms import EventForm, LoginForm, PerfomanceTargetsForm, RegistrationForm, BookAllocationForm, ReportForm, WorkspaceForm, ProjectForm, TaskForm, CSVUploadForm, ChampionCSVUploadForm, ChampionSchoolForm, AkelloSimEventForm
-from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, SchoolVisitLog, Event, WeeklyReport, TaskA, ColumnA, ProjectA, TaskAttachment, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket, AuditLog, AppSetting
+from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, SchoolVisitLog, Event, WeeklyReport, TaskA, TaskASubtask, ColumnA, ProjectA, TaskAttachment, TaskAComment, TaskAActivity, TaskALabel, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket, AuditLog, AppSetting
 from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from collections import defaultdict
 from flask import Blueprint
 from sqlalchemy import and_, create_engine, select, text
+from sqlalchemy.orm import joinedload
 import pymysql
 from werkzeug.utils import secure_filename
 import os
@@ -1498,34 +1499,160 @@ def akello_analytics():
 
 
 # -- Helper to serialize --
-def column_to_dict(col):
-    return {
-        "id": col.id,
-        "title": col.title,
-        "position": col.position,
-        "tasks": [task_to_dict(t) for t in sorted(col.tasks, key=lambda x: x.position)]
-    }
+def label_to_dict(lbl):
+    return {"id": lbl.id, "name": lbl.name, "color": lbl.color}
 
-def task_to_dict(t):
+
+def _safe_task_labels(task):
+    try:
+        return [label_to_dict(l) for l in (getattr(task, "labels", None) or [])]
+    except Exception:
+        return []
+
+
+def task_to_dict(t, summary=False):
     atts = sorted(
         getattr(t, "attachments", []),
         key=lambda a: (a.uploaded_at or datetime.min, a.id),
     )
-    return {
+    subtasks = sorted(getattr(t, "subtasks", []) or [], key=lambda s: (s.sort_order, s.id))
+    subtask_done_count = sum(1 for s in subtasks if s.is_done)
+    subtask_total = len(subtasks)
+    progress = t.progress or 0
+    if subtask_total:
+        progress = int(round(100 * subtask_done_count / subtask_total))
+    base = {
         "id": t.id,
         "title": t.title,
-        "description": t.description,
         "position": t.position,
-        "progress": t.progress,
+        "progress": progress,
+        "priority": getattr(t, "priority", None) or "medium",
         "start_date": t.start_date.isoformat() if t.start_date else None,
         "end_date": t.end_date.isoformat() if t.end_date else None,
+        "date_rollup_enabled": bool(getattr(t, "date_rollup_enabled", False)),
         "column_id": t.column_id,
-        "created_at": t.created_at.isoformat(),
+        "created_at": t.created_at.isoformat() if t.created_at else None,
         "created_by": t.created_by,
         "assignees": [{"id": u.id, "name": u.username} for u in getattr(t, "assignees", [])],
-        "attachments": [attachment_to_dict(a) for a in atts],
+        "labels": _safe_task_labels(t),
+        "blocked_by_task_id": getattr(t, "blocked_by_task_id", None),
+        "source_action_item_id": getattr(t, "source_action_item_id", None),
+        "subtask_done_count": subtask_done_count,
+        "subtask_total": subtask_total,
         "can_delete": can_delete_task_a(t),
     }
+    if summary:
+        base["description"] = (t.description or "")[:200] if t.description else ""
+        base["attachments"] = [{"id": a.id, "original_name": a.original_name} for a in atts]
+        base["subtasks"] = []
+        return base
+    base["description"] = t.description
+    base["attachments"] = [attachment_to_dict(a) for a in atts]
+    base["subtasks"] = [subtask_a_to_dict(s) for s in subtasks]
+    return base
+
+
+def column_to_dict(col, summary=False):
+    return {
+        "id": col.id,
+        "title": col.title,
+        "position": col.position,
+        "tasks": [task_to_dict(t, summary=summary) for t in sorted(col.tasks, key=lambda x: x.position)]
+    }
+
+def subtask_a_to_dict(st):
+    return {
+        "id": st.id,
+        "task_id": st.task_id,
+        "title": st.title,
+        "is_done": st.is_done,
+        "sort_order": st.sort_order,
+        "start_date": st.start_date.isoformat() if st.start_date else None,
+        "end_date": st.end_date.isoformat() if st.end_date else None,
+        "assignees": [{"id": u.id, "name": u.username} for u in getattr(st, "assignees", [])],
+    }
+
+
+def validate_assignee_user_ids(user_ids):
+    """Return list of User objects for valid IDs, or (None, error_message)."""
+    if user_ids is None:
+        return [], None
+    if not isinstance(user_ids, list):
+        return None, "assignees must be a list"
+    ids = []
+    for raw in user_ids:
+        try:
+            ids.append(int(raw))
+        except (TypeError, ValueError):
+            return None, "assignees must contain integer user IDs"
+    users = []
+    for uid in ids:
+        user = User.query.get(uid)
+        if not user:
+            return None, f"Unknown user id: {uid}"
+        users.append(user)
+    return users, None
+
+
+def _parse_optional_iso_datetime(value):
+    if value is None or value == "":
+        return None
+    return datetime.fromisoformat(value)
+
+
+def _apply_subtask_a_fields(st, data):
+    """Apply optional title, dates, done state, and assignees from JSON payload."""
+    if "title" in data:
+        new_title = (data.get("title") or "").strip()
+        if new_title:
+            st.title = new_title
+    if "is_done" in data:
+        st.is_done = bool(data["is_done"])
+    if "start_date" in data:
+        st.start_date = _parse_optional_iso_datetime(data["start_date"])
+    if "end_date" in data:
+        st.end_date = _parse_optional_iso_datetime(data["end_date"])
+    if st.start_date and st.end_date and st.end_date < st.start_date:
+        return "end_date must be greater than or equal to start_date"
+    if "assignees" in data:
+        users, err = validate_assignee_user_ids(data["assignees"])
+        if err:
+            return err
+        st.assignees = users
+    return None
+
+
+def apply_task_a_subtask_progress_rollup(task):
+    """Derive parent task progress from sub-task completion."""
+    subtasks = list(task.subtasks or [])
+    if not subtasks:
+        return False
+    done = sum(1 for s in subtasks if s.is_done)
+    new_progress = int(round(100 * done / len(subtasks)))
+    changed = task.progress != new_progress
+    task.progress = new_progress
+    return changed
+
+
+def apply_task_a_subtask_date_rollup(task):
+    """When enabled, set parent dates from sub-task min/max if parent dates empty."""
+    if not getattr(task, "date_rollup_enabled", False):
+        return False
+    subtasks = [s for s in (task.subtasks or []) if s.start_date or s.end_date]
+    if not subtasks:
+        return False
+    changed = False
+    if not task.start_date:
+        starts = [s.start_date for s in subtasks if s.start_date]
+        if starts:
+            task.start_date = min(starts)
+            changed = True
+    if not task.end_date:
+        ends = [s.end_date for s in subtasks if s.end_date]
+        if ends:
+            task.end_date = max(ends)
+            changed = True
+    return changed
 
 
 def can_manage_project_a(p):
@@ -1566,6 +1693,92 @@ def user_can_access_project_a(p):
     if getattr(p, "project_type", None) == "public":
         return True
     return False
+
+
+def projects_visible_to_user():
+    return [p for p in ProjectA.query.order_by(ProjectA.name).all() if user_can_access_project_a(p)]
+
+
+def project_access_denied():
+    return jsonify({"error": "You do not have permission to access this project."}), 403
+
+
+def _project_for_column(col):
+    return col.project if col else None
+
+
+def _project_for_task(t):
+    return t.column.project if t and t.column else None
+
+
+def _log_task_activity(task, action, detail=None):
+    act = TaskAActivity(
+        task_id=task.id,
+        user_id=current_user.id,
+        action=action,
+        detail=detail,
+    )
+    db.session.add(act)
+
+
+def _notify_pm_assignees(task, new_user_ids, project):
+    if not new_user_ids:
+        return
+    me_id = current_user.id
+    link = url_for("projectmanagement", _external=False) + f"?project={project.id}&task={task.id}"
+    for uid in new_user_ids:
+        if uid == me_id:
+            continue
+        db.session.add(Notification(
+            user_id=uid,
+            task_id=task.id,
+            message=f"You were assigned to task: {task.title}. {link}",
+            notification_type="pm_assignment",
+        ))
+
+
+def _resolve_task_labels(task, label_ids, project_id):
+    if label_ids is None:
+        return None, None
+    if not isinstance(label_ids, list):
+        return None, "labels must be a list"
+    labels = []
+    for raw in label_ids:
+        try:
+            lid = int(raw)
+        except (TypeError, ValueError):
+            return None, "labels must contain integer IDs"
+        lbl = TaskALabel.query.filter_by(id=lid, project_id=project_id).first()
+        if not lbl:
+            return None, f"Unknown label id: {lid}"
+        labels.append(lbl)
+    return labels, None
+
+
+def comment_to_dict(c):
+    author = c.author
+    name = author.username if author else "Unknown"
+    return {
+        "id": c.id,
+        "task_id": c.task_id,
+        "user_id": c.user_id,
+        "author_name": name,
+        "body": c.body,
+        "created_at": c.created_at.isoformat() if c.created_at else None,
+    }
+
+
+def activity_to_dict(a):
+    actor = a.actor
+    return {
+        "id": a.id,
+        "task_id": a.task_id,
+        "user_id": a.user_id,
+        "actor_name": actor.username if actor else None,
+        "action": a.action,
+        "detail": a.detail,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+    }
 
 
 TASK_ATTACHMENTS_FOLDER_REL = os.path.join("uploads", "task_attachments")
@@ -1648,6 +1861,21 @@ def create_tables():
                 _conn.commit()
     except Exception:
         pass
+    # PM roadmap columns on tasksa (SQLite-safe)
+    if db.engine.dialect.name == "sqlite":
+        for stmt in (
+            "ALTER TABLE tasksa ADD COLUMN priority VARCHAR(16) DEFAULT 'medium'",
+            "ALTER TABLE tasksa ADD COLUMN date_rollup_enabled BOOLEAN DEFAULT 0",
+            "ALTER TABLE tasksa ADD COLUMN source_action_item_id INTEGER",
+            "ALTER TABLE tasksa ADD COLUMN blocked_by_task_id INTEGER",
+            "ALTER TABLE notifications ADD COLUMN task_id INTEGER",
+        ):
+            try:
+                with db.engine.connect() as _conn:
+                    _conn.execute(sa.text(stmt))
+                    _conn.commit()
+            except Exception:
+                pass
     # Ensure the task-attachments folder exists under instance/ so uploads survive deploys
     try:
         os.makedirs(_task_attachments_instance_dir(), exist_ok=True)
@@ -1678,12 +1906,18 @@ def projectmanagement():
 def projectmanagement_alias():
     return redirect(url_for("projectmanagement"))
 
+
+@app.route("/aplanforprojects", methods=["GET", "POST"])
+@login_required
+def aplanforprojects_redirect():
+    return redirect(url_for("projectmanagement"))
+
 # List + create projects
 @app.route("/api/projects", methods=["GET", "POST"])
 @login_required
 def projectsA():
     if request.method == "GET":
-        ps = ProjectA.query.all()
+        ps = projects_visible_to_user()
         return jsonify([
             {
                 "id": p.id,
@@ -1713,6 +1947,8 @@ def projectsA():
 @login_required
 def get_projectA(project_id):
     p = ProjectA.query.get_or_404(project_id)
+    if not user_can_access_project_a(p):
+        return project_access_denied()
     return jsonify({
         "id": p.id,
         "name": p.name,
@@ -1769,6 +2005,8 @@ def delete_projectA(project_id):
 @login_required
 def get_membersA(project_id):
     p = ProjectA.query.get_or_404(project_id)
+    if not user_can_access_project_a(p):
+        return project_access_denied()
     return jsonify([{"id": u.id, "name": u.username} for u in p.members])
 
 
@@ -1777,6 +2015,8 @@ def get_membersA(project_id):
 @login_required
 def add_membersA(project_id):
     p = ProjectA.query.get_or_404(project_id)
+    if not can_manage_project_a(p):
+        return project_access_denied()
     data = request.get_json()
     user_ids = data.get("user_ids", [])
     if not isinstance(user_ids, list):
@@ -1813,11 +2053,22 @@ def get_users():
 @login_required
 def project_board(project_id):
     p = ProjectA.query.get_or_404(project_id)
-    cols = ColumnA.query.filter_by(project_id=p.id).order_by(ColumnA.position).all()
+    if not user_can_access_project_a(p):
+        return project_access_denied()
+    summary = request.args.get("summary") in ("1", "true", "yes")
+    cols = (
+        ColumnA.query.options(
+            joinedload(ColumnA.tasks).joinedload(TaskA.assignees),
+            joinedload(ColumnA.tasks).joinedload(TaskA.subtasks).joinedload(TaskASubtask.assignees),
+        )
+        .filter_by(project_id=p.id)
+        .order_by(ColumnA.position)
+        .all()
+    )
     return jsonify({
         "id": p.id,
         "name": p.name,
-        "columns": [column_to_dict(c) for c in cols]
+        "columns": [column_to_dict(c, summary=summary) for c in cols]
     })
 
 # Create column in project
@@ -1825,6 +2076,8 @@ def project_board(project_id):
 @login_required
 def create_column(project_id):
     p = ProjectA.query.get_or_404(project_id)
+    if not user_can_access_project_a(p):
+        return project_access_denied()
     data = request.get_json()
     title = data.get("title","New Column")
     # set position to end
@@ -1841,6 +2094,9 @@ def create_column(project_id):
 @login_required
 def patch_column(column_id):
     c = ColumnA.query.get_or_404(column_id)
+    p = _project_for_column(c)
+    if not user_can_access_project_a(p):
+        return project_access_denied()
     data = request.get_json() or {}
     if "title" in data:
         c.title = data["title"]
@@ -1854,6 +2110,9 @@ def patch_column(column_id):
 @login_required
 def create_taskA(column_id):
     col = ColumnA.query.get_or_404(column_id)
+    p = _project_for_column(col)
+    if not user_can_access_project_a(p):
+        return project_access_denied()
     data = request.get_json()
     title = data.get("title", "New Task")
     desc = data.get("description", "")
@@ -1872,6 +2131,9 @@ def create_taskA(column_id):
     maxpos = db.session.query(db.func.max(TaskA.position)).filter_by(column_id=column_id).scalar()
     pos = (maxpos + 1) if maxpos is not None else 0
 
+    priority = (data.get("priority") or "medium").strip().lower()
+    if priority not in ("low", "medium", "high", "urgent"):
+        priority = "medium"
     t = TaskA(
         column_id=column_id,
         title=title,
@@ -1879,33 +2141,101 @@ def create_taskA(column_id):
         position=pos,
         start_date=start_dt,
         end_date=end_dt,
+        priority=priority,
         created_by=current_user.id,
     )
+    if "date_rollup_enabled" in data:
+        t.date_rollup_enabled = bool(data["date_rollup_enabled"])
+    if "source_action_item_id" in data and data["source_action_item_id"]:
+        t.source_action_item_id = int(data["source_action_item_id"])
     # set initial assignees if provided
+    new_assignee_ids = []
     if isinstance(assignees_ids, list) and len(assignees_ids) > 0:
-        t.assignees = [User.query.get(uid) for uid in assignees_ids if User.query.get(uid)]
+        users, err = validate_assignee_user_ids(assignees_ids)
+        if err:
+            return jsonify({"error": err}), 400
+        t.assignees = users
+        new_assignee_ids = [u.id for u in users]
+    if "labels" in data:
+        labels, err = _resolve_task_labels(t, data["labels"], p.id)
+        if err:
+            return jsonify({"error": err}), 400
+        if labels is not None:
+            t.labels = labels
     db.session.add(t)
+    db.session.flush()
+    _log_task_activity(t, "created", f"Task created in column {col.title}")
+    _notify_pm_assignees(t, new_assignee_ids, p)
     db.session.commit()
     return jsonify(task_to_dict(t)), 201
 
 
 
 # --- Task update extended with progress ---
+@app.route("/api/tasks/<int:task_id>", methods=["GET"])
+@login_required
+def get_taskA(task_id):
+    t = (
+        TaskA.query.options(
+            joinedload(TaskA.assignees),
+            joinedload(TaskA.labels),
+            joinedload(TaskA.subtasks).joinedload(TaskASubtask.assignees),
+            joinedload(TaskA.attachments),
+        )
+        .get_or_404(task_id)
+    )
+    p = _project_for_task(t)
+    if not user_can_access_project_a(p):
+        return project_access_denied()
+    return jsonify(task_to_dict(t))
+
+
 @app.route("/api/tasks/<int:task_id>", methods=["PATCH"])
 @login_required
 def update_taskA(task_id):
     t = TaskA.query.get_or_404(task_id)
+    p = _project_for_task(t)
+    if not user_can_access_project_a(p):
+        return project_access_denied()
     data = request.get_json()
+    old_assignee_ids = {u.id for u in (t.assignees or [])}
+    old_col_id = t.column_id
 
     if "title" in data:
         t.title = data["title"]
     if "assignees" in data and isinstance(data["assignees"], list):
-        ids = set([int(x) for x in data["assignees"]])
-        t.assignees = [User.query.get(uid) for uid in ids if User.query.get(uid)]
+        users, err = validate_assignee_user_ids(data["assignees"])
+        if err:
+            return jsonify({"error": err}), 400
+        t.assignees = users
     if "description" in data:
         t.description = data["description"]
     if "progress" in data:
         t.progress = max(0, min(100, int(data["progress"])))
+    if "priority" in data:
+        pr = (data.get("priority") or "medium").strip().lower()
+        if pr in ("low", "medium", "high", "urgent"):
+            t.priority = pr
+    if "date_rollup_enabled" in data:
+        t.date_rollup_enabled = bool(data["date_rollup_enabled"])
+    if "labels" in data:
+        labels, err = _resolve_task_labels(t, data["labels"], p.id)
+        if err:
+            return jsonify({"error": err}), 400
+        if labels is not None:
+            t.labels = labels
+    if "blocked_by_task_id" in data:
+        bid = data["blocked_by_task_id"]
+        if bid is None or bid == "":
+            t.blocked_by_task_id = None
+        else:
+            bid = int(bid)
+            if bid == t.id:
+                return jsonify({"error": "A task cannot block itself."}), 400
+            blocker = TaskA.query.get(bid)
+            if not blocker or _project_for_task(blocker).id != p.id:
+                return jsonify({"error": "Invalid blocked_by task."}), 400
+            t.blocked_by_task_id = bid
 
     # handle dates
     if "start_date" in data:
@@ -1943,6 +2273,15 @@ def update_taskA(task_id):
             for idx, ot in enumerate(tasks):
                 ot.position = idx
 
+    new_assignee_ids = [u.id for u in (t.assignees or []) if u.id not in old_assignee_ids]
+    if "column_id" in data and t.column_id != old_col_id:
+        _log_task_activity(t, "moved", f"Moved to column id {t.column_id}")
+    if "progress" in data:
+        _log_task_activity(t, "progress", f"Progress set to {t.progress}%")
+    if new_assignee_ids:
+        _log_task_activity(t, "assigned", f"Added assignees: {', '.join(str(x) for x in new_assignee_ids)}")
+        _notify_pm_assignees(t, new_assignee_ids, p)
+    apply_task_a_subtask_date_rollup(t)
     db.session.commit()
     return jsonify(task_to_dict(t))
 
@@ -1990,6 +2329,7 @@ def upload_task_attachment(task_id):
         uploaded_by=current_user.id,
     )
     db.session.add(att)
+    _log_task_activity(t, "attachment", f"Added file: {raw_name}")
     db.session.commit()
     return jsonify(attachment_to_dict(att)), 201
 
@@ -2045,6 +2385,8 @@ def task_attachment_file(attachment_id):
 @login_required
 def reorder_columns(project_id):
     p = ProjectA.query.get_or_404(project_id)
+    if not user_can_access_project_a(p):
+        return project_access_denied()
     data = request.get_json()
     order = data.get("order", [])  # list of column ids in new order
     if not isinstance(order, list):
@@ -2055,6 +2397,35 @@ def reorder_columns(project_id):
             c.position = idx
     db.session.commit()
     return jsonify({"status":"ok"})
+
+
+@app.route("/api/columns/<int:column_id>", methods=["DELETE"])
+@login_required
+def delete_column(column_id):
+    c = ColumnA.query.get_or_404(column_id)
+    p = _project_for_column(c)
+    if not user_can_access_project_a(p):
+        return project_access_denied()
+    col_count = ColumnA.query.filter_by(project_id=p.id).count()
+    if col_count <= 1:
+        return jsonify({"error": "Cannot delete the only column in a project."}), 400
+    data = request.get_json(silent=True) or {}
+    move_to = data.get("move_to_column_id")
+    if not move_to:
+        return jsonify({"error": "move_to_column_id is required."}), 400
+    dest = ColumnA.query.filter_by(id=int(move_to), project_id=p.id).first()
+    if not dest or dest.id == c.id:
+        return jsonify({"error": "Invalid move_to_column_id."}), 400
+    tasks = TaskA.query.filter_by(column_id=c.id).order_by(TaskA.position).all()
+    maxpos = db.session.query(db.func.max(TaskA.position)).filter_by(column_id=dest.id).scalar()
+    next_pos = (maxpos + 1) if maxpos is not None else 0
+    for t in tasks:
+        t.column_id = dest.id
+        t.position = next_pos
+        next_pos += 1
+    db.session.delete(c)
+    db.session.commit()
+    return jsonify({"status": "deleted", "moved_tasks": len(tasks)})
 
 # Delete endpoints (optional)
 @app.route("/api/tasks/<int:task_id>", methods=["DELETE"])
@@ -2083,6 +2454,267 @@ def delete_taskA(task_id):
     db.session.commit()
     return jsonify({"status":"deleted"})
 
+
+def _task_a_with_access(task_id):
+    t = (
+        TaskA.query.options(
+            joinedload(TaskA.subtasks).joinedload(TaskASubtask.assignees),
+        )
+        .get_or_404(task_id)
+    )
+    p = t.column.project
+    if not user_can_access_project_a(p):
+        abort(403)
+    return t
+
+
+def _reload_subtask_a(subtask_id):
+    return (
+        TaskASubtask.query.options(joinedload(TaskASubtask.assignees))
+        .get_or_404(subtask_id)
+    )
+
+
+@app.route("/api/tasks/<int:task_id>/subtasks", methods=["GET", "POST"])
+@login_required
+def task_a_subtasks(task_id):
+    t = _task_a_with_access(task_id)
+    p = _project_for_task(t)
+    if request.method == "GET":
+        subtasks = sorted(t.subtasks or [], key=lambda s: (s.sort_order, s.id))
+        return jsonify([subtask_a_to_dict(s) for s in subtasks])
+
+    data = request.get_json() or {}
+    title = (data.get("title") or "").strip()
+    if not title:
+        return jsonify({"error": "title is required"}), 400
+    max_order = max((s.sort_order for s in (t.subtasks or [])), default=-1)
+    st = TaskASubtask(task_id=t.id, title=title, sort_order=max_order + 1)
+    err = _apply_subtask_a_fields(st, data)
+    if err:
+        return jsonify({"error": err}), 400
+    db.session.add(st)
+    apply_task_a_subtask_progress_rollup(t)
+    apply_task_a_subtask_date_rollup(t)
+    _log_task_activity(t, "subtask_added", title)
+    if st.assignees:
+        _notify_pm_assignees(t, [u.id for u in st.assignees], p)
+    db.session.commit()
+    st = _reload_subtask_a(st.id)
+    return jsonify(subtask_a_to_dict(st)), 201
+
+
+@app.route("/api/task-subtasks/<int:subtask_id>", methods=["PATCH", "DELETE"])
+@login_required
+def task_a_subtask(subtask_id):
+    st = TaskASubtask.query.options(joinedload(TaskASubtask.assignees)).get_or_404(subtask_id)
+    t = (
+        TaskA.query.options(joinedload(TaskA.subtasks))
+        .get_or_404(st.task_id)
+    )
+    p = t.column.project
+    if not user_can_access_project_a(p):
+        return jsonify({"error": "Forbidden"}), 403
+
+    if request.method == "DELETE":
+        db.session.delete(st)
+        apply_task_a_subtask_progress_rollup(t)
+        apply_task_a_subtask_date_rollup(t)
+        _log_task_activity(t, "subtask_removed", st.title)
+        db.session.commit()
+        return jsonify({"status": "deleted"})
+
+    old_assignee_ids = {u.id for u in (st.assignees or [])}
+    data = request.get_json() or {}
+    err = _apply_subtask_a_fields(st, data)
+    if err:
+        return jsonify({"error": err}), 400
+    apply_task_a_subtask_progress_rollup(t)
+    apply_task_a_subtask_date_rollup(t)
+    new_ids = [u.id for u in (st.assignees or []) if u.id not in old_assignee_ids]
+    if new_ids:
+        _notify_pm_assignees(t, new_ids, p)
+    db.session.commit()
+    st = _reload_subtask_a(st.id)
+    return jsonify(subtask_a_to_dict(st))
+
+
+@app.route("/api/my-tasks", methods=["GET"])
+@login_required
+def my_tasks_a():
+    """Tasks and sub-tasks assigned to current user across visible projects."""
+    me_id = current_user.id
+    due_filter = (request.args.get("due") or "all").strip().lower()
+    today = datetime.utcnow().date()
+    week_end = today + timedelta(days=7)
+    rows = []
+    visible_ids = {p.id for p in projects_visible_to_user()}
+
+    def due_bucket(end_dt):
+        if not end_dt:
+            return "none"
+        d = end_dt.date() if hasattr(end_dt, "date") else end_dt
+        if d < today:
+            return "overdue"
+        if d <= week_end:
+            return "week"
+        return "later"
+
+    def append_row(item_type, task, col, project, subtask=None):
+        end_dt = subtask.end_date if subtask else task.end_date
+        bucket = due_bucket(end_dt)
+        is_overdue = bucket == "overdue"
+        if due_filter == "overdue" and not is_overdue:
+            return
+        if due_filter == "week" and bucket not in ("overdue", "week"):
+            return
+        progress = task.progress or 0
+        if subtask:
+            progress = 100 if subtask.is_done else 0
+        rows.append({
+            "item_type": item_type,
+            "task_id": task.id,
+            "subtask_id": subtask.id if subtask else None,
+            "title": ("↳ " + subtask.title) if subtask else task.title,
+            "project_id": project.id,
+            "project_name": project.name,
+            "column_title": col.title,
+            "start_date": (subtask.start_date if subtask else task.start_date).isoformat() if (subtask.start_date if subtask else task.start_date) else None,
+            "end_date": end_dt.isoformat() if end_dt else None,
+            "progress": progress,
+            "is_overdue": is_overdue,
+            "due_bucket": bucket,
+            "priority": getattr(task, "priority", "medium"),
+        })
+
+    if not visible_ids:
+        return jsonify([])
+
+    cols = (
+        ColumnA.query.options(
+            joinedload(ColumnA.tasks).joinedload(TaskA.assignees),
+            joinedload(ColumnA.tasks).joinedload(TaskA.subtasks).joinedload(TaskASubtask.assignees),
+        )
+        .filter(ColumnA.project_id.in_(visible_ids))
+        .all()
+    )
+    for col in cols:
+        project = col.project
+        for task in col.tasks or []:
+            if me_id in {u.id for u in (task.assignees or [])}:
+                append_row("task", task, col, project)
+            for st in task.subtasks or []:
+                if me_id in {u.id for u in (st.assignees or [])}:
+                    append_row("subtask", task, col, project, subtask=st)
+
+    rows.sort(key=lambda r: (r["end_date"] or "9999", r["title"]))
+    return jsonify(rows)
+
+
+@app.route("/api/projects/<int:project_id>/labels", methods=["GET", "POST"])
+@login_required
+def project_a_labels(project_id):
+    p = ProjectA.query.get_or_404(project_id)
+    if not user_can_access_project_a(p):
+        return project_access_denied()
+    if request.method == "GET":
+        labels = TaskALabel.query.filter_by(project_id=p.id).order_by(TaskALabel.name).all()
+        return jsonify([label_to_dict(l) for l in labels])
+    data = request.get_json() or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    color = (data.get("color") or "#6366f1").strip()
+    existing = TaskALabel.query.filter_by(project_id=p.id, name=name).first()
+    if existing:
+        return jsonify(label_to_dict(existing))
+    lbl = TaskALabel(project_id=p.id, name=name, color=color)
+    db.session.add(lbl)
+    db.session.commit()
+    return jsonify(label_to_dict(lbl)), 201
+
+
+@app.route("/api/tasks/<int:task_id>/comments", methods=["GET", "POST"])
+@login_required
+def task_a_comments(task_id):
+    t = _task_a_with_access(task_id)
+    if request.method == "GET":
+        comments = TaskAComment.query.filter_by(task_id=t.id).order_by(TaskAComment.created_at.desc()).all()
+        return jsonify([comment_to_dict(c) for c in comments])
+    data = request.get_json() or {}
+    body = (data.get("body") or "").strip()
+    if not body:
+        return jsonify({"error": "body is required"}), 400
+    c = TaskAComment(task_id=t.id, user_id=current_user.id, body=body)
+    db.session.add(c)
+    _log_task_activity(t, "comment", body[:200])
+    db.session.commit()
+    return jsonify(comment_to_dict(c)), 201
+
+
+@app.route("/api/task-comments/<int:comment_id>", methods=["DELETE"])
+@login_required
+def delete_task_a_comment(comment_id):
+    c = TaskAComment.query.get_or_404(comment_id)
+    t = TaskA.query.get_or_404(c.task_id)
+    p = _project_for_task(t)
+    if not user_can_access_project_a(p):
+        return project_access_denied()
+    if c.user_id != current_user.id and not can_manage_project_a(p):
+        return jsonify({"error": "Forbidden"}), 403
+    db.session.delete(c)
+    db.session.commit()
+    return jsonify({"status": "deleted"})
+
+
+@app.route("/api/tasks/<int:task_id>/activities", methods=["GET"])
+@login_required
+def task_a_activities(task_id):
+    t = _task_a_with_access(task_id)
+    acts = TaskAActivity.query.filter_by(task_id=t.id).order_by(TaskAActivity.created_at.desc()).limit(100).all()
+    return jsonify([activity_to_dict(a) for a in acts])
+
+
+@app.route("/api/meeting-notes/action-items/<int:action_item_id>/create-pm-task", methods=["POST"])
+@login_required
+def meeting_action_item_to_pm_task(action_item_id):
+    from app.blueprints.meeting_notes.models import MeetingActionItem
+    item = MeetingActionItem.query.get_or_404(action_item_id)
+    data = request.get_json() or {}
+    project_id = data.get("project_id")
+    column_id = data.get("column_id")
+    if not project_id or not column_id:
+        return jsonify({"error": "project_id and column_id are required"}), 400
+    p = ProjectA.query.get_or_404(int(project_id))
+    if not user_can_access_project_a(p):
+        return project_access_denied()
+    col = ColumnA.query.filter_by(id=int(column_id), project_id=p.id).first()
+    if not col:
+        return jsonify({"error": "Invalid column for project"}), 400
+    maxpos = db.session.query(db.func.max(TaskA.position)).filter_by(column_id=col.id).scalar()
+    pos = (maxpos + 1) if maxpos is not None else 0
+    t = TaskA(
+        column_id=col.id,
+        title=item.title or "Action item",
+        description=item.comments or "",
+        position=pos,
+        start_date=None,
+        end_date=datetime.combine(item.due_date, datetime.min.time()) if item.due_date else None,
+        priority=(item.priority or "medium"),
+        source_action_item_id=item.id,
+        created_by=current_user.id,
+    )
+    assignee_ids = []
+    if item.assignee_user_id:
+        assignee_ids = [item.assignee_user_id]
+    if assignee_ids:
+        users, err = validate_assignee_user_ids(assignee_ids)
+        if not err:
+            t.assignees = users
+    db.session.add(t)
+    _log_task_activity(t, "created", f"Created from meeting action item #{item.id}")
+    db.session.commit()
+    return jsonify(task_to_dict(t)), 201
 
 
 #new project planning ends here
@@ -22256,15 +22888,14 @@ def global_search():
             ).limit(10).all()
             
             for workspace in workspaces:
-                # Show all workspaces but redirect to aplanforprojects page
-                # Access control will be handled on that page
+                # Show all workspaces but redirect to project planning page
                 search_results.append({
                     'type': 'workspace',
                     'id': workspace.id,
                     'title': workspace.name,
                     'subtitle': 'Workspace',
                     'description': workspace.description or 'No description',
-                    'url': url_for('aplanforprojects'),  # Redirect to project planning page
+                    'url': url_for('projectmanagement'),
                     'icon': 'folder'
                 })
         except Exception as e:
@@ -22273,26 +22904,21 @@ def global_search():
         # 3. Search Projects (ProjectA)
         try:
             projects = ProjectA.query.filter(
-                db.or_(
-                    ProjectA.name.ilike(search_term),
-                    ProjectA.description.ilike(search_term)
-                )
+                ProjectA.name.ilike(search_term)
             ).limit(10).all()
             
             for project in projects:
-                # Only show projects where user is a member or admin/manager
-                if (current_user in project.members or 
-                    current_user.userRole in ['Admin', 'Manager'] or 
-                    current_user.has_privilege('Super-admin')):
-                    search_results.append({
-                        'type': 'project',
-                        'id': project.id,
-                        'title': project.name,
-                        'subtitle': 'Project',
-                        'description': project.description or 'No description',
-                        'url': url_for('aplanforprojects'),  # Redirect to project planning page
-                        'icon': 'clipboard'
-                    })
+                if not user_can_access_project_a(project):
+                    continue
+                search_results.append({
+                    'type': 'project',
+                    'id': project.id,
+                    'title': project.name,
+                    'subtitle': 'Project',
+                    'description': getattr(project, 'description', None) or 'Project',
+                    'url': url_for('projectmanagement') + f'?project={project.id}',
+                    'icon': 'clipboard'
+                })
         except Exception as e:
             print(f"Project search error: {e}")
         

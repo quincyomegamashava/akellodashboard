@@ -30,6 +30,20 @@ task_assigneesA = db.Table(
     db.Column("user_id", db.Integer, db.ForeignKey("user.id"), primary_key=True)
 )
 
+# Association table for sub-task assignees (ProjectA/TaskASubtask system)
+taskasubtask_assigneesa = db.Table(
+    "taskasubtask_assigneesa",
+    db.Column("subtask_id", db.Integer, db.ForeignKey("tasksa_subtasks.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("user_id", db.Integer, db.ForeignKey("user.id"), primary_key=True),
+)
+
+# Task labels (scoped per project)
+taska_labels_assoc = db.Table(
+    "taska_labels_assoc",
+    db.Column("task_id", db.Integer, db.ForeignKey("tasksa.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("label_id", db.Integer, db.ForeignKey("taska_labels.id", ondelete="CASCADE"), primary_key=True),
+)
+
 # Association table for help desk query assignees
 query_assignees = db.Table(
     "query_assignees",
@@ -695,6 +709,15 @@ class ColumnA(db.Model):
     )
 
 
+class TaskALabel(db.Model):
+    __tablename__ = "taska_labels"
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("projectsa.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = db.Column(db.String(80), nullable=False)
+    color = db.Column(db.String(20), nullable=False, default="#6366f1")
+    __table_args__ = (db.UniqueConstraint("project_id", "name", name="uq_taska_label_project_name"),)
+
+
 class TaskA(db.Model):
     __tablename__ = "tasksa"
     id = db.Column(db.Integer, primary_key=True)
@@ -703,19 +726,74 @@ class TaskA(db.Model):
     description = db.Column(db.Text, nullable=True)
     position = db.Column(db.Integer, nullable=False, default=0)
     progress = db.Column(db.Integer, default=0)  # 0–100 (%), optional
+    priority = db.Column(db.String(16), nullable=False, default="medium", index=True)
     start_date = db.Column(db.DateTime, nullable=True)  # NEW
     end_date = db.Column(db.DateTime, nullable=True)    # NEW
+    date_rollup_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    source_action_item_id = db.Column(
+        db.Integer,
+        db.ForeignKey("meeting_notes_action_items.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    blocked_by_task_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tasksa.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
 
     # Many-to-many relationship to users as assignees
     assignees = db.relationship("User", secondary=task_assigneesA, backref="assigned_tasksA")
     creator = db.relationship("User", foreign_keys=[created_by])
+    labels = db.relationship("TaskALabel", secondary=taska_labels_assoc, backref="tasks")
+    blocked_by = db.relationship("TaskA", remote_side=[id], foreign_keys=[blocked_by_task_id])
     attachments = db.relationship(
         "TaskAttachment",
         backref="task",
         lazy=True,
         cascade="all, delete-orphan",
+    )
+    subtasks = db.relationship(
+        "TaskASubtask",
+        backref="parent_task",
+        cascade="all, delete-orphan",
+        order_by="TaskASubtask.sort_order",
+    )
+    comments = db.relationship(
+        "TaskAComment",
+        backref="task",
+        cascade="all, delete-orphan",
+        order_by="TaskAComment.created_at.desc()",
+    )
+    activities = db.relationship(
+        "TaskAActivity",
+        backref="task",
+        cascade="all, delete-orphan",
+        order_by="TaskAActivity.created_at.desc()",
+    )
+
+
+class TaskASubtask(db.Model):
+    __tablename__ = "tasksa_subtasks"
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tasksa.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    title = db.Column(db.String(500), nullable=False, default="")
+    is_done = db.Column(db.Boolean, nullable=False, default=False)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    start_date = db.Column(db.DateTime, nullable=True)
+    end_date = db.Column(db.DateTime, nullable=True)
+    assignees = db.relationship(
+        "User",
+        secondary=taskasubtask_assigneesa,
+        backref="assigned_task_subtasksA",
     )
 
 
@@ -729,6 +807,27 @@ class TaskAttachment(db.Model):
     file_size = db.Column(db.Integer, nullable=True)
     uploaded_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class TaskAComment(db.Model):
+    __tablename__ = "taska_comments"
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey("tasksa.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    body = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    author = db.relationship("User", foreign_keys=[user_id])
+
+
+class TaskAActivity(db.Model):
+    __tablename__ = "taska_activities"
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey("tasksa.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
+    action = db.Column(db.String(64), nullable=False)
+    detail = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    actor = db.relationship("User", foreign_keys=[user_id])
 
 
 # ----------------------
@@ -805,6 +904,7 @@ class Notification(db.Model):
         nullable=True,
         index=True,
     )
+    task_id = db.Column(db.Integer, db.ForeignKey('tasksa.id', ondelete='SET NULL'), nullable=True, index=True)
     message = db.Column(db.Text, nullable=False)
     notification_type = db.Column(db.String(50), nullable=False)  # assignment, resolution, meeting_*
     read = db.Column(db.Boolean, default=False, nullable=False, index=True)

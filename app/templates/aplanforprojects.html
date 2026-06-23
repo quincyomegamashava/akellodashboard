@@ -2,8 +2,14 @@
 
 {% block head_extra %}
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-api.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-url.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-board.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/vendor/pptxgen.bundle.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pm/pm-export.js') }}"></script>
 
   <script>
+    const PM_EXPORT_LOGO_URL = "{{ url_for('static', filename='Logo.png') }}";
     const current_user = { username: "{{current_user.username}}", id: "{{ current_user.id }}" };
     {% set _pm_manage_any = (current_user.userRole == 'Admin') or (current_user.has_privilege('Super-admin')) %}
     const PM_USER = {
@@ -53,6 +59,86 @@
     .scrollbar-thin::-webkit-scrollbar { height: 8px; width: 8px; }
     .scrollbar-thumb-gray-400::-webkit-scrollbar-thumb { background: #9CA3AF; border-radius: 9999px;}
 
+    /* Searchable assignee picker */
+    .pm-assignee-picker { position: relative; }
+    .pm-assignee-picker--compact .pm-assignee-search-input { font-size: 0.75rem; padding: 0.35rem 0.5rem; }
+    .pm-assignee-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; min-height: 1.5rem; margin-bottom: 0.5rem; }
+    .pm-assignee-chip {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 0.15rem 0.45rem; border-radius: 9999px;
+      background: #eef2ff; color: #3730a3; font-size: 0.75rem; font-weight: 500;
+    }
+    .pm-assignee-chip-remove {
+      border: none; background: transparent; color: #6366f1; cursor: pointer;
+      font-size: 1rem; line-height: 1; padding: 0 0.15rem;
+    }
+    .pm-assignee-chip-remove:hover { color: #dc2626; }
+    .pm-assignee-search-wrap { position: relative; }
+    .pm-assignee-search-input {
+      width: 100%; border: 1px solid #e4e4e7; border-radius: 0.5rem;
+      padding: 0.5rem 0.75rem; font-size: 0.875rem;
+    }
+    .pm-assignee-search-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.2); }
+    .pm-assignee-results {
+      position: absolute; left: 0; right: 0; top: 100%; z-index: 50; margin-top: 0.25rem;
+      max-height: 11rem; overflow-y: auto; list-style: none; padding: 0.25rem 0; margin: 0;
+      background: #fff; border: 1px solid #e4e4e7; border-radius: 0.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    }
+    .pm-assignee-results.hidden { display: none; }
+    .pm-assignee-result-item {
+      padding: 0.4rem 0.75rem; font-size: 0.8125rem; cursor: pointer; color: #27272a;
+    }
+    .pm-assignee-result-item:hover { background: #f4f4f5; }
+    .pm-assignee-result-item.is-selected { background: #eef2ff; color: #4338ca; }
+
+    /* Sub-task accordion */
+    .pm-subtask-accordion { display: flex; flex-direction: column; gap: 0.5rem; }
+    .pm-subtask-acc { border: 1px solid #e4e4e7; border-radius: 0.75rem; background: #fff; overflow: hidden; }
+    .pm-subtask-acc.is-done { opacity: 0.75; }
+    .pm-subtask-summary {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.625rem 0.75rem;
+      cursor: pointer; list-style: none; user-select: none;
+    }
+    .pm-subtask-summary::-webkit-details-marker { display: none; }
+    .pm-subtask-summary:hover { background: #fafafa; }
+    .pm-subtask-acc[open] .pm-subtask-summary { border-bottom: 1px solid #f4f4f5; background: #fafafa; }
+    .pm-subtask-chevron {
+      margin-left: auto; flex-shrink: 0; width: 1rem; height: 1rem; color: #a1a1aa;
+      transition: transform 0.15s ease;
+    }
+    .pm-subtask-acc[open] .pm-subtask-chevron { transform: rotate(180deg); }
+
+    /* Board filters */
+    .pm-board-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; align-items: center; }
+    .pm-board-toolbar input, .pm-board-toolbar select { font-size: 0.8125rem; border: 1px solid #e4e4e7; border-radius: 0.5rem; padding: 0.35rem 0.5rem; }
+
+    /* Mobile board: stack columns vertically */
+    @media (max-width: 768px) {
+      #board.pm-board-stacked { flex-direction: column; overflow-x: hidden; }
+      #board.pm-board-stacked .column { width: 100% !important; max-width: 100%; }
+    }
+
+    /* Project sidebar search */
+    #sidebarPanel.pm-sidebar-visible { display: block; }
+    @media (min-width: 1024px) {
+      .pm-layout-with-sidebar { grid-template-columns: 14rem 1fr; }
+    }
+    .pm-sidebar-search { width: 100%; font-size: 0.75rem; border: 1px solid #e4e4e7; border-radius: 0.375rem; padding: 0.35rem 0.5rem; margin-bottom: 0.5rem; }
+
+    .pm-priority-high, .pm-priority-urgent { color: #dc2626; }
+    .pm-priority-medium { color: #d97706; }
+    .pm-priority-low { color: #6b7280; }
+    .pm-label-chip { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 9999px; color: #fff; margin-right: 0.25rem; }
+
+    kbd.pm-kbd { font-size: 0.65rem; padding: 0.1rem 0.35rem; border: 1px solid #d4d4d8; border-radius: 0.25rem; background: #fafafa; }
+    .pm-subtask-body { padding: 0.75rem; display: grid; gap: 0.75rem; }
+    .pm-subtask-pill {
+      font-size: 0.6875rem; padding: 0.1rem 0.45rem; border-radius: 9999px;
+      background: #f4f4f5; color: #52525b; white-space: nowrap;
+    }
+    .pm-subtask-title { flex: 1; min-width: 0; font-size: 0.875rem; font-weight: 500; color: #18181b; }
+    .pm-subtask-title.is-done { text-decoration: line-through; color: #71717a; }
+
     /* Create Project modal size */
     #modalBackdrop.project-modal #modalContent {
       width: 65vw;
@@ -79,6 +165,68 @@
       max-height: 65vh;
       overflow: auto;
     }
+
+    /* Task details modal — capped height, scrollable body */
+    #modalBackdrop.task-details-modal #modalContent {
+      width: min(80vw, 56rem);
+      max-width: min(80vw, 56rem);
+      max-height: 60vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 1rem 1.25rem;
+    }
+    #modalBackdrop.task-details-modal #modalTitle {
+      flex-shrink: 0;
+      margin-bottom: 0.75rem;
+    }
+    #modalBackdrop.task-details-modal #modalBody {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      margin-bottom: 0.75rem;
+    }
+    #modalBackdrop.task-details-modal #modalBody + div {
+      flex-shrink: 0;
+    }
+
+    .pm-task-section {
+      border: 1px solid #e4e4e7;
+      border-radius: 0.75rem;
+      background: #fff;
+      overflow: hidden;
+    }
+    .pm-task-section + .pm-task-section { margin-top: 0.75rem; }
+    .pm-task-section__head {
+      padding: 0.5rem 0.75rem;
+      background: #f4f4f5;
+      border-bottom: 1px solid #e4e4e7;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #71717a;
+    }
+    .pm-task-section__body { padding: 0.75rem; }
+    .pm-task-section--overview { border-left: 3px solid #6366f1; }
+    .pm-task-section--description { border-left: 3px solid #a1a1aa; }
+    .pm-task-section--schedule { border-left: 3px solid #0ea5e9; }
+    .pm-task-section--subtasks { border-left: 3px solid #10b981; }
+    .pm-task-section--comments { border-left: 3px solid #f59e0b; }
+    .pm-task-section--activity { border-left: 3px solid #8b5cf6; }
+    .pm-task-section--attachments { border-left: 3px solid #64748b; }
+    .pm-task-section--actions { border-left: 3px solid #d4d4d8; }
+
+    .pm-export-radio-card {
+      display: flex; align-items: flex-start; gap: 0.625rem;
+      padding: 0.75rem 0.875rem; border: 1px solid #e4e4e7; border-radius: 0.75rem;
+      background: #fff; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .pm-export-radio-card:hover { border-color: #c7d2fe; }
+    .pm-export-radio-card:has(input:checked) {
+      border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15); background: #fafaff;
+    }
+    .pm-export-radio-card input { margin-top: 0.2rem; accent-color: #00407D; }
 
     #attachmentPreviewBackdrop.attachment-preview-open #attachmentPreviewContent {
       width: min(92vw, 1200px);
@@ -719,15 +867,16 @@
 {% block content %}
 <div class="pm-page max-w-[1800px] mx-auto">
 
-  <div class="grid grid-cols-1 gap-3">
-    <!-- Sidebar: projects (hidden — use header project dropdown to switch projects) -->
-    <aside id="sidebarPanel" class="hidden min-w-0 rounded-lg border border-zinc-200/80 bg-white p-2 shadow-sm" aria-hidden="true">
+  <div class="grid grid-cols-1 gap-3 pm-layout-with-sidebar">
+    <!-- Sidebar: searchable project list -->
+    <aside id="sidebarPanel" class="pm-sidebar-visible min-w-0 rounded-lg border border-zinc-200/80 bg-white p-2 shadow-sm">
       <div class="flex items-center justify-between mb-2 gap-1">
-        <h2 class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 truncate">Workspace</h2>
+        <h2 class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 truncate">Projects</h2>
         <button id="newProjectBtn2" type="button" class="shrink-0 rounded-md border border-zinc-200 p-1 text-zinc-600 hover:bg-zinc-50" title="New project" aria-label="New project">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
         </button>
       </div>
+      <input type="search" id="pmSidebarSearch" class="pm-sidebar-search" placeholder="Search projects…" aria-label="Search projects" />
       <div id="projectList" class="flex-1 space-y-0.5 overflow-auto max-h-[calc(100vh-8rem)] pr-0.5 min-w-0"></div>
     </aside>
 
@@ -744,21 +893,10 @@
         <div class="header-actions flex flex-wrap items-center gap-2 justify-end">
           <select id="projectSelect" class="min-w-[180px] max-w-[min(100%,280px)] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"></select>
 
-          <select id="pmExportSelect" class="hidden min-w-[200px] max-w-[min(100%,300px)] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" title="Export board, timeline, and schedule" aria-label="Export report">
-            <option value="">Export…</option>
-            <optgroup label="Excel">
-              <option value="excel:all">All tabs (one workbook)</option>
-              <option value="excel:board">Board only</option>
-              <option value="excel:timeline">Timeline only</option>
-              <option value="excel:schedule">Schedule only</option>
-            </optgroup>
-            <optgroup label="PDF">
-              <option value="pdf:all">All tabs (one file)</option>
-              <option value="pdf:board">Board only</option>
-              <option value="pdf:timeline">Timeline only</option>
-              <option value="pdf:schedule">Schedule only</option>
-            </optgroup>
-          </select>
+          <button id="pmExportBtn" type="button" class="hidden items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-700 transition-colors" title="Export project report" aria-label="Export project report">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+            Export
+          </button>
 
           <div class="icon-btn-group hidden">
             <a href="{{ url_for('overview') }}" class="icon-btn" data-tooltip="Home" aria-label="Home">
@@ -793,7 +931,7 @@
         <div class="max-w-md w-full rounded-2xl border border-zinc-200/90 bg-white px-8 py-10 text-center shadow-sm">
           <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600/90 mb-2">Project tracking</p>
           <h2 class="text-2xl font-semibold text-zinc-900 tracking-tight">Welcome</h2>
-          <p class="mt-3 text-sm text-zinc-600 leading-relaxed">Select a project from the dropdown above to open the board, timeline, and schedule for that workspace.</p>
+          <p class="mt-3 text-sm text-zinc-600 leading-relaxed">Select a project from the dropdown above to open the board, open tasks, and schedule for that workspace.</p>
           <p class="mt-4 text-xs text-zinc-500">No project selected yet — your work area will appear here after you choose one.</p>
         </div>
       </div>
@@ -803,7 +941,7 @@
       <div class="px-4 pt-3 pb-0" role="tablist" aria-label="Project views">
         <div class="inline-flex rounded-lg border border-zinc-200 bg-zinc-50/80 p-1">
           <button type="button" id="tab-board" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="true" aria-controls="panel-board">Board</button>
-          <button type="button" id="tab-timeline" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-timeline">Timeline</button>
+          <button type="button" id="tab-incomplete" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-incomplete">Open Tasks</button>
           <button type="button" id="tab-gantt" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-gantt">Schedule</button>
           <button type="button" id="tab-calendar" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-calendar">Calendar</button>
           <button type="button" id="tab-documents" class="pm-tab rounded-md border border-transparent px-4 py-2 text-sm font-medium transition" role="tab" aria-selected="false" aria-controls="panel-documents">Documents</button>
@@ -814,86 +952,51 @@
 
         <!-- Board panel -->
         <div id="panel-board" role="tabpanel" aria-labelledby="tab-board" class="flex flex-col flex-1 min-h-0">
-          <p class="text-sm text-zinc-500 mb-3">Drag columns and cards. Add tasks from each column.</p>
+          <div class="pm-board-toolbar" id="pmBoardToolbar">
+            <input type="search" id="pmBoardSearch" placeholder="Search tasks…" class="min-w-[10rem] flex-1 max-w-xs" aria-label="Search tasks" />
+            <select id="pmBoardFilterColumn" aria-label="Filter by column"><option value="">All columns</option></select>
+            <select id="pmBoardFilterAssignee" aria-label="Filter by assignee"><option value="">All assignees</option></select>
+            <label class="text-xs text-zinc-600 flex items-center gap-1"><input type="checkbox" id="pmBoardFilterMine" /> My tasks</label>
+            <label class="text-xs text-zinc-600 flex items-center gap-1"><input type="checkbox" id="pmBoardFilterSubtasks" /> Has sub-tasks</label>
+            <label class="text-xs text-zinc-600 flex items-center gap-1"><input type="checkbox" id="pmBoardFilterFiles" /> Has files</label>
+            <button type="button" id="pmBoardViewToggle" class="text-xs px-2 py-1 border border-zinc-200 rounded-lg md:hidden" title="Toggle stacked view">Stack</button>
+            <button type="button" id="pmShortcutsHelp" class="text-xs px-2 py-1 border border-zinc-200 rounded-lg text-zinc-500" title="Keyboard shortcuts">?</button>
+          </div>
+          <p class="text-sm text-zinc-500 mb-3">Drag columns and cards. Add tasks from each column. <span class="hidden sm:inline text-xs text-zinc-400">Shortcuts: <kbd class="pm-kbd">/</kbd> search <kbd class="pm-kbd">Esc</kbd> close</span></p>
           <div id="board" class="board flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-zinc-100/50 flex-1 min-h-[280px]"></div>
         </div>
 
-        <!-- Timeline panel -->
-        <div id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" class="hidden flex-1 flex-col min-h-0 overflow-auto" aria-hidden="true">
-          <div id="timelineSection" class="space-y-5">
+        <!-- Open tasks panel (not 100% complete) -->
+        <div id="panel-incomplete" role="tabpanel" aria-labelledby="tab-incomplete" class="hidden flex-1 flex-col min-h-0 overflow-auto" aria-hidden="true">
+          <div class="space-y-4">
             <div>
-              <h2 class="text-lg font-semibold text-zinc-900">Timeline</h2>
-              <p class="text-sm text-zinc-500 mt-1">Visual timeline and a monthly breakdown of tasks.</p>
+              <h2 class="text-lg font-semibold text-zinc-900">Open Tasks</h2>
+              <p class="text-sm text-zinc-500 mt-1">Tasks that are not yet 100% complete.</p>
             </div>
-
             <div class="rounded-xl border border-zinc-200 bg-white overflow-hidden">
-              <div class="px-4 py-3 border-b border-zinc-100 flex flex-wrap items-center justify-between gap-3">
-                <h3 class="text-sm font-semibold text-zinc-800">Items by month</h3>
-                <div class="flex flex-wrap items-center gap-2">
-                  <label for="timelineItemsSort" class="text-xs text-zinc-500">Sort months</label>
-                  <select id="timelineItemsSort" class="rounded-lg border border-zinc-200 px-2 py-1.5 text-sm bg-white">
-                    <option value="asc">Oldest month first</option>
-                    <option value="desc">Newest month first</option>
-                  </select>
-                </div>
-              </div>
-              <div class="p-4 overflow-auto">
+              <div class="p-4 overflow-auto max-h-[min(70vh,100%)]">
                 <table class="min-w-full text-sm">
-                  <thead class="text-left bg-zinc-50 text-zinc-600">
+                  <thead class="text-left bg-zinc-50 text-zinc-600 sticky top-0">
                     <tr>
                       <th class="py-2 px-3 font-medium">Task</th>
-                      <th class="py-2 px-3 font-medium min-w-[8rem] max-w-[14rem]">Description</th>
-                      <th class="py-2 px-3 font-medium align-bottom">
-                        <span class="block mb-1">Column</span>
-                        <label for="timelineFilterColumn" class="sr-only">Filter by column</label>
-                        <select id="timelineFilterColumn" class="mt-0.5 w-full min-w-[7rem] max-w-[11rem] rounded-md border border-zinc-200 px-1.5 py-1 text-xs font-normal text-zinc-800 bg-white">
-                          <option value="">All columns</option>
-                        </select>
-                      </th>
-                      <th class="py-2 px-3 w-32 font-medium">Start</th>
-                      <th class="py-2 px-3 w-32 font-medium">End</th>
-                      <th class="py-2 px-3 w-24 font-medium">Progress</th>
-                      <th class="py-2 px-3 font-medium align-bottom">
-                        <span class="block mb-1">Assignees</span>
-                        <label for="timelineFilterAssignee" class="sr-only">Filter by assignee</label>
-                        <select id="timelineFilterAssignee" class="mt-0.5 w-full min-w-[7rem] max-w-[12rem] rounded-md border border-zinc-200 px-1.5 py-1 text-xs font-normal text-zinc-800 bg-white">
-                          <option value="">All assignees</option>
-                        </select>
-                      </th>
+                      <th class="py-2 px-3 font-medium">Column</th>
+                      <th class="py-2 px-3 font-medium w-28">Progress</th>
+                      <th class="py-2 px-3 font-medium w-32">Start</th>
+                      <th class="py-2 px-3 font-medium w-32">Due</th>
+                      <th class="py-2 px-3 font-medium">Assignees</th>
                     </tr>
                   </thead>
-                  <tbody id="timelineItemsBody"></tbody>
+                  <tbody id="incompleteTasksBody"></tbody>
                 </table>
-                <p id="timelineItemsEmpty" class="py-8 text-center text-zinc-500 hidden">No project items available.</p>
-              </div>
-            </div>
-
-            <div class="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
-              <div id="timelineAxis" class="relative w-full overflow-x-auto" style="min-height: 180px;">
-                <svg id="timelineSVG" class="w-full" viewBox="0 0 1200 180" preserveAspectRatio="none"></svg>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              <div class="lg:col-span-2 rounded-2xl border border-zinc-200/90 bg-white shadow-sm overflow-hidden">
-                <div class="px-4 py-3 border-b border-zinc-100 bg-zinc-50/50">
-                  <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Milestone labels</p>
-                  <h3 class="text-sm font-semibold text-zinc-900">Milestones</h3>
-                </div>
-                <div class="p-4 overflow-auto max-h-[min(28rem,55vh)]">
-                  <div id="milestoneBody" class="space-y-3"></div>
-                </div>
-              </div>
-              <div class="rounded-2xl border border-zinc-200/90 bg-white shadow-sm overflow-hidden">
-                <div class="border-l-4 border-indigo-400 bg-indigo-50/40 p-4 h-full">
-                  <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600/90 mb-1">Tip</p>
-                  <p class="text-sm text-zinc-700 leading-relaxed">
-                    Use each task’s <strong class="font-medium text-zinc-800">Position</strong> to place milestone labels above or below the axis. Edit values in the cards below; the timeline refreshes when you reload the board.
-                  </p>
-                </div>
+                <p id="incompleteTasksEmpty" class="py-8 text-center text-zinc-500 hidden">All tasks are complete.</p>
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- hidden: legacy timeline nodes kept for export helpers -->
+        <div id="panel-timeline" class="hidden" aria-hidden="true">
+          <div id="timelineSection"><div id="timelineItemsBody"></div><div id="timelineAxis"><svg id="timelineSVG"></svg></div><div id="milestoneBody"></div></div>
         </div>
 
         <!-- Schedule: spreadsheet-style Gantt (table + timeline grid) -->
@@ -974,6 +1077,47 @@
 
 </div>
 
+<div id="pmExportModalBackdrop" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-[55]">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden" role="dialog" aria-labelledby="pmExportModalTitle" aria-modal="true">
+    <div class="px-6 py-5 border-b border-zinc-100">
+      <h3 id="pmExportModalTitle" class="text-lg font-semibold text-zinc-900">Export project report</h3>
+      <p class="mt-1 text-sm text-zinc-500">Download a branded PDF or PowerPoint deck to share with stakeholders.</p>
+    </div>
+    <div class="px-6 py-5 space-y-5 max-h-[min(70vh,32rem)] overflow-y-auto">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">Format</p>
+        <div class="grid gap-2 sm:grid-cols-3">
+          <label class="pm-export-radio-card">
+            <input type="radio" name="pm-export-format" value="pdf" checked />
+            <span><span class="block text-sm font-medium text-zinc-900">PDF</span><span class="block text-xs text-zinc-500 mt-0.5">Executive report</span></span>
+          </label>
+          <label class="pm-export-radio-card">
+            <input type="radio" name="pm-export-format" value="pptx" />
+            <span><span class="block text-sm font-medium text-zinc-900">PowerPoint</span><span class="block text-xs text-zinc-500 mt-0.5">Slide deck (.pptx)</span></span>
+          </label>
+          <label class="pm-export-radio-card">
+            <input type="radio" name="pm-export-format" value="excel" />
+            <span><span class="block text-sm font-medium text-zinc-900">Spreadsheet</span><span class="block text-xs text-zinc-500 mt-0.5">Excel workbook</span></span>
+          </label>
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">Include</p>
+        <div class="grid gap-2 sm:grid-cols-2">
+          <label class="pm-export-radio-card"><input type="radio" name="pm-export-scope" value="all" checked /><span class="text-sm text-zinc-800">Full report</span></label>
+          <label class="pm-export-radio-card"><input type="radio" name="pm-export-scope" value="board" /><span class="text-sm text-zinc-800">Board only</span></label>
+          <label class="pm-export-radio-card"><input type="radio" name="pm-export-scope" value="incomplete" /><span class="text-sm text-zinc-800">Open tasks only</span></label>
+          <label class="pm-export-radio-card"><input type="radio" name="pm-export-scope" value="schedule" /><span class="text-sm text-zinc-800">Schedule only</span></label>
+        </div>
+      </div>
+    </div>
+    <div class="px-6 py-4 border-t border-zinc-100 flex justify-end gap-2 bg-zinc-50/50">
+      <button type="button" id="pmExportCancel" class="px-4 py-2 rounded-lg border border-zinc-200 bg-white text-sm text-zinc-700 hover:bg-zinc-50">Cancel</button>
+      <button type="button" id="pmExportConfirm" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Export</button>
+    </div>
+  </div>
+</div>
+
 <div id="modalBackdrop" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
     <div id="modalContent" class="bg-white p-6 rounded-xl shadow-lg w-full max-w-2xl">
       <h3 id="modalTitle" class="text-xl font-semibold mb-4"></h3>
@@ -1035,6 +1179,254 @@ let colorMode = 'column'; // 'column' | 'assignee'
 let colorMaps = { column: {}, assignee: {} };
 let ganttFilterOwner = ''; // '' = All
 let ganttDueFilter = 'all'; // all | week | month
+let pmBoardFilters = { q: '', column: '', assignee: '', mine: false, subtasks: false, files: false };
+let pmPendingDeepLinkTask = null;
+let pmAllProjectsList = [];
+let pmProjectLabelsCache = [];
+
+function pmUpdateUrl() {
+  if (typeof pmSyncUrl === 'function') {
+    pmSyncUrl({ project: currentProjectId, tab: activePmTab, task: pmPendingDeepLinkTask });
+  }
+}
+
+function pmBoardFilterKey() {
+  return `pm_board_filters_${currentProjectId || 'none'}`;
+}
+
+function pmLoadBoardFiltersFromStorage() {
+  try {
+    const raw = sessionStorage.getItem(pmBoardFilterKey());
+    if (raw) pmBoardFilters = { ...pmBoardFilters, ...JSON.parse(raw) };
+  } catch (e) { /* ignore */ }
+}
+
+function pmSaveBoardFiltersToStorage() {
+  try {
+    sessionStorage.setItem(pmBoardFilterKey(), JSON.stringify(pmBoardFilters));
+  } catch (e) { /* ignore */ }
+}
+
+function pmTaskMatchesBoardFilters(task, col) {
+  const f = pmBoardFilters;
+  const q = (f.q || '').trim().toLowerCase();
+  if (q) {
+    const hay = [
+      task.title, task.description,
+      ...(task.assignees || []).map((a) => a.name),
+    ].join(' ').toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  if (f.column && String(col.id) !== String(f.column)) return false;
+  if (f.assignee) {
+    const names = (task.assignees || []).map((a) => a.name);
+    if (!names.includes(f.assignee)) return false;
+  }
+  if (f.mine) {
+    const meId = PM_USER && PM_USER.id ? String(PM_USER.id) : null;
+    const assigned = (task.assignees || []).some((a) => String(a.id) === meId);
+    if (!assigned) return false;
+  }
+  if (f.subtasks && !(task.subtask_total > 0)) return false;
+  if (f.files && !(task.attachments && task.attachments.length)) return false;
+  return true;
+}
+
+function pmApplyBoardFilters() {
+  const board = $('board');
+  if (!board) return;
+  board.querySelectorAll('.column').forEach((colEl) => {
+    const colId = colEl.id.replace('column-', '');
+    let visibleCount = 0;
+    colEl.querySelectorAll('.task').forEach((taskEl) => {
+      const taskId = taskEl.dataset.taskId;
+      let task = null;
+      let col = null;
+      for (const c of (lastBoardData?.columns || [])) {
+        if (String(c.id) !== String(colId)) continue;
+        col = c;
+        task = (c.tasks || []).find((t) => String(t.id) === String(taskId));
+        break;
+      }
+      const show = task && col ? pmTaskMatchesBoardFilters(task, col) : true;
+      taskEl.classList.toggle('hidden', !show);
+      if (show) visibleCount++;
+    });
+    colEl.classList.toggle('hidden', pmBoardFilters.q && visibleCount === 0);
+  });
+}
+
+function pmPopulateBoardFilterDropdowns(boardData) {
+  const colSel = $('pmBoardFilterColumn');
+  const asgSel = $('pmBoardFilterAssignee');
+  if (!colSel || !asgSel) return;
+  const prevCol = colSel.value;
+  const prevAsg = asgSel.value;
+  colSel.innerHTML = '<option value="">All columns</option>';
+  (boardData?.columns || []).forEach((c) => {
+    colSel.appendChild(new Option(c.title || `Column ${c.id}`, String(c.id)));
+  });
+  const nameSet = new Set();
+  (boardData?.columns || []).forEach((c) => {
+    (c.tasks || []).forEach((t) => (t.assignees || []).forEach((a) => { if (a.name) nameSet.add(a.name); }));
+  });
+  asgSel.innerHTML = '<option value="">All assignees</option>';
+  Array.from(nameSet).sort().forEach((n) => asgSel.appendChild(new Option(n, n)));
+  if (prevCol && Array.from(colSel.options).some((o) => o.value === prevCol)) colSel.value = prevCol;
+  if (prevAsg && Array.from(asgSel.options).some((o) => o.value === prevAsg)) asgSel.value = prevAsg;
+}
+
+function pmWireBoardFilters() {
+  const search = $('pmBoardSearch');
+  const colSel = $('pmBoardFilterColumn');
+  const asgSel = $('pmBoardFilterAssignee');
+  const mine = $('pmBoardFilterMine');
+  const sub = $('pmBoardFilterSubtasks');
+  const files = $('pmBoardFilterFiles');
+  const sync = () => {
+    pmBoardFilters.q = search ? search.value : '';
+    pmBoardFilters.column = colSel ? colSel.value : '';
+    pmBoardFilters.assignee = asgSel ? asgSel.value : '';
+    pmBoardFilters.mine = mine ? mine.checked : false;
+    pmBoardFilters.subtasks = sub ? sub.checked : false;
+    pmBoardFilters.files = files ? files.checked : false;
+    pmSaveBoardFiltersToStorage();
+    pmApplyBoardFilters();
+  };
+  if (search) search.oninput = pmDebounce ? pmDebounce(sync, 200) : sync;
+  [colSel, asgSel, mine, sub, files].forEach((el) => { if (el) el.onchange = sync; });
+  if (search) search.value = pmBoardFilters.q || '';
+  if (mine) mine.checked = !!pmBoardFilters.mine;
+  if (sub) sub.checked = !!pmBoardFilters.subtasks;
+  if (files) files.checked = !!pmBoardFilters.files;
+}
+
+async function pmRefreshIncompleteView() {
+  if (lastBoardData) renderIncompleteTasks(lastBoardData);
+}
+
+function renderIncompleteTasks(boardData) {
+  const tbody = $('incompleteTasksBody');
+  const emptyEl = $('incompleteTasksEmpty');
+  if (!tbody) return;
+  const rows = [];
+  (boardData?.columns || []).forEach((col) => {
+    (col.tasks || []).forEach((t) => {
+      const prog = typeof t.progress === 'number' ? t.progress : 0;
+      if (prog >= 100) return;
+      const names = (t.assignees || []).map((a) => a.name).filter(Boolean).join(', ') || '—';
+      rows.push({
+        task: t,
+        colTitle: col.title || `Column ${col.id}`,
+        prog,
+        names,
+        start: t.start_date ? formatDate(t.start_date) : '—',
+        end: t.end_date ? formatDate(t.end_date) : '—',
+      });
+    });
+  });
+  rows.sort((a, b) => (a.prog - b.prog) || String(a.task.title).localeCompare(String(b.task.title)));
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    return;
+  }
+  if (emptyEl) emptyEl.classList.add('hidden');
+  tbody.innerHTML = rows.map((r) => `
+    <tr class="border-b border-zinc-100 hover:bg-zinc-50 cursor-pointer" data-task-id="${r.task.id}">
+      <td class="py-2.5 px-3 font-medium text-zinc-900">${escapeHtml(r.task.title || '')}</td>
+      <td class="py-2.5 px-3 text-zinc-600">${escapeHtml(r.colTitle)}</td>
+      <td class="py-2.5 px-3">
+        <div class="flex items-center gap-2">
+          <div class="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden max-w-[4rem]"><div class="h-full bg-indigo-500 rounded-full" style="width:${r.prog}%"></div></div>
+          <span class="text-xs tabular-nums text-zinc-600">${r.prog}%</span>
+        </div>
+      </td>
+      <td class="py-2.5 px-3 text-zinc-600">${escapeHtml(r.start)}</td>
+      <td class="py-2.5 px-3 text-zinc-600">${escapeHtml(r.end)}</td>
+      <td class="py-2.5 px-3 text-zinc-600">${escapeHtml(r.names)}</td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('tr[data-task-id]').forEach((tr) => {
+    tr.onclick = () => {
+      const id = tr.getAttribute('data-task-id');
+      const t = findTaskOnBoard(id);
+      if (t) openTaskDetails(t);
+    };
+  });
+}
+
+function buildIncompleteExportRows(boardData) {
+  const header = ['Task', 'Column', 'Progress', 'Start', 'Due', 'Assignees'];
+  const rows = [header];
+  if (!boardData || !boardData.columns) return rows;
+  (boardData.columns || []).forEach((col) => {
+    (col.tasks || []).forEach((t) => {
+      const prog = typeof t.progress === 'number' ? t.progress : 0;
+      if (prog >= 100) return;
+      const names = (t.assignees || []).map((a) => a.name).filter(Boolean).join(', ') || 'Unassigned';
+      rows.push([
+        t.title || '',
+        col.title || `Column ${col.id}`,
+        `${prog}%`,
+        t.start_date ? formatDate(t.start_date) : '',
+        t.end_date ? formatDate(t.end_date) : '',
+        names,
+      ]);
+    });
+  });
+  return rows;
+}
+
+async function pmRefreshTimelineViews() {
+  await pmRefreshIncompleteView();
+}
+
+function pmUpdateTaskCardOnBoard(taskId, patch) {
+  const card = document.querySelector(`.task[data-task-id="${taskId}"]`);
+  if (!card || !lastBoardData) return;
+  for (const col of lastBoardData.columns || []) {
+    const t = (col.tasks || []).find((x) => String(x.id) === String(taskId));
+    if (!t) continue;
+    Object.assign(t, patch);
+    const subTotal = t.subtask_total || 0;
+    const subDone = t.subtask_done_count || 0;
+    let badge = card.querySelector('.pm-subtask-badge');
+    if (subTotal) {
+      if (!badge) {
+        badge = el('span', { class: 'pm-subtask-badge shrink-0 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded' });
+        card.querySelector('.flex.items-start')?.appendChild(badge);
+      }
+      badge.textContent = `${subDone}/${subTotal}`;
+    } else if (badge) badge.remove();
+    const prog = card.querySelector('.bg-indigo-500');
+    if (prog && typeof t.progress === 'number') prog.style.width = `${t.progress}%`;
+    break;
+  }
+}
+
+function pmWireKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    const workspace = $('pmWorkspace');
+    if (!workspace || workspace.classList.contains('hidden')) return;
+    const modal = $('modal');
+    if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+      const closeBtn = $('modalClose');
+      if (closeBtn) closeBtn.click();
+      return;
+    }
+    if (e.target.matches('input, textarea, select') && e.key !== 'Escape') return;
+    if (e.key === '/' && activePmTab === 'board') {
+      e.preventDefault();
+      const s = $('pmBoardSearch');
+      if (s) s.focus();
+    }
+  });
+  const helpBtn = $('pmShortcutsHelp');
+  if (helpBtn) {
+    helpBtn.onclick = () => alert('Keyboard shortcuts:\n/ — focus board search\nEsc — close modal');
+  }
+}
 
 /* ---------- Simple helpers ---------- */
 const $ = (id) => document.getElementById(id);
@@ -1051,7 +1443,10 @@ const el = (tag, attrs = {}, children = []) => {
 
 async function apiGET(path) {
   const res = await fetch(path);
-  if (!res.ok) throw new Error(`GET ${path} failed (${res.status})`);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `GET ${path} failed (${res.status})`);
+  }
   return res.json();
 }
 async function apiPOST(path, payload) {
@@ -1075,10 +1470,18 @@ async function apiPATCH(path, payload) {
   }
   return res.json();
 }
-async function apiDELETE(path) {
-  const res = await fetch(path, {method: 'DELETE'});
-  if (!res.ok) throw new Error(`DELETE ${path} failed (${res.status})`);
-  return res.json();
+async function apiDELETE(path, payload) {
+  const opts = { method: 'DELETE' };
+  if (payload) {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify(payload);
+  }
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `DELETE ${path} failed (${res.status})`);
+  }
+  return res.json().catch(() => ({}));
 }
 
 const TEXT_PREVIEW_MAX_BYTES = 512 * 1024;
@@ -1258,6 +1661,7 @@ function closeModal() {
   modalBackdrop.classList.remove('project-modal');
   modalBackdrop.classList.remove('edit-project-modal');
   modalBackdrop.classList.remove('my-tasks-modal');
+  modalBackdrop.classList.remove('task-details-modal');
   modalBackdrop.classList.remove('gantt-modal');
   modalConfirm.disabled = false;
   modalConfirm.style.display = '';
@@ -1271,21 +1675,22 @@ function closeModal() {
 }
 
 /* ---------- Tabbed workspace ---------- */
-const PM_TAB_IDS = ['board', 'timeline', 'gantt', 'calendar', 'documents'];
+const PM_TAB_IDS = ['board', 'incomplete', 'gantt', 'calendar', 'documents'];
 
 function setActiveTab(tab) {
+  if (tab === 'timeline') tab = 'incomplete';
   const next = PM_TAB_IDS.includes(tab) ? tab : 'board';
   activePmTab = next;
   const panels = {
     board: $('panel-board'),
-    timeline: $('panel-timeline'),
+    incomplete: $('panel-incomplete'),
     gantt: $('panel-gantt'),
     calendar: $('panel-calendar'),
     documents: $('panel-documents')
   };
   const tabs = {
     board: $('tab-board'),
-    timeline: $('tab-timeline'),
+    incomplete: $('tab-incomplete'),
     gantt: $('tab-gantt'),
     calendar: $('tab-calendar'),
     documents: $('tab-documents')
@@ -1306,12 +1711,16 @@ function setActiveTab(tab) {
   if (next === 'gantt') {
     requestAnimationFrame(() => renderVisGantt(lastBoardData));
   }
+  if (next === 'incomplete') {
+    requestAnimationFrame(() => renderIncompleteTasks(lastBoardData));
+  }
   if (next === 'calendar') {
     requestAnimationFrame(() => renderCalendar(lastBoardData));
   }
   if (next === 'documents') {
     requestAnimationFrame(() => renderDocumentsPanel(lastBoardData));
   }
+  pmUpdateUrl();
 }
 
 function renderDocumentsPanel(boardData) {
@@ -1429,16 +1838,19 @@ function taskCalendarAnchorDate(task) {
 function buildCalendarTaskIndex(boardData) {
   const byDay = new Map();
   let undated = 0;
-  (boardData.columns || []).forEach((col) => {
-    (col.tasks || []).forEach((task) => {
-      const d = taskCalendarAnchorDate(task);
-      if (!d || isNaN(d.getTime())) {
-        undated++;
-        return;
-      }
-      const k = calDayKey(d);
-      if (!byDay.has(k)) byDay.set(k, []);
-      byDay.get(k).push({ task, columnTitle: col.title || '' });
+  pmFlattenBoardScheduleEntries(boardData).forEach((entry) => {
+    const sched = pmScheduleTaskLike(entry);
+    const d = taskCalendarAnchorDate(sched);
+    if (!d || isNaN(d.getTime())) {
+      undated++;
+      return;
+    }
+    const k = calDayKey(d);
+    if (!byDay.has(k)) byDay.set(k, []);
+    byDay.get(k).push({
+      task: sched,
+      columnTitle: entry.col.title || '',
+      parentTaskId: sched.id,
     });
   });
   return { byDay, undated };
@@ -1484,7 +1896,7 @@ function calDayWorstBarColor(items) {
 
 function calTaskChipMarkup(item) {
   const { task, columnTitle } = item;
-  const tid = task.id;
+  const tid = item.parentTaskId || task.id;
   const rawTitle = (task.title || '').slice(0, 80);
   const barColor = calScheduleBarColor(task);
   const done = calIsDone(task);
@@ -1492,6 +1904,7 @@ function calTaskChipMarkup(item) {
   const badge = nAsg ? `<span class="pm-cal-asg">${nAsg > 9 ? '9+' : String(nAsg)}</span>` : '';
   const cls = ['pm-cal-chip'];
   if (done) cls.push('pm-cal-chip--done');
+  if (task.item_type === 'subtask') cls.push('pm-cal-chip--subtask');
   const tip = escapeHtml([task.title || '', columnTitle].filter(Boolean).join(' — ').slice(0, 220));
   return `<button type="button" class="${cls.join(' ')}" data-cal-task-id="${tid}" title="${tip}" style="--chip-bar:${barColor}"><span class="pm-cal-chip-dot" aria-hidden="true"></span>${badge}<span class="pm-cal-chip-t">${escapeHtml(rawTitle)}</span></button>`;
 }
@@ -1687,7 +2100,7 @@ function renderCalendarYear(mount, boardData, idx) {
       if (calSameLocalDay(cellDate, today)) dcls += ' pm-cal-mini-day--today';
       const label = inMonth ? String(cellDate.getDate()) : '';
       const tip = list.map((x) => x.task.title).join(', ');
-      const openFirst = list.length ? ` data-cal-task-id="${list[0].task.id}" style="cursor:pointer"` : '';
+      const openFirst = list.length ? ` data-cal-task-id="${list[0].parentTaskId || list[0].task.id}" style="cursor:pointer"` : '';
       html += `<div class="${dcls}" title="${escapeHtml(tip.slice(0, 200))}"${openFirst}>${label}${dot}</div>`;
     }
     html += '</div></div>';
@@ -1826,15 +2239,14 @@ function ganttDueInThisMonth(d) {
 
 function ganttCollectDatedTasks(boardData) {
   const out = [];
-  (boardData.columns || []).forEach((col) => {
-    (col.tasks || []).forEach((task) => {
-      if (!task.start_date || !task.end_date) return;
-      const a = ganttParseLocal(task.start_date);
-      const b = ganttParseLocal(task.end_date);
-      if (!a || !b || isNaN(a.getTime()) || isNaN(b.getTime())) return;
-      if (b < a) return;
-      out.push({ task, col });
-    });
+  pmFlattenBoardScheduleEntries(boardData).forEach((entry) => {
+    const task = pmScheduleTaskLike(entry);
+    if (!task.start_date || !task.end_date) return;
+    const a = ganttParseLocal(task.start_date);
+    const b = ganttParseLocal(task.end_date);
+    if (!a || !b || isNaN(a.getTime()) || isNaN(b.getTime())) return;
+    if (b < a) return;
+    out.push({ task, col: entry.col });
   });
   return out;
 }
@@ -2102,6 +2514,8 @@ function renderVisGantt(boardData) {
     const end0 = e ? ganttStripTime(e) : null;
     const isOverdue = !!(end0 && end0 < today0);
     const barColor = (isOverdue && pct < 100) ? '#ef4444' : ganttProgressColor(pct);
+    const isSubtask = task.item_type === 'subtask';
+    const barOpacity = isSubtask ? '0.72' : '1';
     const si = idxFor(s);
     const ei = lastIdxOnOrBefore(e);
     const barLeft = si * GANTT_DAY_W;
@@ -2115,8 +2529,9 @@ function renderVisGantt(boardData) {
       ? `<div class="gantt-desc-trigger px-1 py-1.5 border-r border-zinc-100 truncate text-zinc-600 min-w-0 cursor-default" data-gantt-desc-trigger="1" data-gantt-desc="${encodeURIComponent(rawDesc)}">${escapeHtml(descOneLine)}</div>`
       : `<div class="px-1 py-1.5 border-r border-zinc-100 text-zinc-400 min-w-0">—</div>`;
 
-    bodyHtml += `<div class="grid gap-0 border-b border-r border-zinc-200 bg-white hover:bg-zinc-50/90 cursor-pointer text-[11px] leading-tight" style="grid-template-columns:${GANTT_LEFT_COLS}" data-gantt-task-id="${task.id}">`;
-    bodyHtml += `<div class="px-1.5 py-1.5 border-r border-zinc-100 truncate min-w-0" title="${escapeHtml(task.title || '')}">${escapeHtml(task.title || '')}</div>`;
+    const openId = task.id;
+    bodyHtml += `<div class="grid gap-0 border-b border-r border-zinc-200 bg-white hover:bg-zinc-50/90 cursor-pointer text-[11px] leading-tight${isSubtask ? ' bg-zinc-50/40' : ''}" style="grid-template-columns:${GANTT_LEFT_COLS}" data-gantt-task-id="${openId}">`;
+    bodyHtml += `<div class="px-1.5 py-1.5 border-r border-zinc-100 truncate min-w-0${isSubtask ? ' pl-4 text-zinc-700' : ''}" title="${escapeHtml(task.title || '')}">${escapeHtml(task.title || '')}</div>`;
     bodyHtml += descCell;
     bodyHtml += `<div class="px-1 py-1.5 border-r border-zinc-100 truncate text-zinc-700 min-w-0">${escapeHtml(ganttOwnerShort(assName))}</div>`;
     bodyHtml += `<div class="px-1 py-1.5 border-r border-zinc-100 text-center text-zinc-600">${ganttFormatMMDDYY(s)}</div>`;
@@ -2127,7 +2542,7 @@ function renderVisGantt(boardData) {
 
     bodyHtml += `<div class="relative border-b border-zinc-200 bg-white min-h-[34px]" style="width:${totalW}px">`;
     bodyHtml += `<div class="absolute inset-0 flex pointer-events-none opacity-60">${gridLines}</div>`;
-    bodyHtml += `<div class="gantt-bar absolute bg-blue-600 pointer-events-auto" data-gantt-task-id="${task.id}" style="left:${barLeft}px;width:${barW}px;background:${barColor};border:1px solid rgba(0,0,0,0.12)"></div>`;
+    bodyHtml += `<div class="gantt-bar absolute bg-blue-600 pointer-events-auto" data-gantt-task-id="${openId}" style="left:${barLeft}px;width:${barW}px;background:${barColor};opacity:${barOpacity};border:1px solid rgba(0,0,0,0.12)"></div>`;
     bodyHtml += `</div>`;
   });
 
@@ -2192,6 +2607,232 @@ async function getProjectMembers(projectId) {
   }
 }
 
+/** All registered users — used for task/sub-task assignee pickers. */
+async function getAssignableUsers() {
+  return loadUsers();
+}
+
+function pmAssigneeNamesFromList(assignees) {
+  return (Array.isArray(assignees) ? assignees : []).map((a) => (a && a.name) ? a.name : '').filter(Boolean);
+}
+
+function pmAssigneeIdsFromList(assignees) {
+  return (Array.isArray(assignees) ? assignees : []).map((a) => a && a.id).filter((id) => id != null);
+}
+
+function pmFlattenBoardScheduleEntries(boardData) {
+  const entries = [];
+  (boardData?.columns || []).forEach((col) => {
+    (col.tasks || []).forEach((task) => {
+      entries.push({ kind: 'task', task, col, subtask: null });
+      (task.subtasks || []).forEach((st) => {
+        entries.push({ kind: 'subtask', task, col, subtask: st });
+      });
+    });
+  });
+  return entries;
+}
+
+function pmScheduleTaskLike(entry) {
+  if (entry.kind === 'subtask') {
+    const st = entry.subtask;
+    const parent = entry.task;
+    return {
+      id: parent.id,
+      item_type: 'subtask',
+      subtask_id: st.id,
+      title: '↳ ' + (st.title || ''),
+      description: '',
+      start_date: st.start_date || null,
+      end_date: st.end_date || null,
+      assignees: st.assignees || [],
+      progress: st.is_done ? 100 : 0,
+      position: typeof parent.position === 'number' ? parent.position : 0,
+    };
+  }
+  const t = entry.task;
+  return {
+    id: t.id,
+    item_type: 'task',
+    title: t.title || '',
+    description: t.description != null ? String(t.description) : '',
+    start_date: t.start_date || null,
+    end_date: t.end_date || null,
+    assignees: t.assignees || [],
+    progress: typeof t.progress === 'number' ? t.progress : 0,
+    position: typeof t.position === 'number' ? t.position : 0,
+  };
+}
+
+function pmBuildTimelineItem(entry, col) {
+  const sched = pmScheduleTaskLike(entry);
+  const assigneesArr = sched.assignees || [];
+  const baseItem = {
+    id: entry.kind === 'subtask' ? sched.subtask_id : sched.id,
+    item_type: sched.item_type,
+    parent_task_id: entry.kind === 'subtask' ? sched.id : null,
+    title: sched.title,
+    description: sched.description || '',
+    start_iso: sched.start_date || null,
+    end_iso: sched.end_date || null,
+    progress: typeof sched.progress === 'number' ? sched.progress : null,
+    assigned_names: pmAssigneeNamesFromList(assigneesArr),
+    assigned_ids: pmAssigneeIdsFromList(assigneesArr),
+    column_title: col.title || `Column ${col.id}`,
+    position: sched.position,
+    date: null,
+  };
+  const d = sched.start_date || sched.end_date;
+  if (d) {
+    const dt = new Date(d);
+    if (!isNaN(dt)) baseItem.date = dt;
+  }
+  return baseItem;
+}
+
+function pmUserDisplayName(u) {
+  if (!u) return 'Unknown';
+  if (u.name) return String(u.name);
+  const full = `${(u.firstname || '').trim()} ${(u.lastname || '').trim()}`.trim();
+  return full || u.username || `User #${u.id}`;
+}
+
+function pmNormalizeAssigneeUser(u) {
+  return {
+    id: u.id,
+    name: pmUserDisplayName(u),
+    username: u.username || u.name || '',
+    email: u.email || '',
+  };
+}
+
+function pmMountAssigneePicker(mountEl, options = {}) {
+  if (!mountEl) return null;
+  const compact = !!options.compact;
+  const selectedMap = new Map();
+  (options.selected || []).forEach((u) => {
+    if (u && u.id != null) selectedMap.set(String(u.id), pmNormalizeAssigneeUser(u));
+  });
+  let searchTimeout = null;
+
+  mountEl.innerHTML = '';
+  mountEl.className = 'pm-assignee-picker' + (compact ? ' pm-assignee-picker--compact' : '');
+
+  const chipsWrap = el('div', {class: 'pm-assignee-chips'});
+  const searchWrap = el('div', {class: 'pm-assignee-search-wrap'});
+  const searchInput = el('input', {type: 'text', class: 'pm-assignee-search-input', placeholder: 'Search users by name or email…'});
+  const resultsEl = el('ul', {class: 'pm-assignee-results hidden'});
+  const hintEl = el('div', {class: 'pm-assignee-hint', text: 'Type at least 2 characters to search'});
+  searchWrap.appendChild(searchInput);
+  searchWrap.appendChild(resultsEl);
+  mountEl.appendChild(chipsWrap);
+  mountEl.appendChild(searchWrap);
+  mountEl.appendChild(hintEl);
+
+  function getSelectedIds() {
+    return Array.from(selectedMap.keys()).map((id) => parseInt(id, 10));
+  }
+
+  function notifyChange() {
+    if (typeof options.onChange === 'function') options.onChange(getSelectedIds());
+  }
+
+  function renderChips() {
+    chipsWrap.innerHTML = '';
+    if (!selectedMap.size) {
+      chipsWrap.appendChild(el('span', {class: 'pm-assignee-empty', text: 'No assignees selected'}));
+      return;
+    }
+    selectedMap.forEach((user, id) => {
+      const chip = el('span', {class: 'pm-assignee-chip'});
+      chip.appendChild(el('span', {text: user.name}));
+      const rm = el('button', {type: 'button', class: 'pm-assignee-chip-remove', text: '×'});
+      rm.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        selectedMap.delete(id);
+        renderChips();
+        notifyChange();
+      };
+      chip.appendChild(rm);
+      chipsWrap.appendChild(chip);
+    });
+  }
+
+  async function runSearch(term) {
+    const q = (term || '').trim();
+    if (q.length < 2) {
+      resultsEl.classList.add('hidden');
+      resultsEl.innerHTML = '';
+      hintEl.style.display = '';
+      return;
+    }
+    hintEl.style.display = 'none';
+    try {
+      const res = await fetch(`/api/search-users?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Search failed');
+      const users = data.users || [];
+      resultsEl.innerHTML = '';
+      if (!users.length) {
+        resultsEl.appendChild(el('li', {class: 'pm-assignee-results-empty', text: 'No users found'}));
+      } else {
+        users.forEach((u) => {
+          const li = el('li', {class: 'pm-assignee-result-item' + (selectedMap.has(String(u.id)) ? ' is-selected' : '')});
+          const label = pmUserDisplayName(u) + (u.email ? ` · ${u.email}` : '');
+          li.textContent = label;
+          li.onclick = (e) => {
+            e.stopPropagation();
+            const key = String(u.id);
+            if (selectedMap.has(key)) selectedMap.delete(key);
+            else selectedMap.set(key, pmNormalizeAssigneeUser(u));
+            renderChips();
+            notifyChange();
+            runSearch(searchInput.value);
+          };
+          resultsEl.appendChild(li);
+        });
+      }
+      resultsEl.classList.remove('hidden');
+    } catch (err) {
+      resultsEl.innerHTML = '';
+      resultsEl.appendChild(el('li', {class: 'pm-assignee-results-empty', text: err.message || 'Search error'}));
+      resultsEl.classList.remove('hidden');
+    }
+  }
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => runSearch(searchInput.value), 300);
+  });
+  searchInput.addEventListener('click', (e) => e.stopPropagation());
+
+  renderChips();
+  const api = { getSelectedIds, getSelectedUsers: () => Array.from(selectedMap.values()) };
+  mountEl._pmAssigneePicker = api;
+  return api;
+}
+
+function pmGetAssigneeIdsFromMount(mountElOrId) {
+  const node = typeof mountElOrId === 'string' ? $(mountElOrId) : mountElOrId;
+  if (!node || !node._pmAssigneePicker) return [];
+  return node._pmAssigneePicker.getSelectedIds();
+}
+
+let pmOpenSubtaskIds = new Set();
+
+function pmSubtaskSummaryMeta(st) {
+  const parts = [];
+  const names = pmAssigneeNamesFromList(st.assignees);
+  if (names.length) parts.push(names.length === 1 ? names[0] : `${names.length} assignees`);
+  if (st.start_date || st.end_date) {
+    const s = st.start_date ? formatDate(st.start_date) : '—';
+    const e = st.end_date ? formatDate(st.end_date) : '—';
+    parts.push(`${s} → ${e}`);
+  }
+  return parts;
+}
+
 /* ---------- Helpers for project/member normalization ---------- */
 function normalizeMembers(members) {
   if (!members) return [];
@@ -2219,8 +2860,21 @@ function normalizeProjectType(typeValue) {
 async function renderProjectSidebar(projects) {
   const list = document.getElementById('projectList');
   if (!list) return;
+  pmAllProjectsList = projects || [];
+  const q = (($('pmSidebarSearch') || {}).value || '').trim().toLowerCase();
+  const recent = typeof pmGetRecentProjects === 'function' ? pmGetRecentProjects() : [];
+  let filtered = pmAllProjectsList;
+  if (q) filtered = pmAllProjectsList.filter((p) => (p.name || '').toLowerCase().includes(q));
+  filtered.sort((a, b) => {
+    const ai = recent.indexOf(String(a.id));
+    const bi = recent.indexOf(String(b.id));
+    if (ai >= 0 && bi < 0) return -1;
+    if (bi >= 0 && ai < 0) return 1;
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    return String(a.name).localeCompare(String(b.name));
+  });
   list.innerHTML = '';
-  projects.forEach(p => {
+  filtered.forEach(p => {
     const item = document.createElement('button');
     item.type = 'button';
     item.className = 'w-full min-w-0 text-left rounded-md border px-2 py-1.5 transition ' + (String(p.id)===String(currentProjectId) ? 'border-indigo-200 bg-indigo-50/90 shadow-sm' : 'border-transparent hover:border-zinc-200 hover:bg-zinc-50');
@@ -2229,10 +2883,13 @@ async function renderProjectSidebar(projects) {
       const sel = document.getElementById('projectSelect');
       if (sel) sel.value = p.id;
       currentProjectId = p.id;
+      if (typeof pmPushRecentProject === 'function') pmPushRecentProject(p.id);
+      pmLoadBoardFiltersFromStorage();
       updatePmWorkspaceVisibility();
       updateProjectManageButtons();
+      pmUpdateUrl();
       await loadBoard(currentProjectId);
-      renderProjectSidebar(projects);
+      renderProjectSidebar(pmAllProjectsList);
     };
     list.appendChild(item);
   });
@@ -2264,8 +2921,11 @@ function updatePmWorkspaceVisibility() {
   const showWorkspace = !!currentProjectId;
   welcome.classList.toggle('hidden', showWorkspace);
   workspace.classList.toggle('hidden', !showWorkspace);
-  const pmExportSelect = $('pmExportSelect');
-  if (pmExportSelect) pmExportSelect.classList.toggle('hidden', !currentProjectId);
+  const pmExportBtn = $('pmExportBtn');
+  if (pmExportBtn) {
+    pmExportBtn.classList.toggle('hidden', !currentProjectId);
+    pmExportBtn.classList.toggle('inline-flex', !!currentProjectId);
+  }
 }
 
 function clearPmWorkspaceState() {
@@ -2274,9 +2934,7 @@ function clearPmWorkspaceState() {
   lastTimelineTableItems = [];
   const board = $('board');
   if (board) board.innerHTML = '<p class="text-sm text-zinc-500">Select a project to load the board.</p>';
-  renderTimeline([]);
-  renderTimelineItemsTable([]);
-  renderMilestonesTable([], []);
+  renderIncompleteTasks([]);
   populateTimelineItemFilters([]);
   const legend = document.getElementById('timelineLegend');
   if (legend) legend.innerHTML = '';
@@ -2330,10 +2988,17 @@ function updateProjectManageButtons() {
 
 async function loadProjects() {
   try {
+    const urlState = typeof pmReadUrlState === 'function' ? pmReadUrlState() : {};
+    if (urlState.project) currentProjectId = urlState.project;
+    if (urlState.tab && (urlState.tab === 'timeline' || PM_TAB_IDS.includes(urlState.tab))) {
+      activePmTab = urlState.tab === 'timeline' ? 'incomplete' : urlState.tab;
+    }
+    if (urlState.task) pmPendingDeepLinkTask = urlState.task;
+
     const projects = await apiGET(`${API_BASE}/projects`);
     const sel = $('projectSelect');
     sel.innerHTML = '';
-    projectsCache = {}; // reset cache and repopulate
+    projectsCache = {};
     if (!projects.length) {
       sel.appendChild(new Option('— No projects —', ''));
       currentProjectId = null;
@@ -2347,11 +3012,13 @@ async function loadProjects() {
     projects.forEach((p) => {
       projectsCache[p.id] = p;
       const label = p.name + (p.type || p.project_type ? ` (${p.type||p.project_type})` : '');
-      const option = new Option(label, p.id);
-      sel.appendChild(option);
+      sel.appendChild(new Option(label, p.id));
     });
 
     if (currentProjectId && Array.from(sel.options).some((o) => String(o.value) === String(currentProjectId))) {
+      sel.value = String(currentProjectId);
+    } else if (urlState.project && projectsCache[urlState.project]) {
+      currentProjectId = urlState.project;
       sel.value = String(currentProjectId);
     } else {
       sel.value = '';
@@ -2360,22 +3027,35 @@ async function loadProjects() {
 
     sel.onchange = async (e) => {
       currentProjectId = e.target.value || null;
+      pmPendingDeepLinkTask = null;
       if (currentProjectId) {
+        if (typeof pmPushRecentProject === 'function') pmPushRecentProject(currentProjectId);
+        pmLoadBoardFiltersFromStorage();
         updatePmWorkspaceVisibility();
         updateProjectManageButtons();
+        pmUpdateUrl();
         await loadBoard(currentProjectId);
       } else {
         clearPmWorkspaceState();
         updatePmWorkspaceVisibility();
         updateProjectManageButtons();
+        pmUpdateUrl();
       }
     };
+
+    const sidebarSearch = $('pmSidebarSearch');
+    if (sidebarSearch && !sidebarSearch._wired) {
+      sidebarSearch._wired = true;
+      sidebarSearch.oninput = () => renderProjectSidebar(pmAllProjectsList);
+    }
 
     renderProjectSidebar(projects);
 
     if (currentProjectId) {
+      pmLoadBoardFiltersFromStorage();
       updatePmWorkspaceVisibility();
       updateProjectManageButtons();
+      setActiveTab(activePmTab);
       await loadBoard(currentProjectId);
     } else {
       clearPmWorkspaceState();
@@ -2486,6 +3166,11 @@ const renameBtn = el('button', {class:'text-xs px-2 py-1 rounded-md bg-white hov
       renameBtn.onclick = () => promptRenameColumn(projectId, col.id, col.title);
       controls.appendChild(addBtn);
       controls.appendChild(renameBtn);
+      if ((data.columns || []).length > 1) {
+        const delColBtn = el('button', {class:'text-xs px-2 py-1 rounded-md bg-white hover:bg-red-50 text-red-600 border border-zinc-200', text:'Delete'});
+        delColBtn.onclick = () => promptDeleteColumn(projectId, col, data.columns);
+        controls.appendChild(delColBtn);
+      }
       header.appendChild(title);
       header.appendChild(controls);
 
@@ -2503,13 +3188,10 @@ const addColBtn = el('button', {class:'flex-none h-fit self-start px-4 py-2.5 ro
     addColBtn.onclick = () => promptAddColumn(projectId);
     board.appendChild(addColBtn);
 
-    // Build timeline from tasks across all columns
+    // Refresh open-tasks list (timeline UI removed)
     try {
-      ensureTimelineControls();
-      ensureTimelineMiniMap();
-      ensureColorMaps(data);
-      await buildTimelineFromBoard(data);
-    } catch(e){ console.warn('Timeline build failed', e); }
+      renderIncompleteTasks(data);
+    } catch(e){ console.warn('Open tasks render failed', e); }
 
     // initialize Sortable for columns (reorder)
     new Sortable(board, {
@@ -2565,6 +3247,9 @@ const addColBtn = el('button', {class:'flex-none h-fit self-start px-4 py-2.5 ro
       });
     });
 
+    if (activePmTab === 'incomplete') {
+      requestAnimationFrame(() => renderIncompleteTasks(data));
+    }
     if (activePmTab === 'gantt') {
       requestAnimationFrame(() => renderVisGantt(data));
     }
@@ -2576,9 +3261,29 @@ const addColBtn = el('button', {class:'flex-none h-fit self-start px-4 py-2.5 ro
     }
 
     updateProjectManageButtons();
+    pmPopulateBoardFilterDropdowns(data);
+    pmWireBoardFilters();
+    pmApplyBoardFilters();
+    if (typeof pmPushRecentProject === 'function') pmPushRecentProject(projectId);
+    pmUpdateUrl();
+
+    if (pmPendingDeepLinkTask) {
+      const tid = pmPendingDeepLinkTask;
+      pmPendingDeepLinkTask = null;
+      const t = findTaskOnBoard(tid);
+      if (t) {
+        requestAnimationFrame(() => openTaskDetails(t));
+      } else {
+        try {
+          const full = await apiGET(`${API_BASE}/tasks/${tid}`);
+          openTaskDetails(full);
+        } catch (e) { /* task not in board */ }
+      }
+    }
   } catch (err) {
     console.error('Error loading board', err);
-    $('board').innerHTML = "<p class='text-red-500'>Failed to load board.</p>";
+    const msg = err && err.message ? escapeHtml(err.message) : 'Unknown error';
+    $('board').innerHTML = `<p class='text-red-500'>Failed to load board.${msg ? ` (${msg})` : ''}</p>`;
     // $('projectMembers').innerHTML = "";
   }
 }
@@ -2590,6 +3295,25 @@ async function promptAddColumn(projectId) {
   }, async () => {
     const title = $('col_title').value.trim() || 'New Column';
     await apiPOST(`${API_BASE}/projects/${projectId}/columns`, {title});
+    await loadBoard(projectId);
+  });
+}
+
+async function promptDeleteColumn(projectId, column, allColumns) {
+  const others = (allColumns || []).filter((c) => String(c.id) !== String(column.id));
+  if (!others.length) {
+    alert('Cannot delete the only column.');
+    return;
+  }
+  const opts = others.map((c) => `<option value="${c.id}">${escapeHtml(c.title)}</option>`).join('');
+  openModal('Delete Column', (c) => {
+    c.innerHTML = `
+      <p class="text-sm text-zinc-700 mb-3">Move all tasks from <strong>${escapeHtml(column.title)}</strong> to:</p>
+      <select id="col_move_to" class="w-full border p-2 rounded">${opts}</select>
+    `;
+  }, async () => {
+    const moveTo = parseInt($('col_move_to').value, 10);
+    await apiDELETE(`${API_BASE}/columns/${column.id}`, { move_to_column_id: moveTo });
     await loadBoard(projectId);
   });
 }
@@ -2658,6 +3382,8 @@ function renderTask(task, container) {
   div.onclick = () => openTaskDetails(task);
 
   const attCount = (task.attachments && task.attachments.length) ? task.attachments.length : 0;
+  const subTotal = task.subtask_total || 0;
+  const subDone = task.subtask_done_count || 0;
   const titleRow = el('div', {class:'flex items-start justify-between gap-2 mb-1'});
   const title = el('div', {class:'font-semibold text-sm text-zinc-900 min-w-0 flex-1', text: task.title});
   titleRow.appendChild(title);
@@ -2666,7 +3392,29 @@ function renderTask(task, container) {
     clip.title = 'Has attachments';
     titleRow.appendChild(clip);
   }
+  if (subTotal) {
+    const subBadge = el('span', {class:'pm-subtask-badge shrink-0 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded', text: `${subDone}/${subTotal}`});
+    subBadge.title = 'Sub-tasks completed';
+    titleRow.appendChild(subBadge);
+  }
+  const pri = (task.priority || 'medium').toLowerCase();
+  if (pri && pri !== 'medium') {
+    const priEl = el('span', { class: `shrink-0 text-[10px] font-semibold uppercase pm-priority-${pri}`, text: pri });
+    titleRow.appendChild(priEl);
+  }
+  if (task.blocked_by_task_id) {
+    titleRow.appendChild(el('span', { class: 'shrink-0 text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded', text: 'Blocked' }));
+  }
   const desc = el('div', {class:'text-xs text-zinc-500 max-h-9 overflow-hidden', text: task.description || 'No description'});
+  let labelsRow = null;
+  if (task.labels && task.labels.length) {
+    labelsRow = el('div', { class: 'flex flex-wrap gap-1 mt-1' });
+    task.labels.forEach((lb) => {
+      const chip = el('span', { class: 'pm-label-chip', text: lb.name });
+      chip.style.backgroundColor = lb.color || '#6366f1';
+      labelsRow.appendChild(chip);
+    });
+  }
 
   // dates & progress and assignees
   const meta = el('div', {class:'text-[11px] text-zinc-500 mt-2'});
@@ -2700,6 +3448,7 @@ function renderTask(task, container) {
   }
 
   div.appendChild(titleRow);
+  if (labelsRow) div.appendChild(labelsRow);
   div.appendChild(desc);
   div.appendChild(meta);
   div.appendChild(progressWrap);
@@ -2730,8 +3479,22 @@ async function promptAddTask(columnId) {
           <label class="text-sm text-gray-600">Progress:</label>
           <input id="task_progress" type="number" min="0" max="100" value="0" class="border p-2 rounded w-24" />
         </div>
+        <div class="flex items-center gap-2">
+          <label class="text-sm text-gray-600">Priority:</label>
+          <select id="task_priority" class="border p-2 rounded text-sm">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+        <div class="grid gap-1">
+          <label class="text-sm text-gray-600">Assignees:</label>
+          <div id="task_assignees_pick"></div>
+        </div>
       </div>
     `;
+    pmMountAssigneePicker(c.querySelector('#task_assignees_pick'), { selected: [] });
   }, async () => {
     const title = $('task_title').value.trim();
     if (!title) throw new Error('Title required');
@@ -2739,12 +3502,204 @@ async function promptAddTask(columnId) {
     const start_date = $('task_start').value || null;
     const end_date = $('task_end').value || null;
     const progress = parseInt($('task_progress').value || 0, 10);
+    const priority = ($('task_priority') || {}).value || 'medium';
+    const assignees = pmGetAssigneeIdsFromMount('task_assignees_pick');
 
     await apiPOST(`${API_BASE}/columns/${columnId}/tasks`, {
-      title, description, start_date: start_date || undefined, end_date: end_date || undefined, progress
+      title, description, start_date: start_date || undefined, end_date: end_date || undefined, progress, priority, assignees
     });
     await loadBoard(currentProjectId);
   });
+}
+
+function findTaskOnBoard(taskId) {
+  const src = lastBoardData || boardData;
+  for (const col of (src?.columns || [])) {
+    for (const t of (col.tasks || [])) {
+      if (String(t.id) === String(taskId)) return t;
+    }
+  }
+  return null;
+}
+
+function renderPmSubtaskRows(container, task, users, onChange) {
+  if (!container) return;
+  container.querySelectorAll('details.pm-subtask-acc[open]').forEach((d) => {
+    const id = d.getAttribute('data-subtask-id');
+    if (id) pmOpenSubtaskIds.add(id);
+  });
+
+  container.innerHTML = '';
+  container.className = 'pm-subtask-accordion';
+  const subtasks = (task.subtasks || []).slice().sort((a, b) => (a.sort_order - b.sort_order) || (a.id - b.id));
+  if (!subtasks.length) {
+    container.className = '';
+    container.innerHTML = '<div class="text-sm text-zinc-500 italic border border-dashed border-zinc-300 rounded-xl px-3 py-3 bg-zinc-50/70">No sub-tasks yet</div>';
+    return;
+  }
+
+  subtasks.forEach((st, idx) => {
+    const details = document.createElement('details');
+    details.className = 'pm-subtask-acc' + (st.is_done ? ' is-done' : '');
+    details.setAttribute('data-subtask-id', String(st.id));
+    const sid = String(st.id);
+    if (pmOpenSubtaskIds.has(sid) || (subtasks.length === 1 && idx === 0)) details.open = true;
+    details.addEventListener('toggle', () => {
+      if (details.open) pmOpenSubtaskIds.add(sid);
+      else pmOpenSubtaskIds.delete(sid);
+    });
+
+    const summary = el('summary', {class: 'pm-subtask-summary'});
+    const chk = el('input', {type: 'checkbox'});
+    chk.checked = !!st.is_done;
+    chk.className = 'rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 shrink-0';
+    chk.onmousedown = (e) => e.stopPropagation();
+    chk.onclick = (e) => e.stopPropagation();
+    chk.onchange = async () => {
+      try {
+        await apiPATCH(`${API_BASE}/task-subtasks/${st.id}`, { is_done: chk.checked });
+        if (typeof onChange === 'function') await onChange();
+      } catch (e) {
+        chk.checked = !chk.checked;
+        alert(e.message || e);
+      }
+    };
+
+    const titleEl = el('span', {
+      class: 'pm-subtask-title' + (st.is_done ? ' is-done' : ''),
+      text: st.title || 'Untitled',
+    });
+
+    const metaWrap = el('div', {class: 'flex flex-wrap items-center gap-1 shrink-0'});
+    pmSubtaskSummaryMeta(st).forEach((txt) => {
+      metaWrap.appendChild(el('span', {class: 'pm-subtask-pill', text: txt}));
+    });
+
+    const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    chevron.setAttribute('class', 'pm-subtask-chevron');
+    chevron.setAttribute('viewBox', '0 0 20 20');
+    chevron.setAttribute('fill', 'currentColor');
+    chevron.innerHTML = '<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd"/>';
+
+    summary.appendChild(chk);
+    summary.appendChild(titleEl);
+    summary.appendChild(metaWrap);
+    summary.appendChild(chevron);
+
+    const body = el('div', {class: 'pm-subtask-body'});
+    const datesRow = el('div', {class: 'flex flex-wrap items-center gap-2'});
+    const startIn = el('input', {type: 'date', class: 'border border-zinc-200 rounded-lg px-2 py-1.5 text-sm'});
+    startIn.value = st.start_date ? String(st.start_date).slice(0, 10) : '';
+    const endIn = el('input', {type: 'date', class: 'border border-zinc-200 rounded-lg px-2 py-1.5 text-sm'});
+    endIn.value = st.end_date ? String(st.end_date).slice(0, 10) : '';
+    datesRow.appendChild(el('label', {class: 'text-xs text-zinc-500', text: 'Start'}));
+    datesRow.appendChild(startIn);
+    datesRow.appendChild(el('label', {class: 'text-xs text-zinc-500', text: 'Due'}));
+    datesRow.appendChild(endIn);
+
+    const assignLabel = el('label', {class: 'text-xs font-medium text-zinc-600', text: 'Assignees'});
+    const assignMount = el('div', {class: 'pm-subtask-assignee-mount'});
+    let assignPicker = null;
+
+    const saveMeta = async () => {
+      const assignees = assignPicker ? assignPicker.getSelectedIds() : [];
+      try {
+        await apiPATCH(`${API_BASE}/task-subtasks/${st.id}`, {
+          start_date: startIn.value || null,
+          end_date: endIn.value || null,
+          assignees,
+        });
+        if (typeof onChange === 'function') await onChange();
+      } catch (e) {
+        alert(e.message || e);
+      }
+    };
+
+    startIn.onchange = saveMeta;
+    endIn.onchange = saveMeta;
+    const saveMetaDebounced = (typeof pmDebounce === 'function') ? pmDebounce(saveMeta, 500) : saveMeta;
+    assignPicker = pmMountAssigneePicker(assignMount, {
+      selected: st.assignees || [],
+      compact: true,
+      onChange: saveMetaDebounced,
+    });
+
+    const delBtn = el('button', {
+      type: 'button',
+      class: 'text-sm text-red-600 hover:text-red-700 border border-red-200 rounded-lg px-3 py-1.5 w-fit hover:bg-red-50',
+      text: 'Remove sub-task',
+    });
+    delBtn.onclick = async () => {
+      if (!confirm('Remove this sub-task?')) return;
+      try {
+        await apiDELETE(`${API_BASE}/task-subtasks/${st.id}`);
+        pmOpenSubtaskIds.delete(sid);
+        if (typeof onChange === 'function') await onChange();
+      } catch (e) {
+        alert(e.message || e);
+      }
+    };
+
+    body.appendChild(datesRow);
+    body.appendChild(assignLabel);
+    body.appendChild(assignMount);
+    body.appendChild(delBtn);
+
+    details.appendChild(summary);
+    details.appendChild(body);
+    container.appendChild(details);
+  });
+}
+
+async function syncTaskAfterSubtaskChange(taskId) {
+  try {
+    const full = await apiGET(`${API_BASE}/tasks/${taskId}`);
+    for (const col of (lastBoardData?.columns || [])) {
+      const idx = (col.tasks || []).findIndex((t) => String(t.id) === String(taskId));
+      if (idx >= 0) {
+        col.tasks[idx] = full;
+        break;
+      }
+    }
+    pmUpdateTaskCardOnBoard(taskId, full);
+    await pmRefreshTimelineViews();
+    openTaskDetails(full);
+  } catch (e) {
+    if (currentProjectId) await loadBoard(currentProjectId);
+    const updated = findTaskOnBoard(taskId);
+    if (updated) openTaskDetails(updated);
+  }
+}
+
+async function pmLoadTaskCommentsAndActivity(taskId) {
+  const commentsEl = document.getElementById('pm-task-comments-list');
+  const activityEl = document.getElementById('pm-task-activity-list');
+  if (!commentsEl && !activityEl) return;
+  try {
+    const [comments, activities] = await Promise.all([
+      apiGET(`${API_BASE}/tasks/${taskId}/comments`),
+      apiGET(`${API_BASE}/tasks/${taskId}/activities`),
+    ]);
+    if (commentsEl) {
+      commentsEl.innerHTML = (comments || []).length
+        ? comments.map((c) => `<div class="border border-zinc-100 rounded-lg px-2.5 py-2 bg-white"><div class="text-xs text-zinc-500">${escapeHtml(c.author_name || 'User')} · ${c.created_at ? formatDate(c.created_at) : ''}</div><div class="mt-0.5 text-zinc-800">${escapeHtml(c.body)}</div></div>`).join('')
+        : '<p class="text-zinc-500 italic text-xs">No comments yet</p>';
+    }
+    if (activityEl) {
+      activityEl.innerHTML = (activities || []).length
+        ? activities.map((a) => `<div><span class="font-medium">${escapeHtml(a.actor_name || 'System')}</span> ${escapeHtml(a.action)}${a.detail ? `: ${escapeHtml(a.detail)}` : ''}</div>`).join('')
+        : '<p class="text-zinc-500 italic">No activity recorded</p>';
+    }
+  } catch (e) {
+    if (commentsEl) commentsEl.innerHTML = '<p class="text-red-500 text-xs">Failed to load comments</p>';
+  }
+}
+
+function pmTaskSection(title, bodyHtml, extraClass = '') {
+  return `<section class="pm-task-section ${extraClass}">
+    <div class="pm-task-section__head">${escapeHtml(title)}</div>
+    <div class="pm-task-section__body">${bodyHtml}</div>
+  </section>`;
 }
 
 async function openTaskDetails(task) {
@@ -2761,6 +3716,10 @@ async function openTaskDetails(task) {
   const startFmt = task.start_date ? formatDate(task.start_date) : '—';
   const endFmt = task.end_date ? formatDate(task.end_date) : '—';
   const progress = typeof task.progress === 'number' ? Math.max(0, Math.min(100, task.progress)) : 0;
+  const subTotal = task.subtask_total || (task.subtasks || []).length;
+  const subDone = task.subtask_done_count != null
+    ? task.subtask_done_count
+    : (task.subtasks || []).filter((s) => s.is_done).length;
   const s = ganttParseLocal(task.start_date);
   const e = ganttParseLocal(task.end_date);
   const duration = (s && e) ? ganttCountBizInclusive(s, e) : null;
@@ -2786,46 +3745,78 @@ async function openTaskDetails(task) {
     : '<div class="text-sm text-zinc-500 italic border border-dashed border-zinc-300 rounded-xl px-3 py-3 bg-zinc-50/70">No attachments</div>';
 
   openModal('Task details', (c) => {
-    c.innerHTML = `
-      <div class="grid gap-4">
-        <div class="rounded-2xl border border-zinc-200 bg-white/90 backdrop-blur-sm p-4 shadow-sm">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <h3 class="text-xl font-semibold tracking-tight text-zinc-900 break-words">${escapeHtml(task.title || 'Untitled task')}</h3>
-            ${columnTitle ? `<div class="mt-2 inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100/70 px-2.5 py-1 text-[11px] font-medium text-zinc-600">Column: <span class="ml-1 text-zinc-800">${escapeHtml(columnTitle)}</span></div>` : ''}
-          </div>
-          <div class="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1.5 rounded-full shrink-0">${progress}% complete</div>
+    const overviewBody = `
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h3 class="text-lg font-semibold tracking-tight text-zinc-900 break-words">${escapeHtml(task.title || 'Untitled task')}</h3>
+          ${columnTitle ? `<div class="mt-1.5 inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100/70 px-2.5 py-0.5 text-[11px] font-medium text-zinc-600">Column: <span class="ml-1 text-zinc-800">${escapeHtml(columnTitle)}</span></div>` : ''}
         </div>
-        <div class="mt-3">
-          <div class="h-2 bg-zinc-100 rounded-full overflow-hidden">
-            <div class="h-full bg-indigo-500 rounded-full transition-all duration-300" style="width:${progress}%"></div>
-          </div>
-        </div>
-        </div>
-
-        <div class="text-sm text-zinc-700 bg-white border border-zinc-200 rounded-xl p-3.5 whitespace-pre-wrap break-words leading-relaxed">${escapeHtml(task.description || 'No description')}</div>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-sm">
-          <div class="border border-zinc-200 bg-white rounded-xl p-2.5"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Start</div><div class="mt-0.5 font-semibold text-zinc-800">${escapeHtml(startFmt)}</div></div>
-          <div class="border border-zinc-200 bg-white rounded-xl p-2.5"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Due</div><div class="mt-0.5 font-semibold text-zinc-800">${escapeHtml(endFmt)}</div></div>
-          <div class="border border-zinc-200 bg-white rounded-xl p-2.5"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Duration</div><div class="mt-0.5 font-semibold text-zinc-800">${duration != null ? `${duration} day${duration === 1 ? '' : 's'}` : '—'}</div></div>
-          <div class="border border-zinc-200 bg-white rounded-xl p-2.5"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Assignees</div><div class="mt-0.5 font-semibold text-zinc-800 break-words">${escapeHtml(assigneesLabel)}</div></div>
-        </div>
-
-        ${createdByName ? `<div class="text-xs text-zinc-500">Created by <span class="font-medium text-zinc-700">${escapeHtml(createdByName)}</span></div>` : ''}
-
-        <div class="space-y-2.5">
-          <div class="text-sm font-semibold text-zinc-800">Attachments</div>
-          ${attachmentsHtml}
-        </div>
-
-        <div class="pt-3 border-t border-zinc-200 flex flex-wrap items-center justify-end gap-2">
-          <button type="button" class="px-3.5 py-2 rounded-lg border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 transition-colors" data-details-act="close">Close</button>
-          <button type="button" class="px-3.5 py-2 rounded-lg border border-indigo-200 bg-indigo-600 text-white hover:bg-indigo-700 transition-colors" data-details-act="edit">Edit</button>
-          ${task.can_delete ? '<button type="button" class="px-3.5 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors" data-details-act="delete">Delete</button>' : ''}
-        </div>
+        <div class="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full shrink-0">${progress}% complete</div>
       </div>
-    `;
+      <div class="mt-2">
+        <div class="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+          <div class="h-full bg-indigo-500 rounded-full transition-all duration-300" style="width:${progress}%"></div>
+        </div>
+      </div>`;
+
+    const descriptionBody = `
+      <div class="text-sm text-zinc-700 whitespace-pre-wrap break-words leading-snug">${escapeHtml(task.description || 'No description')}</div>`;
+
+    const scheduleBody = `
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+        <div class="border border-zinc-200 bg-zinc-50/50 rounded-lg p-2"><div class="text-[10px] uppercase tracking-wide text-zinc-500">Start</div><div class="mt-0.5 font-semibold text-zinc-800">${escapeHtml(startFmt)}</div></div>
+        <div class="border border-zinc-200 bg-zinc-50/50 rounded-lg p-2"><div class="text-[10px] uppercase tracking-wide text-zinc-500">Due</div><div class="mt-0.5 font-semibold text-zinc-800">${escapeHtml(endFmt)}</div></div>
+        <div class="border border-zinc-200 bg-zinc-50/50 rounded-lg p-2"><div class="text-[10px] uppercase tracking-wide text-zinc-500">Duration</div><div class="mt-0.5 font-semibold text-zinc-800">${duration != null ? `${duration} day${duration === 1 ? '' : 's'}` : '—'}</div></div>
+        <div class="border border-zinc-200 bg-zinc-50/50 rounded-lg p-2"><div class="text-[10px] uppercase tracking-wide text-zinc-500">Assignees</div><div class="mt-0.5 font-semibold text-zinc-800 break-words">${escapeHtml(assigneesLabel)}</div></div>
+      </div>
+      ${createdByName ? `<div class="mt-2 text-xs text-zinc-500">Created by <span class="font-medium text-zinc-700">${escapeHtml(createdByName)}</span></div>` : ''}`;
+
+    const subtasksBody = `
+      ${subTotal ? `<div class="flex items-center justify-between gap-2 mb-2"><span class="text-xs text-zinc-500">${subDone}/${subTotal} complete</span></div><div class="h-1.5 bg-zinc-100 rounded-full overflow-hidden mb-2"><div class="h-full bg-emerald-500 rounded-full transition-all duration-300" style="width:${Math.round(100 * subDone / subTotal)}%"></div></div>` : ''}
+      <div id="pm-subtask-list" class="space-y-1.5"></div>
+      <div class="grid gap-2 mt-2">
+        <div class="flex flex-wrap gap-2">
+          <input type="text" id="pm-subtask-input" class="flex-1 min-w-[10rem] border border-zinc-200 rounded-lg px-3 py-1.5 text-sm" placeholder="Add a sub-task…" />
+          <input type="date" id="pm-subtask-start" class="border border-zinc-200 rounded-lg px-2 py-1.5 text-sm" title="Start date" />
+          <input type="date" id="pm-subtask-end" class="border border-zinc-200 rounded-lg px-2 py-1.5 text-sm" title="Due date" />
+          <button type="button" id="pm-subtask-add" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">Add</button>
+        </div>
+        <div>
+          <label class="text-xs text-zinc-500 block mb-1">Assignees (optional)</label>
+          <div id="pm-subtask-assignees-wrap"></div>
+        </div>
+      </div>`;
+
+    const commentsBody = `
+      <div id="pm-task-comments-list" class="space-y-2 max-h-40 overflow-y-auto text-sm mb-2"></div>
+      <div class="flex gap-2">
+        <input type="text" id="pm-task-comment-input" class="flex-1 border border-zinc-200 rounded-lg px-3 py-1.5 text-sm" placeholder="Add a comment…" />
+        <button type="button" id="pm-task-comment-add" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">Post</button>
+      </div>`;
+
+    const activityBody = `
+      <details class="rounded-lg border border-zinc-200 bg-zinc-50/50">
+        <summary class="px-3 py-1.5 text-sm font-medium text-zinc-700 cursor-pointer">Show activity log</summary>
+        <div id="pm-task-activity-list" class="px-3 pb-2 text-xs text-zinc-600 space-y-1 max-h-48 overflow-y-auto"></div>
+      </details>`;
+
+    const actionsBody = `
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <button type="button" class="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 transition-colors text-sm" data-details-act="close">Close</button>
+        <button type="button" class="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-600 text-white hover:bg-indigo-700 transition-colors text-sm" data-details-act="edit">Edit</button>
+        ${task.can_delete ? '<button type="button" class="px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors text-sm" data-details-act="delete">Delete</button>' : ''}
+      </div>`;
+
+    c.innerHTML = [
+      pmTaskSection('Overview', overviewBody, 'pm-task-section--overview'),
+      pmTaskSection('Description', descriptionBody, 'pm-task-section--description'),
+      pmTaskSection('Schedule & people', scheduleBody, 'pm-task-section--schedule'),
+      pmTaskSection('Sub-tasks', subtasksBody, 'pm-task-section--subtasks'),
+      pmTaskSection('Comments', commentsBody, 'pm-task-section--comments'),
+      pmTaskSection('Activity', activityBody, 'pm-task-section--activity'),
+      pmTaskSection('Attachments', attachmentsHtml, 'pm-task-section--attachments'),
+      pmTaskSection('Actions', actionsBody, 'pm-task-section--actions'),
+    ].join('');
 
     c.querySelectorAll('[data-details-preview-aid]').forEach((btn) => {
       btn.onclick = () => {
@@ -2869,19 +3860,80 @@ async function openTaskDetails(task) {
         confirmDeleteTask(task.id);
       };
     }
-  }, null, true);
-  // Keep details modal wide, but ~20% narrower than full-width mode.
-  modalContent.style.maxWidth = '80vw';
+
+    const subtaskList = c.querySelector('#pm-subtask-list');
+    const refreshSubtasks = () => syncTaskAfterSubtaskChange(task.id);
+    renderPmSubtaskRows(subtaskList, task, users, refreshSubtasks);
+
+    const asgWrap = c.querySelector('#pm-subtask-assignees-wrap');
+    if (asgWrap) {
+      pmMountAssigneePicker(asgWrap, { selected: [], compact: true });
+    }
+
+    const subAddBtn = c.querySelector('#pm-subtask-add');
+    const subInput = c.querySelector('#pm-subtask-input');
+    const addSubtask = async () => {
+      const title = (subInput?.value || '').trim();
+      if (!title) return;
+      const startVal = ($('pm-subtask-start') || {}).value || null;
+      const endVal = ($('pm-subtask-end') || {}).value || null;
+      const assignees = pmGetAssigneeIdsFromMount(asgWrap);
+      try {
+        await apiPOST(`${API_BASE}/tasks/${task.id}/subtasks`, {
+          title,
+          start_date: startVal || undefined,
+          end_date: endVal || undefined,
+          assignees,
+        });
+        if (subInput) subInput.value = '';
+        if ($('pm-subtask-start')) $('pm-subtask-start').value = '';
+        if ($('pm-subtask-end')) $('pm-subtask-end').value = '';
+        if (asgWrap) pmMountAssigneePicker(asgWrap, { selected: [], compact: true });
+        await refreshSubtasks();
+      } catch (e) {
+        alert(e.message || e);
+      }
+    };
+    if (subAddBtn) subAddBtn.onclick = addSubtask;
+    if (subInput) {
+      subInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addSubtask();
+        }
+      };
+    }
+
+    pmLoadTaskCommentsAndActivity(task.id);
+    const commentAdd = c.querySelector('#pm-task-comment-add');
+    const commentInput = c.querySelector('#pm-task-comment-input');
+    if (commentAdd && commentInput) {
+      const postComment = async () => {
+        const body = (commentInput.value || '').trim();
+        if (!body) return;
+        try {
+          await apiPOST(`${API_BASE}/tasks/${task.id}/comments`, { body });
+          commentInput.value = '';
+          await pmLoadTaskCommentsAndActivity(task.id);
+        } catch (e) {
+          alert(e.message || e);
+        }
+      };
+      commentAdd.onclick = postComment;
+      commentInput.onkeydown = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); postComment(); }
+      };
+    }
+  }, null, false);
+  modalBackdrop.classList.add('task-details-modal');
 }
 
 async function promptEditTask(task) {
   // task argument is the object returned by project board
   if (!task.attachments) task.attachments = [];
-  const members = await getProjectMembers(currentProjectId);
   openModal('Edit Task', (c) => {
     const startVal = task.start_date ? task.start_date.slice(0,10) : '';
     const endVal = task.end_date ? task.end_date.slice(0,10) : '';
-    const selectedIds = new Set((task.assignees||[]).map(a => String(a.id)));
     c.innerHTML = `
       <div class="grid gap-2">
         <input id="task_title" class="w-full border p-2 rounded" value="${escapeHtml(task.title)}" />
@@ -2894,12 +3946,18 @@ async function promptEditTask(task) {
           <label class="text-sm text-gray-600">Progress:</label>
           <input id="task_progress" type="number" min="0" max="100" value="${task.progress||0}" class="border p-2 rounded w-24" />
         </div>
+        <div class="flex items-center gap-2">
+          <label class="text-sm text-gray-600">Priority:</label>
+          <select id="task_priority" class="border p-2 rounded text-sm">
+            <option value="low" ${(task.priority||'medium')==='low'?'selected':''}>Low</option>
+            <option value="medium" ${(task.priority||'medium')==='medium'?'selected':''}>Medium</option>
+            <option value="high" ${(task.priority||'medium')==='high'?'selected':''}>High</option>
+            <option value="urgent" ${(task.priority||'medium')==='urgent'?'selected':''}>Urgent</option>
+          </select>
+        </div>
         <div class="grid gap-1">
           <label class="text-sm text-gray-600">Assignees:</label>
-          <select id="task_assignees" class="border p-2 rounded" multiple>
-            ${members.map(m => `<option value="${m.id}" ${selectedIds.has(String(m.id)) ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
-          </select>
-          <p class="text-xs text-gray-500">Hold Ctrl/Cmd (or Shift) to select multiple members.</p>
+          <div id="task_assignees_pick"></div>
         </div>
         <div class="grid gap-2 border-t border-zinc-200 pt-3 mt-1">
           <label class="text-sm text-gray-600">Attachments</label>
@@ -2909,6 +3967,7 @@ async function promptEditTask(task) {
         </div>
       </div>
     `;
+    pmMountAssigneePicker(c.querySelector('#task_assignees_pick'), { selected: task.assignees || [] });
     const pickBtn = $('task_attachment_pick');
     const fileInput = $('task_attachment_input');
     if (pickBtn && fileInput) {
@@ -2940,7 +3999,8 @@ async function promptEditTask(task) {
     const start_date = $('task_start').value || null;
     const end_date = $('task_end').value || null;
     const progress = parseInt($('task_progress').value || 0, 10);
-    const assignees = Array.from(($('task_assignees')||{options:[]}).options).filter(o => o.selected).map(o => parseInt(o.value));
+    const priority = ($('task_priority') || {}).value || 'medium';
+    const assignees = pmGetAssigneeIdsFromMount('task_assignees_pick');
 
     await apiPATCH(`${API_BASE}/tasks/${task.id}`, {
       title,
@@ -2948,6 +4008,7 @@ async function promptEditTask(task) {
       start_date: start_date || undefined,
       end_date: end_date || undefined,
       progress,
+      priority,
       assignees
     });
     await loadBoard(currentProjectId);
@@ -3127,39 +4188,18 @@ async function confirmDeleteProject(projectId) {
 async function buildTimelineFromBoard(boardData){
   const timelineTasks = [];
   const allItems = [];
-  (boardData.columns||[]).forEach(col=>{
-    (col.tasks||[]).forEach(t=>{
-      const assigneesArr = Array.isArray(t.assignees) ? t.assignees : [];
-      const baseItem = {
-        id: t.id,
-        title: t.title,
-        description: t.description != null && t.description !== '' ? String(t.description) : '',
-        start_iso: t.start_date || null,
-        end_iso: t.end_date || null,
-        progress: typeof t.progress === 'number' ? t.progress : null,
-        assigned_names: assigneesArr.map(a => a.name),
-        assigned_ids: assigneesArr.map(a => a.id),
-        column_title: col.title || `Column ${col.id}`,
-        position: typeof t.position==='number' ? t.position : 0,
-        date: null
-      };
-      const d = t.start_date || t.end_date;
-      if (d) {
-        const dt = new Date(d);
-        if (!isNaN(dt)) {
-          baseItem.date = dt;
-          timelineTasks.push(baseItem);
-        }
-      }
-      allItems.push(baseItem);
-    });
+  pmFlattenBoardScheduleEntries(boardData).forEach((entry) => {
+    const item = pmBuildTimelineItem(entry, entry.col);
+    if (item.date) timelineTasks.push(item);
+    allItems.push(item);
   });
   timelineTasks.sort((a,b)=>a.date-b.date);
   const sortedAllItems = sortTimelineItemsForTable(allItems, timelineSortDirection);
+  const milestoneRows = timelineTasks.filter((r) => r.item_type !== 'subtask');
   lastTimelineRows = timelineTasks;
   renderTimeline(timelineTasks);
-  const members = await getProjectMembers(currentProjectId);
-  renderMilestonesTable(timelineTasks, members);
+  const users = await getAssignableUsers();
+  renderMilestonesTable(milestoneRows, users);
   renderTimelineLegend(timelineTasks);
   lastTimelineTableItems = sortedAllItems;
   populateTimelineItemFilters(sortedAllItems);
@@ -3263,43 +4303,33 @@ function taskAssigneesExportStr(t) {
 }
 
 function buildBoardExportRows(boardData) {
-  const header = ['Column', 'Task', 'Description', 'Start', 'End', 'Progress %', 'Assignees'];
+  const header = ['Column', 'Type', 'Task', 'Description', 'Start', 'End', 'Progress %', 'Assignees'];
   const rows = [header];
   if (!boardData || !boardData.columns) return rows;
-  (boardData.columns || []).forEach((col) => {
-    const colTitle = col.title || `Column ${col.id}`;
-    (col.tasks || []).forEach((t) => {
-      const prog = typeof t.progress === 'number' ? `${t.progress}%` : '';
-      const desc = (t.description != null ? String(t.description) : '').replace(/\s+/g, ' ').trim();
-      rows.push([
-        colTitle,
-        t.title || '',
-        desc,
-        t.start_date ? formatDate(t.start_date) : '',
-        t.end_date ? formatDate(t.end_date) : '',
-        prog,
-        taskAssigneesExportStr(t),
-      ]);
-    });
+  pmFlattenBoardScheduleEntries(boardData).forEach((entry) => {
+    const sched = pmScheduleTaskLike(entry);
+    const colTitle = entry.col.title || `Column ${entry.col.id}`;
+    const prog = typeof sched.progress === 'number' ? `${sched.progress}%` : '';
+    const desc = (sched.description || '').replace(/\s+/g, ' ').trim();
+    const typeLabel = entry.kind === 'subtask' ? 'Sub-task' : 'Task';
+    rows.push([
+      colTitle,
+      typeLabel,
+      sched.title || '',
+      desc,
+      sched.start_date ? formatDate(sched.start_date) : '',
+      sched.end_date ? formatDate(sched.end_date) : '',
+      prog,
+      pmAssigneeNamesFromList(sched.assignees).join(', ') || 'Unassigned',
+    ]);
   });
   return rows;
 }
 
 function buildTimelineExportRows() {
-  const header = ['Month', 'Task', 'Description', 'Column', 'Start', 'End', 'Progress', 'Assignees'];
-  const rows = [header];
-  const items = getTimelineTableFilteredItems() || [];
-  items.forEach((r) => {
-    const mk = monthKey(r.date);
-    const month = monthLabelFromKey(mk);
-    const assignees = r.assigned_names && r.assigned_names.length ? r.assigned_names.join(', ') : 'Unassigned';
-    const start = r.start_iso ? formatDate(r.start_iso) : '';
-    const end = r.end_iso ? formatDate(r.end_iso) : '';
-    const prog = r.progress === null || r.progress === undefined ? '' : `${r.progress}%`;
-    const desc = (r.description != null ? String(r.description) : '').replace(/\s+/g, ' ').trim();
-    rows.push([month, r.title || '', desc, r.column_title || '', start, end, prog, assignees]);
-  });
-  return rows;
+  return (window.PmExport && PmExport.buildIncompleteExportRows)
+    ? PmExport.buildIncompleteExportRows(lastBoardData)
+    : [];
 }
 
 function buildGanttExportRows(boardData) {
@@ -3365,128 +4395,6 @@ function truncateForPdfCell(val, maxLen) {
   return s.slice(0, maxLen) + '…';
 }
 
-function exportPmReportExcel(scope) {
-  if (!lastBoardData || !lastBoardData.columns) {
-    alert('No project data loaded. Select a project and wait for the board to load.');
-    return;
-  }
-  if (typeof XLSX === 'undefined' || !XLSX.utils) {
-    alert('Excel export library is not available.');
-    return;
-  }
-  const allowed = new Set(['all', 'board', 'timeline', 'schedule']);
-  const s = allowed.has(scope) ? scope : 'all';
-  const projLabel = sanitizeFilenamePart(getCurrentProjectExportName());
-  const dateStr = new Date().toISOString().slice(0, 10);
-  const wb = XLSX.utils.book_new();
-
-  const appendBoard = () => {
-    const boardAoa = buildBoardExportRows(lastBoardData);
-    const wsBoard = XLSX.utils.aoa_to_sheet(boardAoa);
-    wsBoard['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 44 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 28 }];
-    XLSX.utils.book_append_sheet(wb, wsBoard, 'Board');
-  };
-  const appendTimeline = () => {
-    const timelineAoa = buildTimelineExportRows();
-    const wsTimeline = XLSX.utils.aoa_to_sheet(timelineAoa);
-    wsTimeline['!cols'] = [{ wch: 16 }, { wch: 28 }, { wch: 40 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 28 }];
-    XLSX.utils.book_append_sheet(wb, wsTimeline, 'Timeline');
-  };
-  const appendSchedule = () => {
-    const ganttAoa = buildGanttExportRows(lastBoardData);
-    const wsGantt = XLSX.utils.aoa_to_sheet(ganttAoa);
-    wsGantt['!cols'] = [{ wch: 20 }, { wch: 28 }, { wch: 40 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 12 }];
-    XLSX.utils.book_append_sheet(wb, wsGantt, 'Schedule');
-  };
-
-  if (s === 'all') {
-    appendBoard();
-    appendTimeline();
-    appendSchedule();
-    XLSX.writeFile(wb, `${projLabel}_report_${dateStr}.xlsx`);
-  } else if (s === 'board') {
-    appendBoard();
-    XLSX.writeFile(wb, `${projLabel}_board_${dateStr}.xlsx`);
-  } else if (s === 'timeline') {
-    appendTimeline();
-    XLSX.writeFile(wb, `${projLabel}_timeline_${dateStr}.xlsx`);
-  } else {
-    appendSchedule();
-    XLSX.writeFile(wb, `${projLabel}_schedule_${dateStr}.xlsx`);
-  }
-}
-
-function exportPmReportPdf(scope) {
-  if (!lastBoardData || !lastBoardData.columns) {
-    alert('No project data loaded. Select a project and wait for the board to load.');
-    return;
-  }
-  if (!window.jspdf || !window.jspdf.jsPDF) {
-    alert('PDF export library is not available.');
-    return;
-  }
-  const allowed = new Set(['all', 'board', 'timeline', 'schedule']);
-  const s = allowed.has(scope) ? scope : 'all';
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  const projName = getCurrentProjectExportName();
-  const projLabel = sanitizeFilenamePart(projName);
-  const dateStr = new Date().toISOString().slice(0, 10);
-
-  const sectionLabel = s === 'board' ? 'Board' : s === 'timeline' ? 'Timeline' : s === 'schedule' ? 'Schedule' : '';
-  doc.setFontSize(16);
-  doc.text(`Project report: ${truncateForPdfCell(projName, 80)}`, 14, 16);
-  doc.setFontSize(10);
-  let cursorY;
-  if (s === 'all') {
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 24);
-    cursorY = 32;
-  } else {
-    doc.text(`Section: ${sectionLabel}`, 14, 22);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
-    cursorY = 36;
-  }
-  const PDF_TRUNC = 200;
-
-  function addTableSection(title, aoa) {
-    if (!aoa || aoa.length < 1) return;
-    const head = aoa[0].map((c) => truncateForPdfCell(c, PDF_TRUNC));
-    const body = aoa.slice(1).map((row) => row.map((c) => truncateForPdfCell(c, PDF_TRUNC)));
-    if (cursorY > 250) {
-      doc.addPage();
-      cursorY = 14;
-    }
-    doc.setFontSize(11);
-    doc.text(title, 14, cursorY);
-    cursorY += 4;
-    doc.autoTable({
-      head: [head],
-      body,
-      startY: cursorY,
-      styles: { fontSize: 7, cellPadding: 1.5 },
-      headStyles: { fillColor: [67, 56, 202] },
-      margin: { left: 14, right: 14 },
-    });
-    cursorY = doc.lastAutoTable.finalY + 10;
-  }
-
-  if (s === 'all') {
-    addTableSection('Board', buildBoardExportRows(lastBoardData));
-    addTableSection('Timeline', buildTimelineExportRows());
-    addTableSection('Schedule', buildGanttExportRows(lastBoardData));
-    doc.save(`${projLabel}_report_${dateStr}.pdf`);
-  } else if (s === 'board') {
-    addTableSection('Board', buildBoardExportRows(lastBoardData));
-    doc.save(`${projLabel}_board_${dateStr}.pdf`);
-  } else if (s === 'timeline') {
-    addTableSection('Timeline', buildTimelineExportRows());
-    doc.save(`${projLabel}_timeline_${dateStr}.pdf`);
-  } else {
-    addTableSection('Schedule', buildGanttExportRows(lastBoardData));
-    doc.save(`${projLabel}_schedule_${dateStr}.pdf`);
-  }
-}
-
 function renderTimelineItemsTable(items){
   const body = document.getElementById('timelineItemsBody');
   const empty = document.getElementById('timelineItemsEmpty');
@@ -3533,8 +4441,8 @@ function renderTimelineItemsTable(items){
         ? `<td class="px-3 py-2 max-w-[14rem] truncate text-zinc-600" title="${escapeHtml(descOne)}">${escapeHtml(descOne)}</td>`
         : `<td class="px-3 py-2 text-zinc-400">—</td>`;
       return `
-        <tr class="border-b border-slate-100 hover:bg-slate-50">
-          <td class="px-3 py-2 font-medium">${escapeHtml(r.title || '')}</td>
+        <tr class="border-b border-slate-100 hover:bg-slate-50${r.item_type === 'subtask' ? ' bg-zinc-50/50' : ''}">
+          <td class="px-3 py-2 font-medium${r.item_type === 'subtask' ? ' pl-5 text-zinc-700' : ''}">${escapeHtml(r.title || '')}</td>
           ${descCell}
           <td class="px-3 py-2">${escapeHtml(r.column_title || '')}</td>
           <td class="px-3 py-2 whitespace-nowrap">${escapeHtml(start)}</td>
@@ -3565,16 +4473,7 @@ function renderMilestonesTable(rows, members){
   };
 
   body.innerHTML = rows.map(r=>{
-    const selected = new Set((r.assigned_ids||[]).map(x => String(x)));
     const summary = buildSummary(r.assigned_names||[]);
-    const checks = (members||[]).map(m => {
-      const checked = selected.has(String(m.id)) ? 'checked' : '';
-      const id = `assignee-${r.id}-${m.id}`;
-      return `<label for="${id}" class="flex items-center gap-2 text-sm p-1 rounded hover:bg-slate-50">
-        <input id="${id}" type="checkbox" data-uid="${m.id}" class="accent-indigo-600" ${checked} />
-        <span>${escapeHtml(m.name)}</span>
-      </label>`;
-    }).join('');
 
     return `<article class="rounded-xl border border-zinc-100 bg-zinc-50/30 p-4 hover:bg-white hover:shadow-md transition-shadow relative z-0">
       <div class="flex flex-wrap items-start gap-2 mb-3">
@@ -3587,9 +4486,7 @@ function renderMilestonesTable(rows, members){
           <button type="button" class="shrink-0 px-2.5 py-1 text-xs font-medium rounded-lg border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50" onclick="toggleAssigneePanel(${r.id})">Assign</button>
         </div>
         <div id="assignee-panel-${r.id}" class="assignee-panel hidden absolute z-30 left-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl p-3 w-[min(16rem,calc(100vw-2rem))]">
-          <div class="max-h-48 overflow-auto space-y-1">
-            ${checks}
-          </div>
+          <div id="milestone-assignee-pick-${r.id}"></div>
           <div class="flex justify-end gap-2 mt-2 pt-2 border-t border-zinc-100">
             <button type="button" class="px-2.5 py-1 text-xs rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50" onclick="closeAssigneePanel(${r.id})">Cancel</button>
             <button type="button" class="px-2.5 py-1 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700" onclick="saveAssigneePanel(${r.id})">Save</button>
@@ -3602,6 +4499,15 @@ function renderMilestonesTable(rows, members){
       </div>
     </article>`;
   }).join('');
+
+  rows.forEach((r) => {
+    const mount = document.getElementById(`milestone-assignee-pick-${r.id}`);
+    if (!mount) return;
+    const ids = r.assigned_ids || [];
+    const names = r.assigned_names || [];
+    const selected = ids.map((id, i) => ({ id, name: names[i] || `User #${id}` }));
+    pmMountAssigneePicker(mount, { selected, compact: true });
+  });
 }
 
 // Popover helpers for assignee controls
@@ -3616,15 +4522,26 @@ window.closeAssigneePanel = function(taskId){
   if (panel) panel.classList.add('hidden');
 };
 window.saveAssigneePanel = async function(taskId){
-  const panel = document.getElementById(`assignee-panel-${taskId}`);
-  if (!panel) return;
-  const ids = Array.from(panel.querySelectorAll('input[type=checkbox][data-uid]'))
-    .filter(cb => cb.checked)
-    .map(cb => parseInt(cb.getAttribute('data-uid')));
+  const mount = document.getElementById(`milestone-assignee-pick-${taskId}`);
+  if (!mount) return;
+  const ids = pmGetAssigneeIdsFromMount(mount);
   try {
     await apiPATCH(`${API_BASE}/tasks/${taskId}`, {assignees: ids});
     closeAssigneePanel(taskId);
-    await loadBoard(currentProjectId);
+    if (lastBoardData) {
+      for (const col of lastBoardData.columns || []) {
+        const t = (col.tasks || []).find((x) => String(x.id) === String(taskId));
+        if (t) {
+          const users = await loadUsers();
+          t.assignees = ids.map((id) => {
+            const u = users.find((x) => String(x.id) === String(id));
+            return { id, name: u ? u.name : `User #${id}` };
+          });
+          break;
+        }
+      }
+    }
+    await pmRefreshTimelineViews();
   } catch (e) {
     alert('Failed to update task assignees');
   }
@@ -3643,7 +4560,7 @@ window.addEventListener('click', (e) => {
 window.updateMilestonePosition = async function(taskId, newVal){
   try{
     await apiPATCH(`${API_BASE}/tasks/${taskId}`, {position: Number(newVal)});
-    await loadBoard(currentProjectId);
+    await pmRefreshTimelineViews();
   }catch(e){ alert('Failed to update position'); }
 }
 
@@ -3722,6 +4639,7 @@ function renderTimeline(rows){
     const magnitude = 40 + (Math.abs(r.position)||0); // keep "position" as vertical offset magnitude
     const above = (idx % 2) === 0; // alternate: first above, second below, etc.
     const dy = above ? -magnitude : magnitude;
+    const isSubtask = r.item_type === 'subtask';
 
     // determine color by mode
     const groupKey = colorMode === 'assignee'
@@ -3732,7 +4650,9 @@ function renderTimeline(rows){
     // marker
     const circ = document.createElementNS('http://www.w3.org/2000/svg','circle');
     circ.setAttribute('cx', String(x)); circ.setAttribute('cy', String(axisY));
-    circ.setAttribute('r','4'); circ.setAttribute('fill', color);
+    circ.setAttribute('r', isSubtask ? '3' : '4');
+    circ.setAttribute('fill', color);
+    if (isSubtask) circ.setAttribute('opacity', '0.75');
     circ.style.cursor = 'pointer';
     svg.appendChild(circ);
 
@@ -3783,7 +4703,8 @@ function renderTimeline(rows){
       showTimelineTooltip(html, tipX, tipY);
     };
     const hideTip = () => hideTimelineTooltip();
-    const open = () => openTaskFromTimeline(r.id);
+    const openTaskId = r.parent_task_id || r.id;
+    const open = () => openTaskFromTimeline(openTaskId);
 
     [circ, text, sub].filter(Boolean).forEach(elm => {
       elm.addEventListener('mouseenter', showTip);
@@ -3869,7 +4790,12 @@ function renderTimeline(rows){
           // no dates, set start_date only
           payload.start_date = new Date(anchorTs + deltaDays*dayMs).toISOString().slice(0,10);
         }
-        await apiPATCH(`${API_BASE}/tasks/${r.id}`, payload);
+        await apiPATCH(
+          r.item_type === 'subtask'
+            ? `${API_BASE}/task-subtasks/${r.id}`
+            : `${API_BASE}/tasks/${r.id}`,
+          payload
+        );
         await loadBoard(currentProjectId);
       } catch (err) {
         console.warn('Failed to update task date via drag', err);
@@ -4095,56 +5021,47 @@ function showGanttChart() {
   setActiveTab('gantt');
 }
 
-/* ---------- My Tasks Modal (Assigned to me in current project) ---------- */
+/* ---------- My Tasks Modal (cross-project) ---------- */
 async function showMyTasks(){
-  if (!currentProjectId) { alert('Please select a project first.'); return; }
   try {
-    let boardData = lastBoardData;
-    if (!boardData || !boardData.columns) {
-      boardData = await apiGET(`${API_BASE}/projects/${currentProjectId}/board`);
-    }
-    const meId = current_user && current_user.id ? String(current_user.id) : null;
-    const meName = (current_user && current_user.username ? current_user.username : '').toLowerCase();
-    const mine = [];
-    (boardData.columns||[]).forEach(col => {
-      (col.tasks||[]).forEach(t => {
-        const assigned = Array.isArray(t.assignees) ? t.assignees : [];
-        const isMine = assigned.some(a => {
-          const aId = (a && a.id !== undefined) ? String(a.id) : null;
-          const aName = (a && a.name) ? a.name.toLowerCase() : '';
-          return (meId && aId === meId) || (aName && aName === meName);
-        });
-        if (isMine) {
-          mine.push({
-            id: t.id,
-            title: t.title || '',
-            description: t.description || '',
-            column: col.title || `Column ${col.id}`,
-            start: t.start_date ? t.start_date.slice(0,10) : '',
-            end: t.end_date ? t.end_date.slice(0,10) : '',
-            progress: (typeof t.progress === 'number') ? t.progress : 0,
-            assignees: assigned.map(a => a && a.name ? a.name : '').filter(Boolean).join(', ')
-          });
-        }
-      });
-    });
+    let dueFilter = 'all';
+    const rows = await apiGET(`${API_BASE}/my-tasks?due=${dueFilter}`);
+    let mine = rows.map((r) => ({
+      id: r.task_id,
+      subtask_id: r.subtask_id,
+      item_type: r.item_type,
+      title: r.title || '',
+      project: r.project_name || '',
+      project_id: r.project_id,
+      column: r.column_title || '',
+      start: r.start_date ? String(r.start_date).slice(0, 10) : '',
+      end: r.end_date ? String(r.end_date).slice(0, 10) : '',
+      progress: r.progress || 0,
+      priority: r.priority || 'medium',
+      is_overdue: r.is_overdue,
+      due_bucket: r.due_bucket,
+    }));
 
     openModal('My Tasks', (c) => {
       c.innerHTML = `
-        <div class="mb-3">
-          <input id="myTasksSearch" class="w-full border p-2 rounded" placeholder="Search by title, description, column, assignee..." />
+        <div class="mb-3 flex flex-wrap gap-2 items-center">
+          <input id="myTasksSearch" class="flex-1 min-w-[12rem] border p-2 rounded" placeholder="Search tasks…" />
+          <select id="myTasksDueFilter" class="border p-2 rounded text-sm">
+            <option value="all">All due dates</option>
+            <option value="overdue">Overdue</option>
+            <option value="week">Due this week</option>
+          </select>
         </div>
         <div class="max-h-[60vh] overflow-auto">
           <table class="min-w-full text-sm">
             <thead class="bg-slate-50 sticky top-0">
               <tr>
                 <th class="px-3 py-2 text-left">Title</th>
-                <th class="px-3 py-2 text-left">Description</th>
+                <th class="px-3 py-2 text-left">Project</th>
                 <th class="px-3 py-2 text-left">Column</th>
                 <th class="px-3 py-2 text-left">Start</th>
                 <th class="px-3 py-2 text-left">End</th>
                 <th class="px-3 py-2 text-left">Progress</th>
-                <th class="px-3 py-2 text-left">Assignees</th>
               </tr>
             </thead>
             <tbody id="myTasksBody"></tbody>
@@ -4152,25 +5069,37 @@ async function showMyTasks(){
         </div>
       `;
       const tbody = document.getElementById('myTasksBody');
-      const renderRows = (rows) => {
-        if (!rows || !rows.length) {
-          tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-slate-500">No tasks assigned to you</td></tr>';
+      const renderRows = (list) => {
+        if (!list || !list.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-slate-500">No tasks assigned to you</td></tr>';
           return;
         }
-        tbody.innerHTML = rows.map(r => `
-          <tr class="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" data-task-id="${r.id}">
-            <td class="px-3 py-2 font-medium">${escapeHtml(r.title)}</td>
-            <td class="px-3 py-2">${escapeHtml(r.description)}</td>
+        tbody.innerHTML = list.map(r => `
+          <tr class="border-b border-slate-100 hover:bg-slate-50 cursor-pointer ${r.is_overdue ? 'bg-red-50/50' : ''}" data-task-id="${r.id}" data-project-id="${r.project_id}">
+            <td class="px-3 py-2 font-medium">${escapeHtml(r.title)}${r.item_type === 'subtask' ? ' <span class="text-xs text-zinc-500">(sub-task)</span>' : ''}</td>
+            <td class="px-3 py-2">${escapeHtml(r.project)}</td>
             <td class="px-3 py-2">${escapeHtml(r.column)}</td>
             <td class="px-3 py-2">${escapeHtml(r.start || '—')}</td>
-            <td class="px-3 py-2">${escapeHtml(r.end || '—')}</td>
+            <td class="px-3 py-2">${escapeHtml(r.end || '—')}${r.is_overdue ? ' <span class="text-red-600 text-xs">overdue</span>' : ''}</td>
             <td class="px-3 py-2">${r.progress}%</td>
-            <td class="px-3 py-2">${escapeHtml(r.assignees)}</td>
           </tr>
         `).join('');
-        // Click to open editor
         Array.from(tbody.querySelectorAll('tr[data-task-id]')).forEach(tr => {
-          tr.addEventListener('click', () => { const id = tr.getAttribute('data-task-id'); closeModal(); openTaskFromTimeline(id); });
+          tr.addEventListener('click', async () => {
+            const id = tr.getAttribute('data-task-id');
+            const pid = tr.getAttribute('data-project-id');
+            closeModal();
+            if (pid && String(pid) !== String(currentProjectId)) {
+              currentProjectId = pid;
+              const sel = $('projectSelect');
+              if (sel) sel.value = pid;
+              pmPendingDeepLinkTask = id;
+              updatePmWorkspaceVisibility();
+              await loadBoard(pid);
+            } else {
+              openTaskFromTimeline(id);
+            }
+          });
         });
       };
       renderRows(mine);
@@ -4178,12 +5107,31 @@ async function showMyTasks(){
       if (input){
         input.addEventListener('input', () => {
           const q = (input.value||'').toLowerCase();
-          const filtered = mine.filter(r => `${r.title} ${r.description} ${r.column} ${r.assignees}`.toLowerCase().includes(q));
-          renderRows(filtered);
+          renderRows(mine.filter(r => `${r.title} ${r.project} ${r.column}`.toLowerCase().includes(q)));
         });
       }
+      const dueSel = document.getElementById('myTasksDueFilter');
+      if (dueSel) {
+        dueSel.onchange = async () => {
+          try {
+            mine = (await apiGET(`${API_BASE}/my-tasks?due=${dueSel.value || 'all'}`)).map((r) => ({
+              id: r.task_id,
+              subtask_id: r.subtask_id,
+              item_type: r.item_type,
+              title: r.title || '',
+              project: r.project_name || '',
+              project_id: r.project_id,
+              column: r.column_title || '',
+              start: r.start_date ? String(r.start_date).slice(0, 10) : '',
+              end: r.end_date ? String(r.end_date).slice(0, 10) : '',
+              progress: r.progress || 0,
+              is_overdue: r.is_overdue,
+            }));
+            renderRows(mine);
+          } catch (e) { alert(e.message || e); }
+        };
+      }
     }, () => { closeModal(); });
-    // Apply custom sizing for My Tasks modal
     modalBackdrop.classList.add('my-tasks-modal');
   } catch (err) {
     console.error('Failed to load my tasks', err);
@@ -4218,12 +5166,12 @@ window.onload = async () => {
     timelineFilterAssignee.addEventListener('change', () => renderTimelineItemsTable(getTimelineTableFilteredItems()));
   }
   const tabBoard = $('tab-board');
-  const tabTimeline = $('tab-timeline');
   const tabGantt = $('tab-gantt');
   const tabCalendar = $('tab-calendar');
   const tabDocuments = $('tab-documents');
   if (tabBoard) tabBoard.onclick = () => setActiveTab('board');
-  if (tabTimeline) tabTimeline.onclick = () => setActiveTab('timeline');
+  const tabIncomplete = $('tab-incomplete');
+  if (tabIncomplete) tabIncomplete.onclick = () => setActiveTab('incomplete');
   if (tabGantt) tabGantt.onclick = () => setActiveTab('gantt');
   if (tabCalendar) tabCalendar.onclick = () => setActiveTab('calendar');
   if (tabDocuments) tabDocuments.onclick = () => setActiveTab('documents');
@@ -4285,21 +5233,28 @@ window.onload = async () => {
     };
   }
 
-  const pmExportSelect = $('pmExportSelect');
-  if (pmExportSelect) {
-    pmExportSelect.onchange = () => {
-      const v = pmExportSelect.value;
-      if (!v) return;
-      const parts = v.split(':');
-      const kind = parts[0];
-      const sc = parts[1] || 'all';
-      if (kind === 'excel') exportPmReportExcel(sc);
-      else if (kind === 'pdf') exportPmReportPdf(sc);
-      pmExportSelect.value = '';
-    };
+  if (window.PmExport && typeof PmExport.wireExportModal === 'function') {
+    PmExport.wireExportModal(() => {
+      const projectName = (typeof getCurrentProjectExportName === 'function')
+        ? getCurrentProjectExportName()
+        : (projectsCache[currentProjectId]?.name || 'Project');
+      const projectInfo = projectsCache[currentProjectId] || {};
+      return {
+        boardData: lastBoardData,
+        meta: PmExport.getExportMeta(lastBoardData, projectName, projectInfo),
+      };
+    });
   }
 
-  await loadUsers(); // prefetch users for quick modals
+  await loadUsers();
+  pmWireKeyboardShortcuts();
+  const boardToggle = $('pmBoardViewToggle');
+  if (boardToggle) {
+    boardToggle.onclick = () => {
+      const board = $('board');
+      if (board) board.classList.toggle('pm-board-stacked');
+    };
+  }
   await loadProjects();
 };
 </script>
