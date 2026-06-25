@@ -8,118 +8,206 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
 </head>
 <body class="sm-connect-page">
-  <div class="sm-connect-hero text-center mb-3">
-    {% if prefill_event %}
-    <p class="h5 mb-1">{{ prefill_event.name }}</p>
-    {% if prefill_event.banner_text %}<p class="small text-muted">{{ prefill_event.banner_text }}</p>{% endif %}
-    {% else %}
-    <img src="{{ url_for('static', filename='smartlearning.webp') }}" alt="Akello" class="sm-connect-logo-img mb-2" onerror="this.style.display='none'" />
-    <div class="sm-connect-logo">Akello</div>
-    <p class="text-muted mb-0">Digital learning for Zimbabwe</p>
-    {% endif %}
-  </div>
-  <div class="sm-connect-card">
-    <p class="mb-4">Share your details and we'll follow up with information tailored to your interest.</p>
-    <div id="sm-alert" class="alert d-none" role="alert"></div>
-    <div id="sm-thank-you" class="sm-thank-you d-none text-center py-4">
-      <h2 class="h5 text-success mb-2">Thank you!</h2>
-      <p class="text-muted">We've received your details. Our team will contact you within 2–3 business days.</p>
-      <p class="small"><a href="https://akello.co" target="_blank" rel="noopener">Visit akello.co</a> · <a href="/connect">Submit another response</a></p>
-    </div>
-    <form id="sm-public-form" novalidate>
-      <div class="sm-form-steps mb-3 small text-muted" id="sm-step-indicator">Step <span id="sm-step-num">1</span> of 3</div>
-      <div class="row g-3" data-sm-step="1">
-        <div class="col-md-6">
-          <label class="form-label">Full name *</label>
-          <input type="text" class="form-control" name="full_name" required maxlength="255" autocomplete="name" />
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Occupation *</label>
-          <input type="text" class="form-control" name="occupation" required maxlength="255" />
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Email *</label>
-          <input type="email" class="form-control" name="email" required maxlength="255" autocomplete="email" />
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Mobile *</label>
-          <input type="tel" class="form-control" name="mobile" required maxlength="64" placeholder="+263…" autocomplete="tel" />
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Province</label>
-          <select class="form-select" name="province" id="sm-province">
-            <option value="">Select province…</option>
-            {% for p in provinces %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">School</label>
-          <input type="text" class="form-control" name="school_name" id="sm-school" list="sm-school-list" maxlength="255" />
-          <datalist id="sm-school-list"></datalist>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Organization</label>
-          <input type="text" class="form-control" name="organization" maxlength="255" />
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Role</label>
-          <select class="form-select" name="role_category">
-            <option value="">Select…</option>
-            {% for r in role_categories %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Event date</label>
-          <input type="date" class="form-control" name="event_date" id="sm-event-date" value="{{ today }}" />
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Event</label>
-          <select class="form-select" name="event_id" id="sm-event-id">
-            <option value="">Not at an event / General enquiry</option>
-          </select>
-        </div>
-        <div class="col-12">
-          <label class="form-label">Your interest *</label>
-          <select class="form-select" name="interest_option_id" required>
-            <option value="">Select…</option>
-            {% for o in interest_options %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Preferred contact</label>
-          <select class="form-select" name="preferred_contact">
-            <option value="email">Email</option>
-            <option value="phone">Phone</option>
-            <option value="whatsapp">WhatsApp</option>
-          </select>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">How did you hear about us?</label>
-          <select class="form-select" name="heard_about">
-            <option value="">Select…</option>
-            {% for h in heard_about_options %}<option value="{{ h }}">{{ h }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="col-12">
-          <label class="form-label">Comments</label>
-          <textarea class="form-control" name="comments" rows="3" maxlength="2000"></textarea>
-        </div>
-        <div class="col-12">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="consent_marketing" id="sm-consent" value="1" required />
-            <label class="form-check-label" for="sm-consent">I agree to receive information from Akello *</label>
+  <div class="sm-connect-shell">
+    <header class="sm-connect-hero text-center">
+      {% if prefill_event %}
+      <div class="sm-event-badge">Event registration</div>
+      <h1 class="sm-connect-title">{{ prefill_event.name }}</h1>
+      {% if prefill_event.banner_text %}<p class="sm-connect-subtitle">{{ prefill_event.banner_text }}</p>{% endif %}
+      {% else %}
+      <img src="{{ url_for('static', filename='smartlearning.webp') }}" alt="Akello" class="sm-connect-logo-img" onerror="this.style.display='none'" />
+      <div class="sm-connect-logo">Akello</div>
+      <p class="sm-connect-subtitle">Digital learning for Zimbabwe</p>
+      {% endif %}
+    </header>
+
+    <main class="sm-connect-card">
+      <p class="sm-connect-intro">Share your details and we'll follow up with information tailored to your interest.</p>
+
+      <div id="sm-alert" class="alert d-none" role="alert" aria-live="polite"></div>
+
+      <div id="sm-thank-you" class="sm-thank-you d-none text-center" role="status" aria-live="polite">
+        <div class="sm-thank-you-icon" aria-hidden="true">&#10003;</div>
+        <h2 class="sm-thank-you-title">Thank you!</h2>
+        <p class="sm-thank-you-text">We've received your details. Our team will contact you within 2–3 business days.</p>
+        <p class="sm-thank-you-links">
+          <a href="https://akello.co" target="_blank" rel="noopener">Visit akello.co</a>
+          <span aria-hidden="true">&middot;</span>
+          <a href="/connect">Submit another response</a>
+        </p>
+      </div>
+
+      <form id="sm-public-form" novalidate>
+        <nav class="sm-wizard-progress" aria-label="Form progress">
+          <ol class="sm-wizard-steps" id="sm-wizard-steps">
+            <li class="sm-wizard-step is-active" data-step="1">
+              <span class="sm-wizard-step-num">1</span>
+              <span class="sm-wizard-step-label">Contact</span>
+            </li>
+            <li class="sm-wizard-step" data-step="2">
+              <span class="sm-wizard-step-num">2</span>
+              <span class="sm-wizard-step-label">Context</span>
+            </li>
+            <li class="sm-wizard-step" data-step="3">
+              <span class="sm-wizard-step-num">3</span>
+              <span class="sm-wizard-step-label">Interest</span>
+            </li>
+          </ol>
+          <div class="sm-wizard-bar" aria-hidden="true">
+            <div class="sm-wizard-bar-fill" id="sm-wizard-bar-fill"></div>
           </div>
-        </div>
-        <div class="sm-honeypot">
+          <p class="sm-form-steps" id="sm-step-indicator">Step <span id="sm-step-num">1</span> of 3 &mdash; <span id="sm-step-label">Contact details</span></p>
+        </nav>
+
+        <!-- Step 1: Contact details -->
+        <section class="sm-step-panel" data-sm-step="1" aria-labelledby="sm-step-1-heading">
+          <h2 class="sm-section-heading" id="sm-step-1-heading">Contact details</h2>
+          <p class="sm-section-hint">Tell us how we can reach you.</p>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="sm-full-name">Full name <span class="text-danger" aria-hidden="true">*</span></label>
+              <input type="text" class="form-control sm-field" name="full_name" id="sm-full-name" required maxlength="255" autocomplete="name" aria-required="true" />
+              <div class="invalid-feedback">Please enter your full name.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="sm-occupation">Occupation <span class="text-danger" aria-hidden="true">*</span></label>
+              <input type="text" class="form-control sm-field" name="occupation" id="sm-occupation" required maxlength="255" aria-required="true" />
+              <div class="invalid-feedback">Please enter your occupation.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="sm-email">Email <span class="text-danger" aria-hidden="true">*</span></label>
+              <input type="email" class="form-control sm-field" name="email" id="sm-email" required maxlength="255" autocomplete="email" aria-required="true" />
+              <div class="invalid-feedback">Please enter a valid email address.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="sm-mobile">Mobile <span class="text-danger" aria-hidden="true">*</span></label>
+              <input type="tel" class="form-control sm-field" name="mobile" id="sm-mobile" required maxlength="64" placeholder="+263 77 123 4567" autocomplete="tel" aria-required="true" aria-describedby="sm-mobile-hint" />
+              <div id="sm-mobile-hint" class="form-text">Include country code, e.g. +263…</div>
+              <div class="invalid-feedback">Please enter your mobile number.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Step 2: Context -->
+        <section class="sm-step-panel d-none" data-sm-step="2" aria-labelledby="sm-step-2-heading">
+          <h2 class="sm-section-heading" id="sm-step-2-heading">Your context</h2>
+          <p class="sm-section-hint">Help us understand where you're coming from. All fields on this step are optional.</p>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="sm-province">Province</label>
+              <select class="form-select sm-field" name="province" id="sm-province">
+                <option value="">Select province&hellip;</option>
+                {% for p in provinces %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="sm-school">School</label>
+              <input type="text" class="form-control sm-field" name="school_name" id="sm-school" list="sm-school-list" maxlength="255" placeholder="Start typing to search" />
+              <datalist id="sm-school-list"></datalist>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="sm-event-date">Event date</label>
+              <input type="date" class="form-control sm-field" name="event_date" id="sm-event-date" value="{{ today }}" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="sm-event-id">Event</label>
+              <select class="form-select sm-field" name="event_id" id="sm-event-id">
+                <option value="">Not at an event / General enquiry</option>
+              </select>
+            </div>
+          </div>
+
+          <details class="sm-optional-details mt-3">
+            <summary class="sm-optional-summary">Add organization details <span class="sm-optional-badge">Optional</span></summary>
+            <div class="sm-optional-body row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="sm-organization">Organization</label>
+                <input type="text" class="form-control sm-field" name="organization" id="sm-organization" maxlength="255" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="sm-role">Role</label>
+                <select class="form-select sm-field" name="role_category" id="sm-role">
+                  <option value="">Select&hellip;</option>
+                  {% for r in role_categories %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+                </select>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <!-- Step 3: Interest & consent -->
+        <section class="sm-step-panel d-none" data-sm-step="3" aria-labelledby="sm-step-3-heading">
+          <h2 class="sm-section-heading" id="sm-step-3-heading">Your interest</h2>
+          <p class="sm-section-hint">Let us know what you're looking for and how to follow up.</p>
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label" for="sm-interest">Your interest <span class="text-danger" aria-hidden="true">*</span></label>
+              <select class="form-select sm-field" name="interest_option_id" id="sm-interest" required aria-required="true">
+                <option value="">Select&hellip;</option>
+                {% for o in interest_options %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}
+              </select>
+              <div class="invalid-feedback">Please select your area of interest.</div>
+            </div>
+          </div>
+
+          <details class="sm-optional-details mt-3">
+            <summary class="sm-optional-summary">Add more details <span class="sm-optional-badge">Optional</span></summary>
+            <div class="sm-optional-body row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="sm-preferred-contact">Preferred contact</label>
+                <select class="form-select sm-field" name="preferred_contact" id="sm-preferred-contact">
+                  <option value="email">Email</option>
+                  <option value="phone">Phone</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="sm-heard-about">How did you hear about us?</label>
+                <select class="form-select sm-field" name="heard_about" id="sm-heard-about">
+                  <option value="">Select&hellip;</option>
+                  {% for h in heard_about_options %}<option value="{{ h }}">{{ h }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="sm-comments">Comments</label>
+                <textarea class="form-control sm-field" name="comments" id="sm-comments" rows="3" maxlength="2000" placeholder="Anything else you'd like us to know?"></textarea>
+              </div>
+            </div>
+          </details>
+
+          <div class="sm-consent-block mt-4">
+            <div class="form-check">
+              <input class="form-check-input sm-field" type="checkbox" name="consent_marketing" id="sm-consent" value="1" required aria-required="true" />
+              <label class="form-check-label" for="sm-consent">
+                I agree to receive information from Akello <span class="text-danger" aria-hidden="true">*</span>
+              </label>
+              <div class="invalid-feedback">You must agree to continue.</div>
+            </div>
+            <p class="form-text mb-0">We respect your privacy and will only use your details to follow up on your enquiry.</p>
+          </div>
+        </section>
+
+        <div class="sm-honeypot" aria-hidden="true">
           <label>Website</label>
           <input type="text" name="website" tabindex="-1" autocomplete="off" />
         </div>
-        <div class="col-12 sm-sticky-submit">
-          <button type="submit" class="btn btn-primary w-100 btn-lg" id="sm-submit-btn" style="background:#00407d;border-color:#00407d;">Submit</button>
+
+        <div class="sm-wizard-nav sm-sticky-submit">
+          <button type="button" class="btn btn-outline-secondary sm-btn-back d-none" id="sm-back-btn">Back</button>
+          <button type="button" class="btn btn-primary sm-btn-next" id="sm-next-btn">Continue</button>
+          <button type="submit" class="btn btn-primary sm-btn-submit d-none" id="sm-submit-btn">
+            <span class="sm-btn-label">Submit</span>
+            <span class="sm-btn-spinner d-none" aria-hidden="true"></span>
+          </button>
         </div>
-      </div>
-    </form>
+      </form>
+    </main>
+
+    <footer class="sm-connect-footer text-center">
+      <p>&copy; Akello &middot; <a href="https://akello.co" target="_blank" rel="noopener">akello.co</a></p>
+    </footer>
   </div>
+
   <script>
     window.SM_PREFILL_EVENT_ID = {{ prefill_event_id|tojson }};
     window.SM_PREFILL_EVENT = {{ prefill_event|tojson }};
