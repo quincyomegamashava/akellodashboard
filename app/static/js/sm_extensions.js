@@ -40,38 +40,51 @@
     try {
       const lead = await sm.fetchJson(sm.API.stakeholder(id));
       if (title) title.textContent = lead.full_name;
-      let html = '<dl class="sm-drawer-dl small">';
-      const fields = [
+      const contactFields = [
         ["Email", lead.email], ["Mobile", lead.mobile], ["Occupation", lead.occupation],
+      ];
+      const contextFields = [
         ["Province", lead.province], ["School", lead.school_name], ["Organization", lead.organization],
-        ["Event", lead.event_name], ["Interest", lead.interest_label], ["Status", lead.follow_up_status],
-        ["Source", lead.source], ["Heard about", lead.heard_about],
+        ["Event", lead.event_name], ["Interest", lead.interest_label],
+      ];
+      const metaFields = [
+        ["Status", lead.follow_up_status], ["Source", lead.source], ["Heard about", lead.heard_about],
         ["Consent", lead.consent_marketing ? "Yes" : "No"],
         ["Submitted", (lead.submitted_at || "").slice(0, 16).replace("T", " ")],
         ["Comments", lead.comments],
       ];
-      fields.forEach(function (pair) {
-        if (!pair[1]) return;
-        html += "<dt>" + sm.esc(pair[0]) + "</dt><dd>" + sm.esc(String(pair[1])) + "</dd>";
-      });
-      html += "</dl>";
-      if (lead.lead_score != null) {
-        html += '<p class="small"><strong>Lead score:</strong> ' + lead.lead_score + "/100</p>";
+      function renderSection(sectionTitle, fields) {
+        const rows = fields.filter(function (pair) { return pair[1]; });
+        if (!rows.length) return "";
+        let block = '<section class="sm-drawer-section"><h3 class="sm-drawer-section-title">' + sm.esc(sectionTitle) + "</h3><dl class=\"sm-drawer-dl\">";
+        rows.forEach(function (pair) {
+          block += "<dt>" + sm.esc(pair[0]) + "</dt><dd>" + sm.esc(String(pair[1])) + "</dd>";
+        });
+        return block + "</dl></section>";
       }
+      let html = "";
+      if (lead.lead_score != null) {
+        html += '<div class="sm-drawer-score">Lead score: ' + lead.lead_score + "/100</div>";
+      }
+      html += renderSection("Contact", contactFields);
+      html += renderSection("Context", contextFields);
+      html += renderSection("Details", metaFields);
+      html += '<div class="sm-drawer-actions">';
       try {
         const sug = await sm.fetchJson("/sales-marketing/api/stakeholders/" + id + "/suggested-action");
         if (sug.suggested_action) {
-          html += '<p class="small text-primary"><strong>Next:</strong> ' + sm.esc(sug.suggested_action) + "</p>";
+          html += '<p class="small text-primary mb-2"><strong>Next:</strong> ' + sm.esc(sug.suggested_action) + "</p>";
         }
         if (sug.whatsapp_url) {
-          html += '<a class="btn btn-sm btn-success mb-2" href="' + sm.esc(sug.whatsapp_url) + '" target="_blank" rel="noopener">Open WhatsApp</a> ';
-          html += '<button type="button" class="btn btn-sm btn-outline-success mb-2" id="sm-wa-log">Log WhatsApp</button>';
+          html += '<a class="btn btn-sm btn-success" href="' + sm.esc(sug.whatsapp_url) + '" target="_blank" rel="noopener">Open WhatsApp</a> ';
+          html += '<button type="button" class="btn btn-sm btn-outline-success" id="sm-wa-log">Log WhatsApp</button>';
         }
       } catch (e2) { /* ignore */ }
+      html += "</div>";
       if (lead.is_duplicate_flag && !lead.duplicate_dismissed) {
         html += '<button type="button" class="btn btn-sm btn-outline-warning mb-2" id="sm-dismiss-dup">Dismiss duplicate flag</button>';
       }
-      html += '<div class="sm-notes-section"><h3 class="h6">Timeline</h3><div id="sm-notes-list">';
+      html += '<section class="sm-drawer-section"><h3 class="sm-drawer-section-title">Timeline</h3><div id="sm-notes-list">';
       try {
         const tl = await sm.fetchJson("/sales-marketing/api/stakeholders/" + id + "/timeline");
         (tl.items || []).forEach(function (n) {
@@ -85,7 +98,7 @@
         });
       }
       html += '</div><textarea class="form-control form-control-sm mt-2" id="sm-note-input" rows="2" placeholder="Add internal note…"></textarea>';
-      html += '<button type="button" class="btn btn-sm btn-outline-primary mt-1" id="sm-note-add">Add note</button></div>';
+      html += '<button type="button" class="btn btn-sm btn-outline-primary mt-1" id="sm-note-add">Add note</button></section>';
       body.innerHTML = html;
       const dismiss = $("sm-dismiss-dup");
       if (dismiss) dismiss.addEventListener("click", async function () {
@@ -133,7 +146,32 @@
     if (copyBtn) copyBtn.addEventListener("click", function () {
       navigator.clipboard.writeText(window.location.origin + "/connect");
       copyBtn.textContent = "Copied!";
+      if (sm.showPageToast) sm.showPageToast("Public form link copied.", "success");
       setTimeout(function () { copyBtn.textContent = "Copy link"; }, 2000);
+    });
+    document.querySelectorAll("[data-sm-stat-filter]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const filter = btn.getAttribute("data-sm-stat-filter");
+        if (filter === "all") {
+          if (sm.clearFilters) sm.clearFilters();
+          return;
+        }
+        if (sm.clearFilters) {
+          if ($("sm-search")) $("sm-search").value = "";
+          if ($("sm-filter-event")) $("sm-filter-event").value = "";
+          if ($("sm-filter-province")) $("sm-filter-province").value = "";
+          if ($("sm-filter-interest")) $("sm-filter-interest").value = "";
+          if ($("sm-filter-status")) $("sm-filter-status").value = "";
+          if ($("sm-filter-consent")) $("sm-filter-consent").checked = false;
+          if ($("sm-filter-dup")) $("sm-filter-dup").checked = false;
+        }
+        if (filter === "consent" && $("sm-filter-consent")) $("sm-filter-consent").checked = true;
+        if (filter === "dup" && $("sm-filter-dup")) $("sm-filter-dup").checked = true;
+        if (filter === "week" && $("sm-search")) $("sm-search").value = "";
+        if (sm.updateActiveFilterChips) sm.updateActiveFilterChips();
+        sm.loadLeads();
+        if (filter === "week" && sm.showPageToast) sm.showPageToast("Showing current page results. Use date filters for precise weekly segmentation.", "warning");
+      });
     });
     const closeBtn = $("sm-drawer-close");
     const backdrop = $("sm-drawer-backdrop");
@@ -157,7 +195,7 @@
       const status = bulkSel.value;
       if (!status) return;
       const ids = Array.from(sm.selectedLeadIds());
-      if (!ids.length) { alert("Select at least one lead."); bulkSel.value = ""; return; }
+      if (!ids.length) { if (sm.showPageToast) sm.showPageToast("Select at least one lead.", "warning"); bulkSel.value = ""; return; }
       await sm.fetchJson(sm.API.bulkStatus, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -165,6 +203,7 @@
       });
       bulkSel.value = "";
       sm.loadLeads();
+      if (sm.showPageToast) sm.showPageToast("Status updated for " + ids.length + " lead(s).", "success");
     });
     const filterEmail = $("sm-btn-email-filter");
     if (filterEmail) filterEmail.addEventListener("click", async function () {

@@ -302,15 +302,84 @@
     };
   }
 
+  function showPageToast(message, type) {
+    const el = $("sm-page-toast");
+    if (!el) return;
+    el.textContent = message;
+    el.className = "sm-page-toast";
+    if (type === "success") el.classList.add("is-success");
+    if (type === "warning") el.classList.add("is-warning");
+    if (type === "error") el.classList.add("is-error");
+    el.classList.remove("d-none");
+    clearTimeout(showPageToast._timer);
+    showPageToast._timer = setTimeout(function () { el.classList.add("d-none"); }, 3200);
+  }
+
+  function updateActiveFilterChips() {
+    const host = $("sm-active-filters");
+    if (!host) return;
+    const chips = [];
+    const search = ($("sm-search") || {}).value;
+    if (search) chips.push({ key: "search", label: "Search: " + search });
+    const evSel = $("sm-filter-event");
+    if (evSel && evSel.value) {
+      const label = evSel.options[evSel.selectedIndex] ? evSel.options[evSel.selectedIndex].textContent : "Event";
+      chips.push({ key: "event", label: "Event: " + label });
+    }
+    const provSel = $("sm-filter-province");
+    if (provSel && provSel.value) chips.push({ key: "province", label: "Province: " + provSel.value });
+    const intSel = $("sm-filter-interest");
+    if (intSel && intSel.value) {
+      const label = intSel.options[intSel.selectedIndex] ? intSel.options[intSel.selectedIndex].textContent : "Interest";
+      chips.push({ key: "interest", label: "Interest: " + label });
+    }
+    const stSel = $("sm-filter-status");
+    if (stSel && stSel.value) chips.push({ key: "status", label: "Status: " + stSel.value });
+    if (($("sm-filter-consent") || {}).checked) chips.push({ key: "consent", label: "Consent only" });
+    if (($("sm-filter-dup") || {}).checked) chips.push({ key: "dup", label: "Duplicates only" });
+    host.innerHTML = chips.map(function (chip) {
+      return '<span class="sm-filter-chip">' + esc(chip.label) +
+        ' <button type="button" data-clear-filter="' + esc(chip.key) + '" aria-label="Remove ' + esc(chip.label) + ' filter">&times;</button></span>';
+    }).join("");
+    host.querySelectorAll("[data-clear-filter]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const key = btn.getAttribute("data-clear-filter");
+        if (key === "search" && $("sm-search")) $("sm-search").value = "";
+        if (key === "event" && $("sm-filter-event")) $("sm-filter-event").value = "";
+        if (key === "province" && $("sm-filter-province")) $("sm-filter-province").value = "";
+        if (key === "interest" && $("sm-filter-interest")) $("sm-filter-interest").value = "";
+        if (key === "status" && $("sm-filter-status")) $("sm-filter-status").value = "";
+        if (key === "consent" && $("sm-filter-consent")) $("sm-filter-consent").checked = false;
+        if (key === "dup" && $("sm-filter-dup")) $("sm-filter-dup").checked = false;
+        currentPage = 1;
+        updateActiveFilterChips();
+        loadLeads();
+      });
+    });
+  }
+
+  function clearFilters() {
+    if ($("sm-search")) $("sm-search").value = "";
+    if ($("sm-filter-event")) $("sm-filter-event").value = "";
+    if ($("sm-filter-province")) $("sm-filter-province").value = "";
+    if ($("sm-filter-interest")) $("sm-filter-interest").value = "";
+    if ($("sm-filter-status")) $("sm-filter-status").value = "";
+    if ($("sm-filter-consent")) $("sm-filter-consent").checked = false;
+    if ($("sm-filter-dup")) $("sm-filter-dup").checked = false;
+    currentPage = 1;
+    updateActiveFilterChips();
+    loadLeads();
+  }
+
   async function loadLeads() {
     const body = $("sm-leads-body");
     if (!body) return;
-    body.innerHTML = '<tr><td colspan="9" class="text-muted">Loading…</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" class="sm-table-state text-muted">Loading leads…</td></tr>';
     try {
       const data = await fetchJson(API.stakeholders + "?" + filterParams().toString());
       body.innerHTML = "";
       if (!data.items.length) {
-        body.innerHTML = '<tr><td colspan="9" class="text-muted">No leads found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="9" class="sm-table-state"><div class="sm-empty-state">No leads match your current filters.</div></td></tr>';
       }
       data.items.forEach(function (it) {
         const tr = document.createElement("tr");
@@ -347,8 +416,10 @@
         });
       });
       if (window.smOnLeadsLoaded) window.smOnLeadsLoaded(data);
+      updateActiveFilterChips();
     } catch (e) {
-      body.innerHTML = '<tr><td colspan="9" class="text-danger">' + esc(e.message) + "</td></tr>";
+      body.innerHTML = '<tr><td colspan="9" class="sm-table-state text-danger">' + esc(e.message) + "</td></tr>";
+      updateActiveFilterChips();
     }
   }
 
@@ -427,7 +498,10 @@
     const qs = new URLSearchParams(window.location.search);
     const evQ = qs.get("event_id");
     if (evQ && $("sm-filter-event")) $("sm-filter-event").value = evQ;
-    loadInterestOptions().then(loadEventsForFilter).then(loadLeads);
+    loadInterestOptions().then(loadEventsForFilter).then(function () {
+      updateActiveFilterChips();
+      return loadLeads();
+    });
     ["sm-search", "sm-filter-event", "sm-filter-province", "sm-filter-interest", "sm-filter-consent", "sm-filter-status", "sm-filter-dup"].forEach(function (id) {
       const el = $(id);
       if (el) el.addEventListener("change", function () { currentPage = 1; loadLeads(); });
@@ -435,6 +509,8 @@
     });
     const refresh = $("sm-btn-refresh");
     if (refresh) refresh.addEventListener("click", loadLeads);
+    const clearBtn = $("sm-filter-clear");
+    if (clearBtn) clearBtn.addEventListener("click", clearFilters);
     const exp = $("sm-btn-export");
     if (exp) exp.addEventListener("click", function () {
       window.location.href = API.stakeholdersExport + "?" + filterParams().toString();
@@ -454,11 +530,13 @@
     });
     const addBtn = $("sm-btn-add");
     if (addBtn) addBtn.addEventListener("click", function () { openLeadModal(null); });
+    const addHeaderBtn = $("sm-btn-add-header");
+    if (addHeaderBtn) addHeaderBtn.addEventListener("click", function () { openLeadModal(null); });
     const saveLeadBtn = $("sm-lead-save");
     if (saveLeadBtn) saveLeadBtn.addEventListener("click", saveLead);
     const emailBtn = $("sm-btn-email");
     if (emailBtn) emailBtn.addEventListener("click", function () {
-      if (!selectedLeadIds.size) { alert("Select at least one lead."); return; }
+      if (!selectedLeadIds.size) { showPageToast("Select at least one lead.", "warning"); return; }
       const cnt = $("sm-email-count");
       if (cnt) cnt.textContent = selectedLeadIds.size + " recipient(s) with consent will be emailed.";
       new bootstrap.Modal($("smEmailModal")).show();
@@ -475,9 +553,9 @@
             body_html: ($("sm-email-body") || {}).value,
           }),
         });
-        alert("Sent " + data.sent + " of " + data.total);
+        showPageToast("Sent " + data.sent + " of " + data.total, "success");
         bootstrap.Modal.getInstance($("smEmailModal")).hide();
-      } catch (e) { alert(e.message); }
+      } catch (e) { showPageToast(e.message, "error"); }
     });
   }
 
@@ -671,6 +749,9 @@
     filterParams: filterParams,
     filterParamsObject: filterParamsObject,
     loadLeads: loadLeads,
+    clearFilters: clearFilters,
+    updateActiveFilterChips: updateActiveFilterChips,
+    showPageToast: showPageToast,
     selectedLeadIds: function () { return selectedLeadIds; },
     openLeadModal: openLeadModal,
     getEventsCache: function () { return eventsCache; },

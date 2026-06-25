@@ -5,141 +5,208 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
 {% endblock %}
 {% block content %}
-<div class="sm-page px-3 py-3">
-  <h1 class="h4 mb-1">{{ title }}</h1>
-  <p class="text-muted small mb-3">Stakeholder leads from events and the public connect form.</p>
+<div class="sm-page">
+  <header class="sm-page-header">
+    <div class="sm-page-header-main">
+      <h1 class="sm-page-title">{{ title }}</h1>
+      <p class="sm-page-subtitle">Stakeholder leads from events and the public connect form.</p>
+    </div>
+    <div class="sm-page-header-actions">
+      <a href="/connect" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary sm-btn-brand-outline">Public form ↗</a>
+      <button type="button" class="btn btn-sm btn-primary sm-btn-brand" id="sm-btn-add-header">Add lead</button>
+    </div>
+  </header>
+
   {% include "sales_marketing/_subnav.html" %}
 
-  <div id="sm-funnel-chart" class="sm-card mb-3 p-2"></div>
+  <section class="sm-insights-zone" aria-label="Lead insights">
+    <div id="sm-funnel-chart" class="sm-funnel-widget sm-card"></div>
+    <div class="sm-stats-row" id="sm-stats-row">
+      <button type="button" class="sm-stat-card sm-stat-card--clickable" data-sm-stat-filter="all" aria-label="Filter all leads">
+        <div class="sm-stat-val" id="sm-stat-total">—</div>
+        <div class="sm-stat-lbl">Total leads</div>
+      </button>
+      <button type="button" class="sm-stat-card sm-stat-card--clickable" data-sm-stat-filter="week" aria-label="Show this week">
+        <div class="sm-stat-val" id="sm-stat-week">—</div>
+        <div class="sm-stat-lbl">This week</div>
+      </button>
+      <button type="button" class="sm-stat-card sm-stat-card--clickable" data-sm-stat-filter="consent" aria-label="Filter consent only">
+        <div class="sm-stat-val" id="sm-stat-consent">—</div>
+        <div class="sm-stat-lbl">With consent</div>
+      </button>
+      <button type="button" class="sm-stat-card sm-stat-card--clickable" data-sm-stat-filter="dup" aria-label="Filter duplicates only">
+        <div class="sm-stat-val" id="sm-stat-dup">—</div>
+        <div class="sm-stat-lbl">Open duplicates</div>
+      </button>
+      <div class="sm-stat-card">
+        <div class="sm-stat-val" id="sm-stat-events">—</div>
+        <div class="sm-stat-lbl">Active events</div>
+      </div>
+    </div>
+  </section>
 
-  <div class="sm-stats-row mb-3" id="sm-stats-row">
-    <div class="sm-stat-card"><div class="sm-stat-val" id="sm-stat-total">—</div><div class="sm-stat-lbl">Total leads</div></div>
-    <div class="sm-stat-card"><div class="sm-stat-val" id="sm-stat-week">—</div><div class="sm-stat-lbl">This week</div></div>
-    <div class="sm-stat-card"><div class="sm-stat-val" id="sm-stat-consent">—</div><div class="sm-stat-lbl">With consent</div></div>
-    <div class="sm-stat-card"><div class="sm-stat-val" id="sm-stat-dup">—</div><div class="sm-stat-lbl">Open duplicates</div></div>
-    <div class="sm-stat-card"><div class="sm-stat-val" id="sm-stat-events">—</div><div class="sm-stat-lbl">Active events</div></div>
-  </div>
-
-  <div class="sm-empty-guide d-none mb-3" id="sm-empty-guide">
-    <h2 class="h6">Get started</h2>
-    <ol class="small mb-2">
+  <div class="sm-empty-guide d-none" id="sm-empty-guide">
+    <div class="sm-empty-guide-icon" aria-hidden="true">&#9733;</div>
+    <h2 class="sm-empty-guide-title">Get started</h2>
+    <ol class="sm-empty-guide-steps">
       <li>Create a marketing event under <a href="/sales-marketing/events">Events</a></li>
       <li>Share the public form: <a href="/connect" target="_blank" rel="noopener">/connect</a>
-        <button type="button" class="btn btn-sm btn-link p-0" id="sm-copy-connect">Copy link</button></li>
+        <button type="button" class="btn btn-sm btn-link p-0 align-baseline" id="sm-copy-connect">Copy link</button></li>
       <li>Review submissions here and follow up by status</li>
     </ol>
   </div>
 
-  <div class="sm-card mb-3">
-    <div class="sm-filter-row" id="sm-filters">
-      <div class="btn-group btn-group-sm me-2">
-        <button type="button" class="btn btn-outline-secondary active" data-sm-view="table">Table</button>
-        <button type="button" class="btn btn-outline-secondary" data-sm-view="board">Board</button>
+  <section class="sm-workspace sm-card" aria-label="Lead workspace">
+    <div class="sm-toolbar" id="sm-filters">
+      <div class="sm-toolbar-group sm-toolbar-group--primary">
+        <div class="sm-view-toggle btn-group btn-group-sm" role="group" aria-label="View mode">
+          <button type="button" class="btn btn-outline-secondary active" data-sm-view="table">Table</button>
+          <button type="button" class="btn btn-outline-secondary" data-sm-view="board">Board</button>
+        </div>
+        <div class="sm-toolbar-field sm-toolbar-field--search">
+          <label class="visually-hidden" for="sm-search">Search leads</label>
+          <input type="search" class="form-control form-control-sm" id="sm-search" placeholder="Search name, email, school…" />
+        </div>
       </div>
-      <select class="form-select form-select-sm" id="sm-saved-view-select" style="max-width:10rem;"><option value="">Saved views…</option></select>
-      <button type="button" class="btn btn-sm btn-outline-secondary" id="sm-saved-view-save">Save view</button>
-      <input type="search" class="form-control form-control-sm" id="sm-search" placeholder="Search name, email, school…" style="max-width:14rem;" />
-      <select class="form-select form-select-sm" id="sm-filter-event"><option value="">All events</option></select>
-      <select class="form-select form-select-sm" id="sm-filter-province">
-        <option value="">All provinces</option>
-        {% for p in provinces %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
-      </select>
-      <select class="form-select form-select-sm" id="sm-filter-interest"><option value="">All interests</option></select>
-      <select class="form-select form-select-sm" id="sm-filter-status" style="max-width:9rem;">
-        <option value="">All statuses</option>
-        <option value="new">New</option>
-        <option value="contacted">Contacted</option>
-        <option value="qualified">Qualified</option>
-        <option value="closed">Closed</option>
-      </select>
-      <label class="form-check-label small d-flex align-items-center gap-1">
-        <input type="checkbox" class="form-check-input" id="sm-filter-consent" /> Consent only
-      </label>
-      <label class="form-check-label small d-flex align-items-center gap-1">
-        <input type="checkbox" class="form-check-input" id="sm-filter-dup" /> Duplicates only
-      </label>
-      <button type="button" class="btn btn-sm btn-outline-secondary" id="sm-btn-refresh">Refresh</button>
-      <button type="button" class="btn btn-sm btn-outline-primary" id="sm-btn-export">Export CSV</button>
-      <button type="button" class="btn btn-sm btn-primary" id="sm-btn-email" style="background:#00407d;border-color:#00407d;">Email selected</button>
-      <button type="button" class="btn btn-sm btn-outline-primary" id="sm-btn-email-filter">Email matching filters</button>
-      <button type="button" class="btn btn-sm btn-outline-success" id="sm-btn-add">Add lead</button>
-      <select class="form-select form-select-sm" id="sm-bulk-status" style="max-width:9rem;">
-        <option value="">Set status…</option>
-        <option value="new">New</option>
-        <option value="contacted">Contacted</option>
-        <option value="qualified">Qualified</option>
-        <option value="closed">Closed</option>
-      </select>
-    </div>
-    <div id="sm-kanban-board" class="d-none mb-2"></div>
-    <div class="table-responsive">
-      <table class="table table-sm table-hover sm-table mb-0">
-        <thead>
-          <tr>
-            <th><input type="checkbox" id="sm-chk-all" /></th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Status</th>
-            <th>Event</th>
-            <th>Interest</th>
-            <th>Province</th>
-            <th>Submitted</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="sm-leads-body"></tbody>
-      </table>
-    </div>
-    <div class="d-flex justify-content-between align-items-center mt-2 small text-muted">
-      <span id="sm-pagination-info"></span>
-      <div class="btn-group btn-group-sm">
-        <button type="button" class="btn btn-outline-secondary" id="sm-prev">Prev</button>
-        <button type="button" class="btn btn-outline-secondary" id="sm-next">Next</button>
+
+      <div class="sm-toolbar-group sm-toolbar-group--segment">
+        <span class="sm-toolbar-label">Segment</span>
+        <select class="form-select form-select-sm" id="sm-filter-event" aria-label="Filter by event">
+          <option value="">All events</option>
+        </select>
+        <select class="form-select form-select-sm" id="sm-filter-province" aria-label="Filter by province">
+          <option value="">All provinces</option>
+          {% for p in provinces %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        </select>
+        <select class="form-select form-select-sm" id="sm-filter-interest" aria-label="Filter by interest">
+          <option value="">All interests</option>
+        </select>
+        <select class="form-select form-select-sm" id="sm-filter-status" aria-label="Filter by status">
+          <option value="">All statuses</option>
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="qualified">Qualified</option>
+          <option value="closed">Closed</option>
+        </select>
+        <label class="sm-filter-chip-toggle">
+          <input type="checkbox" class="form-check-input" id="sm-filter-consent" />
+          <span>Consent only</span>
+        </label>
+        <label class="sm-filter-chip-toggle">
+          <input type="checkbox" class="form-check-input" id="sm-filter-dup" />
+          <span>Duplicates only</span>
+        </label>
+      </div>
+
+      <div class="sm-toolbar-group sm-toolbar-group--actions">
+        <span class="sm-toolbar-label">Actions</span>
+        <div class="sm-saved-views">
+          <select class="form-select form-select-sm" id="sm-saved-view-select" aria-label="Saved views">
+            <option value="">Saved views…</option>
+          </select>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="sm-saved-view-save" title="Save current filters">Save</button>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="sm-btn-refresh">Refresh</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="sm-filter-clear">Clear filters</button>
+        <button type="button" class="btn btn-sm btn-outline-primary sm-btn-brand-outline" id="sm-btn-export">Export CSV</button>
+        <button type="button" class="btn btn-sm btn-primary sm-btn-brand" id="sm-btn-email">Email selected</button>
+        <button type="button" class="btn btn-sm btn-outline-primary sm-btn-brand-outline" id="sm-btn-email-filter">Email matching</button>
+        <button type="button" class="btn btn-sm btn-outline-success d-none" id="sm-btn-add">Add lead</button>
+        <select class="form-select form-select-sm" id="sm-bulk-status" aria-label="Bulk status update">
+          <option value="">Set status…</option>
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="qualified">Qualified</option>
+          <option value="closed">Closed</option>
+        </select>
       </div>
     </div>
-  </div>
+
+    <div id="sm-active-filters" class="sm-active-filters" aria-live="polite" aria-label="Active filters"></div>
+
+    <div id="sm-kanban-board" class="d-none sm-kanban-host"></div>
+
+    <div class="sm-table-panel">
+      <div class="table-responsive" id="sm-table-wrap">
+        <table class="table table-hover sm-table mb-0">
+          <thead>
+            <tr>
+              <th class="sm-col-check"><input type="checkbox" id="sm-chk-all" aria-label="Select all leads on page" /></th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Event</th>
+              <th>Interest</th>
+              <th>Province</th>
+              <th>Submitted</th>
+              <th class="sm-col-actions"></th>
+            </tr>
+          </thead>
+          <tbody id="sm-leads-body"></tbody>
+        </table>
+      </div>
+      <div class="sm-pagination-bar">
+        <span id="sm-pagination-info" class="sm-pagination-info"></span>
+        <div class="btn-group btn-group-sm">
+          <button type="button" class="btn btn-outline-secondary" id="sm-prev">Previous</button>
+          <button type="button" class="btn btn-outline-secondary" id="sm-next">Next</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="sm-page-toast" class="sm-page-toast d-none" role="status" aria-live="polite"></div>
 </div>
 
 <div class="sm-drawer-backdrop d-none" id="sm-drawer-backdrop"></div>
 <aside class="sm-drawer d-none" id="sm-lead-drawer" aria-label="Lead details">
   <div class="sm-drawer-header">
-    <h2 class="h6 mb-0" id="sm-drawer-title">Lead</h2>
+    <div>
+      <p class="sm-drawer-eyebrow">Lead profile</p>
+      <h2 class="sm-drawer-title" id="sm-drawer-title">Lead</h2>
+    </div>
     <button type="button" class="btn-close" id="sm-drawer-close" aria-label="Close"></button>
   </div>
   <div class="sm-drawer-body" id="sm-drawer-body"></div>
   <div class="sm-drawer-footer">
-    <button type="button" class="btn btn-sm btn-outline-primary" id="sm-drawer-edit">Edit</button>
-    <button type="button" class="btn btn-sm btn-primary" id="sm-drawer-email" style="background:#00407d;">Email</button>
+    <button type="button" class="btn btn-sm btn-outline-primary sm-btn-brand-outline" id="sm-drawer-edit">Edit lead</button>
+    <button type="button" class="btn btn-sm btn-primary sm-btn-brand" id="sm-drawer-email">Send email</button>
   </div>
 </aside>
 
-<div class="modal fade" id="smEmailModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">Send email</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal fade" id="smEmailModal" tabindex="-1" aria-labelledby="smEmailModalLabel">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content sm-modal">
+      <div class="modal-header">
+        <h5 class="modal-title" id="smEmailModalLabel">Send email</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
       <div class="modal-body">
-        <p class="small text-muted" id="sm-email-count"></p>
-        <label class="form-label">Subject</label>
-        <input type="text" class="form-control mb-2" id="sm-email-subject" />
-        <label class="form-label">Message (HTML allowed)</label>
+        <p class="sm-modal-hint" id="sm-email-count"></p>
+        <label class="form-label" for="sm-email-subject">Subject</label>
+        <input type="text" class="form-control mb-3" id="sm-email-subject" />
+        <label class="form-label" for="sm-email-body">Message <span class="text-muted fw-normal">(HTML allowed)</span></label>
         <textarea class="form-control" id="sm-email-body" rows="6"></textarea>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="sm-email-send" style="background:#00407d;">Send</button>
+        <button type="button" class="btn btn-primary sm-btn-brand" id="sm-email-send">Send email</button>
       </div>
     </div>
   </div>
 </div>
 
-<div class="modal fade" id="smLeadModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title" id="sm-lead-modal-title">Add lead</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal fade" id="smLeadModal" tabindex="-1" aria-labelledby="smLeadModalLabel">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content sm-modal">
+      <div class="modal-header">
+        <h5 class="modal-title" id="sm-lead-modal-title">Add lead</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
       <div class="modal-body" id="sm-lead-form-host"></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="sm-lead-save" style="background:#00407d;">Save</button>
+        <button type="button" class="btn btn-primary sm-btn-brand" id="sm-lead-save">Save lead</button>
       </div>
     </div>
   </div>

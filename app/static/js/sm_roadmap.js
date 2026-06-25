@@ -22,7 +22,7 @@
   function setViewMode(mode) {
     viewMode = mode;
     localStorage.setItem("sm_view_mode", mode);
-    const tableWrap = document.querySelector(".table-responsive");
+    const tableWrap = $("sm-table-wrap") || document.querySelector(".table-responsive");
     const board = $("sm-kanban-board");
     document.querySelectorAll("[data-sm-view]").forEach(function (btn) {
       btn.classList.toggle("active", btn.getAttribute("data-sm-view") === mode);
@@ -91,22 +91,25 @@
     if (!el) return;
     try {
       const data = await sm.fetchJson("/sales-marketing/api/stakeholders/funnel?period=30");
-      let html = "<div class=\"d-flex flex-wrap gap-2 align-items-end\">";
+      const max = Math.max.apply(null, STAGES.map(function (st) { return (data.by_stage || {})[st] || 0; }).concat([1]));
+      let html = '<div class="sm-funnel-title">Pipeline (30 days)</div><div class="sm-funnel-bars">';
       STAGES.forEach(function (st) {
         const n = (data.by_stage || {})[st] || 0;
-        const h = Math.max(20, Math.min(120, n * 8));
-        html += "<div class=\"text-center\"><div style=\"height:" + h + "px;width:3rem;background:#00407d;border-radius:4px;margin:0 auto;\"></div><div class=\"small mt-1\">" + esc(STAGE_LABELS[st]) + "</div><strong>" + n + "</strong></div>";
+        const h = Math.max(24, Math.round((n / max) * 96));
+        html += '<div class="sm-funnel-bar-item"><div class="sm-funnel-bar" style="height:' + h + 'px"></div>' +
+          '<div class="sm-funnel-bar-count">' + n + '</div>' +
+          '<div class="sm-funnel-bar-label">' + esc(STAGE_LABELS[st]) + "</div></div>";
       });
       html += "</div>";
       if ((data.anomalies || []).length) {
-        html += "<div class=\"mt-2\">";
+        html += '<div class="mt-2 d-flex flex-wrap gap-1">';
         data.anomalies.forEach(function (a) {
-          html += "<span class=\"hub-analytics-chip text-warning\">" + esc(a.message) + "</span>";
+          html += '<span class="hub-analytics-chip text-warning">' + esc(a.message) + "</span>";
         });
         html += "</div>";
       }
       el.innerHTML = html;
-    } catch (e) { el.innerHTML = ""; }
+    } catch (e) { el.innerHTML = '<div class="sm-funnel-title">Pipeline (30 days)</div><p class="small text-muted mb-0">Funnel data unavailable.</p>'; }
   }
 
   async function initSavedViews() {
@@ -133,6 +136,7 @@
         if (f.status && $("sm-filter-status")) $("sm-filter-status").value = f.status;
         if (f.province && $("sm-filter-province")) $("sm-filter-province").value = f.province;
         if (opt.dataset.viewMode) setViewMode(opt.dataset.viewMode);
+        if (sm.updateActiveFilterChips) sm.updateActiveFilterChips();
         sm.loadLeads();
       } catch (err) { /* ignore */ }
     });
