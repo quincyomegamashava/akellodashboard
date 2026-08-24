@@ -15,6 +15,7 @@
   let externalDdlAllowed = true;
   let migStatusCache = null;
   let migDiagnosticsCache = null;
+  let migPreflightCache = null;
   let migConfirmCallback = null;
 
   const $ = (sel, ctx) => (ctx || document).querySelector(sel);
@@ -525,7 +526,8 @@
       <table class="studio-table mb-4"><thead><tr><th>Revision</th><th>Message</th></tr></thead>
       <tbody>${pending.map((r) => `<tr><td><code>${escapeHtml(r.revision)}</code></td><td>${escapeHtml(r.message || '')}</td></tr>`).join('') || '<tr><td colspan="2">None</td></tr>'}</tbody></table>
       <div id="migPreflightResult"></div>
-      <div id="migResult" class="studio-sql-preview mt-3 hidden"></div>`;
+      <div id="migResult" class="studio-sql-preview mt-3 hidden"></div>
+      <div id="migHistory"></div>`;
 
     const recs = health.recommendations || [];
     const recEl = $('#migHealthRecs');
@@ -541,20 +543,83 @@
     $('#migBtnFix')?.addEventListener('click', () => showMigConfirm('Fix migrations', 'Run full migration recovery (backup, orphans, merge, upgrade).', () => migFix()));
     $('#migBtnMerge')?.addEventListener('click', () => showMigConfirm('Merge heads', 'Merge multiple Alembic heads into one.', () => migMerge()));
     $('#migBtnRepair')?.addEventListener('click', () => {
-      const rev = prompt('Stamp revision for repair:', diagnostics.current_revision || '');
+      const suggested = diagnostics.inferred_stamp_revision || diagnostics.current_revision || status.current_revision || '';
+      const rev = prompt('Stamp revision for repair:', suggested);
       if (!rev) return;
       showMigConfirm('Repair chain', `Repair migration chain and stamp to ${rev}.`, () => migRepair(rev));
     });
     $('#migBtnAlign')?.addEventListener('click', () => showMigConfirm('Align schema', 'Stamp DB to match current schema then upgrade.', () => migAlign()));
     $('#migBtnSync')?.addEventListener('click', () => showMigConfirm('Sync revision', 'Update alembic_version when schema already matches.', () => migSync()));
 
+    updateMigActionButtons(status, diagnostics);
+    await migPreflight();
+
     const hist = await api('/app/migrations/history?limit=10');
-    if (hist.revisions) {
-      panel.innerHTML += `
+    const histEl = $('#migHistory');
+    if (histEl && hist.revisions) {
+      histEl.innerHTML = `
         <h4 class="font-bold text-sm mb-2 mt-4">Recent history</h4>
         <table class="studio-table"><thead><tr><th>Revision</th><th>Message</th></tr></thead>
         <tbody>${hist.revisions.map((r) => `<tr><td><code>${escapeHtml(r.revision)}</code></td><td>${escapeHtml(r.message || '')}</td></tr>`).join('')}</tbody></table>`;
     }
+  }
+
+  function setMigBtnState(id, { hidden = false, disabled = false, title = '' } = {}) {
+    const btn = $(id);
+    if (!btn) return;
+    btn.classList.toggle('hidden', hidden);
+    btn.disabled = disabled;
+    btn.title = title || '';
+  }
+
+  function updateMigActionButtons(status, diagnostics) {
+    const enabled = !!(status && status.web_migrations_enabled !== false);
+    const needsRepair = !!(status && (status.needs_repair || status.chain_broken));
+    const multipleHeads = !!(status && status.multiple_heads) || !!(diagnostics && diagnostics.multiple_heads);
+    const hasOrphans = !!(status && status.has_orphan_files) || !!(diagnostics && diagnostics.has_orphan_files);
+    const pendingCount = (status && status.pending_count) || 0;
+    const preflightReady = !migPreflightCache || migPreflightCache.ready !== false;
+    const canSync = !!(status && status.can_sync) || !!(migPreflightCache && migPreflightCache.can_sync);
+    const canAlign = !!(status && status.can_align_schema);
+    const canDowngrade = !!(status && status.can_downgrade);
+    const showFix = needsRepair || multipleHeads || hasOrphans;
+    const upgradeBlocked = !enabled || !status || status.is_up_to_date || pendingCount === 0 || needsRepair || !preflightReady;
+
+    setMigBtnState('#migBtnFix', {
+      hidden: !showFix,
+      disabled: !enabled || !showFix,
+    });
+    setMigBtnState('#migBtnMerge', {
+      hidden: !multipleHeads,
+      disabled: !enabled || !multipleHeads || hasOrphans,
+      title: hasOrphans ? 'Remove orphan migration files first (use Fix migrations)' : '',
+    });
+    setMigBtnState('#migBtnRepair', {
+      hidden: !(needsRepair && !multipleHeads),
+      disabled: !enabled || !needsRepair || multipleHeads,
+    });
+    setMigBtnState('#migBtnUpgradeAll', {
+      disabled: upgradeBlocked,
+      title: !preflightReady ? 'Resolve preflight blockers before applying.' : '',
+    });
+    setMigBtnState('#migBtnUpgradeNext', {
+      disabled: upgradeBlocked,
+      title: !preflightReady ? 'Resolve preflight blockers before applying.' : '',
+    });
+    setMigBtnState('#migBtnSync', {
+      hidden: !canSync,
+      disabled: !enabled || !canSync || needsRepair,
+    });
+    setMigBtnState('#migBtnAlign', {
+      hidden: !canAlign,
+      disabled: !enabled || !canAlign || needsRepair,
+    });
+    setMigBtnState('#migBtnDowngrade', {
+      hidden: !canDowngrade,
+      disabled: !enabled || !canDowngrade || needsRepair,
+    });
+    setMigBtnState('#migBtnGenerate', { disabled: !enabled });
+    setMigBtnState('#migBtnPreflight', { disabled: false });
   }
 
   async function migPost(path, body, okMsg) {
@@ -611,12 +676,34 @@
 
   async function migPreflight() {
     const res = await api('/app/migrations/preflight');
+    migPreflightCache = res;
+    updateMigActionButtons(migStatusCache, migDiagnosticsCache);
     const el = $('#migPreflightResult');
-    if (!el) return;
-    const issues = res.issues || [];
+    if (!el) return res;
+    if (!res.success) {
+      el.innerHTML = `<h4 class="font-bold text-sm mb-2">Preflight</h4>
+        <p class="text-sm text-rose-600">${escapeHtml(res.error || 'Could not run preflight checks.')}</p>`;
+      return res;
+    }
+    const findings = res.findings || [];
+    const severityClass = {
+      blocker: 'text-rose-700 font-bold',
+      warning: 'text-amber-700 font-semibold',
+      info: 'text-slate-600',
+    };
+    const rows = findings.length
+      ? findings.map((item) => {
+          const severity = item.severity || 'info';
+          return `<tr><td class="${severityClass[severity] || 'text-slate-600'}">${escapeHtml(severity)}</td>
+            <td><code>${escapeHtml(item.revision || '')}</code></td>
+            <td>${escapeHtml(item.message || '')}</td></tr>`;
+        }).join('')
+      : '<tr><td colspan="3" class="text-emerald-700">No issues detected for pending migrations.</td></tr>';
     el.innerHTML = `<h4 class="font-bold text-sm mb-2">Preflight</h4>
-      <p class="text-sm mb-2">${escapeHtml(res.summary || '')}</p>
-      ${issues.length ? '<ul class="text-sm">' + issues.map((i) => `<li>${escapeHtml(i.message || JSON.stringify(i))}</li>`).join('') + '</ul>' : '<p class="text-sm text-emerald-600">No issues detected</p>'}`;
+      <p class="text-sm mb-2">${escapeHtml(res.message || 'Preflight complete.')}</p>
+      <table class="studio-table"><thead><tr><th>Severity</th><th>Revision</th><th>Details</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+    return res;
   }
 
   // --- Activity ---

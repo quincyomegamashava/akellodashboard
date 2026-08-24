@@ -378,6 +378,13 @@
   background: #f8fafc;
 }
 
+.studio-btn:disabled,
+.studio-btn:disabled:hover {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .studio-btn-primary {
   background: var(--studio-primary);
   border-color: var(--studio-primary);
