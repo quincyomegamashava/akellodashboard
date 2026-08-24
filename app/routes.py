@@ -23690,6 +23690,42 @@ def sync_ruzivo_exercises():
         return jsonify({'error': str(e)}), 500
 
 
+GAMES_INCLUDE_CROSS_AGE_9_19_KEY = 'games_include_cross_age_9_19'
+_SPECIFIC_AGE_BANDS_FOR_CROSS = ('9-10', '11-12', '13-14', '15-16', '17-19')
+
+
+def _games_include_cross_age_9_19() -> bool:
+    return (AppSetting.get_value(GAMES_INCLUDE_CROSS_AGE_9_19_KEY, 'false') or 'false').strip().lower() == 'true'
+
+
+def _can_access_game_events():
+    return (
+        current_user.userRole == 'Admin'
+        or current_user.has_privilege('Content Development')
+        or current_user.has_privilege('Akello Events')
+    )
+
+
+def _learner_age_matching_ranges(user_age: int, include_cross: bool) -> list[str]:
+    if user_age < 9:
+        return ['Infants']
+    if 9 <= user_age <= 10:
+        ranges = ['9-10']
+    elif 11 <= user_age <= 12:
+        ranges = ['11-12']
+    elif 13 <= user_age <= 14:
+        ranges = ['13-14']
+    elif 15 <= user_age <= 16:
+        ranges = ['15-16']
+    elif 17 <= user_age <= 19:
+        ranges = ['17-19']
+    else:
+        return ['Youths & older']
+    if include_cross:
+        ranges.append('9-19')
+    return ranges
+
+
 # Game API Routes
 @app.route('/api/games', methods=['GET'])
 def list_games():
@@ -23702,7 +23738,10 @@ def list_games():
         content_source_filter = (request.args.get('content_source') or '').strip()
         grade_filter = request.args.get('grade', type=int)
         prefer_user_grade = request.args.get('prefer_user_grade', '').lower() in ('1', 'true', 'yes')
-        include_cross = request.args.get('include_cross_age', '').lower() == 'true'
+        include_cross = (
+            request.args.get('include_cross_age', '').lower() == 'true'
+            and _games_include_cross_age_9_19()
+        )
         
         query = Game.query
         if active_only:
@@ -23719,7 +23758,7 @@ def list_games():
 
         if age_range_filter:
             ages = [age_range_filter]
-            if include_cross and age_range_filter in ('9-10', '11-12', '13-14', '15-16', '17-19'):
+            if include_cross and age_range_filter in _SPECIFIC_AGE_BANDS_FOR_CROSS:
                 ages.append('9-19')
             query = query.filter(Game.age_range.in_(ages))
         
@@ -23730,22 +23769,9 @@ def list_games():
                 game_user = GameUser.query.get(int(user_id))
                 if game_user and game_user.age:
                     user_age = game_user.age
-                    matching_ranges = []
-                    
-                    if user_age < 9:
-                        matching_ranges = ['Infants']
-                    elif 9 <= user_age <= 10:
-                        matching_ranges = ['9-10', '9-19']
-                    elif 11 <= user_age <= 12:
-                        matching_ranges = ['11-12', '9-19']
-                    elif 13 <= user_age <= 14:
-                        matching_ranges = ['13-14', '9-19']
-                    elif 15 <= user_age <= 16:
-                        matching_ranges = ['15-16', '9-19']
-                    elif 17 <= user_age <= 19:
-                        matching_ranges = ['17-19', '9-19']
-                    else:
-                        matching_ranges = ['Youths & older']
+                    matching_ranges = _learner_age_matching_ranges(
+                        user_age, _games_include_cross_age_9_19()
+                    )
                     
                     if matching_ranges:
                         query = query.filter(Game.age_range.in_(matching_ranges))
@@ -23802,6 +23828,36 @@ def _can_manage_games():
         current_user.userRole == 'Admin'
         or current_user.has_privilege('Content Development')
     )
+
+
+@app.route('/api/games/settings/cross-age-9-19', methods=['GET'])
+@login_required
+def get_games_cross_age_9_19_setting():
+    """Staff: whether 9-19 games are mixed into other age-band catalogs."""
+    if not _can_access_game_events():
+        return jsonify({'error': 'Unauthorized'}), 403
+    return jsonify({'enabled': _games_include_cross_age_9_19()}), 200
+
+
+@app.route('/api/games/settings/cross-age-9-19', methods=['POST'])
+@login_required
+def set_games_cross_age_9_19_setting():
+    """Staff: toggle mixing 9-19 games into learner and race catalogs."""
+    if not _can_access_game_events():
+        return jsonify({'error': 'Unauthorized'}), 403
+    try:
+        data = request.get_json(silent=True) or {}
+        enabled = bool(data.get('enabled'))
+        AppSetting.set_value(
+            GAMES_INCLUDE_CROSS_AGE_9_19_KEY,
+            'true' if enabled else 'false',
+            user_id=current_user.id,
+            description='Mix age-band 9-19 games into other 9-19 learner/race catalogs',
+        )
+        return jsonify({'success': True, 'enabled': enabled}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/games/export', methods=['GET'])
@@ -24035,7 +24091,10 @@ def list_game_bank_items():
         age_range = (request.args.get('age_range') or '').strip()
         subject = (request.args.get('subject') or '').strip()
         active_only = request.args.get('active', 'true').lower() != 'false'
-        include_cross = request.args.get('include_cross_age', 'true').lower() != 'false'
+        include_cross = (
+            request.args.get('include_cross_age', 'true').lower() != 'false'
+            and _games_include_cross_age_9_19()
+        )
 
         query = GameBankItem.query
         if active_only:
@@ -24044,7 +24103,7 @@ def list_game_bank_items():
             query = query.filter(GameBankItem.subject == subject)
         if age_range:
             ages = [age_range]
-            if include_cross and age_range in ('9-10', '11-12', '13-14', '15-16', '17-19'):
+            if include_cross and age_range in _SPECIFIC_AGE_BANDS_FOR_CROSS:
                 ages.append('9-19')
             query = query.filter(GameBankItem.age_range.in_(ages))
 

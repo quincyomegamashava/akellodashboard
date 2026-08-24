@@ -243,6 +243,17 @@
         <p id="gkPackStatus" class="text-xs text-slate-500 text-center mb-4"></p>
         {% endif %}
 
+        <div class="mb-4 rounded-xl border border-slate-200 bg-white p-4">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" id="crossAge919Toggle" class="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" onchange="saveCrossAge919Setting(this.checked)">
+            <span>
+              <span class="block text-sm font-semibold text-slate-800">Include age 9–19 games with other age bands</span>
+              <span class="block text-xs text-slate-500 mt-0.5">When off, learners and race pickers only see the specific band (e.g. 9–10), not the overlapping 9–19 catalog. Off by default to avoid duplicate questions.</span>
+            </span>
+          </label>
+          <p id="crossAge919Status" class="text-xs text-slate-500 mt-2"></p>
+        </div>
+
         <div class="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label class="block text-xs font-medium text-slate-500 mb-1">Catalog</label>
@@ -652,8 +663,58 @@
   function openGameManagementModal() {
     toggleModal('gameManagementModal', true);
     loadGames();
+    loadCrossAge919Setting();
   }
   window.openGameManagementModal = openGameManagementModal;
+
+  async function loadCrossAge919Setting() {
+    const box = document.getElementById('crossAge919Toggle');
+    const status = document.getElementById('crossAge919Status');
+    if (!box) return;
+    try {
+      const r = await fetch('/api/games/settings/cross-age-9-19', { credentials: 'same-origin' });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Could not load setting');
+      box.checked = !!data.enabled;
+      if (status) {
+        status.textContent = data.enabled
+          ? 'Learners and race pickers currently include 9–19 games with other bands.'
+          : '9–19 games are hidden from other age bands (learner dashboard and race pickers).';
+      }
+    } catch (e) {
+      if (status) status.textContent = 'Could not load 9–19 display setting.';
+    }
+  }
+  window.loadCrossAge919Setting = loadCrossAge919Setting;
+
+  async function saveCrossAge919Setting(enabled) {
+    const box = document.getElementById('crossAge919Toggle');
+    const status = document.getElementById('crossAge919Status');
+    if (box) box.disabled = true;
+    if (status) status.textContent = 'Saving…';
+    try {
+      const r = await fetch('/api/games/settings/cross-age-9-19', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !!enabled }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Could not save setting');
+      if (status) {
+        status.textContent = data.enabled
+          ? 'Saved. 9–19 games are mixed into other age bands.'
+          : 'Saved. 9–19 games are not mixed into other age bands.';
+      }
+    } catch (e) {
+      if (box) box.checked = !enabled;
+      alert('Could not save setting: ' + (e.message || ''));
+      if (status) status.textContent = 'Save failed.';
+    } finally {
+      if (box) box.disabled = false;
+    }
+  }
+  window.saveCrossAge919Setting = saveCrossAge919Setting;
 
   function closeGameManagementModal() {
     toggleModal('gameManagementModal', false);
