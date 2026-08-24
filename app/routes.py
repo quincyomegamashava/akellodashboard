@@ -23797,6 +23797,68 @@ def list_games():
         return jsonify({'error': str(e)}), 500
 
 
+def _can_manage_games():
+    return (
+        current_user.userRole == 'Admin'
+        or current_user.has_privilege('Content Development')
+    )
+
+
+@app.route('/api/games/export', methods=['GET'])
+@login_required
+def export_games_pack():
+    """Download General Knowledge games as a JSON pack (excludes Ruzivo imports)."""
+    if not _can_manage_games():
+        return jsonify({'error': 'Unauthorized'}), 403
+    try:
+        from app.games.game_pack import build_game_pack
+
+        pack = build_game_pack()
+        stamp = datetime.utcnow().strftime('%Y%m%d')
+        filename = f'akello-gk-games-{stamp}.json'
+        payload = json.dumps(pack, ensure_ascii=False, indent=2)
+        response = Response(payload, mimetype='application/json; charset=utf-8')
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/games/import', methods=['POST'])
+@login_required
+def import_games_pack():
+    """Upload a General Knowledge JSON pack and upsert games (never touches Ruzivo)."""
+    if not _can_manage_games():
+        return jsonify({'error': 'Unauthorized'}), 403
+    try:
+        from app.games.game_pack import import_game_pack
+
+        pack = None
+        upload = request.files.get('file') or request.files.get('pack')
+        if upload and upload.filename:
+            raw = upload.read()
+            if not raw:
+                return jsonify({'error': 'Uploaded file is empty.'}), 400
+            pack = json.loads(raw.decode('utf-8-sig'))
+        else:
+            pack = request.get_json(silent=True)
+
+        if not pack:
+            return jsonify({'error': 'Provide a JSON file or JSON body.'}), 400
+
+        stats = import_game_pack(pack, created_by=current_user.id)
+        return jsonify({'success': True, **stats}), 200
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+    except json.JSONDecodeError:
+        db.session.rollback()
+        return jsonify({'error': 'Invalid JSON file.'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/games', methods=['POST'])
 @login_required
 def create_game():

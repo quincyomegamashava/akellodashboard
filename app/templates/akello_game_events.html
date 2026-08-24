@@ -228,11 +228,19 @@
 
       <div class="px-4 py-5 sm:p-6 bg-slate-50/50 min-h-[400px]">
         {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}
-        <div class="mb-6 flex justify-center">
+        <div class="mb-6 flex flex-wrap justify-center gap-3">
           <button type="button" onclick="openGameModal()" class="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:bg-emerald-500 hover:shadow-xl transition-all transform hover:scale-105">
             <i class="fas fa-plus mr-2"></i> Create New Game
           </button>
+          <button type="button" onclick="exportGeneralKnowledgeGames()" id="gkExportBtn" class="inline-flex items-center justify-center rounded-lg bg-slate-800 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-700 transition-all">
+            <i class="fas fa-download mr-2"></i> Export General Knowledge
+          </button>
+          <button type="button" onclick="document.getElementById('gkImportFile').click()" id="gkImportBtn" class="inline-flex items-center justify-center rounded-lg bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition-all">
+            <i class="fas fa-upload mr-2"></i> Import games
+          </button>
+          <input type="file" id="gkImportFile" accept="application/json,.json" class="hidden" onchange="importGeneralKnowledgeGames(this)">
         </div>
+        <p id="gkPackStatus" class="text-xs text-slate-500 text-center mb-4"></p>
         {% endif %}
 
         <div class="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1073,6 +1081,82 @@
       document.getElementById('gamesList').innerHTML = '<div class="col-span-full text-center text-red-500">Error loading games</div>';
     }
   }
+
+  async function exportGeneralKnowledgeGames() {
+    const btn = document.getElementById('gkExportBtn');
+    const status = document.getElementById('gkPackStatus');
+    if (btn) btn.disabled = true;
+    if (status) status.textContent = 'Preparing export…';
+    try {
+      const r = await fetch('/api/games/export?source=general_knowledge', { credentials: 'same-origin' });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        throw new Error(data.error || 'Export failed');
+      }
+      const blob = await r.blob();
+      const disp = r.headers.get('Content-Disposition') || '';
+      const match = disp.match(/filename="?([^"]+)"?/i);
+      const filename = match ? match[1] : 'akello-gk-games.json';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      const msg = 'Downloaded ' + filename;
+      if (status) status.textContent = msg;
+    } catch (e) {
+      alert('Export error: ' + (e.message || ''));
+      if (status) status.textContent = 'Export failed.';
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+  window.exportGeneralKnowledgeGames = exportGeneralKnowledgeGames;
+
+  async function importGeneralKnowledgeGames(input) {
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    if (!confirm('Import General Knowledge games from ' + file.name + '? Existing matching titles will be updated. Smart Learning / Ruzivo games will not be changed.')) {
+      input.value = '';
+      return;
+    }
+    const btn = document.getElementById('gkImportBtn');
+    const status = document.getElementById('gkPackStatus');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Importing…';
+    }
+    if (status) status.textContent = 'Importing…';
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const r = await fetch('/api/games/import', {
+        method: 'POST',
+        credentials: 'same-origin',
+        body: formData,
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Import failed');
+      const msg = 'Imported: ' + (data.created || 0) + ' created, ' + (data.updated || 0) + ' updated, ' + (data.skipped || 0) + ' skipped.';
+      alert(msg);
+      if (status) status.textContent = msg;
+      loadGames();
+    } catch (e) {
+      alert('Import error: ' + (e.message || ''));
+      if (status) status.textContent = 'Import failed.';
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+      }
+      input.value = '';
+    }
+  }
+  window.importGeneralKnowledgeGames = importGeneralKnowledgeGames;
 
   async function syncRuzivoExercises() {
     const btn = document.getElementById('ruzivoSyncBtn');
