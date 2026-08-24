@@ -19,285 +19,323 @@
   <style>
     body {
       font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-      background: #ffffff;
+      background: #f4f5f8;
       min-height: 100vh;
     }
+    @media (max-width: 767px) {
+      body { padding-bottom: 5.5rem; }
+    }
     .portal-card {
-      background: #ffffff;
-      border: 1px solid rgba(15, 23, 42, 0.06);
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
+      background: #fff;
+      border-radius: 1.5rem;
+      box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06);
     }
-    .portal-card-hover {
-      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-    }
+    .portal-card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
     .portal-card-hover:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 4px 8px rgba(15, 23, 42, 0.06), 0 16px 32px rgba(15, 23, 42, 0.08);
-      border-color: #cbd5e1;
+      transform: translateY(-2px);
+      box-shadow: 0 12px 36px rgba(15, 23, 42, 0.1);
     }
-    .theme-banner {
-      animation: bannerIn 0.55s ease-out;
-    }
-    @keyframes bannerIn {
-      from { opacity: 0; transform: translateY(-8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .progress-fill {
+    .xp-fill {
+      background: linear-gradient(90deg, #fda4af, #fb923c);
       transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
     }
+    .progress-fill { transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
+    .btn-navy {
+      background: #1e293b;
+      color: #fff;
+      font-weight: 700;
+      border-radius: 9999px;
+    }
+    .btn-navy:hover { background: #0f172a; }
+    .btn-outline {
+      border: 1.5px solid #cbd5e1;
+      background: #fff;
+      color: #1e293b;
+      font-weight: 700;
+      border-radius: 9999px;
+    }
+    .btn-outline:hover { background: #f8fafc; }
+    .dash-panel { display: none; }
+    .dash-panel.active { display: block; }
+    .side-link {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      width: 100%;
+      padding: 0.7rem 0.9rem;
+      border-radius: 0.9rem;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #64748b;
+      background: transparent;
+      border: 0;
+      text-align: left;
+      position: relative;
+    }
+    .side-link[aria-current="page"] {
+      background: #1e293b;
+      color: #fff;
+    }
+    .dash-tab {
+      flex: 1;
+      min-height: 56px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #64748b;
+      background: transparent;
+      border: 0;
+      position: relative;
+    }
+    .dash-tab[aria-current="page"] { color: #1e293b; }
+    .tab-badge {
+      position: absolute;
+      top: 6px;
+      right: calc(50% - 22px);
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      border-radius: 9999px;
+      background: #fb923c;
+      color: #fff;
+      font-size: 10px;
+      line-height: 16px;
+      font-weight: 800;
+    }
+    .side-link .tab-badge { top: 10px; right: 10px; }
+    .tab-badge.hidden { display: none; }
     .live-pulse {
       width: 8px; height: 8px; border-radius: 9999px;
-      background: #0f172a;
-      box-shadow: 0 0 0 0 rgba(15, 23, 42, 0.35);
+      background: #fb7185;
       animation: pulseDot 1.6s infinite;
     }
     @keyframes pulseDot {
-      0% { box-shadow: 0 0 0 0 rgba(15, 23, 42, 0.35); }
-      70% { box-shadow: 0 0 0 8px rgba(15, 23, 42, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(15, 23, 42, 0); }
+      0% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0.45); }
+      70% { box-shadow: 0 0 0 8px rgba(251, 113, 133, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0); }
     }
-    .seg-track {
-      background: #F1F5F9;
-      border-radius: 9999px;
-      padding: 4px;
-      display: inline-flex;
-      gap: 2px;
-    }
+    .seg-track { background: #f1f5f9; border-radius: 9999px; padding: 4px; display: inline-flex; gap: 2px; }
     .seg-btn {
-      border-radius: 9999px;
-      padding: 0.5rem 1.1rem;
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: #475569;
-      transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+      border-radius: 9999px; padding: 0.5rem 1.1rem; font-size: 0.875rem; font-weight: 700; color: #64748b;
     }
-    .seg-btn.active {
-      background: #0f172a;
-      color: #fff;
-    }
+    .seg-btn.active { background: #1e293b; color: #fff; }
     .chip {
-      border-radius: 9999px;
-      padding: 0.35rem 0.85rem;
-      font-size: 0.75rem;
-      font-weight: 600;
-      border: 1px solid #E2E8F0;
-      background: #fff;
-      color: #475569;
-      transition: background 0.2s, color 0.2s, border-color 0.2s;
+      border-radius: 9999px; padding: 0.35rem 0.85rem; font-size: 0.75rem; font-weight: 700;
+      border: 1px solid #e2e8f0; background: #fff; color: #475569;
     }
-    .chip.active {
-      background: #0f172a;
-      border-color: #0f172a;
-      color: #fff;
+    .chip.active { background: #1e293b; border-color: #1e293b; color: #fff; }
+    .medal {
+      width: 4.25rem; height: 4.25rem;
+      clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 1.1rem;
     }
-    .race-card {
-      border-style: dashed;
-      border-width: 1.5px;
-      border-color: #cbd5e1;
-    }
-    .slate-edge { border-left: 3px solid #e2e8f0; }
+    .medal.locked { background: #e2e8f0; color: #94a3b8; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
-    details.history-panel > summary { list-style: none; cursor: pointer; }
-    details.history-panel > summary::-webkit-details-marker { display: none; }
+    ::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.15); border-radius: 4px; }
   </style>
 </head>
 <body class="font-sans text-slate-800">
 
-  <header class="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b border-slate-100">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl overflow-hidden ring-2 ring-slate-200 shadow-sm">
-          <img src="{{ url_for('static', filename='smartlearning.webp') }}" alt="Game Portal" class="w-full h-full object-cover">
-        </div>
-        <div>
-          <h1 class="text-lg font-extrabold text-slate-900 tracking-tight leading-none">Game Portal</h1>
-          <p class="text-[11px] text-slate-800 font-semibold tracking-wide mt-0.5 hidden sm:block">Powering Growth</p>
-        </div>
+  <div class="md:flex md:min-h-screen">
+    <aside class="hidden md:flex w-60 shrink-0 flex-col bg-white border-r border-slate-100 p-5 sticky top-0 h-screen">
+      <div class="flex items-center gap-2 mb-8">
+        <img src="{{ url_for('static', filename='smartlearning.webp') }}" alt="" class="w-9 h-9 rounded-xl object-cover">
+        <span class="font-extrabold text-slate-900 text-lg">Game Portal</span>
       </div>
-      <div class="flex items-center gap-3">
-        <span id="userNameDisplay" class="text-sm font-medium text-slate-600 hidden sm:block">Welcome!</span>
-        <button onclick="logout()" class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:border-rose-200 hover:text-rose-600 hover:bg-rose-50">
-          <i class="fas fa-sign-out-alt mr-2"></i> Logout
+      <nav class="flex-1 space-y-1" aria-label="Main">
+        <button type="button" class="side-link" data-tab="home" aria-current="page" onclick="setDashTab('home')">
+          <i class="fas fa-house w-5 text-center"></i> Home
         </button>
+        <button type="button" class="side-link" data-tab="play" onclick="setDashTab('play')">
+          <i class="fas fa-play w-5 text-center"></i> Play
+        </button>
+        <button type="button" class="side-link" data-tab="races" onclick="setDashTab('races')">
+          <i class="fas fa-flag-checkered w-5 text-center"></i> Races
+          <span class="tab-badge races-live-badge hidden">0</span>
+        </button>
+        <button type="button" class="side-link" data-tab="leaderboard" onclick="setDashTab('leaderboard')">
+          <i class="fas fa-trophy w-5 text-center"></i> Leaderboard
+        </button>
+      </nav>
+      <div class="mt-auto pt-4 border-t border-slate-100 flex items-center gap-3">
+        <div id="sideAvatar" class="w-10 h-10 rounded-full bg-sky-100 text-sky-700 font-extrabold flex items-center justify-center">?</div>
+        <div class="min-w-0 flex-1">
+          <div id="sideName" class="text-sm font-extrabold text-slate-900 truncate">Player</div>
+          <button type="button" onclick="logout()" class="text-xs font-semibold text-slate-400 hover:text-rose-500">Log out</button>
+        </div>
       </div>
-    </div>
-  </header>
+    </aside>
 
-  <div class="theme-banner border-b border-slate-100 bg-gradient-to-r from-white via-white to-slate-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center gap-2 sm:gap-3">
-      <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-800">
-        <i class="fas fa-calendar-week"></i> This week
-      </span>
-      <span class="text-sm font-semibold text-slate-800">
-        Powering Growth: Where Agriculture, Technology &amp; Commerce Converge
-      </span>
-      <span class="hidden md:inline-flex items-center gap-2 ml-auto text-[11px] font-medium text-slate-500">
-        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-900"></span> Agriculture</span>
-        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-900"></span> Technology</span>
-        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-700"></span> Commerce</span>
-      </span>
+    <div class="flex-1 min-w-0">
+      <header class="sticky top-0 z-40 bg-[#f4f5f8]/90 backdrop-blur-md">
+        <div class="px-4 sm:px-8 py-4 flex items-center justify-end gap-2">
+          <button type="button" class="btn-outline px-4 py-2.5 text-sm" onclick="setDashTab('races')">Join Lobby</button>
+          <button type="button" class="btn-navy px-4 py-2.5 text-sm" onclick="setDashTab('play')">Start Quiz</button>
+        </div>
+      </header>
+
+      <main class="px-4 sm:px-8 pb-8">
+
+        <section id="panel-home" class="dash-panel active" role="tabpanel">
+          <div class="portal-card p-6 sm:p-8 mb-6">
+            <div class="flex flex-col sm:flex-row gap-6">
+              <div class="relative w-28 h-28 sm:w-32 sm:h-32 rounded-3xl bg-sky-100 flex items-center justify-center shrink-0">
+                <span id="homeInitials" class="text-4xl font-black text-sky-700">?</span>
+                <span id="streakBadge" class="hidden absolute -top-2 -right-2 w-8 h-8 rounded-full bg-orange-400 text-white flex items-center justify-center text-sm shadow">
+                  <i class="fas fa-fire"></i>
+                </span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h2 id="homeFullName" class="text-3xl sm:text-4xl font-extrabold text-slate-900">Player</h2>
+                <p id="homeSubtitle" class="text-slate-400 font-semibold mt-1">Ready to play</p>
+                <div class="mt-5">
+                  <div class="flex justify-between text-xs font-bold text-slate-500 mb-1.5">
+                    <span id="xpLabel">0 / 1000 XP</span>
+                    <span id="levelLabel">Lv 1</span>
+                  </div>
+                  <div class="h-3 rounded-full bg-slate-100 overflow-hidden">
+                    <div id="xpBarFill" class="xp-fill h-full rounded-full" style="width:0%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3 mt-8">
+              <div class="rounded-2xl bg-slate-50 p-4">
+                <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mb-2"><i class="fas fa-flag"></i></div>
+                <div class="text-2xl font-extrabold text-slate-900" id="statPlayed">0</div>
+                <div class="text-xs font-semibold text-slate-400">Quizzes played</div>
+              </div>
+              <div class="rounded-2xl bg-slate-50 p-4">
+                <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2"><i class="fas fa-arrow-up"></i></div>
+                <div class="text-2xl font-extrabold text-slate-900" id="statBest">0</div>
+                <div class="text-xs font-semibold text-slate-400">Highest score</div>
+              </div>
+              <div class="rounded-2xl bg-slate-50 p-4">
+                <div class="w-8 h-8 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center mb-2"><i class="fas fa-check"></i></div>
+                <div class="text-2xl font-extrabold text-slate-900" id="statAttempts">0</div>
+                <div class="text-xs font-semibold text-slate-400">Attempts</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="portal-card p-6">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-lg font-extrabold text-slate-900">Achievements</h3>
+                <span id="achCount" class="text-xs font-bold text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">0</span>
+              </div>
+              <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden mb-6">
+                <div id="achBar" class="xp-fill h-full rounded-full" style="width:0%"></div>
+              </div>
+              <p id="achMeta" class="text-xs font-semibold text-slate-400 mb-4">0/3</p>
+              <div id="achievementsList" class="flex justify-around gap-2 min-h-[6rem]"></div>
+            </div>
+            <div class="portal-card p-6">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-lg font-extrabold text-slate-900">Recent quizzes</h3>
+                <span id="recentCount" class="text-xs font-bold text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">0</span>
+              </div>
+              <div id="recentQuizzes" class="space-y-3 min-h-[6rem]"></div>
+              <button type="button" onclick="setDashTab('play')" class="mt-5 w-full text-center text-sm font-bold text-slate-400 hover:text-slate-800">View all</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="panel-play" class="dash-panel" role="tabpanel">
+          <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
+            <div>
+              <h2 class="text-2xl font-extrabold text-slate-900">Play</h2>
+              <p class="text-sm text-slate-400">Quizzes matched to your age</p>
+            </div>
+            <div class="seg-track" id="gameSourceTabs">
+              <button type="button" data-source="ruzivo" class="seg-btn game-tab active">Smart Learning</button>
+              <button type="button" data-source="general_knowledge" class="seg-btn game-tab">General Knowledge</button>
+            </div>
+          </div>
+          <div id="slToolbar" class="mb-4 space-y-3">
+            <div id="progressSummary" class="text-sm font-medium text-slate-600"></div>
+            <div id="progressBarWrap" class="hidden h-2 rounded-full bg-slate-100 overflow-hidden">
+              <div id="progressBarFill" class="xp-fill h-full rounded-full" style="width:0%"></div>
+            </div>
+            <div class="flex flex-wrap gap-2 items-center">
+              <div class="relative flex-1 min-w-[160px]">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
+                <input id="gameSearch" type="search" placeholder="Search quizzes…"
+                  class="w-full rounded-full border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+              </div>
+              <label class="inline-flex items-center gap-2 text-sm text-slate-600 bg-white px-3 py-2.5 rounded-full border border-slate-200">
+                <input type="checkbox" id="preferMyGrade" checked class="rounded border-slate-300 text-slate-800">
+                My grade only
+              </label>
+            </div>
+            <div id="subjectChips" class="flex flex-wrap gap-2"></div>
+          </div>
+          <div id="gamesList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="col-span-full portal-card p-12 text-center">
+              <i class="fas fa-spinner fa-spin text-3xl text-slate-300 mb-4"></i>
+              <p class="text-slate-400">Loading games…</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="panel-races" class="dash-panel" role="tabpanel">
+          <div class="mb-4">
+            <h2 class="text-2xl font-extrabold text-slate-900">Races</h2>
+            <p class="text-sm text-slate-400">Live challenges with friends</p>
+          </div>
+          <div id="racesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="col-span-full portal-card p-8 text-center">
+              <i class="fas fa-spinner fa-spin text-2xl text-slate-300 mb-3"></i>
+              <p class="text-slate-400 text-sm">Loading races…</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="panel-leaderboard" class="dash-panel" role="tabpanel">
+          <div class="mb-4">
+            <h2 class="text-2xl font-extrabold text-slate-900">Leaderboard</h2>
+            <p class="text-sm text-slate-400">Top players in your age band</p>
+          </div>
+          <div class="portal-card overflow-hidden">
+            <div id="leaderboard" class="p-5 sm:p-6">
+              <div class="text-center text-slate-400 py-8">
+                <i class="fas fa-spinner fa-spin text-2xl mb-4"></i>
+                <p class="text-sm">Loading…</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   </div>
 
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-
-    <!-- Greeting + primary CTA -->
-    <section class="portal-card rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-      <div>
-        <p class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Keep growing</p>
-        <h2 id="greetingTitle" class="text-xl sm:text-2xl font-extrabold text-slate-900">Welcome back</h2>
-        <p id="greetingSub" class="text-sm text-slate-500 mt-1">Pick a quiz or jump into a live race.</p>
-      </div>
-      <div class="flex flex-wrap gap-2" id="primaryCtas">
-        <a href="#gamesSection" class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800">
-          <i class="fas fa-play mr-2"></i> Play a quiz
-        </a>
-        <a href="#racesSection" class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-bold text-slate-800 hover:bg-slate-900 hover:text-white hover:border-slate-400">
-          <i class="fas fa-flag-checkered mr-2"></i> Live races
-        </a>
-      </div>
-    </section>
-
-    <!-- Compact stats -->
-    <section class="grid grid-cols-3 gap-3 sm:gap-4">
-      <div class="portal-card rounded-xl p-3 sm:p-4 slate-edge">
-        <div class="text-xl sm:text-2xl font-extrabold text-slate-800" id="totalGamesPlayed">0</div>
-        <div class="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide mt-0.5">Played</div>
-      </div>
-      <div class="portal-card rounded-xl p-3 sm:p-4 slate-edge">
-        <div class="text-xl sm:text-2xl font-extrabold text-slate-700" id="averageScore">0</div>
-        <div class="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide mt-0.5">Avg score</div>
-      </div>
-      <div class="portal-card rounded-xl p-3 sm:p-4 slate-edge">
-        <div class="text-xl sm:text-2xl font-extrabold text-slate-700" id="bestScore">0</div>
-        <div class="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide mt-0.5">Best</div>
-      </div>
-    </section>
-
-    <!-- Live Races -->
-    <section id="racesSection">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
-          <i class="fas fa-flag-checkered"></i>
-        </div>
-        <div>
-          <h2 class="text-xl font-extrabold text-slate-900">Growth Races</h2>
-          <p class="text-xs text-slate-500">Field challenges · compete live</p>
-        </div>
-      </div>
-      <div id="racesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div class="col-span-full portal-card rounded-xl p-8 text-center">
-          <i class="fas fa-spinner fa-spin text-2xl text-slate-700 mb-3"></i>
-          <p class="text-slate-500 text-sm">Loading races…</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Games + Leaderboard -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="gamesSection">
-      <div class="lg:col-span-2">
-        <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center">
-              <i class="fas fa-th-large"></i>
-            </div>
-            <div>
-              <h2 class="text-xl font-extrabold text-slate-900">Available Games</h2>
-              <p class="text-xs text-slate-500">Grow your knowledge, one quiz at a time</p>
-            </div>
-          </div>
-          <div class="seg-track" id="gameSourceTabs">
-            <button type="button" data-source="ruzivo" class="seg-btn game-tab active">Smart Learning</button>
-            <button type="button" data-source="general_knowledge" class="seg-btn game-tab">General Knowledge</button>
-          </div>
-        </div>
-
-        <div id="slToolbar" class="mb-4 space-y-3">
-          <div id="progressSummary" class="text-sm font-medium text-slate-600"></div>
-          <div id="progressBarWrap" class="hidden h-2 rounded-full bg-slate-100 overflow-hidden">
-            <div id="progressBarFill" class="progress-fill h-full rounded-full bg-gradient-to-r from-slate-700 to-slate-900" style="width:0%"></div>
-          </div>
-          <div class="flex flex-wrap gap-2 items-center">
-            <div class="relative flex-1 min-w-[160px]">
-              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-              <input id="gameSearch" type="search" placeholder="Search the field…"
-                class="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-800">
-            </div>
-            <label class="inline-flex items-center gap-2 text-sm text-slate-600 bg-white px-3 py-2.5 rounded-xl border border-slate-200">
-              <input type="checkbox" id="preferMyGrade" checked class="rounded border-slate-300 text-slate-800 focus:ring-slate-400">
-              My grade only
-            </label>
-          </div>
-          <div id="subjectChips" class="flex flex-wrap gap-2"></div>
-        </div>
-
-        <div id="gamesList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="col-span-full portal-card rounded-xl p-12 text-center">
-            <i class="fas fa-spinner fa-spin text-3xl text-slate-800 mb-4"></i>
-            <p class="text-slate-500">Loading games…</p>
-          </div>
-        </div>
-      </div>
-
-      <aside class="lg:col-span-1">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
-            <i class="fas fa-trophy"></i>
-          </div>
-          <div>
-            <h2 class="text-xl font-extrabold text-slate-900">Harvest Board</h2>
-            <p class="text-xs text-slate-500">Top growers in your age band</p>
-          </div>
-        </div>
-        <div class="portal-card rounded-2xl overflow-hidden sticky top-24">
-          <div id="leaderboard" class="p-5">
-            <div class="text-center text-slate-400 py-8">
-              <i class="fas fa-spinner fa-spin text-2xl mb-4"></i>
-              <p class="text-sm">Loading…</p>
-            </div>
-          </div>
-        </div>
-      </aside>
+  <nav class="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-100" role="tablist" aria-label="Main">
+    <div class="flex">
+      <button type="button" class="dash-tab" data-tab="home" aria-current="page" onclick="setDashTab('home')">
+        <i class="fas fa-house"></i> Home
+      </button>
+      <button type="button" class="dash-tab" data-tab="play" onclick="setDashTab('play')">
+        <i class="fas fa-play"></i> Play
+      </button>
+      <button type="button" class="dash-tab" data-tab="races" onclick="setDashTab('races')">
+        <i class="fas fa-flag-checkered"></i> Races
+        <span class="tab-badge races-live-badge hidden">0</span>
+      </button>
+      <button type="button" class="dash-tab" data-tab="leaderboard" onclick="setDashTab('leaderboard')">
+        <i class="fas fa-trophy"></i> Board
+      </button>
     </div>
-
-    <!-- History (collapsed by default) -->
-    <details class="history-panel portal-card rounded-2xl overflow-hidden">
-      <summary class="px-6 py-4 flex items-center justify-between gap-3 bg-white hover:bg-slate-50/80">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
-            <i class="fas fa-history"></i>
-          </div>
-          <div>
-            <h2 class="text-base font-bold text-slate-900">Your Performance History</h2>
-            <p class="text-xs text-slate-500">Past attempts &amp; scores</p>
-          </div>
-        </div>
-        <i class="fas fa-chevron-down text-slate-400 text-sm"></i>
-      </summary>
-      <div id="myScores" class="overflow-x-auto border-t border-slate-100">
-        <div class="p-12 text-center text-slate-400">
-          <i class="fas fa-spinner fa-spin text-3xl mb-4"></i>
-          <p>Loading your scores…</p>
-        </div>
-      </div>
-    </details>
-  </main>
-
-  <footer class="mt-4 py-8 text-center text-sm text-slate-400">
-    <p>&copy; <span id="year"></span> Akello Game Portal · Powering Growth</p>
-  </footer>
+  </nav>
 
   <script>
-    document.getElementById('year').textContent = new Date().getFullYear();
     const gameUserId = sessionStorage.getItem('gameUserId');
     const gameUserName = sessionStorage.getItem('gameUserName');
-
-    if (!gameUserId) {
-      window.location.href = '/game-login';
-    }
-
-    document.getElementById('userNameDisplay').textContent = `Welcome, ${gameUserName || 'Player'}!`;
+    if (!gameUserId) window.location.href = '/game-login';
 
     let userScores = [];
     let bestByGame = {};
@@ -309,6 +347,44 @@
     let learnerGrade = null;
     let allLoadedGames = [];
     let liveRaceCount = 0;
+    let currentDashTab = 'home';
+    let playerFirst = 'Player';
+    let playerLast = '';
+    let currentUserRank = 0;
+    let playerAgeRange = '';
+    let playerAge = null;
+
+    function initialsOf(first, last) {
+      return ((first || 'P').charAt(0) + (last || '').charAt(0)).toUpperCase() || '?';
+    }
+
+    function setDashTab(name) {
+      currentDashTab = name;
+      document.querySelectorAll('.dash-panel').forEach((p) => {
+        p.classList.toggle('active', p.id === 'panel-' + name);
+      });
+      document.querySelectorAll('.dash-tab, .side-link').forEach((btn) => {
+        if (btn.dataset.tab === name) btn.setAttribute('aria-current', 'page');
+        else btn.removeAttribute('aria-current');
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (name === 'play') loadGames();
+      if (name === 'races') loadRaces();
+      if (name === 'leaderboard') loadLeaderboard();
+      if (name === 'home') renderHomeHub();
+    }
+    window.setDashTab = setDashTab;
+
+    function updateRacesBadge() {
+      document.querySelectorAll('.races-live-badge').forEach((badge) => {
+        if (liveRaceCount > 0) {
+          badge.textContent = String(liveRaceCount);
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      });
+    }
 
     function setTabActive(source) {
       document.querySelectorAll('#gameSourceTabs .game-tab').forEach((b) => {
@@ -330,9 +406,74 @@
       if (/english|lang|lit/.test(s)) return 'fa-book-open';
       if (/geo|social|history/.test(s)) return 'fa-globe-africa';
       if (/ict|comp|tech/.test(s)) return 'fa-microchip';
-      if (/agri|farm/.test(s)) return 'fa-seedling';
-      if (/commerce|business|account/.test(s)) return 'fa-chart-line';
       return 'fa-book';
+    }
+
+    function renderHomeHub() {
+      const ini = initialsOf(playerFirst, playerLast);
+      const full = [playerFirst, playerLast].filter(Boolean).join(' ') || 'Player';
+      const short = playerLast ? `${playerFirst} ${playerLast.charAt(0)}.` : playerFirst;
+      document.getElementById('homeInitials').textContent = ini;
+      document.getElementById('homeFullName').textContent = full;
+      document.getElementById('sideAvatar').textContent = ini;
+      document.getElementById('sideName').textContent = short;
+      let sub = 'Ready to play';
+      if (learnerGrade) sub = `Grade ${learnerGrade}`;
+      else if (playerAgeRange) sub = `Ages ${playerAgeRange}`;
+      else if (playerAge != null) sub = `Age ${playerAge}`;
+      document.getElementById('homeSubtitle').textContent = sub;
+
+      const xp = Number((userStats && userStats.total_score) || 0);
+      const level = Math.floor(xp / 1000) + 1;
+      const into = xp % 1000;
+      document.getElementById('xpLabel').textContent = `${into} / 1000 XP`;
+      document.getElementById('levelLabel').textContent = `Lv ${level}`;
+      document.getElementById('xpBarFill').style.width = `${Math.min(100, (into / 1000) * 100)}%`;
+
+      document.getElementById('statPlayed').textContent = (userStats && userStats.total_games) || 0;
+      document.getElementById('statBest').textContent = (userStats && userStats.best_score) || 0;
+      document.getElementById('statAttempts').textContent = (userStats && userStats.total_attempts) || 0;
+
+      const hasFirst = (userStats && userStats.total_games) > 0;
+      const hasHigh = (userScores || []).some((s) => (s.percentage || 0) >= 80);
+      const onBoard = currentUserRank > 0;
+      const medals = [
+        { key: 'first', label: 'First quiz', icon: 'fa-star', color: 'bg-sky-400', on: hasFirst },
+        { key: 'high', label: 'High score', icon: 'fa-bolt', color: 'bg-orange-400', on: hasHigh },
+        { key: 'board', label: 'On the board', icon: 'fa-trophy', color: 'bg-violet-500', on: onBoard },
+      ];
+      const unlocked = medals.filter((m) => m.on).length;
+      document.getElementById('achCount').textContent = unlocked;
+      document.getElementById('achMeta').textContent = `${unlocked}/3`;
+      document.getElementById('achBar').style.width = `${(unlocked / 3) * 100}%`;
+      document.getElementById('streakBadge').classList.toggle('hidden', !hasFirst);
+      document.getElementById('achievementsList').innerHTML = medals.map((m) => `
+        <div class="text-center">
+          <div class="medal ${m.on ? m.color : 'locked'} mx-auto mb-2"><i class="fas ${m.icon}"></i></div>
+          <div class="text-[11px] font-bold ${m.on ? 'text-slate-700' : 'text-slate-300'}">${m.label}</div>
+        </div>`).join('');
+
+      const recent = (userScores || []).slice(0, 3);
+      document.getElementById('recentCount').textContent = recent.length;
+      const rq = document.getElementById('recentQuizzes');
+      if (!recent.length) {
+        rq.innerHTML = '<p class="text-sm text-slate-400 py-6 text-center">Play a quiz to see it here.</p>';
+      } else {
+        rq.innerHTML = recent.map((s) => {
+          const pct = s.percentage != null ? Math.round(s.percentage) : 0;
+          return `
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0"><i class="fas fa-book"></i></div>
+              <div class="min-w-0 flex-1">
+                <div class="text-sm font-bold text-slate-800 truncate">${escapeHtml(s.game_title || 'Quiz')}</div>
+                <div class="h-1.5 mt-1 rounded-full bg-slate-100 overflow-hidden">
+                  <div class="xp-fill h-full rounded-full" style="width:${Math.min(100, pct)}%"></div>
+                </div>
+              </div>
+              <span class="text-xs font-extrabold text-slate-500">${pct}%</span>
+            </div>`;
+        }).join('');
+      }
     }
 
     async function ensureSession() {
@@ -347,14 +488,11 @@
         }
         if (data.user.dob) sessionStorage.setItem('gameUserDob', data.user.dob);
         learnerGrade = data.user.grade;
-        const name = `${data.user.firstname} ${data.user.surname}`;
-        document.getElementById('userNameDisplay').textContent =
-          `Welcome, ${name}!` + (learnerGrade ? ` · Grade ${learnerGrade}` : '');
-        document.getElementById('greetingTitle').textContent =
-          `Welcome, ${data.user.firstname}` + (learnerGrade ? ` · Grade ${learnerGrade}` : '');
+        playerFirst = data.user.firstname || 'Player';
+        playerLast = data.user.surname || '';
+        playerAge = data.user.age != null ? data.user.age : null;
         return true;
       } catch (e) {
-        console.error(e);
         window.location.href = '/game-login';
         return false;
       }
@@ -372,19 +510,14 @@
         }
       } catch (e) { /* keep default */ }
       updateToolbarVisibility();
-      loadGames();
-      loadRaces();
-      loadUserStats();
-      loadMyScores();
-      loadLeaderboard();
+      await Promise.all([loadUserStats(), loadMyScores(), loadLeaderboard(), loadRaces()]);
+      renderHomeHub();
       setInterval(loadRaces, 15000);
     });
 
     function updateToolbarVisibility() {
-      const tb = document.getElementById('slToolbar');
-      if (!tb) return;
-      if (activeGameSource === 'ruzivo') tb.classList.remove('hidden');
-      else tb.classList.add('hidden');
+      const gradeLabel = document.getElementById('preferMyGrade')?.closest('label');
+      if (gradeLabel) gradeLabel.classList.toggle('hidden', activeGameSource !== 'ruzivo');
     }
 
     document.querySelectorAll('#gameSourceTabs .game-tab').forEach((btn) => {
@@ -415,19 +548,6 @@
       }, 200);
     });
 
-    function getDifficultyBadgeClass(level) {
-      const classes = {
-        'easy': 'bg-slate-100 text-slate-800',
-        'medium': 'bg-slate-100 text-slate-700',
-        'hard': 'bg-rose-50 text-rose-700'
-      };
-      return classes[level] || 'bg-slate-100 text-slate-600';
-    }
-
-    function getDifficultyIcon(level) {
-      return { easy: 'fa-check', medium: 'fa-fire', hard: 'fa-mountain' }[level] || 'fa-circle';
-    }
-
     function getDifficultyLabel(level) {
       return { easy: 'Easy', medium: 'Medium', hard: 'Hard' }[level] || level;
     }
@@ -440,7 +560,6 @@
           userScores = scoresData.scores || [];
           bestByGame = scoresData.best_by_game || {};
         }
-
         let url = `/api/games?active=true&user_id=${gameUserId}&content_source=${activeGameSource}`;
         if (activeGameSource === 'ruzivo' && preferMyGrade) url += '&prefer_user_grade=true';
         const r = await fetch(url);
@@ -450,11 +569,9 @@
           return;
         }
         if (data.learner && data.learner.grade != null) learnerGrade = data.learner.grade;
-
         const emptyLabel = activeGameSource === 'ruzivo'
-          ? 'No quizzes in this field yet — try another subject or turn off “My grade only”.'
+          ? 'No quizzes yet — try another subject or turn off “My grade only”.'
           : 'No general knowledge games for your age yet.';
-
         allLoadedGames = data.games || [];
         if (!allLoadedGames.length) {
           const prog = document.getElementById('progressSummary');
@@ -464,23 +581,16 @@
           const chips = document.getElementById('subjectChips');
           if (chips) chips.innerHTML = '';
           document.getElementById('gamesList').innerHTML = `
-            <div class="col-span-full portal-card rounded-xl p-12 text-center">
-              <div class="w-14 h-14 mx-auto mb-4 rounded-full bg-slate-100 text-slate-800 flex items-center justify-center text-2xl">
-                <i class="fas fa-inbox"></i>
-              </div>
-              <h3 class="text-lg font-bold text-slate-800">Empty field</h3>
-              <p class="text-slate-500 mt-2 text-sm">${emptyLabel}</p>
+            <div class="col-span-full portal-card p-12 text-center">
+              <h3 class="text-lg font-bold text-slate-900">Nothing here yet</h3>
+              <p class="text-slate-400 mt-2 text-sm">${emptyLabel}</p>
             </div>`;
           return;
         }
         renderSubjectChips(allLoadedGames);
         renderGamesList(allLoadedGames);
       } catch (e) {
-        console.error(e);
-        document.getElementById('gamesList').innerHTML = `
-          <div class="col-span-full portal-card rounded-xl p-8 text-center text-rose-600">
-            <p>Error loading games. Please refresh.</p>
-          </div>`;
+        document.getElementById('gamesList').innerHTML = `<div class="col-span-full portal-card p-8 text-center text-rose-600">Error loading games.</div>`;
       }
     }
 
@@ -527,15 +637,9 @@
       const prog = document.getElementById('progressSummary');
       const barWrap = document.getElementById('progressBarWrap');
       const barFill = document.getElementById('progressBarFill');
-      if (prog) {
-        if (activeGameSource === 'ruzivo') {
-          prog.innerHTML = `<i class="fas ${stage.icon} text-slate-800 mr-1.5"></i>` +
-            (learnerGrade
-              ? `Grade ${learnerGrade}: <strong>${completed}</strong> of <strong>${list.length}</strong> done · ${stage.label}`
-              : `<strong>${completed}</strong> of <strong>${list.length}</strong> quizzes · ${stage.label}`);
-        } else {
-          prog.innerHTML = `<i class="fas ${stage.icon} text-slate-800 mr-1.5"></i><strong>${completed}</strong> of <strong>${list.length}</strong> games · ${stage.label}`;
-        }
+        if (prog) {
+        const gradePrefix = (activeGameSource === 'ruzivo' && learnerGrade) ? `Grade ${learnerGrade}: ` : '';
+        prog.innerHTML = `<i class="fas ${stage.icon} mr-1.5"></i>${gradePrefix}<strong>${completed}</strong> of <strong>${list.length}</strong> · ${stage.label}`;
       }
       if (barWrap && barFill) {
         barWrap.classList.remove('hidden');
@@ -546,60 +650,43 @@
         const best = bestByGame[g.id];
         const hasPlayed = !!best;
         const isSL = g.content_source === 'ruzivo';
-        const edge = isSL ? 'slate-edge' : 'slate-edge';
         const pctBest = best && best.percentage != null ? Math.round(best.percentage) : (best && best.max_score ? Math.round(100 * best.score / best.max_score) : 0);
         const metaBits = [];
         if (g.grade) metaBits.push(`G${g.grade}`);
         if (g.difficulty_level) metaBits.push(getDifficultyLabel(g.difficulty_level));
-        const icon = subjectIcon(g.subject);
         return `
-          <div class="group portal-card portal-card-hover rounded-xl flex flex-col h-full relative overflow-hidden ${edge}">
-            <div class="p-5 flex-grow flex flex-col">
-              <div class="flex items-start gap-3 mb-3">
-                <div class="w-10 h-10 rounded-lg ${isSL ? 'bg-slate-100 text-slate-700' : 'bg-slate-100 text-slate-800'} flex items-center justify-center shrink-0">
-                  <i class="fas ${icon}"></i>
-                </div>
-                <div class="min-w-0 flex-1">
-                  <h3 class="text-base font-bold text-slate-900 line-clamp-2 group-hover:text-slate-700">${escapeHtml(g.title)}</h3>
-                  <div class="flex flex-wrap gap-1.5 mt-1.5">
-                    <span class="text-[10px] font-bold uppercase tracking-wide ${isSL ? 'text-slate-700' : 'text-slate-800'}">${isSL ? 'Smart Learning' : 'General Knowledge'}</span>
-                    ${metaBits.map((m) => `<span class="text-[10px] font-semibold text-slate-400">· ${escapeHtml(m)}</span>`).join('')}
-                  </div>
-                </div>
+          <div class="group portal-card portal-card-hover p-5 flex flex-col h-full">
+            <div class="flex items-start gap-3 mb-3">
+              <div class="w-10 h-10 rounded-xl ${isSL ? 'bg-sky-100 text-sky-600' : 'bg-violet-100 text-violet-600'} flex items-center justify-center shrink-0">
+                <i class="fas ${subjectIcon(g.subject)}"></i>
               </div>
-              <p class="text-slate-500 text-sm mb-3 line-clamp-2 flex-grow">${escapeHtml(g.description || 'Practice and power your growth.')}</p>
-              ${hasPlayed ? `
-                <div class="mb-3">
-                  <div class="flex justify-between text-[11px] font-semibold text-slate-700 mb-1">
-                    <span>Best ${best.score}${best.max_score != null ? ' / ' + best.max_score : ''}</span>
-                    <span>${pctBest}% · ${best.attempts || 1} attempt${(best.attempts || 1) === 1 ? '' : 's'}</span>
-                  </div>
-                  <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                    <div class="h-full rounded-full bg-slate-700 progress-fill" style="width:${Math.min(100, pctBest)}%"></div>
-                  </div>
-                </div>` : ''}
-              <div class="mt-auto">
-                ${hasPlayed
-                  ? `<button onclick="playGame(${g.id})" class="w-full inline-flex items-center justify-center rounded-xl border-2 border-slate-800 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-900 hover:text-white">
-                      <i class="fas fa-redo mr-2"></i> Play again
-                    </button>`
-                  : `<button onclick="playGame(${g.id})" class="w-full inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 shadow-sm">
-                      <i class="fas fa-play mr-2"></i> Play now
-                    </button>`}
+              <div class="min-w-0 flex-1">
+                <h3 class="text-base font-bold text-slate-900 line-clamp-2">${escapeHtml(g.title)}</h3>
+                <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mt-1">${isSL ? 'Smart Learning' : 'General Knowledge'} ${metaBits.map((m) => '· ' + escapeHtml(m)).join(' ')}</div>
               </div>
             </div>
+            <p class="text-slate-400 text-sm mb-3 line-clamp-2 flex-grow">${escapeHtml(g.description || 'Practice and level up.')}</p>
+            ${hasPlayed ? `
+              <div class="mb-3">
+                <div class="flex justify-between text-[11px] font-semibold text-slate-500 mb-1">
+                  <span>Best ${best.score}${best.max_score != null ? ' / ' + best.max_score : ''}</span>
+                  <span>${pctBest}%</span>
+                </div>
+                <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div class="xp-fill h-full rounded-full" style="width:${Math.min(100, pctBest)}%"></div>
+                </div>
+              </div>` : ''}
+            <button onclick="playGame(${g.id})" class="mt-auto w-full ${hasPlayed ? 'btn-outline' : 'btn-navy'} px-4 py-2.5 text-sm">
+              <i class="fas ${hasPlayed ? 'fa-redo' : 'fa-play'} mr-2"></i> ${hasPlayed ? 'Play again' : 'Play now'}
+            </button>
           </div>`;
       }
 
       if (!list.length) {
         container.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
-        container.innerHTML = `<div class="col-span-full portal-card rounded-xl p-8 text-center text-slate-500">
-          <i class="fas fa-search mb-2 text-slate-300"></i>
-          <p>No quizzes match your filters.</p>
-        </div>`;
+        container.innerHTML = `<div class="col-span-full portal-card p-8 text-center text-slate-400">No quizzes match your filters.</div>`;
         return;
       }
-
       if (activeGameSource === 'ruzivo') {
         const bySubject = {};
         list.forEach((g) => {
@@ -612,26 +699,21 @@
         container.innerHTML = subjects.map((subject) => {
           const gamesIn = bySubject[subject];
           const done = gamesIn.filter((g) => bestByGame[g.id]).length;
-          return `
-            <section>
-              <div class="flex items-center gap-3 mb-3">
-                <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center text-sm"><i class="fas ${subjectIcon(subject)}"></i></div>
-                <h3 class="text-base font-bold text-slate-900">${escapeHtml(subject)}</h3>
-                <span class="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">${done}/${gamesIn.length} done</span>
-              </div>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${gamesIn.map(renderGameCard).join('')}</div>
-            </section>`;
+          return `<section>
+            <div class="flex items-center gap-3 mb-3">
+              <h3 class="text-base font-bold text-slate-900">${escapeHtml(subject)}</h3>
+              <span class="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">${done}/${gamesIn.length}</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${gamesIn.map(renderGameCard).join('')}</div>
+          </section>`;
         }).join('');
         return;
       }
-
       container.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
       container.innerHTML = list.map(renderGameCard).join('');
     }
 
-    function playGame(gameId) {
-      window.location.href = `/play-game/${gameId}`;
-    }
+    function playGame(gameId) { window.location.href = `/play-game/${gameId}`; }
     window.playGame = playGame;
 
     function mixLabel(mix) {
@@ -646,22 +728,11 @@
     function formatCountdown(total) {
       const m = Math.floor(Math.max(0, total) / 60);
       const s = Math.max(0, total) % 60;
-      if (m >= 60) {
-        const h = Math.floor(m / 60);
-        return `${h}h ${m % 60}m`;
-      }
+      if (m >= 60) return `${Math.floor(m / 60)}h ${m % 60}m`;
       return `${m}:${String(s).padStart(2, '0')}`;
     }
 
-    function updatePrimaryCta() {
-      const sub = document.getElementById('greetingSub');
-      if (!sub) return;
-      if (liveRaceCount > 0) {
-        sub.textContent = `${liveRaceCount} live race${liveRaceCount === 1 ? '' : 's'} waiting — jump in or keep growing with quizzes.`;
-      } else {
-        sub.textContent = 'Pick a quiz or check back for the next growth race.';
-      }
-    }
+    function updatePrimaryCta() { updateRacesBadge(); }
 
     async function loadRaces() {
       const container = document.getElementById('racesList');
@@ -673,48 +744,32 @@
         liveRaceCount = races.filter((x) => x.status === 'live').length;
         updatePrimaryCta();
         if (!races.length) {
-          container.innerHTML = `
-            <div class="col-span-full portal-card rounded-xl p-8 text-center">
-              <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center"><i class="fas fa-flag"></i></div>
-              <p class="text-slate-500 text-sm">No races in the field right now. Check back soon.</p>
-            </div>`;
+          container.innerHTML = `<div class="col-span-full portal-card p-8 text-center text-slate-400">No races right now. Check back soon.</div>`;
           return;
         }
         container.innerHTML = races.map((race) => {
           const live = race.status === 'live';
           const upcoming = race.status === 'upcoming';
           const finished = race.status === 'finished';
-          const when = upcoming
-            ? `Starts in ${formatCountdown(race.seconds_until_start)}`
-            : live
-              ? `${formatCountdown(race.remaining_seconds)} left`
-              : 'Finished';
+          const when = upcoming ? `Starts in ${formatCountdown(race.seconds_until_start)}` : live ? `${formatCountdown(race.remaining_seconds)} left` : 'Finished';
           let action = '';
-          if (finished) {
-            action = `<a href="/play-race/${race.id}" class="w-full inline-flex items-center justify-center rounded-xl bg-slate-700 px-4 py-2.5 text-sm font-bold text-white">View harvest</a>`;
-          } else if (live) {
-            action = `<a href="/play-race/${race.id}" class="w-full inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800">${race.finished ? 'View board' : 'Join race'}</a>`;
-          } else {
-            action = `<a href="/play-race/${race.id}" class="w-full inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800">Enter lobby</a>`;
-          }
-          return `
-            <div class="portal-card portal-card-hover race-card rounded-xl flex flex-col overflow-hidden">
-              <div class="p-5 flex-grow flex flex-col">
-                <div class="flex items-start justify-between gap-2 mb-2">
-                  <h3 class="font-bold text-slate-900">${escapeHtml(race.title)}</h3>
-                  <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-1 ${live ? 'bg-slate-100 text-slate-800' : upcoming ? 'bg-slate-100 text-slate-700' : 'bg-slate-100 text-slate-600'}">
-                    ${live ? '<span class="live-pulse"></span>' : ''}${race.status}
-                  </span>
-                </div>
-                <p class="text-sm text-slate-500 mb-1">${escapeHtml(mixLabel(race.mix))}</p>
-                <p class="text-xs text-slate-400 mb-4">${when} · ${race.player_count || 0} joined · Ages ${escapeHtml(race.age_range || '')} · ${race.duration_minutes} min</p>
-                <div class="mt-auto">${action}</div>
-              </div>
-            </div>`;
+          if (finished) action = `<a href="/play-race/${race.id}" class="btn-navy w-full inline-flex items-center justify-center px-4 py-2.5 text-sm">See results</a>`;
+          else if (live) action = `<a href="/play-race/${race.id}" class="btn-navy w-full inline-flex items-center justify-center px-4 py-2.5 text-sm">${race.finished ? 'View board' : 'Join race'}</a>`;
+          else action = `<a href="/play-race/${race.id}" class="btn-outline w-full inline-flex items-center justify-center px-4 py-2.5 text-sm">Enter lobby</a>`;
+          return `<div class="portal-card portal-card-hover p-5 flex flex-col">
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <h3 class="font-bold text-slate-900">${escapeHtml(race.title)}</h3>
+              <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase rounded-full px-2 py-1 ${live ? 'bg-rose-100 text-rose-600' : upcoming ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'}">
+                ${live ? '<span class="live-pulse"></span>' : ''}${race.status}
+              </span>
+            </div>
+            <p class="text-sm text-slate-400 mb-1">${escapeHtml(mixLabel(race.mix))}</p>
+            <p class="text-xs text-slate-400 mb-4">${when} · ${race.player_count || 0} joined · Ages ${escapeHtml(race.age_range || '')} · ${race.duration_minutes} min</p>
+            <div class="mt-auto">${action}</div>
+          </div>`;
         }).join('');
       } catch (e) {
-        console.error(e);
-        container.innerHTML = `<div class="col-span-full portal-card rounded-xl p-8 text-center text-rose-600">Could not load races.</div>`;
+        container.innerHTML = `<div class="col-span-full portal-card p-8 text-center text-rose-600">Could not load races.</div>`;
       }
     }
 
@@ -724,26 +779,9 @@
         const data = await r.json();
         if (r.ok && data.stats) {
           userStats = data.stats;
-          animateValue(document.getElementById('totalGamesPlayed'), 0, data.stats.total_games || 0, 800);
-          document.getElementById('averageScore').textContent = data.stats.average_score ? data.stats.average_score.toFixed(1) : '0';
-          animateValue(document.getElementById('bestScore'), 0, data.stats.best_score || 0, 800);
+          renderHomeHub();
         }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    function animateValue(obj, start, end, duration) {
-      if (start === end) { obj.innerHTML = end; return; }
-      let startTimestamp = null;
-      const step = (timestamp) => {
-        if (!startTimestamp) startTimestamp = timestamp;
-        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-        obj.innerHTML = Math.floor(progress * (end - start) + start);
-        if (progress < 1) window.requestAnimationFrame(step);
-        else obj.innerHTML = end;
-      };
-      window.requestAnimationFrame(step);
+      } catch (e) { console.error(e); }
     }
 
     async function loadLeaderboard() {
@@ -752,142 +790,68 @@
         if (!r.ok) throw new Error('Failed to load leaderboard');
         const data = await r.json();
         const container = document.getElementById('leaderboard');
-
+        playerAgeRange = data.age_range || playerAgeRange;
         if (!data.leaderboard || data.leaderboard.length === 0) {
-          container.innerHTML = `
-            <div class="text-center text-slate-400 py-8">
-              <div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-700 text-xl">
-                <i class="fas fa-trophy"></i>
-              </div>
-              <p class="text-sm">No harvest ranks yet for ${data.age_range || 'your age group'}.</p>
-            </div>`;
+          currentUserRank = 0;
+          container.innerHTML = `<div class="text-center text-slate-400 py-10">
+            <p class="text-sm font-semibold">No ranks yet for ${escapeHtml(data.age_range || 'your age group')}.</p>
+          </div>`;
+          renderHomeHub();
           return;
         }
-
-        const currentUserRank = data.leaderboard.findIndex(u => u.user_id == gameUserId) + 1;
+        currentUserRank = data.leaderboard.findIndex((u) => u.user_id == gameUserId) + 1;
+        renderHomeHub();
         const topThree = data.leaderboard.slice(0, 3);
         const rest = data.leaderboard.slice(3, 10);
         const medals = [
-          { bg: 'bg-slate-100', text: 'text-slate-700', label: '1st' },
-          { bg: 'bg-slate-100', text: 'text-slate-600', label: '2nd' },
-          { bg: 'bg-amber-50', text: 'text-amber-800', label: '3rd' },
+          { bg: 'bg-amber-400', text: 'text-amber-950', label: '1' },
+          { bg: 'bg-slate-300', text: 'text-slate-800', label: '2' },
+          { bg: 'bg-orange-400', text: 'text-orange-950', label: '3' },
         ];
-
-        let html = `
-          <div class="mb-4">
-            <p class="text-xs text-slate-500">Age band <span class="font-semibold text-slate-700">${escapeHtml(data.age_range || '')}</span></p>
-            ${currentUserRank > 0 ? `<p class="text-xs text-slate-500 mt-0.5">Your rank <span class="font-bold text-slate-800">#${currentUserRank}</span></p>` : ''}
-          </div>
-          <div class="space-y-2.5 mb-3">`;
-
+        let html = `<div class="flex flex-wrap items-center justify-between gap-2 mb-6">
+          <p class="text-sm text-slate-400">Age band <span class="font-bold text-slate-800">${escapeHtml(data.age_range || '')}</span></p>
+          ${currentUserRank > 0 ? `<p class="text-sm font-extrabold text-white bg-slate-900 rounded-full px-3 py-1">Your rank #${currentUserRank}</p>` : ''}
+        </div><div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">`;
         topThree.forEach((user, index) => {
           const isCurrentUser = user.user_id == gameUserId;
           const m = medals[index];
-          html += `
-            <div class="rounded-xl p-3 border ${isCurrentUser ? 'border-slate-800 bg-slate-100' : 'border-slate-100 bg-white'}">
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2 min-w-0">
-                  <span class="text-[10px] font-extrabold ${m.bg} ${m.text} w-8 h-8 rounded-full flex items-center justify-center shrink-0">${m.label}</span>
-                  <div class="min-w-0">
-                    <div class="text-sm font-bold text-slate-800 truncate">${escapeHtml(user.firstname)} ${escapeHtml(user.surname)}</div>
-                    <div class="text-[11px] text-slate-400 truncate">@${escapeHtml(user.username)}</div>
-                  </div>
-                </div>
-                <div class="text-right shrink-0">
-                  <div class="text-sm font-extrabold text-slate-800">${user.best_score}</div>
-                  <div class="text-[10px] text-slate-400">${user.total_games} played</div>
-                </div>
-              </div>
-            </div>`;
+          html += `<div class="rounded-2xl p-4 text-center ${isCurrentUser ? 'ring-2 ring-slate-900 bg-slate-50' : 'bg-slate-50'}">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-full ${m.bg} ${m.text} font-black text-lg mb-2">${m.label}</span>
+            <div class="text-sm font-extrabold text-slate-900 truncate">${escapeHtml(user.firstname)} ${escapeHtml(user.surname)}</div>
+            <div class="text-xl font-black text-orange-400 mt-2">${user.best_score}</div>
+          </div>`;
         });
         html += '</div>';
-
-        if (rest.length > 0) {
-          html += '<div class="space-y-1.5">';
+        if (rest.length) {
+          html += '<div class="space-y-2">';
           rest.forEach((user, index) => {
             const rank = index + 4;
             const isCurrentUser = user.user_id == gameUserId;
-            html += `
-              <div class="rounded-lg px-2.5 py-2 ${isCurrentUser ? 'bg-slate-100 ring-1 ring-slate-300' : ''}">
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <span class="text-[11px] font-semibold text-slate-400 w-5">#${rank}</span>
-                    <span class="text-xs font-semibold text-slate-800 truncate">${escapeHtml(user.firstname)} ${escapeHtml(user.surname)}</span>
-                  </div>
-                  <span class="text-xs font-bold text-slate-700">${user.best_score}</span>
-                </div>
-              </div>`;
+            html += `<div class="rounded-xl px-3 py-2.5 ${isCurrentUser ? 'bg-slate-100' : ''}">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-slate-800"><span class="text-slate-400 mr-2">#${rank}</span>${escapeHtml(user.firstname)} ${escapeHtml(user.surname)}</span>
+                <span class="text-sm font-extrabold">${user.best_score}</span>
+              </div>
+            </div>`;
           });
           html += '</div>';
         }
-
         container.innerHTML = html;
       } catch (e) {
-        console.error('Error loading leaderboard:', e);
-        document.getElementById('leaderboard').innerHTML = `
-          <div class="text-center text-rose-500 py-8 text-sm">Could not load leaderboard.</div>`;
+        currentUserRank = 0;
+        document.getElementById('leaderboard').innerHTML = `<div class="text-center text-rose-500 py-8 text-sm">Could not load leaderboard.</div>`;
       }
     }
 
     async function loadMyScores() {
       try {
         const r = await fetch(`/api/game-users/${gameUserId}/scores`);
-        if (!r.ok) throw new Error('Failed to load scores');
+        if (!r.ok) throw new Error('Failed');
         const data = await r.json();
-        const container = document.getElementById('myScores');
-
-        if (!data.scores || data.scores.length === 0) {
-          container.innerHTML = `
-            <div class="p-12 text-center text-slate-400">
-              <div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-800 text-xl">
-                <i class="fas fa-inbox"></i>
-              </div>
-              <p class="text-sm">Play a quiz to start your history.</p>
-            </div>`;
-          return;
-        }
-
-        container.innerHTML = `
-          <table class="min-w-full divide-y divide-slate-100">
-            <thead class="bg-slate-50/80">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Game</th>
-                <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Score</th>
-                <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Accuracy</th>
-                <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Attempt</th>
-                <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-50">
-              ${data.scores.map(s => `
-                <tr class="hover:bg-slate-50">
-                  <td class="px-6 py-3 whitespace-nowrap text-sm font-semibold text-slate-800">${escapeHtml(s.game_title || 'Unknown')}</td>
-                  <td class="px-6 py-3 whitespace-nowrap">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-sm font-semibold bg-slate-100 text-slate-800">
-                      ${s.score}<span class="text-slate-400 ml-1 text-xs font-normal">/ ${s.max_score || '?'}</span>
-                    </span>
-                  </td>
-                  <td class="px-6 py-3 whitespace-nowrap">
-                    ${s.percentage ? `
-                      <div class="flex items-center">
-                        <span class="text-sm font-semibold ${s.percentage >= 80 ? 'text-slate-800' : s.percentage >= 50 ? 'text-slate-700' : 'text-rose-600'}">${s.percentage.toFixed(1)}%</span>
-                        <div class="w-16 h-1.5 bg-slate-100 rounded-full ml-2 overflow-hidden">
-                          <div class="h-full rounded-full ${s.percentage >= 80 ? 'bg-slate-900' : s.percentage >= 50 ? 'bg-slate-700' : 'bg-rose-500'}" style="width: ${s.percentage}%"></div>
-                        </div>
-                      </div>
-                    ` : '<span class="text-slate-400 text-sm">N/A</span>'}
-                  </td>
-                  <td class="px-6 py-3 whitespace-nowrap text-sm text-slate-500"><span class="font-mono text-xs bg-slate-100 px-2 py-1 rounded">#${s.attempt_number}</span></td>
-                  <td class="px-6 py-3 whitespace-nowrap text-sm text-slate-500">${formatDate(s.played_at)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>`;
-      } catch (e) {
-        console.error('Error loading scores:', e);
-        document.getElementById('myScores').innerHTML = `
-          <div class="p-8 text-center text-rose-500 text-sm">Error loading scores.</div>`;
-      }
+        userScores = data.scores || [];
+        bestByGame = data.best_by_game || {};
+        renderHomeHub();
+      } catch (e) { console.error(e); }
     }
 
     function logout() {
@@ -895,13 +859,6 @@
       window.location.href = '/game-login';
     }
     window.logout = logout;
-
-    function formatDate(d) {
-      if (!d) return 'N/A';
-      const date = new Date(d);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        + ' at ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    }
 
     function escapeHtml(s) {
       return String(s).replace(/[&<>"]+/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] || c));
