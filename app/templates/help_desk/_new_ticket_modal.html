@@ -1,0 +1,60 @@
+<div class="modal fade" id="hd-new-ticket-modal" tabindex="-1" aria-labelledby="hd-new-ticket-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content hd-modal">
+      <div class="modal-header">
+        <h5 class="modal-title" id="hd-new-ticket-title">New support ticket</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="hd-kb-suggestions" class="hd-kb-suggestions mb-3 d-none">
+          <div class="hd-muted small mb-1">Suggested articles</div>
+          <ul class="list-unstyled mb-0" id="hd-kb-suggestions-list"></ul>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="hd-new-title">Title</label>
+          <input type="text" class="form-control" id="hd-new-title" maxlength="200" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="hd-new-desc">Description</label>
+          <textarea class="form-control" id="hd-new-desc" rows="5" required></textarea>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label" for="hd-new-priority">Priority</label>
+            <select class="form-select" id="hd-new-priority">
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="hd-new-category">Category</label>
+            <select class="form-select" id="hd-new-category">
+              <option value="general">General</option>
+              <option value="access">Access</option>
+              <option value="technical">Technical</option>
+              <option value="billing">Billing</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="hd-new-type">Identity</label>
+            <select class="form-select" id="hd-new-type">
+              <option value="self">As myself</option>
+              <option value="anonymous">Anonymous</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="form-label" for="hd-new-files">Attachments</label>
+          <input type="file" class="form-control" id="hd-new-files" multiple>
+        </div>
+        <div class="text-danger small mt-2 d-none" id="hd-new-error"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn hd-btn-primary" id="hd-new-submit">Submit ticket</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -102,6 +102,30 @@
     const saveBtn = $("#mn-saved-view-save");
     if (!sel) return;
 
+    function ensureSaveModal() {
+      let modal = document.getElementById("mnSavedViewModal");
+      if (modal) return modal;
+      modal = document.createElement("div");
+      modal.className = "modal fade";
+      modal.id = "mnSavedViewModal";
+      modal.tabIndex = -1;
+      modal.innerHTML =
+        '<div class="modal-dialog"><div class="modal-content" style="border-radius:16px;">' +
+        '<div class="modal-header"><h5 class="modal-title">Save view</h5>' +
+        '<button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+        '<div class="modal-body">' +
+        '<label class="mn-filter-label" for="mn-sv-name">Name</label>' +
+        '<input type="text" class="form-control form-control-sm mb-3" id="mn-sv-name" placeholder="e.g. My open tasks" />' +
+        '<div class="form-check"><input class="form-check-input" type="checkbox" id="mn-sv-default" />' +
+        '<label class="form-check-label" for="mn-sv-default">Set as default</label></div>' +
+        '</div><div class="modal-footer">' +
+        '<button type="button" class="btn btn-sm mn-btn-ghost" data-bs-dismiss="modal">Cancel</button>' +
+        '<button type="button" class="btn btn-sm mn-btn-primary" id="mn-sv-confirm">Save</button>' +
+        '</div></div></div>';
+      document.body.appendChild(modal);
+      return modal;
+    }
+
     function applyView(view) {
       const f = view.filters_json || {};
       const set = function (id, val) { const el = $(id); if (el && val != null) el.value = val; };
@@ -112,6 +136,9 @@
       set("#mn-filter-priority", f.priority || "");
       set("#mn-filter-label", f.label_id || "");
       set("#mn-filter-search", f.q || "");
+      if (f.board_group && window.MN && window.MN.setBoardGroupMode) {
+        window.MN.setBoardGroupMode(f.board_group);
+      }
       if (window.MN && window.MN.setUrlView && view.view_mode) window.MN.setUrlView(view.view_mode);
       if (window.MN && window.MN.refreshItems) window.MN.refreshItems();
     }
@@ -119,41 +146,95 @@
     function loadViews() {
       fetch(API.savedViews).then(function (r) { return r.json(); }).then(function (views) {
         sel.innerHTML = '<option value="">Saved views…</option>';
-        views.forEach(function (v) {
+        (views || []).forEach(function (v) {
           const opt = document.createElement("option");
           opt.value = String(v.id);
           opt.textContent = v.name + (v.is_default ? " ★" : "");
           opt._view = v;
           sel.appendChild(opt);
         });
+        if (!(views || []).length) return;
+        const delOpt = document.createElement("option");
+        delOpt.value = "__delete__";
+        delOpt.textContent = "Delete selected view…";
+        sel.appendChild(delOpt);
       });
     }
 
-    sel.addEventListener("change", function () {
+    sel.addEventListener("change", async function () {
+      if (sel.value === "__delete__") {
+        const prev = sel.getAttribute("data-last-view-id");
+        sel.value = prev || "";
+        if (!prev) {
+          if (window.MN && window.MN.showToast) window.MN.showToast("Select a view first", "error");
+          return;
+        }
+        if (!confirm("Delete this saved view?")) return;
+        const res = await fetch(API.savedView(prev), { method: "DELETE" });
+        if (!res.ok) {
+          if (window.MN && window.MN.showToast) window.MN.showToast("Could not delete view", "error");
+          return;
+        }
+        sel.removeAttribute("data-last-view-id");
+        loadViews();
+        if (window.MN && window.MN.showToast) window.MN.showToast("View deleted", "success");
+        return;
+      }
       const opt = sel.options[sel.selectedIndex];
-      if (opt && opt._view) applyView(opt._view);
+      if (opt && opt._view) {
+        sel.setAttribute("data-last-view-id", String(opt._view.id));
+        applyView(opt._view);
+      }
     });
 
     if (saveBtn) {
-      saveBtn.addEventListener("click", async function () {
-        const name = prompt("Name for this view:");
-        if (!name) return;
-        const f = {};
-        const g = function (id, key) { const el = $(id); if (el && el.value) f[key] = el.value; };
-        g("#mn-filter-platform", "platform");
-        g("#mn-filter-assignee", "assignee_user_id");
-        g("#mn-filter-status", "status");
-        g("#mn-filter-due", "due_preset");
-        g("#mn-filter-priority", "priority");
-        g("#mn-filter-label", "label_id");
-        g("#mn-filter-search", "q");
-        const viewMode = window.MN && window.MN.getViewFromUrl ? window.MN.getViewFromUrl() : "board";
-        await fetch(API.savedViews, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: name, filters_json: f, view_mode: viewMode }),
+      saveBtn.addEventListener("click", function () {
+        const modal = ensureSaveModal();
+        const nameInput = $("#mn-sv-name");
+        const defChk = $("#mn-sv-default");
+        if (nameInput) nameInput.value = "";
+        if (defChk) defChk.checked = false;
+        if (window.bootstrap) bootstrap.Modal.getOrCreateInstance(modal).show();
+        const confirmBtn = $("#mn-sv-confirm");
+        if (!confirmBtn || confirmBtn.getAttribute("data-wired") === "1") return;
+        confirmBtn.setAttribute("data-wired", "1");
+        confirmBtn.addEventListener("click", async function () {
+          const name = ((nameInput && nameInput.value) || "").trim();
+          if (!name) {
+            if (window.MN && window.MN.showToast) window.MN.showToast("Enter a view name", "error");
+            return;
+          }
+          const f = {};
+          const g = function (id, key) { const el = $(id); if (el && el.value) f[key] = el.value; };
+          g("#mn-filter-platform", "platform");
+          g("#mn-filter-assignee", "assignee_user_id");
+          g("#mn-filter-status", "status");
+          g("#mn-filter-due", "due_preset");
+          g("#mn-filter-priority", "priority");
+          g("#mn-filter-label", "label_id");
+          g("#mn-filter-search", "q");
+          if (window.MN && window.MN.getBoardGroupMode) {
+            f.board_group = window.MN.getBoardGroupMode();
+          }
+          const viewMode = window.MN && window.MN.getViewFromUrl ? window.MN.getViewFromUrl() : "board";
+          const res = await fetch(API.savedViews, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: name,
+              filters_json: f,
+              view_mode: viewMode,
+              is_default: !!(defChk && defChk.checked),
+            }),
+          });
+          if (!res.ok) {
+            if (window.MN && window.MN.showToast) window.MN.showToast("Could not save view", "error");
+            return;
+          }
+          if (window.bootstrap) bootstrap.Modal.getOrCreateInstance(modal).hide();
+          loadViews();
+          if (window.MN && window.MN.showToast) window.MN.showToast("View saved", "success");
         });
-        loadViews();
       });
     }
     loadViews();
@@ -531,8 +612,12 @@
     try {
       const socket = io("/meeting-notes");
       socket.emit("join_meeting", { meeting_id: meetingId });
-      socket.on("item_updated", function () {
-        if (window.MN && window.MN.refreshItems) window.MN.refreshItems();
+      socket.on("item_updated", function (payload) {
+        if (window.MN && window.MN.applyRealtimeItemUpdate) {
+          window.MN.applyRealtimeItemUpdate(payload || {});
+        } else if (window.MN && window.MN.refreshItems) {
+          window.MN.refreshItems();
+        }
       });
     } catch (e) {
       console.warn("Meeting notes realtime unavailable", e);

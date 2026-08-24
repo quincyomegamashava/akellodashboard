@@ -15,6 +15,18 @@
     return "tasks";
   }
 
+  function syncLocalNav(name) {
+    document.querySelectorAll(".mn-local-nav-link, .mn-subnav-link").forEach(function (link) {
+      const href = link.getAttribute("href") || "";
+      const local = link.getAttribute("data-mn-local") || "";
+      let on = false;
+      if (name === "meetings" && (local === "meetings" || href.indexOf("#meetings") >= 0)) on = true;
+      else if (name === "tasks" && (local === "tasks" || href.indexOf("#tasks") >= 0)) on = true;
+      else if (name === "new" && (local === "tasks" || href.indexOf("#tasks") >= 0)) on = false;
+      link.classList.toggle("active", on);
+    });
+  }
+
   function initHubTabs() {
     const tablist = document.getElementById("mn-hub-tabs");
     if (!tablist) return;
@@ -30,16 +42,7 @@
         const pane = document.getElementById("mn-hub-tab-" + key);
         if (pane) pane.classList.toggle("d-none", key !== name);
       });
-      document.querySelectorAll(".mn-subnav-link").forEach(function (link) {
-        const href = link.getAttribute("href") || "";
-        if (name === "meetings" && href.indexOf("#meetings") >= 0) {
-          link.classList.add("active");
-        } else if (name === "tasks" && href.indexOf("#tasks") >= 0) {
-          link.classList.add("active");
-        } else if (href.indexOf("#meetings") >= 0 || href.indexOf("#tasks") >= 0) {
-          link.classList.remove("active");
-        }
-      });
+      syncLocalNav(name);
       if (window.location.hash !== "#" + name) {
         history.replaceState(null, "", window.location.pathname + window.location.search + "#" + name);
       }

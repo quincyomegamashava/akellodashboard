@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HBC: Balance Lab</title>
+  <style>
+    :root {
+      --ink: #1a3344;
+      --muted: #4a6678;
+      --sky: #e3f2f7;
+      --panel: #ffffff;
+      --beam: #8d6e63;
+      --fulcrum: #5d4037;
+      --pan: #f7f1e8;
+      --pan-edge: #a1887f;
+      --tile: #4fc3f7;
+      --tile-deep: #0288d1;
+      --accent: #1565c0;
+      --ok: #2e7d32;
+      --warn: #e65100;
+      --soft: #eceff1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", "Trebuchet MS", system-ui, sans-serif;
+      background:
+        linear-gradient(180deg, #dceef5 0%, var(--sky) 40%, #f0f7fa 100%);
+      color: var(--ink);
+      min-height: 100vh;
+      padding-bottom: 28px;
+    }
+    .wrap {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      font-size: clamp(1.35rem, 3.5vw, 1.75rem);
+      font-weight: 800;
+      color: var(--accent);
+    }
+    .lede {
+      font-size: 0.95rem;
+      color: var(--muted);
+      margin-top: 4px;
+      max-width: 28rem;
+      line-height: 1.35;
+    }
+    #scoreBox {
+      background: var(--panel);
+      padding: 10px 16px;
+      border-radius: 14px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      box-shadow: 0 2px 10px rgba(21, 101, 192, 0.1);
+      align-self: center;
+    }
+    .meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin: 8px 0 12px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .badge {
+      background: #fff;
+      border: 1px solid #b3e5fc;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .lab {
+      background: var(--panel);
+      border-radius: 18px;
+      padding: 18px 16px 20px;
+      box-shadow: 0 8px 24px rgba(26, 51, 68, 0.08);
+      border: 1px solid #d4e8f0;
+    }
+    .story {
+      font-size: 1.02rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+    .hint-row {
+      font-size: 0.92rem;
+      color: var(--muted);
+      margin-bottom: 14px;
+      line-height: 1.35;
+    }
+    .scale {
+      position: relative;
+      height: 230px;
+      margin: 4px 0 8px;
+    }
+    .beam {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      top: 78px;
+      height: 12px;
+      background: linear-gradient(180deg, #a1887f, var(--beam));
+      transform-origin: center;
+      transition: transform 0.4s ease;
+      border-radius: 6px;
+      z-index: 2;
+    }
+    .fulcrum {
+      position: absolute;
+      left: 50%;
+      top: 88px;
+      width: 0;
+      height: 0;
+      border-left: 20px solid transparent;
+      border-right: 20px solid transparent;
+      border-top: 74px solid var(--fulcrum);
+      transform: translateX(-50%);
+      z-index: 1;
+    }
+    .base {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      width: 56px;
+      height: 10px;
+      background: #6d4c41;
+      transform: translateX(-50%);
+      border-radius: 4px;
+    }
+    .pan {
+      position: absolute;
+      top: 18px;
+      width: 42%;
+      min-height: 96px;
+      background: var(--pan);
+      border: 3px solid var(--pan-edge);
+      border-radius: 14px;
+      padding: 8px;
+      text-align: center;
+      z-index: 3;
+      transition: top 0.4s ease;
+    }
+    .pan.left { left: 4%; }
+    .pan.right { right: 4%; }
+    .pan-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .pan-total {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .weight {
+      display: inline-block;
+      margin: 3px;
+      padding: 8px 10px;
+      background: #ffcc80;
+      border-radius: 10px;
+      font-weight: 800;
+      min-width: 48px;
+      min-height: 40px;
+      font-size: 0.95rem;
+      color: #5d4037;
+    }
+    .weight.fixed {
+      background: #81c784;
+      color: #1b5e20;
+    }
+    .tiles-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-top: 10px;
+      margin-bottom: 6px;
+    }
+    .tiles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .tile {
+      min-width: 64px;
+      min-height: 52px;
+      border: none;
+      border-radius: 12px;
+      background: var(--tile);
+      color: #01579b;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 1.05rem;
+      box-shadow: 0 3px 0 var(--tile-deep);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tile:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 var(--tile-deep);
+    }
+    .tile:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .feedback {
+      margin-top: 14px;
+      min-height: 72px;
+      font-size: 0.95rem;
+      line-height: 1.45;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #f5fafc;
+      border: 1px solid #d4e8f0;
+    }
+    .feedback.ok {
+      background: #e8f5e9;
+      border-color: #a5d6a7;
+      color: var(--ok);
+    }
+    .feedback.bad {
+      background: #fff3e0;
+      border-color: #ffcc80;
+      color: var(--warn);
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    button.act {
+      min-height: 48px;
+      min-width: 48px;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.95rem;
+      touch-action: manipulation;
+    }
+    #tryBtn { background: #43a047; color: #fff; }
+    #hintBtn, #clearBtn { background: var(--soft); color: var(--ink); }
+    #nextBtn {
+      background: #ffb74d;
+      color: #e65100;
+      display: none;
+    }
+    #nextBtn.show { display: inline-block; }
+    #checkBtn { background: var(--accent); color: #fff; }
+    #checkBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .sum-chip {
+      display: inline-block;
+      background: #e1f5fe;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Balance Lab</h1>
+        <p class="lede">Make both pans equal. Tap weight tiles to build the right pan — like balancing market produce.</p>
+      </div>
+      <div id="scoreBox">Score: 0 / 10</div>
+    </header>
+    <div class="meta">
+      <span class="badge" id="roundBadge">Round 1 / 10</span>
+      <span id="areaTag">Mathematics · Equality &amp; addition</span>
+    </div>
+    <div class="lab">
+      <p class="story" id="story"></p>
+      <p class="hint-row" id="promptRow">Add weights until both sides match.</p>
+      <div class="scale" id="scale">
+        <div class="pan left" id="leftPan"></div>
+        <div class="pan right" id="rightPan"></div>
+        <div class="beam" id="beam"></div>
+        <div class="fulcrum"></div>
+        <div class="base"></div>
+      </div>
+      <p class="tiles-label">Weight tiles (kg) — tap to add to the right pan</p>
+      <div class="tiles" id="tiles"></div>
+      <div class="feedback" id="feedback" aria-live="polite"></div>
+      <div class="actions">
+        <button type="button" class="act" id="tryBtn">Check balance</button>
+        <button type="button" class="act" id="hintBtn">Hint</button>
+        <button type="button" class="act" id="clearBtn">Clear right pan</button>
+        <button type="button" class="act" id="nextBtn">Next puzzle</button>
+        <button type="button" class="act" id="checkBtn" disabled>Submit score</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const CONTENT = {
+      learningArea: "Mathematics",
+      topic: "Equality and addition on a balance scale (Zimbabwean market weights / produce kg)",
+      ageRange: "9-10",
+      totalRounds: 10,
+      maxScore: 10,
+      questionPool: [
+        {
+          id: "maize_bags",
+          context: "Maize bags at the grain depot",
+          story: "Left pan: maize bags ready for the depot. Match their total weight on the right.",
+          targetMin: 8,
+          targetMax: 14,
+          tiles: [1, 2, 3, 5],
+          leftBlocks: "fixed",
+          unit: "kg",
+          tip: "Add smaller bags until the totals match."
+        },
+        {
+          id: "mbare_tomatoes",
+          context: "Tomatoes at Mbare Musika",
+          story: "At Mbare Musika, tomato crates sit on the left. Balance them with market weights.",
+          targetMin: 6,
+          targetMax: 12,
+          tiles: [1, 2, 4],
+          leftBlocks: "split",
+          unit: "kg",
+          tip: "Try combining 2 kg and 4 kg tiles."
+        },
+        {
+          id: "school_books",
+          context: "School books for the class",
+          story: "A stack of school books is on the left. Make the right pan the same mass.",
+          targetMin: 5,
+          targetMax: 11,
+          tiles: [1, 2, 3],
+          leftBlocks: "fixed",
+          unit: "kg",
+          tip: "Books add up — so do your tiles."
+        },
+        {
+          id: "groundnuts",
+          context: "Groundnut sacks in Marondera",
+          story: "Groundnut sacks wait on the left pan. Equal the weight for a fair sale.",
+          targetMin: 9,
+          targetMax: 16,
+          tiles: [1, 2, 3, 4],
+          leftBlocks: "split",
+          unit: "kg",
+          tip: "If you go over, clear and rebuild with a different mix."
+        },
+        {
+          id: "sugar_packets",
+          context: "Sugar packets in a tuck shop",
+          story: "Sugar packets are weighed on the left. Match them exactly on the right.",
+          targetMin: 4,
+          targetMax: 10,
+          tiles: [1, 2, 5],
+          leftBlocks: "fixed",
+          unit: "kg",
+          tip: "A 5 kg tile plus smaller ones often works."
+        },
+        {
+          id: "oranges_mazowe",
+          context: "Oranges from Mazowe",
+          story: "Boxes of Mazowe oranges tip the left pan. Balance the scale for transport.",
+          targetMin: 7,
+          targetMax: 15,
+          tiles: [2, 3, 5],
+          leftBlocks: "split",
+          unit: "kg",
+          tip: "Only even-ish steps — watch your running total."
+        },
+        {
+          id: "cooking_oil",
+          context: "Cooking oil bottles",
+          story: "Cooking oil bottles sit on the left. Add bottles on the right until equal.",
+          targetMin: 6,
+          targetMax: 12,
+          tiles: [1, 3, 4],
+          leftBlocks: "fixed",
+          unit: "kg",
+          tip: "Three 1 kg and one 3 kg can make many totals."
+        },
+        {
+          id: "cabbage_crates",
+          context: "Cabbage crates in Bulawayo",
+          story: "Cabbage crates for the Bulawayo market are on the left. Match their kg.",
+          targetMin: 10,
+          targetMax: 18,
+          tiles: [2, 4, 5],
+          leftBlocks: "split",
+          unit: "kg",
+          tip: "Larger tiles — plan before you tap."
+        },
+        {
+          id: "rice_bags",
+          context: "Rice bags at the shop",
+          story: "Rice bags rest on the left pan. Build the same weight with shop tiles.",
+          targetMin: 5,
+          targetMax: 13,
+          tiles: [1, 2, 4, 5],
+          leftBlocks: "fixed",
+          unit: "kg",
+          tip: "You have many combinations — check after each add."
+        },
+        {
+          id: "sweet_potatoes",
+          context: "Sweet potatoes from the garden",
+          story: "Sweet potatoes from the garden fill the left pan. Balance them carefully.",
+          targetMin: 8,
+          targetMax: 14,
+          tiles: [1, 3, 5],
+          leftBlocks: "split",
+          unit: "kg",
+          tip: "Odd tiles mean careful adding to hit the target."
+        },
+        {
+          id: "beans_village",
+          context: "Dried beans in the village store",
+          story: "Dried beans are measured on the left. Make both sides equal for a fair trade.",
+          targetMin: 7,
+          targetMax: 15,
+          tiles: [1, 2, 3, 6],
+          leftBlocks: "fixed",
+          unit: "kg",
+          tip: "A 6 kg tile can get you close quickly."
+        },
+        {
+          id: "sport_kit",
+          context: "Sports kit bags at school",
+          story: "Sports kit bags hang on the left. Add weights until the beam is level.",
+          targetMin: 6,
+          targetMax: 12,
+          tiles: [2, 3, 4],
+          leftBlocks: "split",
+          unit: "kg",
+          tip: "No 1 kg tile — think in 2s, 3s, and 4s."
+        }
+      ],
+      hints: {
+        tooLight: "The right pan is too light. Add more weight.",
+        tooHeavy: "The right pan is too heavy. Clear some weight and try a different mix.",
+        equal: "Both sides are equal. Nice balancing!",
+        strategy: "Write the target, then build with the biggest useful tile, filling the gap with smaller ones.",
+        nearMiss: "You are close — compare your right total with the left target."
+      }
+    };
+
+    function initializeGameSession(pool) {
+      let shuffledPool = [...pool];
+      for (let i = shuffledPool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledPool[i], shuffledPool[j]] = [shuffledPool[j], shuffledPool[i]];
+      }
+      return shuffledPool.slice(0, CONTENT.totalRounds);
+    }
+
+    function randInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function shuffleInPlace(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function splitTarget(target) {
+      const parts = [];
+      let rem = target;
+      while (rem > 0) {
+        const maxChunk = Math.min(rem, Math.max(2, Math.ceil(rem / 2)));
+        const chunk = rem <= 3 ? rem : randInt(1, maxChunk);
+        parts.push(chunk);
+        rem -= chunk;
+      }
+      return shuffleInPlace(parts);
+    }
+
+    let sessionItems = [];
+    let roundIndex = 0;
+    let score = 0;
+    let puzzle = null;
+    let rightWeights = [];
+    let roundAwarded = false;
+    let roundSolved = false;
+    let gameComplete = false;
+    let hintLevel = 0;
+
+    const scoreBox = document.getElementById("scoreBox");
+    const roundBadge = document.getElementById("roundBadge");
+    const storyEl = document.getElementById("story");
+    const promptRow = document.getElementById("promptRow");
+    const leftPan = document.getElementById("leftPan");
+    const rightPan = document.getElementById("rightPan");
+    const beam = document.getElementById("beam");
+    const tilesEl = document.getElementById("tiles");
+    const feedbackEl = document.getElementById("feedback");
+    const tryBtn = document.getElementById("tryBtn");
+    const hintBtn = document.getElementById("hintBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const checkBtn = document.getElementById("checkBtn");
+
+    function rightSum() {
+      return rightWeights.reduce(function (a, b) { return a + b; }, 0);
+    }
+
+    function updateScore() {
+      scoreBox.textContent = "Score: " + score + " / " + CONTENT.maxScore;
+    }
+
+    function tiltScale() {
+      if (!puzzle) return;
+      const diff = rightSum() - puzzle.target;
+      let deg = Math.max(-12, Math.min(12, diff * 1.2));
+      if (roundSolved) deg = 0;
+      beam.style.transform = "rotate(" + deg + "deg)";
+      leftPan.style.top = (18 - deg * 1.1) + "px";
+      rightPan.style.top = (18 + deg * 1.1) + "px";
+    }
+
+    function renderPans() {
+      const unit = puzzle.unit;
+      leftPan.innerHTML =
+        '<div class="pan-label">Left (target)</div>' +
+        '<div class="pan-total">' + puzzle.target + " " + unit + "</div>";
+      puzzle.leftParts.forEach(function (w) {
+        const span = document.createElement("span");
+        span.className = "weight fixed";
+        span.textContent = w + " " + unit;
+        leftPan.appendChild(span);
+      });
+
+      rightPan.innerHTML =
+        '<div class="pan-label">Right (you build)</div>' +
+        '<div class="pan-total">' + rightSum() + " " + unit + "</div>";
+      rightWeights.forEach(function (w) {
+        const span = document.createElement("span");
+        span.className = "weight";
+        span.textContent = w + " " + unit;
+        rightPan.appendChild(span);
+      });
+      if (rightWeights.length === 0) {
+        const empty = document.createElement("div");
+        empty.style.fontSize = "0.85rem";
+        empty.style.color = "#78909c";
+        empty.textContent = "Empty — tap tiles below";
+        rightPan.appendChild(empty);
+      }
+      tiltScale();
+    }
+
+    function renderTiles() {
+      tilesEl.innerHTML = "";
+      puzzle.tiles.forEach(function (w) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tile";
+        btn.textContent = w + " " + puzzle.unit;
+        btn.disabled = roundSolved;
+        btn.addEventListener("click", function () {
+          if (roundSolved) return;
+          rightWeights.push(w);
+          feedbackEl.className = "feedback";
+          feedbackEl.textContent = "Added " + w + " " + puzzle.unit + ". Right total: " + rightSum() + " " + puzzle.unit + ".";
+          renderPans();
+        });
+        tilesEl.appendChild(btn);
+      });
+    }
+
+    function materialize(template) {
+      let target = randInt(template.targetMin, template.targetMax);
+      // Ensure target is reachable with available tiles (greedy check with unlimited use)
+      const tiles = template.tiles.slice().sort(function (a, b) { return a - b; });
+      const minTile = tiles[0];
+      if (target % minTile !== 0 && tiles.indexOf(1) === -1) {
+        // nudge target to a reachable sum using small search
+        let found = target;
+        for (let t = template.targetMin; t <= template.targetMax; t++) {
+          if (canMake(t, tiles)) { found = t; break; }
+        }
+        target = found;
+      } else if (!canMake(target, tiles)) {
+        for (let t = target; t <= template.targetMax + 4; t++) {
+          if (canMake(t, tiles)) { target = t; break; }
+        }
+      }
+
+      let leftParts;
+      if (template.leftBlocks === "split") {
+        leftParts = splitTarget(target);
+        if (leftParts.reduce(function (a, b) { return a + b; }, 0) !== target) {
+          leftParts = [target];
+        }
+      } else {
+        leftParts = [target];
+      }
+
+      return {
+        template: template,
+        target: target,
+        tiles: template.tiles.slice(),
+        leftParts: leftParts,
+        unit: template.unit,
+        context: template.context,
+        story: template.story,
+        tip: template.tip
+      };
+    }
+
+    function canMake(n, tiles) {
+      // unbounded knapsack DP for small n
+      const ok = new Array(n + 1).fill(false);
+      ok[0] = true;
+      for (let s = 0; s <= n; s++) {
+        if (!ok[s]) continue;
+        for (let i = 0; i < tiles.length; i++) {
+          const next = s + tiles[i];
+          if (next <= n) ok[next] = true;
+        }
+      }
+      return ok[n];
+    }
+
+    function exampleCombination(target, tilesSortedDesc) {
+      let rem = target;
+      const used = [];
+      const tiles = tilesSortedDesc.slice().sort(function (a, b) { return b - a; });
+      for (let i = 0; i < tiles.length; i++) {
+        while (rem >= tiles[i]) {
+          used.push(tiles[i]);
+          rem -= tiles[i];
+        }
+      }
+      if (rem !== 0) {
+        // fallback: all ones if available
+        if (tiles.indexOf(1) !== -1) {
+          while (rem > 0) { used.push(1); rem--; }
+        }
+      }
+      return used;
+    }
+
+    function loadRound() {
+      roundAwarded = false;
+      roundSolved = false;
+      hintLevel = 0;
+      rightWeights = [];
+      puzzle = materialize(sessionItems[roundIndex]);
+
+      roundBadge.textContent = "Round " + (roundIndex + 1) + " / " + CONTENT.totalRounds;
+      storyEl.textContent = puzzle.story;
+      promptRow.textContent =
+        puzzle.context + " · Target: " + puzzle.target + " " + puzzle.unit +
+        ". Tap tiles, then Check balance.";
+      feedbackEl.className = "feedback";
+      feedbackEl.textContent = "Build the right pan to equal " + puzzle.target + " " + puzzle.unit + ".";
+      nextBtn.classList.remove("show");
+      tryBtn.disabled = false;
+      hintBtn.disabled = false;
+      clearBtn.disabled = false;
+
+      renderPans();
+      renderTiles();
+    }
+
+    function diagnosticFor(diff) {
+      const t = puzzle.target;
+      const r = rightSum();
+      const combo = exampleCombination(t, puzzle.tiles);
+      const comboStr = combo.length
+        ? combo.join(" + ") + " = " + t
+        : "use tiles that add to " + t;
+
+      if (diff === 0) {
+        return CONTENT.hints.equal + " Left = Right = " + t + " " + puzzle.unit +
+          ". Reasoning: " + comboStr + " " + puzzle.unit + " matches the left pan.";
+      }
+      if (diff < 0) {
+        return CONTENT.hints.tooLight +
+          " You have " + r + " " + puzzle.unit + "; need " + t + " " + puzzle.unit +
+          " (short by " + Math.abs(diff) + "). One correct mix: " + comboStr +
+          ". " + puzzle.tip;
+      }
+      return CONTENT.hints.tooHeavy +
+        " You have " + r + " " + puzzle.unit + "; need " + t + " " + puzzle.unit +
+        " (over by " + diff + "). Remove weight or clear and try: " + comboStr +
+        ". " + CONTENT.hints.nearMiss;
+    }
+
+    function checkBalance() {
+      if (!puzzle || roundSolved) return;
+      const diff = rightSum() - puzzle.target;
+      if (diff === 0) {
+        roundSolved = true;
+        if (!roundAwarded) {
+          score += 1;
+          roundAwarded = true;
+          updateScore();
+        }
+        feedbackEl.className = "feedback ok";
+        feedbackEl.innerHTML = diagnosticFor(0);
+        tiltScale();
+        renderTiles();
+        tryBtn.disabled = true;
+
+        if (roundIndex >= CONTENT.totalRounds - 1) {
+          gameComplete = true;
+          checkBtn.disabled = false;
+          feedbackEl.innerHTML += " All puzzles done — tap <strong>Submit score</strong>.";
+        } else {
+          nextBtn.classList.add("show");
+        }
+      } else {
+        feedbackEl.className = "feedback bad";
+        feedbackEl.textContent = diagnosticFor(diff);
+        tiltScale();
+      }
+    }
+
+    function showHint() {
+      if (!puzzle || roundSolved) return;
+      hintLevel += 1;
+      const combo = exampleCombination(puzzle.target, puzzle.tiles);
+      let msg = CONTENT.hints.strategy + " " + puzzle.tip;
+      if (hintLevel >= 2) {
+        msg += " Target is <span class=\"sum-chip\">" + puzzle.target + " " + puzzle.unit +
+          "</span>. Try something like " + combo.join(" + ") + ".";
+      } else if (rightSum() > 0) {
+        const diff = rightSum() - puzzle.target;
+        if (diff < 0) msg = CONTENT.hints.tooLight + " You still need " + Math.abs(diff) + " " + puzzle.unit + " more.";
+        else if (diff > 0) msg = CONTENT.hints.tooHeavy + " You are " + diff + " " + puzzle.unit + " over.";
+        else msg = CONTENT.hints.equal;
+      }
+      feedbackEl.className = "feedback";
+      feedbackEl.innerHTML = msg;
+    }
+
+    function clearRight() {
+      if (roundSolved) return;
+      rightWeights = [];
+      feedbackEl.className = "feedback";
+      feedbackEl.textContent = "Right pan cleared. Build again toward " + puzzle.target + " " + puzzle.unit + ".";
+      renderPans();
+    }
+
+    function goNext() {
+      if (!roundSolved || roundIndex >= CONTENT.totalRounds - 1) return;
+      roundIndex += 1;
+      loadRound();
+    }
+
+    function submitFinal() {
+      if (!gameComplete) return;
+      const finalScore = score;
+      const maxScore = CONTENT.maxScore;
+      feedbackEl.className = "feedback ok";
+      feedbackEl.textContent = "Lab complete! Final score: " + finalScore + " / " + maxScore + ".";
+      if (window.gameScoreSubmit) {
+        window.gameScoreSubmit(finalScore, maxScore);
+      } else if (window.parent && window.parent.submitGameScore) {
+        const gameIdMatch = window.location.pathname.match(/\/play-game\/(\d+)/);
+        if (gameIdMatch) window.parent.submitGameScore(parseInt(gameIdMatch[1]), finalScore, maxScore);
+      }
+    }
+
+    tryBtn.addEventListener("click", checkBalance);
+    hintBtn.addEventListener("click", showHint);
+    clearBtn.addEventListener("click", clearRight);
+    nextBtn.addEventListener("click", goNext);
+    checkBtn.addEventListener("click", submitFinal);
+
+    function startGame() {
+      sessionItems = initializeGameSession(CONTENT.questionPool);
+      roundIndex = 0;
+      score = 0;
+      gameComplete = false;
+      checkBtn.disabled = true;
+      updateScore();
+      loadRound();
+    }
+
+    startGame();
+  </script>
+</body>
+</html>

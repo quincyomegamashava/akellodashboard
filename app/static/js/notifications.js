@@ -30,6 +30,9 @@ function pmNotificationIcon(type) {
     if (type && type.startsWith('meeting_')) return 'clipboard-list';
     if (type === 'assignment') return 'user-plus';
     if (type === 'resolution') return 'check-circle';
+    if (type === 'helpdesk_sla_breach') return 'exclamation-triangle';
+    if (type === 'helpdesk_mention') return 'at';
+    if (type === 'helpdesk_reply') return 'comment';
     return 'bell';
 }
 
@@ -38,7 +41,12 @@ function pmNotificationHref(notif) {
     if (t.startsWith('pm_') && notif.pm_project_id && notif.task_id) {
         return `/projectmanagement?project=${notif.pm_project_id}&task=${notif.task_id}`;
     }
-    if (notif.query_id) return `/help-desk?query=${notif.query_id}`;
+    if (t && t.startsWith('meeting_') && notif.meeting_note_id) {
+        let href = `/meeting-notes/${notif.meeting_note_id}?view=board`;
+        if (notif.action_item_id) href += `&highlight=${notif.action_item_id}`;
+        return href;
+    }
+    if (notif.query_id) return `/help-desk/${notif.query_id}`;
     return null;
 }
 

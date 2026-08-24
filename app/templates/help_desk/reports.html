@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Help Desk — Reports{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/help_desk.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="hd-app-shell">
+  <div class="hd-page">
+    <header class="hd-subheader">
+      <h1 class="hd-hero-title mb-0">Reports</h1>
+      <p class="hd-hero-sub">Volume, resolution time, SLA, and CSAT.</p>
+      {% set hd_active = 'reports' %}
+      {% include "help_desk/_subnav.html" %}
+    </header>
+    <div class="hd-report-stats" id="hd-report-stats"></div>
+    <div class="row g-3 mt-1">
+      <div class="col-lg-7">
+        <div class="hub-glass p-3"><canvas id="hd-chart-volume" height="140"></canvas></div>
+      </div>
+      <div class="col-lg-5">
+        <div class="hub-glass p-3"><canvas id="hd-chart-category" height="140"></canvas></div>
+      </div>
+    </div>
+  </div>
+  {% include "help_desk/_app_shell.html" %}
+  {% include "help_desk/_new_ticket_modal.html" %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/help_desk.js') }}"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { HD.initReports(); });</script>
+{% endblock %}

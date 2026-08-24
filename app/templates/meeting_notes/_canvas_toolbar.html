@@ -1,0 +1,28 @@
+{# Shared canvas toolbar. Set mn_show_col_presets / mn_show_priority_group before include. #}
+{% include "meeting_notes/_filter_offcanvas.html" %}
+<div class="mn-canvas-toolbar mn-toolbar">
+  <div class="mn-canvas-toolbar-left">
+    <div class="mn-view-pills" role="group" aria-label="View">
+      <button type="button" class="btn active" data-mn-view-btn="board">Board</button>
+      <button type="button" class="btn" data-mn-view-btn="table">Table</button>
+      <button type="button" class="btn" data-mn-view-btn="calendar">Calendar</button>
+      <button type="button" class="btn" data-mn-view-btn="gantt">Gantt</button>
+    </div>
+    <button type="button" class="btn btn-sm mn-btn-ghost d-md-none" data-bs-toggle="offcanvas" data-bs-target="#mn-filter-sheet" aria-controls="mn-filter-sheet">
+      <i class="fas fa-filter me-1"></i>Filters
+    </button>
+    {% if mn_show_col_presets %}
+    <div class="mn-view-pills d-none d-md-flex" role="group" aria-label="Column preset">
+      <button type="button" class="btn" data-mn-col-preset="minutes">Minutes</button>
+      <button type="button" class="btn active" data-mn-col-preset="full">Full</button>
+    </div>
+    {% endif %}
+    <div class="mn-view-pills mn-board-group-pills d-none d-md-flex" id="mn-board-group-toggle" role="group" aria-label="Group by">
+      <button type="button" class="btn active" data-mn-board-group="status">By status</button>
+      <button type="button" class="btn" data-mn-board-group="platform">By platform</button>
+      {% if mn_show_priority_group %}
+      <button type="button" class="btn" data-mn-board-group="priority">By priority</button>
+      {% endif %}
+    </div>
+  </div>
+</div>

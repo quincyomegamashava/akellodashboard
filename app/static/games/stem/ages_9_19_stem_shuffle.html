@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HBC: Mixed Learning Shuffle</title>
+  <style>
+    :root {
+      --bg1: #eef6fb;
+      --bg2: #f4f7f2;
+      --ink: #1a2b3c;
+      --muted: #5a6b7c;
+      --card: #ffffff;
+      --line: #d5e0ea;
+      --accent: #1b6ca8;
+      --accent-soft: #e3f0f9;
+      --ok: #2e7d32;
+      --ok-bg: #e8f5e9;
+      --bad: #c62828;
+      --bad-bg: #ffebee;
+      --hint: #ef6c00;
+      --shadow: 0 8px 24px rgba(27, 108, 168, 0.08);
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse at 10% 0%, #d9ecf8 0%, transparent 45%),
+        radial-gradient(ellipse at 90% 10%, #e4f0e4 0%, transparent 40%),
+        linear-gradient(165deg, var(--bg1), var(--bg2));
+      line-height: 1.45;
+    }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 16px; }
+    header {
+      display: flex; justify-content: space-between; gap: 12px;
+      flex-wrap: wrap; align-items: flex-start; margin-bottom: 10px;
+    }
+    h1 { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; }
+    .sub { color: var(--muted); font-size: 0.95rem; max-width: 52ch; margin-top: 4px; }
+    #scoreBox {
+      background: var(--card); padding: 10px 16px; border-radius: 999px;
+      font-weight: 800; border: 1px solid var(--line); box-shadow: var(--shadow);
+      white-space: nowrap;
+    }
+    .meta {
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      margin: 8px 0 12px; font-size: 0.82rem; color: var(--muted);
+    }
+    .chip {
+      background: var(--accent-soft); color: var(--accent); border-radius: 999px;
+      padding: 4px 10px; font-weight: 700;
+    }
+    .progress { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    .pip {
+      width: 28px; height: 8px; border-radius: 99px; background: #cfd8dc;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .pip.on { background: var(--accent); transform: scaleY(1.25); }
+    .pip.done { background: var(--ok); }
+    .pip.miss { background: #ef9a9a; }
+    .lab {
+      background: var(--card); padding: 18px; border-radius: var(--radius);
+      border: 1px solid var(--line); box-shadow: var(--shadow);
+    }
+    .tag {
+      display: inline-block; border-radius: 999px; padding: 3px 10px;
+      font-size: 0.78rem; font-weight: 800; background: var(--accent-soft); color: var(--accent);
+    }
+    #prompt { margin: 12px 0 10px; font-size: 1.15rem; line-height: 1.4; font-weight: 700; }
+    .workspace { min-height: 120px; margin-bottom: 10px; }
+    .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .choice {
+      min-height: 56px; padding: 12px; border: 2px solid var(--line); border-radius: 12px;
+      background: #f8fbfd; font-weight: 700; cursor: pointer; font-size: 1rem;
+      text-align: left; color: var(--ink); transition: border-color 0.15s, background 0.15s, transform 0.12s;
+    }
+    .choice:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .choice.sel { border-color: var(--accent); background: var(--accent-soft); }
+    .choice.ok { border-color: var(--ok); background: var(--ok-bg); }
+    .choice.bad { border-color: var(--bad); background: var(--bad-bg); }
+    .choice:disabled { cursor: default; opacity: 0.95; }
+    .numeric-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .numeric-row input {
+      flex: 1; min-width: 140px; padding: 12px 14px; border: 2px solid var(--line);
+      border-radius: 12px; font-size: 1.1rem; font-weight: 700;
+    }
+    .numeric-row input:focus { outline: none; border-color: var(--accent); }
+    .match {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    }
+    .match-col { display: flex; flex-direction: column; gap: 8px; }
+    .match-col h3 {
+      font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--muted); margin-bottom: 2px;
+    }
+    .match-item {
+      min-height: 48px; border-radius: 10px; border: 2px dashed #90caf9;
+      background: #fff; font-weight: 700; cursor: pointer; padding: 10px; text-align: left;
+      color: var(--ink);
+    }
+    .match-item.sel { background: #bbdefb; border-style: solid; border-color: var(--accent); }
+    .match-item.paired { opacity: 0.45; border-style: solid; border-color: var(--ok); }
+    .match-item.wrong-flash { border-color: var(--bad); background: var(--bad-bg); }
+    .diag {
+      margin-top: 8px; padding: 12px; border-radius: 10px; background: #f4f7fa;
+      border: 1px solid var(--line); font-size: 0.92rem; min-height: 56px; line-height: 1.5;
+    }
+    .diag.ok { background: var(--ok-bg); border-color: #a5d6a7; }
+    .diag.bad { background: #fff8f0; border-color: #ffcc80; }
+    .nudge { min-height: 22px; font-weight: 700; color: var(--hint); font-size: 0.92rem; margin-top: 6px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    .act {
+      min-height: 46px; padding: 10px 16px; border: none; border-radius: 12px;
+      font-weight: 800; cursor: pointer; font-size: 0.95rem;
+    }
+    #hintBtn { background: #eceff1; color: var(--ink); }
+    #checkAnsBtn { background: #43a047; color: #fff; }
+    #checkAnsBtn:disabled, #nextBtn:disabled, #checkBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+    #nextBtn { background: var(--accent); color: #fff; }
+    #checkBtn { background: #0d47a1; color: #fff; }
+    #restartBtn { background: #fff; border: 2px solid var(--line); color: var(--ink); display: none; }
+    .review { display: none; margin-top: 14px; }
+    .review.show { display: block; }
+    .review h2 { font-size: 1.05rem; margin-bottom: 8px; }
+    .rev-item {
+      border: 1px solid var(--line); border-radius: 10px; padding: 10px;
+      margin: 8px 0; font-size: 0.9rem; line-height: 1.4;
+    }
+    .rev-item.ok { border-color: #a5d6a7; background: var(--ok-bg); }
+    .rev-item.bad { border-color: #ef9a9a; background: var(--bad-bg); }
+    .rev-item strong { display: block; margin-bottom: 4px; }
+    @media (max-width: 600px) {
+      .choices, .match { grid-template-columns: 1fr; }
+      h1 { font-size: 1.25rem; }
+      #prompt { font-size: 1.05rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>HBC: Mixed Learning Shuffle</h1>
+        <p class="sub">Cross-age numeracy with Zimbabwean market, school, and farm contexts. Mixed MCQ, numeric, and match rounds — guided hints, then a full results review on submit.</p>
+      </div>
+      <div id="scoreBox">Score: 0 / 10</div>
+    </header>
+    <div class="meta">
+      <span class="chip" id="areaChip">Mathematics</span>
+      <span id="roundLabel">Round 1 / 10</span>
+      <span>· Ages 9–19</span>
+    </div>
+    <div class="progress" id="progress" aria-label="Round progress"></div>
+    <div class="lab" id="playLab">
+      <span class="tag" id="typeTag">MCQ</span>
+      <h2 id="prompt"></h2>
+      <div class="workspace" id="workspace"></div>
+      <div class="diag" id="diag" aria-live="polite"></div>
+      <p class="nudge" id="nudge"></p>
+      <div class="actions">
+        <button type="button" class="act" id="hintBtn">Show hint</button>
+        <button type="button" class="act" id="checkAnsBtn">Check answer</button>
+        <button type="button" class="act" id="nextBtn" disabled>Next round</button>
+        <button type="button" class="act" id="checkBtn" disabled>Submit score</button>
+        <button type="button" class="act" id="restartBtn">Play again</button>
+      </div>
+      <div class="review" id="review">
+        <h2>Results review</h2>
+        <div id="reviewList"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const CONTENT = {
+      learningArea: "Mathematics",
+      topic: "Cross-age numeracy — area, percentages, ratios, simple interest, averages with Zimbabwean market/school/farm contexts",
+      ageRange: "9-19",
+      totalRounds: 10,
+      maxScore: 10,
+      questionPool: [
+        {
+          id: "rect_area_plot",
+          type: "mcq",
+          skill: "area",
+          build: function () {
+            var L = ri(8, 24), W = ri(4, 14);
+            var ans = L * W;
+            var ctx = pick(["Mbare market garden plot", "Mutare school sports strip", "Gweru maize nursery bed"]);
+            return {
+              prompt: "A " + ctx + " is a rectangle " + L + " m by " + W + " m. What is its area in m²?",
+              answer: ans,
+              choices: shuffleUnique([ans, L + W, 2 * (L + W), L * W + L]),
+              steps: "Area of rectangle = length × width = " + L + " × " + W + " = " + ans + " m².",
+              distractors: {
+                perimeter: { value: 2 * (L + W), msg: "You found the perimeter 2(L+W), not area L×W." },
+                sum: { value: L + W, msg: "You added L+W instead of multiplying." },
+                extra: { value: L * W + L, msg: "You added an extra length after multiplying." }
+              },
+              hintKey: "area_rect"
+            };
+          }
+        },
+        {
+          id: "pct_discount_market",
+          type: "mcq",
+          skill: "percentages",
+          build: function () {
+            var price = ri(5, 20) * 100;
+            var pct = pick([10, 15, 20, 25]);
+            var save = Math.round(price * pct / 100);
+            var ans = price - save;
+            var ctx = pick(["tomatoes in Sakubva", "school shoes in Bulawayo CBD", "mealie-meal at a Harare tuckshop"]);
+            return {
+              prompt: "A bag of " + ctx + " costs $" + price + ". With a " + pct + "% discount, what do you pay?",
+              answer: ans,
+              choices: shuffleUnique([ans, save, price + save, Math.round(price * (100 + pct) / 100)]),
+              steps: "Discount = " + pct + "% of " + price + " = " + save + ". Pay = " + price + " − " + save + " = " + ans + ".",
+              distractors: {
+                onlySave: { value: save, msg: "That is only the discount amount, not the final price." },
+                markup: { value: price + save, msg: "You added the discount instead of subtracting it." },
+                increase: { value: Math.round(price * (100 + pct) / 100), msg: "You applied a percentage increase, not a discount." }
+              },
+              hintKey: "pct_discount"
+            };
+          }
+        },
+        {
+          id: "ratio_shares_farm",
+          type: "numeric",
+          skill: "ratios",
+          build: function () {
+            var a = ri(2, 5), b = ri(2, 5);
+            if (a === b) b += 1;
+            var totalParts = a + b;
+            var bag = totalParts * ri(4, 9);
+            var ans = (bag / totalParts) * a;
+            var crop = pick(["groundnuts", "sorghum", "tobacco leaf bales"]);
+            return {
+              prompt: "On a Chegutu farm, " + crop + " are shared in the ratio " + a + ":" + b + " between two co-ops. If there are " + bag + " kg in total, how many kg does the first co-op get?",
+              answer: ans,
+              tolerance: 0.01,
+              steps: "Parts = " + a + "+" + b + "=" + totalParts + ". One part = " + bag + "/" + totalParts + "=" + (bag / totalParts) + " kg. First share = " + a + "×" + (bag / totalParts) + "=" + ans + " kg.",
+              commonWrong: [
+                { value: (bag / totalParts) * b, msg: "You gave the second co-op's share (ratio part " + b + ")." },
+                { value: bag / a, msg: "You divided the total by " + a + " only — use total parts " + totalParts + "." },
+                { value: a / b * bag, msg: "You multiplied by a/b instead of a/(a+b)." }
+              ],
+              hintKey: "ratio_share"
+            };
+          }
+        },
+        {
+          id: "simple_interest_school",
+          type: "mcq",
+          skill: "simple_interest",
+          build: function () {
+            var P = ri(5, 20) * 100;
+            var R = pick([5, 8, 10, 12]);
+            var T = ri(2, 4);
+            var I = Math.round(P * R * T / 100);
+            var amount = P + I;
+            return {
+              prompt: "A Mutoko school savings club invests $" + P + " at " + R + "% simple interest per year for " + T + " years. What is the interest earned (not the total amount)?",
+              answer: I,
+              choices: shuffleUnique([I, amount, Math.round(P * R / 100), Math.round(P * R * T)]),
+              steps: "I = PRT/100 = " + P + "×" + R + "×" + T + "/100 = " + I + ".",
+              distractors: {
+                amount: { value: amount, msg: "That is principal + interest (amount), not interest alone." },
+                oneYear: { value: Math.round(P * R / 100), msg: "You calculated one year of interest and forgot T." },
+                no100: { value: Math.round(P * R * T), msg: "You forgot to divide by 100 in I = PRT/100." }
+              },
+              hintKey: "simple_interest"
+            };
+          }
+        },
+        {
+          id: "average_marks",
+          type: "numeric",
+          skill: "averages",
+          build: function () {
+            var n = ri(4, 6);
+            var marks = [];
+            var sum = 0;
+            for (var i = 0; i < n; i++) {
+              var m = ri(45, 95);
+              marks.push(m);
+              sum += m;
+            }
+            var ans = Math.round((sum / n) * 100) / 100;
+            return {
+              prompt: "Class 3A at a Masvingo day school scored " + marks.join(", ") + " in a Mathematics quiz. What is the mean mark?",
+              answer: ans,
+              tolerance: 0.05,
+              steps: "Mean = (" + marks.join(" + ") + ") / " + n + " = " + sum + " / " + n + " = " + ans + ".",
+              commonWrong: [
+                { value: sum, msg: "That is the total, not the mean — divide by " + n + "." },
+                { value: Math.max.apply(null, marks), msg: "That is the highest mark, not the average." },
+                { value: Math.round(sum / (n - 1) * 100) / 100, msg: "You divided by " + (n - 1) + " instead of " + n + "." }
+              ],
+              hintKey: "mean"
+            };
+          }
+        },
+        {
+          id: "pct_of_quantity",
+          type: "mcq",
+          skill: "percentages",
+          build: function () {
+            var whole = ri(8, 25) * 10;
+            var pct = pick([20, 25, 30, 40, 50]);
+            var ans = Math.round(whole * pct / 100);
+            var crop = pick(["kg of maize", "litres of milk", "bundles of rape"]);
+            return {
+              prompt: "A Bindura farmer keeps " + pct + "% of " + whole + " " + crop + " for home use. How many units are kept?",
+              answer: ans,
+              choices: shuffleUnique([ans, whole - ans, Math.round(whole / pct), whole + ans]),
+              steps: pct + "% of " + whole + " = (" + pct + "/100)×" + whole + " = " + ans + ".",
+              distractors: {
+                complement: { value: whole - ans, msg: "That is the remaining (" + (100 - pct) + "%), not the home share." },
+                invert: { value: Math.round(whole / pct), msg: "You divided by the percentage instead of multiplying by pct/100." },
+                add: { value: whole + ans, msg: "You added the percentage amount to the whole." }
+              },
+              hintKey: "pct_of"
+            };
+          }
+        },
+        {
+          id: "triangle_area_garden",
+          type: "numeric",
+          skill: "area",
+          build: function () {
+            var b = ri(6, 18) * 2;
+            var h = ri(4, 12);
+            var ans = (b * h) / 2;
+            return {
+              prompt: "A triangular flower bed at Victoria Falls Primary has base " + b + " m and height " + h + " m. Area (m²)?",
+              answer: ans,
+              tolerance: 0.01,
+              steps: "Area of triangle = ½ × base × height = ½ × " + b + " × " + h + " = " + ans + " m².",
+              commonWrong: [
+                { value: b * h, msg: "You used base×height without the ½ for a triangle." },
+                { value: 2 * (b + h), msg: "That resembles a perimeter-style expression, not triangular area." },
+                { value: (b + h) / 2, msg: "You averaged base and height instead of using ½bh." }
+              ],
+              hintKey: "area_tri"
+            };
+          }
+        },
+        {
+          id: "ratio_recipe_sadza",
+          type: "match",
+          skill: "ratios",
+          build: function () {
+            var mealie = ri(2, 5);
+            var water = mealie * pick([2, 3]);
+            var salt = 1;
+            var left = [
+              { id: "mealie", label: "Mealie meal parts: " + mealie },
+              { id: "water", label: "Water parts: " + water },
+              { id: "salt", label: "Salt parts: " + salt }
+            ];
+            var right = shuffleArr([
+              { id: "mealie", label: "Ratio share for mealie meal" },
+              { id: "water", label: "Ratio share for water" },
+              { id: "salt", label: "Ratio share for salt" }
+            ]);
+            return {
+              prompt: "A Chitungwiza cooking club mixes sadza mealie meal : water : salt = " + mealie + ":" + water + ":" + salt + ". Match each quantity to its role in the ratio.",
+              pairs: { mealie: "mealie", water: "water", salt: "salt" },
+              left: left,
+              right: right,
+              steps: "In the ratio " + mealie + ":" + water + ":" + salt + ", mealie meal has " + mealie + " parts, water " + water + " parts, salt " + salt + " part.",
+              hintKey: "ratio_match"
+            };
+          }
+        },
+        {
+          id: "unit_rate_kombi",
+          type: "mcq",
+          skill: "ratios",
+          build: function () {
+            var fare = ri(2, 5) * 50;
+            var seats = pick([12, 14, 15, 18]);
+            var ans = Math.round((fare / seats) * 100) / 100;
+            var displayAns = Number.isInteger(ans) ? ans : ans;
+            return {
+              prompt: "A kombi from Mbare to Epworth collects $" + fare + " from " + seats + " passengers (equal fares). What is each passenger's fare?",
+              answer: displayAns,
+              choices: shuffleUnique([displayAns, fare * seats, fare - seats, Math.round(fare / (seats / 2))]),
+              steps: "Unit rate = total ÷ count = " + fare + " ÷ " + seats + " = " + displayAns + ".",
+              distractors: {
+                product: { value: fare * seats, msg: "You multiplied instead of dividing for a unit rate." },
+                diff: { value: fare - seats, msg: "Subtracting seats from money is not a unit rate." },
+                half: { value: Math.round(fare / (seats / 2)), msg: "You used half the passengers by mistake." }
+              },
+              hintKey: "unit_rate"
+            };
+          }
+        },
+        {
+          id: "pct_increase_fees",
+          type: "numeric",
+          skill: "percentages",
+          build: function () {
+            var oldF = ri(10, 40) * 10;
+            var pct = pick([5, 10, 15, 20]);
+            var ans = oldF + Math.round(oldF * pct / 100);
+            return {
+              prompt: "School fees at a Kwekwe secondary were $" + oldF + ". They rise by " + pct + "%. What is the new fee?",
+              answer: ans,
+              tolerance: 0.01,
+              steps: "Increase = " + pct + "% of " + oldF + " = " + Math.round(oldF * pct / 100) + ". New = " + oldF + " + increase = " + ans + ".",
+              commonWrong: [
+                { value: Math.round(oldF * pct / 100), msg: "That is only the increase, not the new fee." },
+                { value: oldF - Math.round(oldF * pct / 100), msg: "You decreased instead of increasing." },
+                { value: Math.round(oldF * (100 - pct) / 100), msg: "You applied a percentage decrease." }
+              ],
+              hintKey: "pct_increase"
+            };
+          }
+        },
+        {
+          id: "compound_avg_interest_check",
+          type: "mcq",
+          skill: "averages",
+          build: function () {
+            var a = ri(60, 90), b = ri(50, 85), c = ri(55, 95);
+            var ans = Math.round(((a + b + c) / 3) * 10) / 10;
+            var opts = shuffleUnique([
+              ans,
+              Math.round(((a + b) / 2) * 10) / 10,
+              a + b + c,
+              Math.round(((a + b + c) / 2) * 10) / 10
+            ]);
+            return {
+              prompt: "Three cricket scores at a Harare high-school match were " + a + ", " + b + ", and " + c + ". Mean score?",
+              answer: ans,
+              choices: opts,
+              steps: "Mean = (" + a + "+" + b + "+" + c + ")/3 = " + (a + b + c) + "/3 = " + ans + ".",
+              distractors: {
+                twoOnly: { value: Math.round(((a + b) / 2) * 10) / 10, msg: "You averaged only the first two scores." },
+                total: { value: a + b + c, msg: "That is the sum, not the mean." },
+                div2: { value: Math.round(((a + b + c) / 2) * 10) / 10, msg: "You divided by 2 instead of 3." }
+              },
+              hintKey: "mean"
+            };
+          }
+        },
+        {
+          id: "si_amount_total",
+          type: "numeric",
+          skill: "simple_interest",
+          build: function () {
+            var P = ri(8, 25) * 100;
+            var R = pick([6, 8, 10]);
+            var T = ri(1, 3);
+            var I = Math.round(P * R * T / 100);
+            var ans = P + I;
+            return {
+              prompt: "A Gokwe co-operative loans $" + P + " at " + R + "% simple interest for " + T + " year(s). What total amount must be repaid?",
+              answer: ans,
+              tolerance: 0.01,
+              steps: "I = PRT/100 = " + I + ". Amount A = P + I = " + P + " + " + I + " = " + ans + ".",
+              commonWrong: [
+                { value: I, msg: "That is interest only — add the principal for the amount." },
+                { value: P * R * T / 10, msg: "Check the /100 in I = PRT/100." },
+                { value: P - I, msg: "You subtracted interest; repayment is P + I." }
+              ],
+              hintKey: "simple_interest"
+            };
+          }
+        }
+      ],
+      hints: {
+        area_rect: "Rectangle area is length × width. Perimeter uses 2(L+W) — do not mix them.",
+        area_tri: "Triangle area is ½ × base × height. Missing the ½ is the most common slip.",
+        pct_discount: "Discounted price = original − (pct/100)×original.",
+        pct_of: "‘R% of N’ means (R/100)×N.",
+        pct_increase: "New value = old + (pct/100)×old = old×(1 + pct/100).",
+        ratio_share: "Share = (own parts ÷ total parts) × whole quantity.",
+        ratio_match: "Each number in a:b:c is that item's share of the whole ratio.",
+        simple_interest: "I = PRT/100. Amount A = P + I.",
+        mean: "Mean = sum of values ÷ how many values.",
+        unit_rate: "Unit rate = total quantity ÷ number of equal parts (e.g. passengers)."
+      }
+    };
+
+    function ri(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+    function shuffleArr(arr) {
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a;
+    }
+    function shuffleUnique(arr) {
+      return shuffleArr(arr.filter(function (v, i, a) { return a.indexOf(v) === i; }));
+    }
+    function nearlyEqual(a, b, tol) {
+      return Math.abs(Number(a) - Number(b)) <= (tol == null ? 0.01 : tol);
+    }
+
+    function initializeGameSession(pool) {
+      var shuffledPool = pool.slice();
+      for (var i = shuffledPool.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = shuffledPool[i];
+        shuffledPool[i] = shuffledPool[j];
+        shuffledPool[j] = tmp;
+      }
+      return shuffledPool.slice(0, CONTENT.totalRounds);
+    }
+
+    var state = {
+      session: [],
+      index: 0,
+      score: 0,
+      finished: false,
+      locked: false,
+      current: null,
+      selected: null,
+      matchPairs: {},
+      matchSelLeft: null,
+      review: [],
+      hintUsed: false
+    };
+
+    var els = {
+      scoreBox: document.getElementById("scoreBox"),
+      progress: document.getElementById("progress"),
+      roundLabel: document.getElementById("roundLabel"),
+      typeTag: document.getElementById("typeTag"),
+      prompt: document.getElementById("prompt"),
+      workspace: document.getElementById("workspace"),
+      diag: document.getElementById("diag"),
+      nudge: document.getElementById("nudge"),
+      hintBtn: document.getElementById("hintBtn"),
+      checkAnsBtn: document.getElementById("checkAnsBtn"),
+      nextBtn: document.getElementById("nextBtn"),
+      checkBtn: document.getElementById("checkBtn"),
+      restartBtn: document.getElementById("restartBtn"),
+      review: document.getElementById("review"),
+      reviewList: document.getElementById("reviewList")
+    };
+
+    function updateScore() {
+      els.scoreBox.textContent = "Score: " + state.score + " / " + CONTENT.maxScore;
+    }
+
+    function renderPips() {
+      els.progress.innerHTML = "";
+      for (var i = 0; i < CONTENT.totalRounds; i++) {
+        var pip = document.createElement("div");
+        pip.className = "pip";
+        if (i < state.index) {
+          var rev = state.review[i];
+          pip.classList.add(rev && rev.correct ? "done" : "miss");
+        } else if (i === state.index && !state.finished) {
+          pip.classList.add("on");
+        }
+        els.progress.appendChild(pip);
+      }
+    }
+
+    function startGame() {
+      state.session = initializeGameSession(CONTENT.questionPool);
+      state.index = 0;
+      state.score = 0;
+      state.finished = false;
+      state.review = [];
+      els.checkBtn.disabled = true;
+      els.restartBtn.style.display = "none";
+      els.review.classList.remove("show");
+      els.reviewList.innerHTML = "";
+      updateScore();
+      loadRound();
+    }
+
+    function loadRound() {
+      state.locked = false;
+      state.selected = null;
+      state.matchPairs = {};
+      state.matchSelLeft = null;
+      state.hintUsed = false;
+      els.nudge.textContent = "";
+      els.diag.textContent = "Choose or enter an answer, then press Check answer.";
+      els.diag.className = "diag";
+      els.nextBtn.disabled = true;
+      els.checkAnsBtn.disabled = false;
+      els.hintBtn.disabled = false;
+
+      var tpl = state.session[state.index];
+      var built = tpl.build();
+      built.id = tpl.id;
+      built.type = tpl.type;
+      built.skill = tpl.skill;
+      state.current = built;
+
+      els.roundLabel.textContent = "Round " + (state.index + 1) + " / " + CONTENT.totalRounds;
+      els.typeTag.textContent = tpl.type === "mcq" ? "Multiple choice" : tpl.type === "numeric" ? "Numeric" : "Match";
+      els.prompt.textContent = built.prompt;
+      renderPips();
+      renderWorkspace(built);
+    }
+
+    function renderWorkspace(q) {
+      els.workspace.innerHTML = "";
+      if (q.type === "mcq") {
+        var grid = document.createElement("div");
+        grid.className = "choices";
+        q.choices.forEach(function (c) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "choice";
+          btn.textContent = String(c);
+          btn.addEventListener("click", function () {
+            if (state.locked) return;
+            state.selected = c;
+            Array.prototype.forEach.call(grid.querySelectorAll(".choice"), function (b) {
+              b.classList.remove("sel");
+            });
+            btn.classList.add("sel");
+          });
+          grid.appendChild(btn);
+        });
+        els.workspace.appendChild(grid);
+      } else if (q.type === "numeric") {
+        var row = document.createElement("div");
+        row.className = "numeric-row";
+        var inp = document.createElement("input");
+        inp.type = "number";
+        inp.id = "numAns";
+        inp.step = "any";
+        inp.placeholder = "Type your answer";
+        inp.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") { e.preventDefault(); checkAnswer(); }
+        });
+        row.appendChild(inp);
+        els.workspace.appendChild(row);
+        setTimeout(function () { inp.focus(); }, 50);
+      } else if (q.type === "match") {
+        var wrap = document.createElement("div");
+        wrap.className = "match";
+        var leftCol = document.createElement("div");
+        leftCol.className = "match-col";
+        leftCol.innerHTML = "<h3>Quantities</h3>";
+        var rightCol = document.createElement("div");
+        rightCol.className = "match-col";
+        rightCol.innerHTML = "<h3>Roles</h3>";
+
+        q.left.forEach(function (item) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "match-item";
+          b.dataset.side = "left";
+          b.dataset.id = item.id;
+          b.textContent = item.label;
+          b.addEventListener("click", function () { onMatchClick(b); });
+          leftCol.appendChild(b);
+        });
+        q.right.forEach(function (item) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "match-item";
+          b.dataset.side = "right";
+          b.dataset.id = item.id;
+          b.textContent = item.label;
+          b.addEventListener("click", function () { onMatchClick(b); });
+          rightCol.appendChild(b);
+        });
+        wrap.appendChild(leftCol);
+        wrap.appendChild(rightCol);
+        els.workspace.appendChild(wrap);
+      }
+    }
+
+    function onMatchClick(btn) {
+      if (state.locked) return;
+      var side = btn.dataset.side;
+      var id = btn.dataset.id;
+      if (btn.classList.contains("paired")) return;
+
+      if (side === "left") {
+        Array.prototype.forEach.call(els.workspace.querySelectorAll('.match-item[data-side="left"]'), function (b) {
+          if (!b.classList.contains("paired")) b.classList.remove("sel");
+        });
+        btn.classList.add("sel");
+        state.matchSelLeft = id;
+      } else if (state.matchSelLeft) {
+        var leftId = state.matchSelLeft;
+        var expected = state.current.pairs[leftId];
+        if (expected === id) {
+          state.matchPairs[leftId] = id;
+          markPaired(leftId, id);
+          state.matchSelLeft = null;
+          els.nudge.textContent = "Pair locked. Match the rest, then Check answer.";
+        } else {
+          btn.classList.add("wrong-flash");
+          setTimeout(function () { btn.classList.remove("wrong-flash"); }, 400);
+          els.nudge.textContent = "Those do not match — try another pairing.";
+          state.matchSelLeft = null;
+          Array.prototype.forEach.call(els.workspace.querySelectorAll(".match-item.sel"), function (b) {
+            b.classList.remove("sel");
+          });
+        }
+      }
+    }
+
+    function markPaired(leftId, rightId) {
+      Array.prototype.forEach.call(els.workspace.querySelectorAll(".match-item"), function (b) {
+        if ((b.dataset.side === "left" && b.dataset.id === leftId) ||
+            (b.dataset.side === "right" && b.dataset.id === rightId)) {
+          b.classList.add("paired");
+          b.classList.remove("sel");
+          b.disabled = true;
+        }
+      });
+    }
+
+    function diagnoseWrong(q, given) {
+      if (q.type === "mcq" && q.distractors) {
+        for (var key in q.distractors) {
+          if (Object.prototype.hasOwnProperty.call(q.distractors, key)) {
+            if (nearlyEqual(q.distractors[key].value, given, 0.01)) {
+              return q.distractors[key].msg;
+            }
+          }
+        }
+      }
+      if (q.type === "numeric" && q.commonWrong) {
+        for (var i = 0; i < q.commonWrong.length; i++) {
+          if (nearlyEqual(q.commonWrong[i].value, given, q.tolerance || 0.05)) {
+            return q.commonWrong[i].msg;
+          }
+        }
+      }
+      if (q.type === "match") {
+        return "One or more pairs were incomplete or incorrect — each quantity maps to exactly one role.";
+      }
+      return "Your value does not match the worked method below.";
+    }
+
+    function checkAnswer() {
+      if (state.locked || state.finished) return;
+      var q = state.current;
+      var correct = false;
+      var given = null;
+
+      if (q.type === "mcq") {
+        if (state.selected == null) {
+          els.nudge.textContent = "Select an option first.";
+          return;
+        }
+        given = state.selected;
+        correct = nearlyEqual(given, q.answer, 0.01);
+        Array.prototype.forEach.call(els.workspace.querySelectorAll(".choice"), function (b) {
+          b.disabled = true;
+          var val = b.textContent;
+          if (nearlyEqual(val, q.answer, 0.01)) b.classList.add("ok");
+          if (b.classList.contains("sel") && !correct) b.classList.add("bad");
+        });
+      } else if (q.type === "numeric") {
+        var inp = document.getElementById("numAns");
+        if (!inp || inp.value === "") {
+          els.nudge.textContent = "Enter a number first.";
+          return;
+        }
+        given = Number(inp.value);
+        if (isNaN(given)) {
+          els.nudge.textContent = "Enter a valid number.";
+          return;
+        }
+        correct = nearlyEqual(given, q.answer, q.tolerance || 0.01);
+        inp.disabled = true;
+      } else if (q.type === "match") {
+        var keys = Object.keys(q.pairs);
+        var done = keys.every(function (k) { return state.matchPairs[k] === q.pairs[k]; });
+        if (Object.keys(state.matchPairs).length < keys.length) {
+          els.nudge.textContent = "Finish all pairs before checking.";
+          return;
+        }
+        given = "pairs";
+        correct = done;
+        Array.prototype.forEach.call(els.workspace.querySelectorAll(".match-item"), function (b) {
+          b.disabled = true;
+        });
+      }
+
+      state.locked = true;
+      els.checkAnsBtn.disabled = true;
+      els.hintBtn.disabled = true;
+      els.nextBtn.disabled = false;
+
+      if (correct) {
+        state.score += 1;
+        updateScore();
+        els.diag.className = "diag ok";
+        els.diag.innerHTML = "<strong>Correct.</strong> " + q.steps;
+        els.nudge.textContent = "";
+      } else {
+        var tip = diagnoseWrong(q, given);
+        els.diag.className = "diag bad";
+        els.diag.innerHTML = "<strong>Not quite.</strong> " + tip + "<br><br><strong>Solution:</strong> " + q.steps +
+          (q.type !== "match" ? " <em>Correct answer: " + q.answer + "</em>" : "");
+      }
+
+      state.review.push({
+        prompt: q.prompt,
+        correct: correct,
+        given: q.type === "match" ? (correct ? "All pairs matched" : "Incomplete / mismatched") : given,
+        answer: q.type === "match" ? "All roles correctly matched" : q.answer,
+        steps: q.steps
+      });
+
+      if (state.index >= CONTENT.totalRounds - 1) {
+        els.nextBtn.textContent = "Finish rounds";
+      }
+    }
+
+    function nextRound() {
+      if (!state.locked) return;
+      if (state.index >= CONTENT.totalRounds - 1) {
+        finishRounds();
+        return;
+      }
+      state.index += 1;
+      loadRound();
+    }
+
+    function finishRounds() {
+      state.finished = true;
+      els.checkBtn.disabled = false;
+      els.nextBtn.disabled = true;
+      els.checkAnsBtn.disabled = true;
+      els.hintBtn.disabled = true;
+      els.diag.className = "diag ok";
+      els.diag.textContent = "All " + CONTENT.totalRounds + " rounds done. Review below, then press Submit score.";
+      renderPips();
+      showReview();
+    }
+
+    function showReview() {
+      els.review.classList.add("show");
+      els.reviewList.innerHTML = "";
+      state.review.forEach(function (r, i) {
+        var div = document.createElement("div");
+        div.className = "rev-item " + (r.correct ? "ok" : "bad");
+        div.innerHTML = "<strong>Round " + (i + 1) + (r.correct ? " — correct" : " — incorrect") + "</strong>" +
+          r.prompt + "<br>Your response: " + r.given + "<br>Target: " + r.answer +
+          "<br>" + r.steps;
+        els.reviewList.appendChild(div);
+      });
+    }
+
+    function submitScore() {
+      if (!state.finished) return;
+      var finalScore = state.score;
+      var maxScore = CONTENT.maxScore;
+      updateScore();
+      if (window.gameScoreSubmit) {
+        window.gameScoreSubmit(finalScore, maxScore);
+      } else if (window.parent && window.parent.submitGameScore) {
+        var gameIdMatch = window.location.pathname.match(/\/play-game\/(\d+)/);
+        if (gameIdMatch) {
+          window.parent.submitGameScore(parseInt(gameIdMatch[1], 10), finalScore, maxScore);
+        }
+      }
+      els.restartBtn.style.display = "inline-block";
+      els.checkBtn.disabled = true;
+      els.diag.textContent = "Score submitted: " + finalScore + " / " + maxScore + ". You can play again.";
+    }
+
+    els.hintBtn.addEventListener("click", function () {
+      if (state.locked || !state.current) return;
+      var key = state.current.hintKey;
+      els.nudge.textContent = CONTENT.hints[key] || "Re-read the question and identify the formula.";
+      state.hintUsed = true;
+    });
+    els.checkAnsBtn.addEventListener("click", checkAnswer);
+    els.nextBtn.addEventListener("click", nextRound);
+    els.checkBtn.addEventListener("click", submitScore);
+    els.restartBtn.addEventListener("click", startGame);
+
+    document.getElementById("areaChip").textContent = CONTENT.learningArea;
+    startGame();
+  </script>
+</body>
+</html>

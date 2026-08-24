@@ -264,6 +264,9 @@ def action_items_query(
             joinedload(MeetingActionItem.assignees),
             joinedload(MeetingActionItem.labels),
             joinedload(MeetingActionItem.subtasks).joinedload(MeetingActionSubtask.assignee),
+            joinedload(MeetingActionItem.source_item)
+            .joinedload(MeetingActionItem.focus_row)
+            .joinedload(MeetingFocusRow.meeting_note),
             joinedload(MeetingActionItem.focus_row)
             .joinedload(MeetingFocusRow.meeting_note)
             .joinedload(MeetingNote.attendees),
@@ -452,9 +455,20 @@ def item_to_dict(
         "source_excerpt": getattr(item, "source_excerpt", None) or "",
         "ai_extracted": bool(getattr(item, "ai_extracted", False)),
         "carry_forward_count": getattr(item, "carry_forward_count", 0) or 0,
+        "source_item_id": getattr(item, "source_item_id", None),
+        "lineage_root_id": lineage_root_id(item),
+        "source_meeting_note_id": None,
+        "source_meeting_title": None,
         "stakeholder_lead_id": getattr(item, "stakeholder_lead_id", None),
         "marketing_event_id": getattr(item, "marketing_event_id", None),
     }
+    src = getattr(item, "source_item", None)
+    if src is not None:
+        src_fr = src.focus_row
+        src_mn = src_fr.meeting_note if src_fr else None
+        if src_mn:
+            d["source_meeting_note_id"] = src_mn.id
+            d["source_meeting_title"] = src_mn.title or ""
     if comment_threads is not None:
         d["comment_threads"] = [comment_to_dict(c) for c in comment_threads]
     return d
@@ -614,6 +628,28 @@ def normalize_cta_key(call_to_action: Optional[str]) -> str:
     return cta.lower()
 
 
+def lineage_root_id(item: MeetingActionItem, max_depth: int = 32) -> int:
+    """Walk source_item_id chain to the root item id."""
+    current = item
+    seen = set()
+    depth = 0
+    while current is not None and depth < max_depth:
+        if current.id in seen:
+            break
+        seen.add(current.id)
+        sid = getattr(current, "source_item_id", None)
+        if not sid:
+            return current.id
+        parent = getattr(current, "source_item", None)
+        if parent is None:
+            parent = db.session.get(MeetingActionItem, sid)
+        if parent is None:
+            return current.id
+        current = parent
+        depth += 1
+    return current.id if current is not None else item.id
+
+
 def existing_cta_keys_for_meeting(meeting_note_id: int) -> set:
     rows = (
         db.session.query(MeetingActionItem.call_to_action)
@@ -624,22 +660,101 @@ def existing_cta_keys_for_meeting(meeting_note_id: int) -> set:
     return {normalize_cta_key(r[0]) for r in rows if r and r[0]}
 
 
+def existing_source_ids_for_meeting(meeting_note_id: int) -> set:
+    """Direct source_item_id values already present on the target meeting."""
+    rows = (
+        db.session.query(MeetingActionItem.source_item_id)
+        .join(MeetingFocusRow, MeetingActionItem.focus_row_id == MeetingFocusRow.id)
+        .filter(
+            MeetingFocusRow.meeting_note_id == meeting_note_id,
+            MeetingActionItem.source_item_id.isnot(None),
+        )
+        .all()
+    )
+    return {r[0] for r in rows if r and r[0]}
+
+
+def existing_lineage_roots_for_meeting(meeting_note_id: int) -> set:
+    items = (
+        MeetingActionItem.query.options(
+            joinedload(MeetingActionItem.source_item),
+        )
+        .join(MeetingFocusRow, MeetingActionItem.focus_row_id == MeetingFocusRow.id)
+        .filter(MeetingFocusRow.meeting_note_id == meeting_note_id)
+        .all()
+    )
+    return {lineage_root_id(it) for it in items}
+
+
+def find_or_create_focus_row(
+    meeting_note_id: int,
+    platform: str,
+    focus_area: str,
+    sort_order: int = 0,
+    cache: Optional[Dict[Tuple[str, str], MeetingFocusRow]] = None,
+) -> MeetingFocusRow:
+    """Reuse an existing focus row on the meeting with the same platform + focus_area."""
+    key = ((platform or "").strip().lower(), (focus_area or "").strip().lower())
+    if cache is not None and key in cache:
+        return cache[key]
+    existing = (
+        MeetingFocusRow.query.filter_by(meeting_note_id=meeting_note_id)
+        .order_by(MeetingFocusRow.sort_order, MeetingFocusRow.id)
+        .all()
+    )
+    for fr in existing:
+        fr_key = ((fr.platform or "").strip().lower(), (fr.focus_area or "").strip().lower())
+        if fr_key == key:
+            if cache is not None:
+                cache[key] = fr
+            return fr
+    new_fr = MeetingFocusRow(
+        meeting_note_id=meeting_note_id,
+        platform=platform,
+        focus_area=focus_area,
+        sort_order=sort_order,
+    )
+    db.session.add(new_fr)
+    db.session.flush()
+    if cache is not None:
+        cache[key] = new_fr
+    return new_fr
+
+
+def should_skip_carry_item(
+    item: MeetingActionItem,
+    existing_cta_keys: set,
+    existing_source_ids: set,
+    existing_roots: set,
+) -> bool:
+    key = normalize_cta_key(item.call_to_action)
+    if not key:
+        return True
+    if key in existing_cta_keys:
+        return True
+    if item.id in existing_source_ids:
+        return True
+    root = lineage_root_id(item)
+    if root in existing_roots or item.id in existing_roots:
+        return True
+    return False
+
+
 def carry_forward_preview(source_meeting_id: int, target_meeting_id: int) -> dict:
     """Count open items on source that would be copied (excluding duplicates on target)."""
     src = db.session.get(MeetingNote, source_meeting_id)
     if not src:
         return {"error": "Source not found", "count": 0, "skipped_duplicate": 0}
     existing = existing_cta_keys_for_meeting(target_meeting_id)
+    existing_sources = existing_source_ids_for_meeting(target_meeting_id)
+    existing_roots = existing_lineage_roots_for_meeting(target_meeting_id)
     to_copy = 0
     skipped = 0
     for fr in src.focus_rows.order_by(MeetingFocusRow.sort_order, MeetingFocusRow.id):
         for it in fr.action_items.filter(MeetingActionItem.status != "done").order_by(
             MeetingActionItem.sort_order, MeetingActionItem.id
         ):
-            key = normalize_cta_key(it.call_to_action)
-            if not key:
-                continue
-            if key in existing:
+            if should_skip_carry_item(it, existing, existing_sources, existing_roots):
                 skipped += 1
             else:
                 to_copy += 1
@@ -650,6 +765,25 @@ def carry_forward_preview(source_meeting_id: int, target_meeting_id: int) -> dic
         "count": to_copy,
         "skipped_duplicate": skipped,
     }
+
+
+def collapse_items_by_lineage(items: Sequence[MeetingActionItem]) -> List[MeetingActionItem]:
+    """Keep one canonical row per lineage root: prefer newest non-done, else newest."""
+    buckets: Dict[int, List[MeetingActionItem]] = {}
+    for it in items:
+        root = lineage_root_id(it)
+        buckets.setdefault(root, []).append(it)
+
+    def _rank(it: MeetingActionItem) -> tuple:
+        is_open = 0 if (it.status or "open") != "done" else 1
+        created = it.created_at or datetime.min
+        return (is_open, -created.timestamp() if hasattr(created, "timestamp") else 0, -it.id)
+
+    out: List[MeetingActionItem] = []
+    for group in buckets.values():
+        group_sorted = sorted(group, key=_rank)
+        out.append(group_sorted[0])
+    return out
 
 
 def overdue_items_count(assignee_user_id: Optional[int] = None) -> int:
@@ -703,6 +837,7 @@ def hub_my_tasks_buckets(user_id: int) -> dict:
         MeetingFocusRow.sort_order,
         MeetingActionItem.sort_order,
     ).all()
+    items = collapse_items_by_lineage(items)
 
     overdue: List[dict] = []
     due_week: List[dict] = []

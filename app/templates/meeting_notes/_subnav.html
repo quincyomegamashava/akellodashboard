@@ -1,12 +1,30 @@
-{# Planner-style section nav. Set mn_active: hub | all_items | detail #}
-<nav class="mn-subnav" aria-label="Meeting notes sections">
-  <a href="{{ url_for('meeting_notes.index') }}#tasks" class="mn-subnav-link{% if mn_active == 'hub' %} active{% endif %}">
-    <i class="fas fa-house-user"></i><span>My tasks</span>
-  </a>
-  <a href="{{ url_for('meeting_notes.all_items') }}?mine=1" class="mn-subnav-link{% if mn_active == 'all_items' %} active{% endif %}">
-    <i class="fas fa-list-check"></i><span>All tasks</span>
-  </a>
-  <a href="{{ url_for('meeting_notes.index') }}#meetings" class="mn-subnav-link{% if mn_active == 'meetings' %} active{% endif %}">
-    <i class="fas fa-calendar-days"></i><span>Meetings</span>
-  </a>
+{# Unified local nav. Set mn_active: hub | meetings | all_items #}
+<nav class="mn-local-nav mn-subnav" aria-label="Meeting notes">
+  <div class="mn-local-nav-links">
+    <a href="{{ url_for('meeting_notes.index') }}#tasks"
+       class="mn-local-nav-link mn-subnav-link{% if mn_active == 'hub' %} active{% endif %}"
+       data-mn-local="tasks">
+      <i class="fas fa-house-user" aria-hidden="true"></i><span>My work</span>
+    </a>
+    <a href="{{ url_for('meeting_notes.index') }}#meetings"
+       class="mn-local-nav-link mn-subnav-link{% if mn_active == 'meetings' %} active{% endif %}"
+       data-mn-local="meetings">
+      <i class="fas fa-calendar-days" aria-hidden="true"></i><span>Meetings</span>
+    </a>
+    <a href="{{ url_for('meeting_notes.all_items') }}?mine=1"
+       class="mn-local-nav-link mn-subnav-link{% if mn_active == 'all_items' %} active{% endif %}"
+       data-mn-local="all_items">
+      <i class="fas fa-list-check" aria-hidden="true"></i><span>All tasks</span>
+    </a>
+  </div>
+  <div class="mn-local-nav-actions">
+    <button type="button" class="btn btn-sm mn-btn-ghost mn-local-nav-search d-none d-md-inline-flex"
+            data-bs-toggle="modal" data-bs-target="#mn-command-palette" title="Search" aria-label="Search">
+      <i class="fas fa-search"></i>
+    </button>
+    <button type="button" class="btn btn-sm mn-btn-primary mn-local-nav-new" id="mn-local-nav-new"
+            data-mn-nav="new" title="New meeting">
+      <i class="fas fa-plus me-1"></i><span class="d-none d-sm-inline">New meeting</span>
+    </button>
+  </div>
 </nav>

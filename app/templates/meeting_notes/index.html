@@ -13,7 +13,7 @@
 
 <div class="mn-app-shell">
 
-<div class="mn-page">
+<div class="mn-page mn-workspace">
 
   <header class="mn-subheader">
 
@@ -23,15 +23,13 @@
 
         <h1 class="mn-hero-title mb-0">My work</h1>
 
-        <p class="mn-hero-sub d-none d-md-block">Tasks, meetings, and action items — Planner-style hub.</p>
+        <p class="mn-hero-sub d-none d-md-block">Your overdue, this-week, and in-progress action items.</p>
 
         <div class="mn-hub-analytics mt-2" id="mn-hub-analytics"></div>
 
       </div>
 
       <div class="mn-subheader-actions d-none d-md-flex">
-
-        <button type="button" class="btn btn-sm mn-btn-ghost" title="Command palette (Ctrl+K)" data-bs-toggle="modal" data-bs-target="#mn-command-palette"><i class="fas fa-search me-1"></i> Search</button>
 
         {% if overdue_count %}
 
@@ -51,7 +49,8 @@
 
     {% include "meeting_notes/_subnav.html" %}
 
-    <div class="mn-hub-tabs mn-detail-tabs" id="mn-hub-tabs" role="tablist" aria-label="Hub sections">
+    {# Hidden hub tablist kept for mn-hub.js / hash routing #}
+    <div class="mn-hub-tabs mn-hub-tabs-hidden" id="mn-hub-tabs" role="tablist" aria-label="Hub sections">
       <button type="button" class="mn-detail-tab active" role="tab" id="mn-hub-tab-btn-tasks" data-mn-hub-tab="tasks" aria-selected="true" aria-controls="mn-hub-tab-tasks">My tasks</button>
       <button type="button" class="mn-detail-tab" role="tab" id="mn-hub-tab-btn-meetings" data-mn-hub-tab="meetings" aria-selected="false" aria-controls="mn-hub-tab-meetings">Meetings</button>
       <button type="button" class="mn-detail-tab" role="tab" id="mn-hub-tab-btn-new" data-mn-hub-tab="new" aria-selected="false" aria-controls="mn-hub-tab-new">New meeting</button>
@@ -63,49 +62,43 @@
 
   <div class="mn-hub-tab-pane" id="mn-hub-tab-tasks" role="tabpanel" aria-labelledby="mn-hub-tab-btn-tasks">
 
-  <div class="mn-card mb-0" id="mn-my-tasks-section">
+  <div class="mb-0" id="mn-my-tasks-section">
 
-    <div class="mn-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-
-      <span>My tasks</span>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
 
       <div class="mn-my-tasks-summary" id="mn-my-tasks-summary"></div>
 
     </div>
 
-    <div class="mn-card-body">
+    <div class="mn-my-tasks-grid" id="mn-my-tasks-track">
 
-      <div class="mn-my-tasks-grid" id="mn-my-tasks-track">
+      <div class="mn-my-tasks-column mn-my-tasks-slide">
 
-        <div class="mn-my-tasks-column mn-my-tasks-slide">
+        <h3>Overdue</h3>
 
-          <h3>Overdue</h3>
-
-          <div id="mn-my-tasks-overdue" class="d-flex flex-column gap-2"></div>
-
-        </div>
-
-        <div class="mn-my-tasks-column mn-my-tasks-slide">
-
-          <h3>Due this week</h3>
-
-          <div id="mn-my-tasks-week" class="d-flex flex-column gap-2"></div>
-
-        </div>
-
-        <div class="mn-my-tasks-column mn-my-tasks-slide">
-
-          <h3>Active</h3>
-
-          <div id="mn-my-tasks-progress" class="d-flex flex-column gap-2"></div>
-
-        </div>
+        <div id="mn-my-tasks-overdue" class="d-flex flex-column gap-2"></div>
 
       </div>
 
-      <div id="mn-my-tasks-dots" class="mn-my-tasks-dots d-lg-none"></div>
+      <div class="mn-my-tasks-column mn-my-tasks-slide">
+
+        <h3>This week</h3>
+
+        <div id="mn-my-tasks-week" class="d-flex flex-column gap-2"></div>
+
+      </div>
+
+      <div class="mn-my-tasks-column mn-my-tasks-slide">
+
+        <h3>In progress</h3>
+
+        <div id="mn-my-tasks-progress" class="d-flex flex-column gap-2"></div>
+
+      </div>
 
     </div>
+
+    <div id="mn-my-tasks-dots" class="mn-my-tasks-dots d-lg-none"></div>
 
   </div>
 
@@ -115,11 +108,11 @@
 
   <div class="mn-hub-tab-pane d-none" id="mn-hub-tab-meetings" role="tabpanel" aria-labelledby="mn-hub-tab-btn-meetings">
 
-  <div class="mn-card mb-0" id="mn-meetings-section">
+  <div class="mb-0" id="mn-meetings-section">
 
-    <div class="mn-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
 
-      <span>Recent meetings</span>
+      <h2 class="h6 mb-0">Meetings</h2>
 
       <form method="get" action="{{ url_for('meeting_notes.index') }}#meetings" class="d-flex gap-2">
 
@@ -131,55 +124,51 @@
 
     </div>
 
-    <div class="mn-card-body">
+    <div class="mn-meetings-grid">
 
-      <div class="mn-meetings-grid">
+      {% for m in meetings %}
 
-        {% for m in meetings %}
+      {% set st = meeting_stats.get(m.id, {}) %}
 
-        {% set st = meeting_stats.get(m.id, {}) %}
+      {% set total = st.get('total', 0) %}
 
-        {% set total = st.get('total', 0) %}
+      {% set done = st.get('done', 0) %}
 
-        {% set done = st.get('done', 0) %}
+      {% set pct = (100 * done // total) if total else 0 %}
 
-        {% set pct = (100 * done // total) if total else 0 %}
+      <article class="mn-meeting-card">
 
-        <article class="mn-meeting-card">
+        <svg class="mn-meeting-card-ring" viewBox="0 0 40 40" aria-hidden="true">
 
-          <svg class="mn-meeting-card-ring" viewBox="0 0 40 40" aria-hidden="true">
+          <circle cx="20" cy="20" r="16" fill="none" stroke="#e2e8f0" stroke-width="4"></circle>
 
-            <circle cx="20" cy="20" r="16" fill="none" stroke="#e2e8f0" stroke-width="4"></circle>
+          <circle cx="20" cy="20" r="16" fill="none" stroke="#00407d" stroke-width="4" stroke-dasharray="{{ pct }} {{ 100 - pct }}" stroke-linecap="round" transform="rotate(-90 20 20)"></circle>
 
-            <circle cx="20" cy="20" r="16" fill="none" stroke="#00407d" stroke-width="4" stroke-dasharray="{{ pct }} {{ 100 - pct }}" stroke-linecap="round" transform="rotate(-90 20 20)"></circle>
+        </svg>
 
-          </svg>
+        <div class="small text-muted">{{ m.meeting_date.strftime('%Y-%m-%d') }}</div>
 
-          <div class="small text-muted">{{ m.meeting_date.strftime('%Y-%m-%d') }}</div>
+        <h3 class="h6 mb-1">{{ m.title }}</h3>
 
-          <h3 class="h6 mb-1">{{ m.title }}</h3>
+        <div class="small text-muted">{{ st.get('open', 0) }} open · {{ st.get('in_progress', 0) }} in progress · {{ done }} done</div>
 
-          <div class="small text-muted">{{ st.get('open', 0) }} open · {{ st.get('in_progress', 0) }} in progress · {{ done }} done</div>
+        {% if m.updated_at %}
 
-          {% if m.updated_at %}
+        <div class="mn-meeting-card-updated mt-1">Updated {{ m.updated_at.strftime('%d %b') }}</div>
 
-          <div class="mn-meeting-card-updated mt-1">Updated {{ m.updated_at.strftime('%d %b') }}</div>
+        {% endif %}
 
-          {% endif %}
+        <div class="mn-meeting-card-progress"><span style="width: {{ pct }}%;"></span></div>
 
-          <div class="mn-meeting-card-progress"><span style="width: {{ pct }}%;"></span></div>
+        <a href="{{ url_for('meeting_notes.detail', meeting_id=m.id) }}?view=board" class="btn btn-sm mn-btn-primary mt-2 w-100">Open</a>
 
-          <a href="{{ url_for('meeting_notes.detail', meeting_id=m.id) }}?view=board" class="btn btn-sm mn-btn-primary mt-2 w-100">Open</a>
+      </article>
 
-        </article>
+      {% else %}
 
-        {% else %}
+      <div class="mn-empty-state">No meetings yet. Create one to get started.</div>
 
-        <p class="text-muted">No meetings yet.</p>
-
-        {% endfor %}
-
-      </div>
+      {% endfor %}
 
     </div>
 

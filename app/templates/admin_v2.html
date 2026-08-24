@@ -823,7 +823,7 @@
     setTitle('Manage Access Keys');
     let privs = {};
     try { privs = JSON.parse(privJson || '{}'); } catch (e) { privs = {}; }
-    const items = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access", "Revenue Reports"];
+    const items = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access", "Help Desk Agent", "Help Desk Viewer", "Revenue Reports"];
     const html = `
     <div class="space-y-6">
       <p class="text-sm text-slate-600">Adjusting access levels for <span class="font-bold text-slate-800">${username}</span>.</p>

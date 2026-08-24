@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ article.title }}{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/help_desk.css') }}">
+{% endblock %}
+{% block content %}
+<div class="hd-app-shell">
+  <div class="hd-page">
+    <header class="hd-subheader">
+      <a href="{{ url_for('help_desk.kb_page') }}" class="hd-back-link">&larr; Knowledge base</a>
+      <h1 class="hd-hero-title">{{ article.title }}</h1>
+      {% if article.tags %}<p class="hd-muted">{{ article.tags }}</p>{% endif %}
+      {% set hd_active = 'kb' %}
+      {% include "help_desk/_subnav.html" %}
+    </header>
+    <article class="hub-glass hd-article-body">{{ article.body | e | replace('\n', '<br>') | safe }}</article>
+  </div>
+  {% include "help_desk/_app_shell.html" %}
+  {% include "help_desk/_new_ticket_modal.html" %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/help_desk.js') }}"></script>
+{% endblock %}

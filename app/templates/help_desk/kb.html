@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Help Desk — Knowledge base{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/help_desk.css') }}">
+{% endblock %}
+{% block content %}
+<div class="hd-app-shell">
+  <div class="hd-page">
+    <header class="hd-subheader">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div>
+          <h1 class="hd-hero-title mb-0">Knowledge base</h1>
+          <p class="hd-hero-sub">Search FAQs and how-tos before opening a ticket.</p>
+        </div>
+        {% if hd_is_agent %}
+        <button type="button" class="btn hd-btn-primary btn-sm" id="hd-kb-new">New article</button>
+        {% endif %}
+      </div>
+      {% set hd_active = 'kb' %}
+      {% include "help_desk/_subnav.html" %}
+    </header>
+    <div class="mb-3">
+      <input type="search" class="form-control" id="hd-kb-search" placeholder="Search articles…">
+    </div>
+    <div id="hd-kb-list" class="hd-kb-grid"></div>
+  </div>
+  {% include "help_desk/_app_shell.html" %}
+  {% include "help_desk/_new_ticket_modal.html" %}
+
+  {% if hd_is_agent %}
+  <div class="modal fade" id="hd-kb-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content hd-modal">
+        <div class="modal-header">
+          <h5 class="modal-title">Article</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="hd-kb-id">
+          <div class="mb-2"><input class="form-control" id="hd-kb-title" placeholder="Title"></div>
+          <div class="mb-2"><input class="form-control" id="hd-kb-tags" placeholder="Tags (comma-separated)"></div>
+          <div class="mb-2"><textarea class="form-control" id="hd-kb-body" rows="10" placeholder="Body"></textarea></div>
+          <label class="form-check-label"><input type="checkbox" class="form-check-input" id="hd-kb-published"> Published</label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn hd-btn-primary" id="hd-kb-save">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/help_desk.js') }}"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { HD.initKb(); });</script>
+{% endblock %}

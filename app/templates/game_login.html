@@ -3,11 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Game Portal - Login & Register</title>
+  <title>Game Portal - Sign In</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
   <style>
     body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
       background: #ffffff;
       min-height: 100vh;
       display: flex;
@@ -17,256 +28,104 @@
       position: relative;
       overflow: hidden;
     }
-    
-    body::before {
-      content: '';
-      position: absolute;
-      width: 600px;
-      height: 600px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
-      top: -300px;
-      right: -300px;
-      animation: float 25s infinite ease-in-out;
-      pointer-events: none;
+    .login-card {
+      background: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 20px 48px rgba(15, 23, 42, 0.08);
     }
-    
-    body::after {
-      content: '';
-      position: absolute;
-      width: 500px;
-      height: 500px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(20, 184, 166, 0.06) 100%);
-      bottom: -250px;
-      left: -250px;
-      animation: float 20s infinite ease-in-out reverse;
-      pointer-events: none;
-    }
-    
-    @keyframes float {
-      0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      50% { transform: translate(40px, 40px) rotate(180deg); }
-    }
-    
-    .glass-card {
-      background: rgba(255, 255, 255, 0.7);
-      backdrop-filter: blur(30px);
-      -webkit-backdrop-filter: blur(30px);
-      border: 1px solid rgba(255, 255, 255, 0.5);
-      box-shadow: 
-        0 8px 32px rgba(0, 0, 0, 0.1),
-        0 0 0 1px rgba(255, 255, 255, 0.8) inset,
-        0 20px 60px rgba(102, 126, 234, 0.15);
-    }
-    
-    .tab-button {
-      transition: all 0.3s ease;
-    }
-    
-    .tab-button.active {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-    
     .form-input:focus {
-      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+      box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.08);
     }
-    
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateX(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(0);
-      }
+    .theme-line {
+      animation: fadeUp 0.5s ease-out;
     }
-    
-    .tab-content {
-      animation: slideIn 0.3s ease-out;
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   </style>
 </head>
-<body>
+<body class="font-sans">
   <div class="relative z-10 w-full max-w-md">
-    <div class="glass-card rounded-3xl p-8 shadow-xl">
-      <!-- Logo Section -->
-      <div class="text-center mb-8">
+    <div class="theme-line mb-4 text-center px-2">
+      <p class="text-[11px] font-bold uppercase tracking-wider text-slate-800 mb-1">
+        <i class="fas fa-calendar-week mr-1"></i> This week
+      </p>
+      <p class="text-xs sm:text-sm font-semibold text-slate-700 leading-snug">
+        Powering Growth: Where Agriculture, Technology &amp; Commerce Converge
+      </p>
+    </div>
+
+    <div class="login-card rounded-3xl p-8">
+      <div class="text-center mb-7">
         <div class="inline-block mb-4">
-          <img src="{{ url_for('static', filename='smartlearning.webp') }}" alt="Game Portal Logo" class="w-24 h-24 mx-auto rounded-2xl shadow-lg">
+          <img src="{{ url_for('static', filename='smartlearning.webp') }}" alt="Game Portal Logo" class="w-20 h-20 mx-auto rounded-2xl shadow-md ring-2 ring-slate-200">
         </div>
-        <h1 class="text-2xl uppercase font-bold text-slate-900 mb-2">Game Portal</h1>
-        <p class="text-slate-400">Join the fun and start playing!</p>
+        <h1 class="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight">Game Portal</h1>
+        <p class="text-slate-500 text-sm leading-relaxed" id="headerSubtitle">
+          Sign in with your <strong class="text-slate-700">Smart Learning</strong> learner username and password.
+        </p>
       </div>
 
-      <!-- Tabs -->
-      <div class="flex gap-2 mb-6 bg-slate-100 rounded-xl p-1">
-        <button 
-          id="loginTab" 
-          class="tab-button flex-1 py-3 px-4 rounded-lg font-semibold text-sm active"
-          onclick="switchTab('login')"
-        >
-          <i class="fas fa-sign-in-alt mr-2"></i> Login
-        </button>
-        <button 
-          id="registerTab" 
-          class="tab-button flex-1 py-3 px-4 rounded-lg font-semibold text-sm text-slate-600 hover:text-slate-900"
-          onclick="switchTab('register')"
-        >
-          <i class="fas fa-user-plus mr-2"></i> Register
-        </button>
-      </div>
+      <div id="loginPanel">
+        <div class="mb-5 rounded-xl bg-slate-100 border border-slate-200 px-4 py-3 text-sm text-slate-800">
+          <i class="fas fa-info-circle mr-1"></i>
+          You need a Smart Learning account first. Register there, then return here to play.
+        </div>
 
-      <!-- Login Form -->
-      <div id="loginContent" class="tab-content">
-        <form id="gameLoginForm" class="space-y-5 w3-small">
+        <form id="gameLoginForm" class="space-y-5">
           <div>
-            <label for="loginUsername" class="block text-sm font-semibold text-slate-700 mb-2">
-              <i class="fas fa-user mr-2 text-indigo-600"></i> Username
+            <label class="block text-sm font-semibold text-slate-700 mb-2">
+              <i class="fas fa-user mr-2 text-slate-800"></i>Learner Username
             </label>
-            <input 
-              type="text" 
-              id="loginUsername" 
-              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
-              placeholder="Enter your username" 
-              required
-              autocomplete="username"
-            >
+            <input type="text" id="loginUsername" required autocomplete="username"
+              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-slate-800 focus:outline-none transition-colors bg-slate-50 focus:bg-white"
+              placeholder="Your Smart Learning username">
           </div>
-          
           <div>
-            <label for="loginPassword" class="block text-sm font-semibold text-slate-700 mb-2">
-              <i class="fas fa-lock mr-2 text-indigo-600"></i> Password
+            <label class="block text-sm font-semibold text-slate-700 mb-2">
+              <i class="fas fa-lock mr-2 text-slate-800"></i>Password
             </label>
-            <input 
-              type="password" 
-              id="loginPassword" 
-              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
-              placeholder="Enter your password" 
-              required
-              autocomplete="current-password"
-            >
+            <input type="password" id="loginPassword" required autocomplete="current-password"
+              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-slate-800 focus:outline-none transition-colors bg-slate-50 focus:bg-white"
+              placeholder="Your Smart Learning password">
           </div>
-          
-          <div id="loginError" class="hidden bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg">
+          <div id="loginError" class="hidden bg-rose-50 border-l-4 border-rose-500 text-rose-700 p-4 rounded-lg text-sm">
             <i class="fas fa-exclamation-circle mr-2"></i>
             <span id="loginErrorMsg"></span>
           </div>
-          
-          <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 flex items-center justify-center gap-2" id="loginBtn">
+          <button type="submit" id="loginBtn"
+            class="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold shadow-sm hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
             <i class="fas fa-sign-in-alt"></i>
-            <span>Login</span>
+            <span>Sign In</span>
           </button>
         </form>
+        <p class="mt-6 text-center text-xs text-slate-400">
+          Need an account? Register on Smart Learning, then use those credentials here.
+        </p>
       </div>
 
-      <!-- Register Form -->
-      <div id="registerContent" class="tab-content hidden">
-        <form id="gameRegisterForm" class="space-y-5">
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label for="regFirstname" class="block text-sm font-semibold text-slate-700 mb-2">
-                <i class="fas fa-user mr-2 text-emerald-600"></i> First Name
-              </label>
-              <input 
-                type="text" 
-                id="regFirstname" 
-                class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
-                placeholder="John" 
-                required
-                autocomplete="given-name"
-              >
-            </div>
-            
-            <div>
-              <label for="regSurname" class="block text-sm font-semibold text-slate-700 mb-2">
-                <i class="fas fa-user mr-2 text-emerald-600"></i> Surname
-              </label>
-              <input 
-                type="text" 
-                id="regSurname" 
-                class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
-                placeholder="Doe" 
-                required
-                autocomplete="family-name"
-              >
-            </div>
-          </div>
-          
+      <div id="dobPanel" class="hidden">
+        <div class="mb-5 rounded-xl bg-slate-100 border border-slate-200 px-4 py-3 text-sm text-slate-700">
+          <i class="fas fa-birthday-cake mr-1"></i>
+          Welcome, <strong id="dobUserName"></strong>. Enter your date of birth so we can show age-appropriate games.
+        </div>
+        <form id="dobForm" class="space-y-5">
           <div>
-            <label for="regUsername" class="block text-sm font-semibold text-slate-700 mb-2">
-              <i class="fas fa-at mr-2 text-emerald-600"></i> Username
+            <label class="block text-sm font-semibold text-slate-700 mb-2">
+              <i class="fas fa-calendar mr-2 text-slate-700"></i>Date of birth
             </label>
-            <input 
-              type="text" 
-              id="regUsername" 
-              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
-              placeholder="Choose a username" 
-              required
-              autocomplete="username"
-            >
+            <input type="date" id="dobInput" required
+              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-slate-800 focus:outline-none transition-colors bg-slate-50 focus:bg-white">
           </div>
-          
-          <div>
-            <label for="regPassword" class="block text-sm font-semibold text-slate-700 mb-2">
-              <i class="fas fa-lock mr-2 text-emerald-600"></i> Password
-            </label>
-            <input 
-              type="password" 
-              id="regPassword" 
-              class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
-              placeholder="Create a password" 
-              required
-              autocomplete="new-password"
-            >
-          </div>
-          
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label for="regAge" class="block text-sm font-semibold text-slate-700 mb-2">
-                <i class="fas fa-birthday-cake mr-2 text-emerald-600"></i> Age <span class="text-xs text-slate-500 font-normal">(All ages welcome)</span>
-              </label>
-              <input 
-                type="number" 
-                id="regAge" 
-                class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
-                placeholder="Enter your age" 
-                min="0"
-                max="150"
-                required
-              >
-              <p class="text-xs text-slate-500 mt-1">Age ranges: Infants (under 9), 9-19, Youths & older (over 19)</p>
-            </div>
-            
-            <div>
-              <label for="regPhoneNumber" class="block text-sm font-semibold text-slate-700 mb-2">
-                <i class="fas fa-phone mr-2 text-emerald-600"></i> Phone Number <span class="text-xs text-slate-500 font-normal">(Optional)</span>
-              </label>
-              <input 
-                type="tel" 
-                id="regPhoneNumber" 
-                class="form-input w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-all bg-slate-50 focus:bg-white"
-                placeholder="+263 77 123 4567"
-                autocomplete="tel"
-              >
-            </div>
-          </div>
-          
-          <div id="registerError" class="hidden bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg">
+          <div id="dobError" class="hidden bg-rose-50 border-l-4 border-rose-500 text-rose-700 p-4 rounded-lg text-sm">
             <i class="fas fa-exclamation-circle mr-2"></i>
-            <span id="registerErrorMsg"></span>
+            <span id="dobErrorMsg"></span>
           </div>
-          
-          <div id="registerSuccess" class="hidden bg-green-50 border-l-4 border-green-500 text-green-700 p-4 rounded-lg">
-            <i class="fas fa-check-circle mr-2"></i>
-            <span>Registration successful! Redirecting to login...</span>
-          </div>
-          
-          <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 flex items-center justify-center gap-2" id="registerBtn">
-            <i class="fas fa-user-plus"></i>
-            <span>Create Account</span>
+          <button type="submit" id="dobBtn"
+            class="w-full py-3.5 bg-slate-700 text-white rounded-xl font-bold shadow-sm hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
+            <i class="fas fa-check"></i>
+            <span>Save and continue</span>
           </button>
         </form>
       </div>
@@ -274,31 +133,32 @@
   </div>
 
   <script>
-    // Tab switching functionality
-    function switchTab(tab) {
-      const loginTab = document.getElementById('loginTab');
-      const registerTab = document.getElementById('registerTab');
-      const loginContent = document.getElementById('loginContent');
-      const registerContent = document.getElementById('registerContent');
-      
-      if (tab === 'login') {
-        loginTab.classList.add('active');
-        loginTab.classList.remove('text-slate-600', 'hover:text-slate-900');
-        registerTab.classList.remove('active');
-        registerTab.classList.add('text-slate-600', 'hover:text-slate-900');
-        loginContent.classList.remove('hidden');
-        registerContent.classList.add('hidden');
-      } else {
-        registerTab.classList.add('active');
-        registerTab.classList.remove('text-slate-600', 'hover:text-slate-900');
-        loginTab.classList.remove('active');
-        loginTab.classList.add('text-slate-600', 'hover:text-slate-900');
-        registerContent.classList.remove('hidden');
-        loginContent.classList.add('hidden');
-      }
+    let pendingUserId = null;
+
+    function storeSession(user) {
+      sessionStorage.setItem('gameUserId', user.id);
+      sessionStorage.setItem('gameUsername', user.username);
+      sessionStorage.setItem('gameUserName', `${user.firstname} ${user.surname}`);
+      if (user.age != null) sessionStorage.setItem('gameUserAge', String(user.age));
+      if (user.dob) sessionStorage.setItem('gameUserDob', user.dob);
     }
 
-    // Login Form Handler
+    function goDashboard() {
+      window.location.href = '/game-dashboard';
+    }
+
+    function showDobPanel(user) {
+      pendingUserId = user.id;
+      document.getElementById('loginPanel').classList.add('hidden');
+      document.getElementById('dobPanel').classList.remove('hidden');
+      document.getElementById('dobUserName').textContent = `${user.firstname} ${user.surname}`;
+      document.getElementById('headerSubtitle').textContent = 'One more step before you play';
+      const dobInput = document.getElementById('dobInput');
+      const today = new Date().toISOString().slice(0, 10);
+      dobInput.max = today;
+      dobInput.min = '1920-01-01';
+    }
+
     document.getElementById('gameLoginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const username = document.getElementById('loginUsername').value.trim();
@@ -306,12 +166,10 @@
       const errorDiv = document.getElementById('loginError');
       const errorMsg = document.getElementById('loginErrorMsg');
       const btn = document.getElementById('loginBtn');
-      const btnSpan = btn.querySelector('span');
 
       errorDiv.classList.add('hidden');
       btn.disabled = true;
-      btnSpan.textContent = 'Logging in...';
-      btn.innerHTML = '<span class="spinner inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span> Logging in...';
+      btn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span> Signing in...';
 
       try {
         const r = await fetch('/api/game-users/login', {
@@ -321,102 +179,57 @@
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || 'Login failed');
-        
-        // Store user session
-        sessionStorage.setItem('gameUserId', data.user.id);
-        sessionStorage.setItem('gameUsername', data.user.username);
-        sessionStorage.setItem('gameUserName', `${data.user.firstname} ${data.user.surname}`);
-        
-        // Success animation
-        btn.style.background = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
+
+        storeSession(data.user);
+
+        if (data.needs_dob) {
+          showDobPanel(data.user);
+          return;
+        }
+
+        btn.classList.remove('bg-slate-900', 'hover:bg-slate-800');
+        btn.classList.add('bg-slate-900');
         btn.innerHTML = '<i class="fas fa-check mr-2"></i> Success!';
-        
-        // Redirect to dashboard
-        setTimeout(() => {
-          window.location.href = '/game-dashboard';
-        }, 500);
+        setTimeout(goDashboard, 400);
       } catch (err) {
         errorMsg.textContent = err.message || 'Invalid username or password';
         errorDiv.classList.remove('hidden');
-        btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-        btn.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i> Login';
+        btn.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i> Sign In';
       } finally {
         btn.disabled = false;
       }
     });
 
-    // Register Form Handler
-    document.getElementById('gameRegisterForm').addEventListener('submit', async (e) => {
+    document.getElementById('dobForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const firstname = document.getElementById('regFirstname').value.trim();
-      const surname = document.getElementById('regSurname').value.trim();
-      const username = document.getElementById('regUsername').value.trim();
-      const password = document.getElementById('regPassword').value;
-      const age = parseInt(document.getElementById('regAge').value);
-      const phoneNumber = document.getElementById('regPhoneNumber').value.trim() || null;
-      
-      const errorDiv = document.getElementById('registerError');
-      const successDiv = document.getElementById('registerSuccess');
-      const errorMsg = document.getElementById('registerErrorMsg');
-      const btn = document.getElementById('registerBtn');
-      const btnSpan = btn.querySelector('span');
-
+      const dob = document.getElementById('dobInput').value;
+      const errorDiv = document.getElementById('dobError');
+      const errorMsg = document.getElementById('dobErrorMsg');
+      const btn = document.getElementById('dobBtn');
+      if (!pendingUserId) {
+        errorMsg.textContent = 'Session expired. Please sign in again.';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
       errorDiv.classList.add('hidden');
-      successDiv.classList.add('hidden');
-      
-      // Validation
-      if (!firstname || !surname || !username || !password || !age) {
-        errorMsg.textContent = 'All fields are required';
-        errorDiv.classList.remove('hidden');
-        return;
-      }
-      
-      if (isNaN(age) || age < 0 || age > 150) {
-        errorMsg.textContent = 'Please enter a valid age';
-        errorDiv.classList.remove('hidden');
-        return;
-      }
-      
-      if (password.length < 4) {
-        errorMsg.textContent = 'Password must be at least 4 characters long';
-        errorDiv.classList.remove('hidden');
-        return;
-      }
-
       btn.disabled = true;
-      btnSpan.textContent = 'Creating account...';
-      btn.innerHTML = '<span class="spinner inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span> Creating account...';
+      btn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span> Saving...';
 
       try {
-        const r = await fetch('/api/game-users/register-public', {
+        const r = await fetch(`/api/game-users/${pendingUserId}/dob`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ firstname, surname, username, password, age, phone_number: phoneNumber })
+          body: JSON.stringify({ dob })
         });
         const data = await r.json();
-        if (!r.ok) throw new Error(data.error || 'Registration failed');
-        
-        // Success
-        successDiv.classList.remove('hidden');
-        btn.style.background = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
-        btn.innerHTML = '<i class="fas fa-check mr-2"></i> Account Created!';
-        
-        // Clear form
-        document.getElementById('gameRegisterForm').reset();
-        
-        // Switch to login tab after 2 seconds
-        setTimeout(() => {
-          switchTab('login');
-          document.getElementById('loginUsername').value = username;
-          successDiv.classList.add('hidden');
-          btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-          btn.innerHTML = '<i class="fas fa-user-plus mr-2"></i> Create Account';
-        }, 2000);
+        if (!r.ok) throw new Error(data.error || 'Could not save date of birth');
+        storeSession(data.user);
+        btn.innerHTML = '<i class="fas fa-check mr-2"></i> Saved!';
+        setTimeout(goDashboard, 400);
       } catch (err) {
-        errorMsg.textContent = err.message || 'Registration failed. Please try again.';
+        errorMsg.textContent = err.message || 'Could not save date of birth';
         errorDiv.classList.remove('hidden');
-        btn.style.background = 'linear-gradient(135deg, #ed8936 0%, #dd6b20 100%)';
-        btn.innerHTML = '<i class="fas fa-user-plus mr-2"></i> Create Account';
+        btn.innerHTML = '<i class="fas fa-check mr-2"></i> Save and continue';
       } finally {
         btn.disabled = false;
       }

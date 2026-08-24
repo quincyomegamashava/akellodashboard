@@ -7096,14 +7096,16 @@ def is_admin_user():
     return False
 
 def can_view_all_queries():
-    """Check if user can view all queries (admin or has Admin Queries Access privilege)."""
+    """Check if user can view all queries (admin or help-desk agent/viewer privileges)."""
     try:
-        # Admins can always view all queries
         if getattr(current_user, 'userRole', None) == 'Admin':
             return True
-        # Users with Admin Queries Access privilege can also view all queries
         if hasattr(current_user, 'has_privilege'):
-            return current_user.has_privilege('Admin Queries Access')
+            return (
+                current_user.has_privilege('Admin Queries Access')
+                or current_user.has_privilege('Help Desk Agent')
+                or current_user.has_privilege('Help Desk Viewer')
+            )
     except Exception:
         pass
     return False
@@ -21055,183 +21057,11 @@ def akello_monitor():
 @app.route('/help-desk', methods=['GET', 'POST'])
 @login_required
 def help_desk():
-    from app.forms import HelpDeskForm
-    from app.models import HelpDeskQuery
-
-    form = HelpDeskForm()
-    if form.validate_on_submit():
-        # Check if resolved_at column exists to avoid insert errors
-        try:
-            from sqlalchemy import inspect
-            inspector = inspect(db.engine)
-            columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
-            has_resolved_at = 'resolved_at' in columns
-        except Exception:
-            has_resolved_at = False
-        
-        qtype = form.query_type.data
-        created_by = 'anonymous' if qtype == 'anonymous' else current_user.username
-        image_path = None
-        if form.image.data:
-            file = form.image.data
-            if file.filename:
-                filename = secure_filename(f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{file.filename}")
-                save_path = os.path.join(app.config['HELP_DESK_UPLOAD_FOLDER'], filename)
-                file.save(save_path)
-                image_path = '/' + save_path  # make it web path
-        
-        if has_resolved_at:
-            # Use ORM when column exists
-            q = HelpDeskQuery(
-                query_title=form.query_title.data,
-                query_description=form.query_description.data,
-                query_type=qtype,
-                created_by=created_by,
-                image_path=image_path
-            )
-            db.session.add(q)
-            db.session.commit()
-        else:
-            # Use raw SQL when column doesn't exist
-            timestamp = datetime.utcnow()
-            db.session.execute(
-                text("""
-                    INSERT INTO helpdesk_queries 
-                    (query_title, query_description, timestamp, query_type, created_by, image_path, status) 
-                    VALUES (:title, :description, :timestamp, :qtype, :created_by, :image_path, :status)
-                """),
-                {
-                    'title': form.query_title.data,
-                    'description': form.query_description.data,
-                    'timestamp': timestamp,
-                    'qtype': qtype,
-                    'created_by': created_by,
-                    'image_path': image_path,
-                    'status': 'Not started'
-                }
-            )
-            db.session.commit()
-        
-        flash('Your query has been submitted.', 'success')
-        return redirect(url_for('help_desk'))
-
-    # Show newest first; admins see all; others see only their own and anonymous
-    # Check if resolved_at column exists to avoid query errors
-    try:
-        from sqlalchemy import inspect
-        inspector = inspect(db.engine)
-        columns = [col['name'] for col in inspector.get_columns('helpdesk_queries')]
-        has_resolved_at = 'resolved_at' in columns
-    except Exception:
-        has_resolved_at = False
-    
-    try:
-        if has_resolved_at:
-            # Use ORM when column exists
-            if can_view_all_queries():
-                queries = HelpDeskQuery.query.order_by(HelpDeskQuery.timestamp.desc()).all()
-            else:
-                queries = HelpDeskQuery.query.filter(
-                    (HelpDeskQuery.created_by == current_user.username) | (HelpDeskQuery.created_by == 'anonymous')
-                ).order_by(HelpDeskQuery.timestamp.desc()).all()
-            
-            my_queries = HelpDeskQuery.query.filter(HelpDeskQuery.created_by == current_user.username) \
-                .order_by(HelpDeskQuery.timestamp.desc()).all()
-            
-            # Load assignees for each query
-            for query in queries + my_queries:
-                # Initialize assignees list to empty list
-                query._assignees_list = []
-                try:
-                    # Check if query_assignees table exists
-                    try:
-                        assignees_result = db.session.execute(
-                            text("SELECT u.id, u.username, u.email, u.firstname, u.lastname, u.userRole FROM query_assignees qa JOIN user u ON qa.user_id = u.id WHERE qa.query_id = :query_id"),
-                            {'query_id': query.id}
-                        ).fetchall()
-                        query._assignees_list = [dict(row._mapping) for row in assignees_result]
-                    except Exception:
-                        # Table doesn't exist or relationship not working, try using ORM
-                        try:
-                            if hasattr(query, 'assignees') and query.assignees:
-                                query._assignees_list = [{'id': u.id, 'username': u.username, 'email': u.email, 'firstname': u.firstname, 'lastname': u.lastname, 'userRole': u.userRole} for u in query.assignees]
-                        except Exception:
-                            pass  # Keep empty list
-                except Exception:
-                    pass  # Keep empty list
-        else:
-            # Use raw SQL when column doesn't exist
-            # Need to manually construct objects and convert timestamp strings to datetime
-            if can_view_all_queries():
-                result = db.session.execute(
-                    text("SELECT * FROM helpdesk_queries ORDER BY timestamp DESC")
-                )
-            else:
-                result = db.session.execute(
-                    text("SELECT * FROM helpdesk_queries WHERE created_by = :username OR created_by = 'anonymous' ORDER BY timestamp DESC"),
-                    {'username': current_user.username}
-                )
-            
-            queries = []
-            for row in result:
-                row_dict = dict(row._mapping)
-                # Convert timestamp string to datetime if it's a string
-                if 'timestamp' in row_dict and isinstance(row_dict['timestamp'], str):
-                    try:
-                        row_dict['timestamp'] = datetime.fromisoformat(row_dict['timestamp'].replace('Z', '+00:00'))
-                    except Exception:
-                        try:
-                            row_dict['timestamp'] = datetime.strptime(row_dict['timestamp'], '%Y-%m-%d %H:%M:%S')
-                        except Exception:
-                            row_dict['timestamp'] = None
-                query_obj = HelpDeskQuery(**row_dict)
-                # Initialize and load assignees
-                query_obj._assignees_list = []
-                try:
-                    assignees_result = db.session.execute(
-                        text("SELECT u.id, u.username, u.email, u.firstname, u.lastname, u.userRole FROM query_assignees qa JOIN user u ON qa.user_id = u.id WHERE qa.query_id = :query_id"),
-                        {'query_id': query_obj.id}
-                    ).fetchall()
-                    query_obj._assignees_list = [dict(row._mapping) for row in assignees_result]
-                except Exception:
-                    pass  # Keep empty list
-                queries.append(query_obj)
-            
-            result = db.session.execute(
-                text("SELECT * FROM helpdesk_queries WHERE created_by = :username ORDER BY timestamp DESC"),
-                {'username': current_user.username}
-            )
-            
-            my_queries = []
-            for row in result:
-                row_dict = dict(row._mapping)
-                # Convert timestamp string to datetime if it's a string
-                if 'timestamp' in row_dict and isinstance(row_dict['timestamp'], str):
-                    try:
-                        row_dict['timestamp'] = datetime.fromisoformat(row_dict['timestamp'].replace('Z', '+00:00'))
-                    except Exception:
-                        try:
-                            row_dict['timestamp'] = datetime.strptime(row_dict['timestamp'], '%Y-%m-%d %H:%M:%S')
-                        except Exception:
-                            row_dict['timestamp'] = None
-                query_obj = HelpDeskQuery(**row_dict)
-                # Initialize and load assignees
-                query_obj._assignees_list = []
-                try:
-                    assignees_result = db.session.execute(
-                        text("SELECT u.id, u.username, u.email, u.firstname, u.lastname, u.userRole FROM query_assignees qa JOIN user u ON qa.user_id = u.id WHERE qa.query_id = :query_id"),
-                        {'query_id': query_obj.id}
-                    ).fetchall()
-                    query_obj._assignees_list = [dict(row._mapping) for row in assignees_result]
-                except Exception:
-                    pass  # Keep empty list
-                my_queries.append(query_obj)
-    except Exception as e:
-        app.logger.error(f"Error fetching queries: {str(e)}")
-        queries = []
-        my_queries = []
-
-    return render_template('help_desk.html', form=form, queries=queries, my_queries=my_queries, title='Help desk')
+    """Legacy Help Desk entry — redirect into the support hub."""
+    qid = request.args.get('query', type=int)
+    if qid:
+        return redirect(url_for('help_desk.detail', query_id=qid))
+    return redirect(url_for('help_desk.index'))
 
 
 @app.route('/api/help-desk/stats', methods=['GET'])
@@ -23516,7 +23346,8 @@ def register_game_user():
             surname=surname,
             username=username,
             age=age,
-            phone_number=phone_number
+            phone_number=phone_number,
+            auth_source='local',
         )
         # Automatically assign age range based on age
         game_user.age_range = game_user.determine_age_range()
@@ -23533,7 +23364,8 @@ def register_game_user():
                 'username': game_user.username,
                 'age': game_user.age,
                 'age_range': game_user.age_range,
-                'phone_number': game_user.phone_number
+                'phone_number': game_user.phone_number,
+                'auth_source': game_user.auth_source,
             }
         }), 201
     except Exception as e:
@@ -23543,47 +23375,45 @@ def register_game_user():
 
 @app.route('/api/game-users/register-public', methods=['POST'])
 def register_game_user_public():
-    """Public registration endpoint for game users to register themselves"""
+    """Public self-registration is disabled — use Smart Learning credentials."""
+    return jsonify({
+        'error': (
+            'Register on Smart Learning / Ruzivo first, then sign in here '
+            'with the same learner username and password.'
+        )
+    }), 403
+
+
+@app.route('/api/game-users/login', methods=['POST'])
+def game_user_login():
+    """Login for game users via Smart Learning / Ruzivo student credentials."""
     try:
-        data = request.get_json()
-        firstname = data.get('firstname', '').strip()
-        surname = data.get('surname', '').strip()
+        from app.services.ruzivo_student_auth import (
+            RuzivoAuthError,
+            authenticate_student,
+            sync_game_user_from_ruzivo,
+            user_needs_dob,
+        )
+
+        data = request.get_json() or {}
         username = data.get('username', '').strip()
         password = data.get('password', '')
-        age = data.get('age')
-        phone_number = data.get('phone_number', '').strip() or None
-        
-        if not all([firstname, surname, username, password, age]):
-            return jsonify({'error': 'All fields are required'}), 400
-        
-        # Validate age (accept all ages)
+
+        if not username or not password:
+            return jsonify({'error': 'Username and password are required'}), 400
+
         try:
-            age = int(age)
-            if age < 0 or age > 150:  # Reasonable age limits
-                return jsonify({'error': 'Please enter a valid age'}), 400
-        except (ValueError, TypeError):
-            return jsonify({'error': 'Age must be a valid number'}), 400
-        
-        # Check if username exists
-        existing = GameUser.query.filter_by(username=username).first()
-        if existing:
-            return jsonify({'error': 'Username already exists'}), 400
-        
-        game_user = GameUser(
-            firstname=firstname,
-            surname=surname,
-            username=username,
-            age=age,
-            phone_number=phone_number
-        )
-        # Automatically assign age range based on age
-        game_user.age_range = game_user.determine_age_range()
-        game_user.set_password(password)
-        db.session.add(game_user)
+            student = authenticate_student(username, password)
+        except RuzivoAuthError as auth_err:
+            return jsonify({'error': str(auth_err)}), auth_err.status_code
+
+        game_user = sync_game_user_from_ruzivo(student)
         db.session.commit()
-        
+
+        needs_dob = user_needs_dob(game_user)
         return jsonify({
             'success': True,
+            'needs_dob': needs_dob,
             'user': {
                 'id': game_user.id,
                 'firstname': game_user.firstname,
@@ -23591,44 +23421,48 @@ def register_game_user_public():
                 'username': game_user.username,
                 'age': game_user.age,
                 'age_range': game_user.age_range,
-                'phone_number': game_user.phone_number
+                'dob': game_user.dob.isoformat() if game_user.dob else None,
+                'auth_source': game_user.auth_source,
+                'ruzivo_student_id': game_user.ruzivo_student_id,
             }
-        }), 201
+        }), 200
     except Exception as e:
         db.session.rollback()
+        app.logger.exception('Game user login failed')
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/game-users/login', methods=['POST'])
-def game_user_login():
-    """Login for game users"""
+@app.route('/api/game-users/<int:user_id>/dob', methods=['POST'])
+def set_game_user_dob(user_id):
+    """Save date of birth for a game user when Ruzivo has none."""
     try:
-        data = request.get_json()
-        username = data.get('username', '').strip()
-        password = data.get('password', '')
-        
-        if not username or not password:
-            return jsonify({'error': 'Username and password are required'}), 400
-        
-        game_user = GameUser.query.filter_by(username=username).first()
-        if not game_user or not game_user.check_password(password):
-            return jsonify({'error': 'Invalid username or password'}), 401
-        
-        # Update last login
-        game_user.last_login = datetime.utcnow()
+        from app.services.ruzivo_student_auth import apply_local_dob
+
+        data = request.get_json() or {}
+        dob_value = data.get('dob')
+        game_user = GameUser.query.get_or_404(user_id)
+        try:
+            apply_local_dob(game_user, dob_value)
+        except ValueError as ve:
+            return jsonify({'error': str(ve)}), 400
         db.session.commit()
-        
         return jsonify({
             'success': True,
+            'needs_dob': False,
             'user': {
                 'id': game_user.id,
                 'firstname': game_user.firstname,
                 'surname': game_user.surname,
                 'username': game_user.username,
-                'age': game_user.age
+                'age': game_user.age,
+                'age_range': game_user.age_range,
+                'dob': game_user.dob.isoformat() if game_user.dob else None,
+                'auth_source': game_user.auth_source,
+                'ruzivo_student_id': game_user.ruzivo_student_id,
             }
         }), 200
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 
@@ -23654,6 +23488,10 @@ def list_game_users():
                 'username': u.username,
                 'age': u.age,
                 'phone_number': u.phone_number,
+                'dob': u.dob.isoformat() if getattr(u, 'dob', None) else None,
+                'auth_source': getattr(u, 'auth_source', None) or 'local',
+                'ruzivo_student_id': getattr(u, 'ruzivo_student_id', None),
+                'grade': getattr(u, 'grade', None),
                 'created_at': u.created_at.isoformat() if u.created_at else None,
                 'last_login': u.last_login.isoformat() if u.last_login else None
             } for u in users]
@@ -23787,29 +23625,113 @@ def get_leaderboard():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/ruzivo-exercises', methods=['GET'])
+@login_required
+def browse_ruzivo_exercises():
+    """Browse Ruzivo exercises available for import (staff only)."""
+    has_permission = (
+        current_user.userRole == 'Admin'
+        or current_user.has_privilege('Content Development')
+        or current_user.has_privilege('Akello Events')
+    )
+    if not has_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    try:
+        from app.services.ruzivo_exercise_import import fetch_exercises, grade_to_age_range
+
+        grade = request.args.get('grade', type=int)
+        hs_param = (request.args.get('hs') or '').strip().lower()
+        hs = True if hs_param in ('1', 'true', 'yes') else False if hs_param in ('0', 'false', 'no') else None
+        limit = min(int(request.args.get('limit', 50)), 500)
+        specs = []
+        for is_hs in ([hs] if hs is not None else [False, True]):
+            specs.extend(fetch_exercises(hs=is_hs, grade=grade, limit=limit))
+        return jsonify({
+            'exercises': [{
+                'ex_id': s['ex_id'],
+                'exercise': s['exercise'],
+                'grade': s['grade'],
+                'age_range': grade_to_age_range(s['grade']),
+                'subject': s['subject_name'],
+                'question_count': len(s['questions']),
+                'ruzivo_source': s['ruzivo_source'],
+            } for s in specs[:limit]],
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/ruzivo-exercises/sync', methods=['POST'])
+@login_required
+def sync_ruzivo_exercises():
+    """Import/update Ruzivo exercises into the games catalog."""
+    has_permission = (
+        current_user.userRole == 'Admin'
+        or current_user.has_privilege('Content Development')
+        or current_user.has_privilege('Akello Events')
+    )
+    if not has_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    try:
+        from app.services.ruzivo_exercise_import import sync_ruzivo_exercises
+
+        data = request.get_json() or {}
+        grade = data.get('grade')
+        if grade is not None:
+            grade = int(grade)
+        hs = data.get('hs')
+        if hs is not None:
+            hs = bool(hs)
+        limit = min(int(data.get('limit_per_band', 100)), 500)
+        stats = sync_ruzivo_exercises(grade=grade, hs=hs, limit_per_band=limit)
+        return jsonify({'success': True, 'stats': stats}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 # Game API Routes
 @app.route('/api/games', methods=['GET'])
 def list_games():
-    """List all games (filter by active if requested, filter by user age if user_id provided)"""
+    """List all games (filter by active, age, subject, or user age)."""
     try:
         active_only = request.args.get('active', '').lower() == 'true'
         user_id = request.args.get('user_id')  # For filtering by user's age
+        age_range_filter = (request.args.get('age_range') or '').strip()
+        subject_filter = (request.args.get('subject') or '').strip()
+        content_source_filter = (request.args.get('content_source') or '').strip()
+        grade_filter = request.args.get('grade', type=int)
+        prefer_user_grade = request.args.get('prefer_user_grade', '').lower() in ('1', 'true', 'yes')
+        include_cross = request.args.get('include_cross_age', '').lower() == 'true'
         
         query = Game.query
         if active_only:
             query = query.filter_by(is_active=True)
+
+        if content_source_filter in ('ruzivo', 'general_knowledge'):
+            query = query.filter(Game.content_source == content_source_filter)
+
+        if subject_filter:
+            query = query.filter(Game.subject == subject_filter)
+
+        if grade_filter is not None:
+            query = query.filter(Game.grade == grade_filter)
+
+        if age_range_filter:
+            ages = [age_range_filter]
+            if include_cross and age_range_filter in ('9-10', '11-12', '13-14', '15-16', '17-19'):
+                ages.append('9-19')
+            query = query.filter(Game.age_range.in_(ages))
         
         # Filter by user's age if user_id is provided
+        game_user = None
         if user_id:
             try:
                 game_user = GameUser.query.get(int(user_id))
                 if game_user and game_user.age:
                     user_age = game_user.age
-                    # Filter games where user's age falls within the game's age range
-                    # Age ranges: "Infants", "9-10", "11-12", "13-14", "15-16", "17-19", "9-19", "Youths & older"
                     matching_ranges = []
                     
-                    # Determine which age ranges match the user's age
                     if user_age < 9:
                         matching_ranges = ['Infants']
                     elif 9 <= user_age <= 10:
@@ -23822,30 +23744,54 @@ def list_games():
                         matching_ranges = ['15-16', '9-19']
                     elif 17 <= user_age <= 19:
                         matching_ranges = ['17-19', '9-19']
-                    else:  # user_age > 19
+                    else:
                         matching_ranges = ['Youths & older']
                     
                     if matching_ranges:
                         query = query.filter(Game.age_range.in_(matching_ranges))
                     else:
-                        # If age doesn't match any range, return empty
-                        query = query.filter(Game.id == -1)  # Impossible condition
+                        query = query.filter(Game.id == -1)
+                # Smart Learning: prefer learner grade when available
+                if (
+                    prefer_user_grade
+                    and content_source_filter == 'ruzivo'
+                    and game_user
+                    and game_user.grade
+                    and grade_filter is None
+                ):
+                    query = query.filter(Game.grade == int(game_user.grade))
             except (ValueError, AttributeError):
-                pass  # Invalid user_id, ignore filter
+                pass
         
-        games = query.order_by(Game.created_at.desc()).all()
-        
+        games = query.order_by(Game.subject.asc(), Game.grade.asc(), Game.title.asc()).all()
+
+        from app.games.quiz_titles import display_game_title
+
         return jsonify({
             'games': [{
                 'id': g.id,
-                'title': g.title,
+                'title': display_game_title(
+                    g.title,
+                    content_source=getattr(g, 'content_source', None),
+                    grade=getattr(g, 'grade', None),
+                ),
                 'description': g.description,
                 'max_score': g.max_score,
                 'age_range': g.age_range,
+                'subject': g.subject,
+                'content_source': getattr(g, 'content_source', None) or 'general_knowledge',
+                'grade': getattr(g, 'grade', None),
+                'ruzivo_ex_id': getattr(g, 'ruzivo_ex_id', None),
                 'difficulty_level': g.difficulty_level,
                 'is_active': g.is_active,
+                'bank_item_count': len(g.bank_items) if g.bank_items is not None else 0,
                 'created_at': g.created_at.isoformat() if g.created_at else None
-            } for g in games]
+            } for g in games],
+            'learner': {
+                'grade': game_user.grade if game_user else None,
+                'age': game_user.age if game_user else None,
+                'needs_dob': (game_user.dob is None) if game_user else None,
+            } if game_user else None,
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -23870,6 +23816,7 @@ def create_game():
         html_content = data.get('html_content', '').strip()
         max_score = data.get('max_score')
         age_range = data.get('age_range', '').strip()
+        subject = (data.get('subject') or '').strip()
         difficulty_level = data.get('difficulty_level', '').strip()
         is_active = data.get('is_active', True)
         
@@ -23892,6 +23839,8 @@ def create_game():
             html_content=html_content,
             max_score=int(max_score) if max_score else None,
             age_range=age_range if age_range else None,
+            subject=subject or None,
+            content_source=(data.get('content_source') or 'general_knowledge').strip() or 'general_knowledge',
             difficulty_level=difficulty_level if difficulty_level else None,
             is_active=bool(is_active),
             created_by=current_user.id
@@ -23907,6 +23856,7 @@ def create_game():
                 'description': game.description,
                 'max_score': game.max_score,
                 'age_range': game.age_range,
+                'subject': game.subject,
                 'difficulty_level': game.difficulty_level,
                 'is_active': game.is_active
             }
@@ -23920,15 +23870,23 @@ def create_game():
 def get_game(game_id):
     """Get a specific game"""
     try:
+        from app.games.quiz_titles import display_game_title
         game = Game.query.get_or_404(game_id)
         return jsonify({
             'game': {
                 'id': game.id,
-                'title': game.title,
+                'title': display_game_title(
+                    game.title,
+                    content_source=getattr(game, 'content_source', None),
+                    grade=getattr(game, 'grade', None),
+                ),
                 'description': game.description,
                 'html_content': game.html_content,
                 'max_score': game.max_score,
                 'age_range': game.age_range,
+                'subject': game.subject,
+                'content_source': getattr(game, 'content_source', None) or 'general_knowledge',
+                'grade': getattr(game, 'grade', None),
                 'difficulty_level': game.difficulty_level,
                 'is_active': game.is_active,
                 'created_at': game.created_at.isoformat() if game.created_at else None
@@ -23967,6 +23925,8 @@ def update_game(game_id):
             if age_range and age_range not in valid_age_ranges:
                 return jsonify({'error': f'Age range must be one of: {", ".join(valid_age_ranges)}'}), 400
             game.age_range = age_range if age_range else None
+        if 'subject' in data:
+            game.subject = (data.get('subject') or '').strip() or None
         if 'difficulty_level' in data:
             difficulty_level = data.get('difficulty_level', '').strip()
             valid_difficulty_levels = ['easy', 'medium', 'hard']
@@ -23987,12 +23947,67 @@ def update_game(game_id):
                 'description': game.description,
                 'max_score': game.max_score,
                 'age_range': game.age_range,
+                'subject': game.subject,
                 'difficulty_level': game.difficulty_level,
                 'is_active': game.is_active
             }
         }), 200
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/game-bank-items', methods=['GET'])
+@login_required
+def list_game_bank_items():
+    """List selectable bank items for race builders (staff)."""
+    has_permission = (
+        current_user.userRole == 'Admin'
+        or current_user.has_privilege('Content Development')
+        or current_user.has_privilege('Akello Events')
+    )
+    if not has_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    try:
+        from app.models import GameBankItem
+        age_range = (request.args.get('age_range') or '').strip()
+        subject = (request.args.get('subject') or '').strip()
+        active_only = request.args.get('active', 'true').lower() != 'false'
+        include_cross = request.args.get('include_cross_age', 'true').lower() != 'false'
+
+        query = GameBankItem.query
+        if active_only:
+            query = query.filter_by(is_active=True)
+        if subject:
+            query = query.filter(GameBankItem.subject == subject)
+        if age_range:
+            ages = [age_range]
+            if include_cross and age_range in ('9-10', '11-12', '13-14', '15-16', '17-19'):
+                ages.append('9-19')
+            query = query.filter(GameBankItem.age_range.in_(ages))
+
+        items = query.order_by(
+            GameBankItem.subject.asc(),
+            GameBankItem.sort_order.asc(),
+            GameBankItem.title.asc(),
+        ).all()
+        return jsonify({
+            'items': [{
+                'id': item.id,
+                'game_id': item.game_id,
+                'subject': item.subject,
+                'age_range': item.age_range,
+                'item_kind': item.item_kind,
+                'slug': item.slug,
+                'title': item.title,
+                'prompt': item.prompt,
+                'payload': item.payload_json or {},
+                'points_default': item.points_default,
+                'sort_order': item.sort_order,
+                'game_title': item.game.title if item.game else None,
+            } for item in items]
+        }), 200
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
@@ -24031,6 +24046,13 @@ def submit_game_score():
         # Get user from request body (sent from frontend sessionStorage)
         if not user_id:
             return jsonify({'error': 'User not authenticated. Please login again.'}), 401
+
+        game_user = GameUser.query.get(int(user_id))
+        if not game_user:
+            return jsonify({'error': 'User not found. Please login again.'}), 401
+        from app.services.ruzivo_student_auth import user_needs_dob
+        if user_needs_dob(game_user):
+            return jsonify({'error': 'Please enter your date of birth before playing.', 'needs_dob': True}), 403
         
         if not game_id or score is None:
             return jsonify({'error': 'Game ID and score are required'}), 400
@@ -24084,6 +24106,30 @@ def submit_game_score():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/game-users/<int:user_id>/session', methods=['GET'])
+def get_game_user_session(user_id):
+    """Session check for portal (DOB gate, grade, display name)."""
+    try:
+        from app.services.ruzivo_student_auth import user_needs_dob
+        game_user = GameUser.query.get_or_404(user_id)
+        needs = user_needs_dob(game_user)
+        return jsonify({
+            'user': {
+                'id': game_user.id,
+                'firstname': game_user.firstname,
+                'surname': game_user.surname,
+                'username': game_user.username,
+                'age': game_user.age,
+                'grade': game_user.grade,
+                'dob': game_user.dob.isoformat() if game_user.dob else None,
+                'needs_dob': needs,
+                'auth_source': game_user.auth_source,
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/game-users/<int:user_id>/scores', methods=['GET'])
 def get_game_user_scores(user_id):
     """Get scores for a specific game user (public endpoint for game users)"""
@@ -24093,18 +24139,39 @@ def get_game_user_scores(user_id):
         # Get related data
         game_ids = list(set(s.game_id for s in scores))
         games = {g.id: g for g in Game.query.filter(Game.id.in_(game_ids)).all()} if game_ids else {}
+
+        best_by_game = {}
+        for s in scores:
+            prev = best_by_game.get(s.game_id)
+            if prev is None or (s.percentage or 0) > (prev.get('percentage') or 0) or (
+                (s.percentage or 0) == (prev.get('percentage') or 0) and s.score >= prev.get('score', 0)
+            ):
+                best_by_game[s.game_id] = {
+                    'game_id': s.game_id,
+                    'score': s.score,
+                    'max_score': s.max_score,
+                    'percentage': s.percentage,
+                    'attempt_number': s.attempt_number,
+                    'attempts': 0,
+                }
+        attempt_counts = {}
+        for s in scores:
+            attempt_counts[s.game_id] = attempt_counts.get(s.game_id, 0) + 1
+        for gid, row in best_by_game.items():
+            row['attempts'] = attempt_counts.get(gid, 1)
         
         return jsonify({
             'scores': [{
                 'id': s.id,
                 'game_id': s.game_id,
-                'game_title': games.get(s.game_id, Game()).title if s.game_id in games else 'Unknown',
+                'game_title': games.get(s.game_id).title if s.game_id in games else 'Unknown',
                 'score': s.score,
                 'max_score': s.max_score,
                 'percentage': s.percentage,
                 'attempt_number': s.attempt_number,
                 'played_at': s.played_at.isoformat() if s.played_at else None
-            } for s in scores]
+            } for s in scores],
+            'best_by_game': best_by_game,
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500

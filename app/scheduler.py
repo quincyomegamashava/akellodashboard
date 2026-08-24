@@ -301,6 +301,17 @@ def _scheduled_pm_stats_snapshot(app):
             logger.exception("PM stats snapshot scheduler job failed: %s", e)
 
 
+def _scheduled_helpdesk_sla(app):
+    with app.app_context():
+        try:
+            from app.blueprints.help_desk.services import check_sla_breaches
+            n = check_sla_breaches()
+            if n:
+                logger.info("Helpdesk SLA job: marked %d new breach(es)", n)
+        except Exception as e:
+            logger.exception("Helpdesk SLA scheduler job failed: %s", e)
+
+
 def start_scheduler(app):
     """
     Start the background scheduler with a 60-second email fetch job.
@@ -316,6 +327,14 @@ def start_scheduler(app):
         trigger="interval",
         seconds=60,
         id="helpdesk_email_fetch",
+    )
+    _scheduler.add_job(
+        func=_scheduled_helpdesk_sla,
+        args=[app],
+        trigger="interval",
+        minutes=5,
+        id="helpdesk_sla_check",
+        replace_existing=True,
     )
     _scheduler.add_job(
         func=_scheduled_meeting_overdue_notifications,

@@ -4,6 +4,8 @@
 
 {% block head_extra %}
 
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
+
 <link rel="stylesheet" href="{{ url_for('static', filename='css/meeting_notes.css') }}">
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
@@ -16,39 +18,29 @@
 
 <div class="mn-app-shell">
 
-<div class="mn-page">
+<div class="mn-page mn-workspace">
 
   <header class="mn-subheader">
-
-    <nav class="mn-breadcrumb">
-
-      <a href="{{ url_for('meeting_notes.index') }}">Meeting notes</a>
-
-    </nav>
 
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
 
       <div>
 
-        <h1 class="mn-hero-title mb-0">All action items</h1>
+        <h1 class="mn-hero-title mb-0">All tasks</h1>
 
-        <p class="mn-hero-sub d-none d-md-block">Global workspace — edit tasks across all meetings.</p>
+        <p class="mn-hero-sub d-none d-md-block">Edit action items across every meeting.</p>
 
       </div>
 
       <div class="mn-subheader-actions">
-
-        <button type="button" class="btn btn-sm mn-btn-ghost d-none d-md-inline-flex" data-bs-toggle="modal" data-bs-target="#mn-command-palette"><i class="fas fa-search me-1"></i> Search</button>
-
-        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-export-pdf"><i class="fas fa-file-pdf me-1"></i><span class="d-none d-sm-inline"> PDF</span></button>
-
-        <a class="btn btn-sm mn-btn-ghost d-none d-md-inline-flex" href="{{ url_for('meeting_notes.index') }}">Meetings</a>
 
         {% if overdue_count %}
 
         <span class="badge bg-danger-subtle text-danger border">{{ overdue_count }} overdue</span>
 
         {% endif %}
+
+        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-export-pdf"><i class="fas fa-file-pdf me-1"></i><span class="d-none d-sm-inline"> PDF</span></button>
 
       </div>
 
@@ -62,39 +54,17 @@
 
 
 
-  <div class="mn-card">
+  <div class="mn-canvas">
 
-    <div class="mn-card-body">
+    <div class="mn-canvas-chrome">
 
-      {% include "meeting_notes/_filter_offcanvas.html" %}
+      {% set mn_show_col_presets = false %}
 
-      <div class="mn-toolbar mt-2">
+      {% set mn_show_priority_group = false %}
 
-        <div class="mn-view-pills" role="group">
-
-          <button type="button" class="btn active" data-mn-view-btn="board">Board</button>
-
-          <button type="button" class="btn" data-mn-view-btn="table">Table</button>
-
-          <button type="button" class="btn" data-mn-view-btn="calendar">Calendar</button>
-
-          <button type="button" class="btn" data-mn-view-btn="gantt">Gantt</button>
-
-        </div>
-
-        <div class="mn-view-pills ms-2 mn-board-group-pills" id="mn-board-group-toggle" role="group">
-
-          <button type="button" class="btn active" data-mn-board-group="status">By status</button>
-
-          <button type="button" class="btn" data-mn-board-group="platform">By platform</button>
-
-        </div>
-
-      </div>
+      {% include "meeting_notes/_canvas_toolbar.html" %}
 
     </div>
-
-  </div>
 
 
 
@@ -273,6 +243,8 @@
     </div>
 
   </div>
+
+  </div>{# /.mn-canvas #}
 
 </div>
 

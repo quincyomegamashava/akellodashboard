@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Race</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+  <script src="{{ url_for('static', filename='js/quiz_math.js') }}"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: #ffffff;
+      min-height: 100vh;
+    }
+    .portal-card {
+      background: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px rgba(15, 23, 42, 0.05);
+    }
+    .option-btn.selected { outline: 2px solid #0f172a; background: #f8fafc; }
+    #puzzleMount { min-height: 280px; }
+    #scoreSubmissionStatus { display: none; }
+    .live-pulse {
+      width: 8px; height: 8px; border-radius: 9999px; background: #0f172a;
+      display: inline-block; box-shadow: 0 0 0 0 rgba(15,23,42,0.35);
+      animation: pulseDot 1.6s infinite;
+    }
+    @keyframes pulseDot {
+      0% { box-shadow: 0 0 0 0 rgba(15,23,42,0.35); }
+      70% { box-shadow: 0 0 0 8px rgba(15,23,42,0); }
+      100% { box-shadow: 0 0 0 0 rgba(15,23,42,0); }
+    }
+  </style>
+</head>
+<body class="font-sans min-h-screen">
+  <header class="sticky top-0 z-40 bg-white border-b border-slate-100 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+          <span class="live-pulse"></span> Live Race
+        </div>
+        <h1 id="raceTitle" class="text-lg font-extrabold text-slate-900 truncate">Loading…</h1>
+      </div>
+      <div class="flex items-center gap-4 shrink-0">
+        <div class="text-right">
+          <div class="text-[11px] font-semibold text-slate-500" id="timerLabel">Starts in</div>
+          <div id="timerDisplay" class="text-2xl font-mono font-bold text-slate-900">--:--</div>
+        </div>
+        <a href="/game-dashboard" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:border-slate-800 hover:text-slate-900 hover:bg-slate-50">
+          <i class="fas fa-arrow-left mr-1"></i> Dashboard
+        </a>
+      </div>
+    </div>
+    <div class="max-w-7xl mx-auto px-4 pb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+      <span id="itemProgress" class="font-medium">Item 0 / 0</span>
+      <span class="text-slate-300">•</span>
+      <span id="myScore" class="font-medium">Progress 0</span>
+      <span class="text-slate-300">•</span>
+      <span id="playerCount" class="font-medium">0 racers</span>
+      <span class="hidden sm:inline ml-auto text-[11px] font-semibold text-slate-400">Powering Growth</span>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <section class="lg:col-span-2">
+      <div id="stageCard" class="portal-card rounded-2xl p-6 min-h-[420px]">
+        <div id="waitOverlay" class="text-center py-16">
+          <i class="fas fa-flag-checkered text-5xl text-slate-400 mb-4"></i>
+          <h2 class="text-xl font-extrabold text-slate-900">Get ready</h2>
+          <p class="text-slate-500 mt-2" id="waitMessage">The race will start soon.</p>
+        </div>
+        <div id="itemStage" class="hidden"></div>
+        <div id="resultsStage" class="hidden"></div>
+      </div>
+    </section>
+    <aside>
+      <div class="portal-card rounded-2xl overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50">
+          <i class="fas fa-trophy text-slate-700"></i>
+          <h2 class="font-bold text-slate-900">Leaderboard</h2>
+        </div>
+        <div id="leaderboard" class="p-4 text-sm text-slate-500">Waiting for racers…</div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const raceId = {{ race_id|int }};
+    const gameUserId = sessionStorage.getItem('gameUserId');
+    if (!gameUserId) window.location.href = '/game-login';
+
+    let race = null;
+    let items = [];
+    let currentIndex = 0;
+    let tickTimer = null;
+    let ended = false;
+    let socket = null;
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    async function init() {
+      const current = await getJson(`/api/game-races/${raceId}?user_id=${gameUserId}`);
+      if (current && current.race && (current.race.status === 'finished' || current.race.status === 'cancelled')) {
+        applyRace(current.race);
+        handleRaceEnd(true);
+        return;
+      }
+      const joined = await postJson(`/api/game-races/${raceId}/join`, { user_id: Number(gameUserId) });
+      if (!joined.ok) {
+        showFatal(joined.error || 'Could not join this race');
+        return;
+      }
+      applyRace(joined.race);
+      connectSocket();
+      tickTimer = setInterval(tick, 1000);
+      tick();
+    }
+
+    function connectSocket() {
+      try {
+        socket = io('/game-races', { transports: ['websocket', 'polling'] });
+        socket.on('connect', () => {
+          socket.emit('join_race', { race_id: raceId, game_user_id: Number(gameUserId) });
+        });
+        socket.on('leaderboard_update', (payload) => {
+          if (payload.leaderboard) renderLeaderboard(payload.leaderboard);
+          if (payload.player_count != null) {
+            document.getElementById('playerCount').textContent = `${payload.player_count} racer${payload.player_count === 1 ? '' : 's'}`;
+          }
+          if (payload.status === 'finished') handleRaceEnd();
+        });
+        socket.on('race_ended', handleRaceEnd);
+      } catch (err) {
+        console.warn('Socket unavailable, using polling', err);
+      }
+      setInterval(refreshRace, 5000);
+    }
+
+    async function refreshRace() {
+      const data = await getJson(`/api/game-races/${raceId}?user_id=${gameUserId}`);
+      if (data && data.race) applyRace(data.race, { keepStage: true });
+    }
+
+    function applyRace(next, opts = {}) {
+      race = next;
+      items = next.items || [];
+      document.getElementById('raceTitle').textContent = race.title || 'Race';
+      document.getElementById('playerCount').textContent = `${race.player_count || 0} racer${(race.player_count || 0) === 1 ? '' : 's'}`;
+      if (race.leaderboard) renderLeaderboard(race.leaderboard);
+      updateScoreHeader();
+      if (race.status === 'finished' || (race.me && race.me.finished)) {
+        handleRaceEnd(true);
+        return;
+      }
+      if (!opts.keepStage) maybeShowStage();
+    }
+
+    function tick() {
+      if (!race) return;
+      const nowRemain = remainingNow();
+      const untilStart = secondsUntilStart();
+      if (race.status === 'upcoming' || untilStart > 0) {
+        document.getElementById('timerLabel').textContent = 'Starts in';
+        document.getElementById('timerDisplay').textContent = formatTime(untilStart);
+        document.getElementById('waitMessage').textContent = `Get ready. ${items.length} items. ${formatTime(untilStart)} until start.`;
+        return;
+      }
+      document.getElementById('timerLabel').textContent = 'Time left';
+      document.getElementById('timerDisplay').textContent = formatTime(nowRemain);
+      if (nowRemain <= 0) {
+        handleTimeout();
+        return;
+      }
+      if (document.getElementById('itemStage').classList.contains('hidden') && !ended) {
+        maybeShowStage();
+      }
+    }
+
+    function remainingNow() {
+      if (!race || !race.ends_at) return 0;
+      return Math.max(0, Math.floor((new Date(race.ends_at) - new Date()) / 1000));
+    }
+
+    function secondsUntilStart() {
+      if (!race || !race.starts_at) return 0;
+      return Math.max(0, Math.floor((new Date(race.starts_at) - new Date()) / 1000));
+    }
+
+    function maybeShowStage() {
+      if (!race || ended) return;
+      if (secondsUntilStart() > 0) {
+        document.getElementById('waitOverlay').classList.remove('hidden');
+        document.getElementById('itemStage').classList.add('hidden');
+        return;
+      }
+      document.getElementById('waitOverlay').classList.add('hidden');
+      document.getElementById('itemStage').classList.remove('hidden');
+      if (currentIndex >= items.length) currentIndex = Math.max(0, items.length - 1);
+      renderCurrentItem();
+    }
+
+    function hasDraft(itemId) {
+      const ids = new Set([
+        ...((race.me && race.me.draft_item_ids) || []),
+        ...((race.me && race.me.answered_item_ids) || []),
+      ]);
+      return ids.has(itemId);
+    }
+
+    function getDraftForItem(itemId) {
+      const answers = (race.me && race.me.answers) || {};
+      return answers[String(itemId)] || answers[itemId] || null;
+    }
+
+    function renderCurrentItem() {
+      const item = items[currentIndex];
+      document.getElementById('itemProgress').textContent = `Item ${Math.min(currentIndex + 1, items.length)} / ${items.length}`;
+      const stage = document.getElementById('itemStage');
+      document.querySelectorAll('style[data-race-style]').forEach((el) => el.remove());
+      if (!item) return;
+      const draft = getDraftForItem(item.id);
+      if (item.item_type === 'quiz') {
+        stage.innerHTML = quizHtml(item);
+        if (draft && draft.selected_index != null) {
+          const btn = stage.querySelector(`.option-btn[data-index="${draft.selected_index}"]`);
+          if (btn) btn.classList.add('selected');
+        }
+      } else if (item.item_type === 'question') {
+        stage.innerHTML = questionHtml(item);
+        if (draft && draft.answer != null) {
+          const kind = (item.payload && item.payload.kind) || 'short';
+          if (kind === 'true_false') {
+            const btn = stage.querySelector(`.option-btn[data-answer="${draft.answer}"]`);
+            if (btn) btn.classList.add('selected');
+          } else {
+            const input = document.getElementById('shortAnswer');
+            if (input) input.value = draft.answer;
+          }
+        }
+      } else {
+        stage.innerHTML = `<div class="mb-3 text-sm text-slate-500">Puzzle · ${escapeHtml(item.game_title || 'Game')} · ${item.points} pts</div><div id="puzzleMount"><div class="text-center py-12 text-slate-400"><i class="fas fa-spinner fa-spin text-2xl"></i></div></div>`;
+        loadPuzzle(item);
+      }
+      updateFinishButton();
+      if (window.QuizMath) window.QuizMath.typesetMath(stage);
+    }
+
+    function navHtml() {
+      return `
+        <div class="mt-6 flex flex-wrap gap-3 items-center">
+          <button type="button" onclick="goPrev()" class="rounded-lg border px-4 py-2.5 text-slate-600" ${currentIndex <= 0 ? 'disabled' : ''}>Previous</button>
+          <button type="button" onclick="goNext()" class="rounded-lg border px-4 py-2.5 text-slate-600" ${currentIndex >= items.length - 1 ? 'disabled' : ''}>Next</button>
+          <button type="button" onclick="finishRace()" class="rounded-lg bg-slate-900 text-white px-5 py-2.5 font-semibold ml-auto">Finish & submit</button>
+        </div>
+        <p id="draftStatus" class="mt-3 text-sm text-slate-500"></p>`;
+    }
+
+    function updateFinishButton() {
+      const el = document.getElementById('draftStatus');
+      if (!el || !race || !race.me) return;
+      const progress = race.me.progress || 0;
+      el.textContent = `${progress} of ${items.length} items saved. You can change answers until you finish.`;
+    }
+
+    function goPrev() {
+      if (currentIndex <= 0) return;
+      currentIndex -= 1;
+      renderCurrentItem();
+    }
+
+    function goNext() {
+      if (currentIndex >= items.length - 1) return;
+      currentIndex += 1;
+      renderCurrentItem();
+    }
+
+    function quizHtml(item) {
+      const options = (item.payload && item.payload.options) || [];
+      return `
+        <div class="text-xs uppercase tracking-wide text-slate-500 font-bold mb-2">Quiz · ${item.points} pts</div>
+        <h2 class="text-xl font-extrabold text-slate-900 mb-6">${escapeHtml(item.prompt || '')}</h2>
+        <div class="space-y-3" id="quizOptions">
+          ${options.map((opt, i) => `
+            <button type="button" class="option-btn w-full text-left rounded-xl border border-slate-200 px-4 py-3 hover:border-slate-800" data-index="${i}">
+              ${escapeHtml(opt)}
+            </button>
+          `).join('')}
+        </div>
+        <div class="mt-6 flex gap-3">
+          <button type="button" onclick="saveQuizDraft()" class="rounded-xl bg-slate-900 text-white px-5 py-2.5 font-bold hover:bg-slate-800">Save answer</button>
+          <button type="button" onclick="skipItem()" class="rounded-xl border border-slate-200 px-5 py-2.5 text-slate-600 font-semibold">Skip</button>
+        </div>
+        ${navHtml()}
+      `;
+    }
+
+    function questionHtml(item) {
+      const kind = (item.payload && item.payload.kind) || 'short';
+      const body = kind === 'true_false' ? `
+        <div class="flex gap-3">
+          <button type="button" class="option-btn flex-1 rounded-xl border px-4 py-3" data-answer="true">True</button>
+          <button type="button" class="option-btn flex-1 rounded-xl border px-4 py-3" data-answer="false">False</button>
+        </div>
+      ` : `<input id="shortAnswer" class="w-full rounded-xl border px-4 py-3" placeholder="Your answer">`;
+      return `
+        <div class="text-xs uppercase tracking-wide text-slate-500 font-semibold mb-2">Question · ${item.points} pts</div>
+        <h2 class="text-xl font-bold text-slate-800 mb-6">${escapeHtml(item.prompt || '')}</h2>
+        ${body}
+        <div class="mt-6 flex gap-3">
+          <button type="button" onclick="saveQuestionDraft('${kind}')" class="rounded-xl bg-slate-900 text-white px-5 py-2.5 font-bold hover:bg-slate-800">Save answer</button>
+          <button type="button" onclick="skipItem()" class="rounded-lg border px-5 py-2.5 text-slate-600">Skip</button>
+        </div>
+        ${navHtml()}
+      `;
+    }
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.option-btn');
+      if (!btn) return;
+      btn.parentElement.querySelectorAll('.option-btn').forEach((el) => el.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+
+    async function saveQuizDraft() {
+      const selected = document.querySelector('#quizOptions .option-btn.selected');
+      if (!selected) return alert('Choose an option first');
+      await saveDraft({ selected_index: Number(selected.dataset.index) });
+    }
+
+    async function saveQuestionDraft(kind) {
+      let answer = '';
+      if (kind === 'true_false') {
+        const selected = document.querySelector('#itemStage .option-btn.selected');
+        if (!selected) return alert('Choose True or False');
+        answer = selected.dataset.answer;
+      } else {
+        answer = (document.getElementById('shortAnswer') || {}).value || '';
+        if (!answer.trim()) return alert('Enter an answer');
+      }
+      await saveDraft({ answer });
+    }
+
+    async function skipItem() {
+      await saveDraft({ skipped: true, selected_index: -1, answer: '' });
+    }
+
+    let submitting = false;
+
+    async function saveDraft(body) {
+      const item = items[currentIndex];
+      if (!item || ended || submitting) return;
+      submitting = true;
+      const url = `/api/game-races/${raceId}/items/${item.id}/draft`;
+      const result = await postJson(url, {
+        user_id: Number(gameUserId),
+        ...body,
+      });
+      submitting = false;
+      if (!result.ok) {
+        alert(result.error || 'Could not save');
+        return;
+      }
+      applyRace(result.race, { keepStage: true });
+      const status = document.getElementById('draftStatus');
+      if (status) status.textContent = 'Saved — you can change this until you finish the race.';
+    }
+
+    async function loadPuzzle(item) {
+      try {
+        const r = await fetch(`/api/games/${item.game_id}`);
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Failed to load puzzle');
+        injectGameHtml(data.game.html_content, data.game, item);
+      } catch (err) {
+        document.getElementById('puzzleMount').innerHTML = `<p class="text-red-600">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    function injectGameHtml(html, game, item) {
+      const mount = document.getElementById('puzzleMount');
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const styles = Array.from(doc.querySelectorAll('style'));
+      const scripts = Array.from(doc.querySelectorAll('script'));
+      const scriptContents = scripts.map((script) => ({ src: script.src, text: script.textContent, type: script.type }));
+      scripts.forEach((s) => s.remove());
+      styles.forEach((s) => s.remove());
+      styles.forEach((style) => {
+        const el = document.createElement('style');
+        el.dataset.raceStyle = '1';
+        el.textContent = style.textContent;
+        document.head.appendChild(el);
+      });
+      mount.innerHTML = doc.body.innerHTML + `<div class="mt-4"><button type="button" onclick="skipItem()" class="rounded-lg border px-4 py-2 text-slate-600 text-sm">Skip puzzle</button></div>`;
+      window.gameScoreSubmit = function(score, maxScore) {
+        submitPuzzleScore({ score: Number(score), max_score: Number(maxScore || game.max_score || item.points) });
+      };
+      scriptContents.forEach((scriptData) => {
+        const newScript = document.createElement('script');
+        if (scriptData.type) newScript.type = scriptData.type;
+        if (scriptData.src) newScript.src = scriptData.src;
+        else newScript.textContent = scriptData.text;
+        mount.appendChild(newScript);
+      });
+      if (!mount.dataset.scoreClickBound) {
+        mount.dataset.scoreClickBound = '1';
+        mount.addEventListener('click', function(e) {
+          const btn = e.target.closest('#checkBtn');
+          if (!btn || btn.disabled) return;
+          setTimeout(() => {
+            const scoreBox = document.getElementById('scoreBox');
+            if (!scoreBox || !window.gameScoreSubmit) return;
+            const match = (scoreBox.textContent || '').match(/(?:Score|Answered):\s*(\d+)\s*\/\s*(\d+)/i);
+            if (match) window.gameScoreSubmit(parseInt(match[1], 10), parseInt(match[2], 10));
+          }, 400);
+        });
+      }
+    }
+
+    async function submitPuzzleScore(body) {
+      const item = items[currentIndex];
+      if (!item || ended || submitting) return;
+      submitting = true;
+      const result = await postJson(`/api/game-races/${raceId}/items/${item.id}/submit`, {
+        user_id: Number(gameUserId),
+        ...body,
+      });
+      submitting = false;
+      if (!result.ok) alert(result.error || 'Could not submit puzzle score');
+      else applyRace(result.race, { keepStage: true });
+    }
+
+    async function handleTimeout() {
+      if (ended) return;
+      const item = items[currentIndex];
+      if (item && item.item_type === 'puzzle') {
+        const scoreBox = document.getElementById('scoreBox');
+        const match = scoreBox && (scoreBox.textContent || '').match(/Score:\s*(\d+)\s*\/\s*(\d+)/i);
+        if (match) {
+          await postJson(`/api/game-races/${raceId}/items/${item.id}/submit`, {
+            user_id: Number(gameUserId),
+            score: parseInt(match[1], 10),
+            max_score: parseInt(match[2], 10),
+          });
+        }
+      }
+      await finishRace();
+    }
+
+    async function finishRace() {
+      if (ended) return;
+      ended = true;
+      const result = await postJson(`/api/game-races/${raceId}/finish`, { user_id: Number(gameUserId) });
+      if (result.race) applyRace(result.race, { keepStage: true });
+      handleRaceEnd(true);
+    }
+
+    function handleRaceEnd(force) {
+      if (ended && !force) return;
+      ended = true;
+      if (tickTimer) {
+        clearInterval(tickTimer);
+        tickTimer = null;
+      }
+      document.getElementById('timerLabel').textContent = 'Finished';
+      document.getElementById('timerDisplay').textContent = '0:00';
+      document.getElementById('waitOverlay').classList.add('hidden');
+      document.getElementById('itemStage').classList.add('hidden');
+      const board = (race && race.leaderboard) || [];
+      const me = race && race.me;
+      const podium = board.slice(0, 3);
+      document.getElementById('resultsStage').classList.remove('hidden');
+      document.getElementById('resultsStage').innerHTML = `
+        <div class="text-center">
+          <i class="fas fa-flag-checkered text-4xl text-slate-400 mb-3"></i>
+          <h2 class="text-2xl font-bold text-slate-800">Race complete</h2>
+          <p class="text-slate-500 mt-2">Your score: <strong>${me ? me.score : 0}</strong>${me && me.place ? ` · Place #${me.place}` : ''}</p>
+        </div>
+        <div class="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          ${podium.map((row, i) => `
+            <div class="rounded-xl border p-4 text-center ${row.user_id == gameUserId ? 'border-slate-800 bg-slate-50' : 'border-slate-100'}">
+              <div class="text-2xl font-extrabold ${i === 0 ? 'text-slate-900' : 'text-slate-500'}">${i === 0 ? '1st' : i === 1 ? '2nd' : '3rd'}</div>
+              <div class="font-semibold mt-1">${escapeHtml(row.firstname)} ${escapeHtml(row.surname)}</div>
+              <div class="text-slate-900 font-bold">${row.score}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="mt-8">
+          <h3 class="font-bold text-slate-800 mb-3">Your answers</h3>
+          <div class="space-y-2 text-sm">
+            ${(items || []).map((item, idx) => {
+              const ans = (me && me.answers && (me.answers[String(item.id)] || me.answers[item.id])) || {};
+              const earned = ans.score != null ? ans.score : 0;
+              const max = ans.max != null ? ans.max : item.points;
+              const ok = ans.correct === true || (earned === max && max > 0 && !ans.skipped);
+              const skipped = !!ans.skipped;
+              return `<div class="rounded-lg border px-3 py-2 flex justify-between gap-3 ${skipped ? 'border-slate-200' : ok ? 'border-slate-300 bg-slate-50' : 'border-rose-200 bg-rose-50'}">
+                <span><span class="text-slate-400 mr-2">#${idx + 1}</span>${escapeHtml(item.prompt || item.game_title || item.item_type)}</span>
+                <span class="font-semibold whitespace-nowrap">${skipped ? 'Skipped' : (ok ? 'Correct' : 'Incorrect')} · ${earned}/${max}</span>
+              </div>`;
+            }).join('') || '<p class="text-slate-400">No item details available.</p>'}
+          </div>
+        </div>
+        <div class="mt-8 text-center">
+          <a href="/game-dashboard" class="inline-flex rounded-xl bg-slate-900 text-white px-5 py-2.5 font-bold hover:bg-slate-800">Back to dashboard</a>
+        </div>
+      `;
+      renderLeaderboard(board);
+      if (window.QuizMath) window.QuizMath.typesetMath(document.getElementById('resultsStage'));
+    }
+
+    function renderLeaderboard(rows) {
+      const el = document.getElementById('leaderboard');
+      if (!rows || !rows.length) {
+        el.innerHTML = '<p class="text-slate-400">No racers yet.</p>';
+        return;
+      }
+      const live = race && race.status === 'live';
+      el.innerHTML = rows.map((row) => `
+        <div class="flex items-center justify-between py-2 border-b border-slate-100 last:border-0 ${row.user_id == gameUserId ? 'font-semibold text-slate-900' : 'text-slate-700'}">
+          <span><span class="text-slate-400 mr-2">#${row.place}</span>${escapeHtml(row.firstname)} ${escapeHtml(row.surname)}</span>
+          <span>${live && row.show_progress ? `${row.progress || row.score}/${row.total_items || ''}` : row.score}${row.finished ? ' <i class="fas fa-check text-slate-500 text-xs"></i>' : ''}</span>
+        </div>
+      `).join('');
+    }
+
+    function updateScoreHeader() {
+      if (!race || !race.me) {
+        document.getElementById('myScore').textContent = 'Progress 0';
+        return;
+      }
+      if (race.status === 'live' && !race.me.finished) {
+        document.getElementById('myScore').textContent = `Progress ${race.me.progress || 0}/${items.length || race.mix.total_items || 0}`;
+      } else {
+        const score = race.me.score || 0;
+        const max = race.mix ? race.mix.total_points : 0;
+        document.getElementById('myScore').textContent = `Score ${score}${max ? ' / ' + max : ''}`;
+      }
+    }
+
+    function showFatal(message) {
+      document.getElementById('waitOverlay').innerHTML = `<p class="text-rose-600">${escapeHtml(message)}</p><p class="mt-4"><a class="text-slate-900 font-semibold" href="/game-dashboard">Back to dashboard</a></p>`;
+    }
+
+    function formatTime(total) {
+      const m = Math.floor(Math.max(0, total) / 60);
+      const s = Math.max(0, total) % 60;
+      return `${m}:${String(s).padStart(2, '0')}`;
+    }
+
+    async function getJson(url) {
+      try {
+        const r = await fetch(url);
+        return await r.json();
+      } catch (err) {
+        return null;
+      }
+    }
+
+    async function postJson(url, body) {
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await r.json();
+        return { ok: r.ok, ...data };
+      } catch (err) {
+        return { ok: false, error: err.message };
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s || '').replace(/[&<>"]+/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] || c));
+    }
+
+    window.saveQuizDraft = saveQuizDraft;
+    window.saveQuestionDraft = saveQuestionDraft;
+    window.skipItem = skipItem;
+    window.goPrev = goPrev;
+    window.goNext = goNext;
+    window.finishRace = finishRace;
+  </script>
+</body>
+</html>

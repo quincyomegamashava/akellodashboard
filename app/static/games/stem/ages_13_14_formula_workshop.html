@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HBC: Formula Workshop</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --surface: #ffffff;
+      --ink: #1e293b;
+      --muted: #64748b;
+      --line: #d0d8e2;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --ok: #15803d;
+      --bad: #b91c1c;
+      --panel: #f8fafc;
+      --shadow: 0 6px 18px rgba(30, 41, 59, 0.07);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      background:
+        linear-gradient(180deg, #e2eaf4 0%, var(--bg) 40%, #e8edf3 100%);
+      color: var(--ink);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 16px; }
+    header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 12px; flex-wrap: wrap; margin-bottom: 10px;
+    }
+    header h1 {
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      font-size: 1.4rem; letter-spacing: -0.02em;
+    }
+    header .sub {
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: var(--muted); font-size: 0.9rem; margin-top: 4px; max-width: 36rem;
+    }
+    #scoreBox {
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: var(--surface); padding: 10px 16px; border-radius: 10px;
+      font-weight: 800; box-shadow: var(--shadow); border: 1px solid var(--line);
+    }
+    .stats {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+      margin-bottom: 10px; font-family: "Segoe UI", Tahoma, sans-serif;
+    }
+    .stat {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 10px; padding: 10px 12px; box-shadow: var(--shadow);
+    }
+    .stat span {
+      display: block; font-size: 0.68rem; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--muted); font-weight: 700;
+    }
+    .stat strong { font-size: 1rem; }
+    .tabs {
+      display: flex; gap: 4px; font-family: "Segoe UI", Tahoma, sans-serif;
+    }
+    .tab {
+      padding: 10px 16px; border: 1px solid var(--line); border-bottom: none;
+      border-radius: 10px 10px 0 0; background: #e2e8f0; cursor: pointer;
+      font-weight: 700; color: var(--muted);
+    }
+    .tab.on { background: var(--surface); color: var(--ink); }
+    .panel {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 0 12px 12px 12px; padding: 18px; box-shadow: var(--shadow);
+      min-height: 360px; font-family: "Segoe UI", Tahoma, sans-serif;
+    }
+    .hidden { display: none; }
+    .skills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .skill {
+      font-size: 0.75rem; padding: 4px 10px; border-radius: 6px;
+      background: #eef2f7; color: var(--muted); font-weight: 700; border: 1px solid var(--line);
+    }
+    .skill.got { background: #dcfce7; color: var(--ok); border-color: #86efac; }
+    #scenario {
+      font-size: 1.05rem; font-weight: 600; margin-bottom: 6px;
+    }
+    #given {
+      color: var(--muted); font-size: 0.9rem; margin-bottom: 12px;
+      padding: 10px; background: var(--panel); border-radius: 8px; border: 1px dashed var(--line);
+    }
+    .label { font-size: 0.82rem; font-weight: 800; color: var(--muted); margin: 10px 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .formulas { display: flex; flex-wrap: wrap; gap: 8px; }
+    .fbtn {
+      min-height: 44px; padding: 8px 14px; border: 2px solid #94a3b8;
+      background: #fff; border-radius: 8px; cursor: pointer; font-weight: 800;
+      font-family: "Consolas", "Courier New", monospace;
+    }
+    .fbtn.sel { background: var(--accent-soft); border-color: var(--accent); color: #1e3a8a; }
+    .fbtn:disabled { opacity: 0.55; cursor: default; }
+    input[type=number] {
+      width: 100%; max-width: 240px; padding: 12px; font-size: 1.05rem;
+      border: 2px solid var(--line); border-radius: 8px; margin-top: 4px;
+    }
+    input[type=number]:focus { outline: none; border-color: var(--accent); }
+    .feedback {
+      margin-top: 14px; min-height: 100px; padding: 12px; border-radius: 10px;
+      background: var(--panel); font-size: 0.92rem; white-space: pre-wrap;
+      border: 1px solid var(--line);
+    }
+    .feedback.ok { background: #f0fdf4; border-color: #86efac; color: var(--ok); }
+    .feedback.bad { background: #fef2f2; border-color: #fca5a5; color: var(--bad); }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .act {
+      min-height: 44px; padding: 10px 16px; border: none; border-radius: 8px;
+      font-weight: 800; cursor: pointer; font-size: 0.95rem;
+    }
+    #submitAns { background: var(--accent); color: #fff; }
+    #submitAns:disabled { opacity: 0.45; }
+    #hintBtn, #nextBtn { background: #e2e8f0; color: var(--ink); }
+    #nextBtn:disabled { opacity: 0.4; }
+    #checkBtn { background: #0f766e; color: #fff; }
+    #checkBtn:disabled { opacity: 0.4; cursor: default; }
+    .log { list-style: none; }
+    .log li {
+      padding: 10px 12px; margin-bottom: 8px; background: var(--panel);
+      border-radius: 8px; border-left: 4px solid var(--line); font-size: 0.9rem;
+    }
+    .log li.pass { border-left-color: var(--ok); }
+    .log li.fail { border-left-color: var(--bad); }
+    .review-head { margin-bottom: 12px; }
+    .review-head h2 { font-size: 1.1rem; margin-bottom: 4px; }
+    @media (max-width: 720px) {
+      .stats { grid-template-columns: 1fr 1fr; }
+      header h1 { font-size: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>HBC: Formula Workshop</h1>
+        <p class="sub">Combined Science · Ages 13–14 · Speed, distance, time and related formulas with Zimbabwe road contexts.</p>
+      </div>
+      <div id="scoreBox">Score: 0 / 10</div>
+    </header>
+
+    <div class="stats">
+      <div class="stat"><span>Round</span><strong id="statRound">1 / 10</strong></div>
+      <div class="stat"><span>Correct</span><strong id="statCorrect">0</strong></div>
+      <div class="stat"><span>Formula picks</span><strong id="statFormula">0 ok</strong></div>
+      <div class="stat"><span>Topic</span><strong>v, d, t …</strong></div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab on" data-tab="play" role="tab" aria-selected="true">Play</button>
+      <button type="button" class="tab" data-tab="review" role="tab" aria-selected="false">Review</button>
+    </div>
+
+    <div class="panel" id="playPanel" role="tabpanel">
+      <div class="skills" id="skills"></div>
+      <p id="scenario"></p>
+      <p id="given"></p>
+      <p class="label">1. Choose the formula</p>
+      <div class="formulas" id="formulas"></div>
+      <p class="label">2. Enter the numeric answer</p>
+      <label for="ans">Your answer
+        <input type="number" id="ans" step="any" inputmode="decimal">
+      </label>
+      <div class="feedback" id="feedback" aria-live="polite"></div>
+      <div class="actions">
+        <button type="button" class="act" id="submitAns">Submit answer</button>
+        <button type="button" class="act" id="hintBtn">Hint</button>
+        <button type="button" class="act" id="nextBtn" disabled>Next round</button>
+        <button type="button" class="act" id="checkBtn" disabled>Submit score</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="reviewPanel" role="tabpanel">
+      <div class="review-head">
+        <h2>Review log</h2>
+        <p style="color:var(--muted);font-size:0.9rem;">Each attempt with formula choice and diagnostics.</p>
+      </div>
+      <ul class="log" id="log"></ul>
+    </div>
+  </div>
+
+  <script>
+    const CONTENT = {
+      learningArea: "Combined Science",
+      topic: "Speed, distance, time and related formulas (Zimbabwe road/bus contexts: Harare–Bulawayo, etc.)",
+      ageRange: "13-14",
+      totalRounds: 10,
+      maxScore: 10,
+      questionPool: [
+        {
+          id: "speed_bus_hb",
+          find: "v",
+          formula: "v=d/t",
+          formulas: ["v=d/t", "d=vt", "t=d/v"],
+          skill: "v = d / t",
+          build: function () {
+            var d = [300, 360, 420, 440, 480][randInt(0, 4)];
+            var t = [5, 6, 7, 8][randInt(0, 3)];
+            var v = round2(d / t);
+            return {
+              scenario: "A ZUPCO coach covers " + d + " km on the Harare–Bulawayo highway in " + t + " hours. Find average speed v in km/h.",
+              given: "d = " + d + " km, t = " + t + " h. Find v.",
+              answer: v,
+              unit: "km/h",
+              vars: { d: d, t: t, v: v },
+              steps: [
+                "Average speed uses v = d / t.",
+                "Substitute: v = " + d + " / " + t + " = " + v + " km/h.",
+                "Do not use d = v t here — that finds distance when speed and time are known."
+              ],
+              wrongFormulaNote: "d=vt finds distance; t=d/v finds time. You need speed → v=d/t."
+            };
+          }
+        },
+        {
+          id: "distance_mutare",
+          find: "d",
+          formula: "d=vt",
+          formulas: ["v=d/t", "d=vt", "t=d/v"],
+          skill: "d = v t",
+          build: function () {
+            var v = [60, 70, 80, 90][randInt(0, 3)];
+            var t = [2, 3, 4, 5][randInt(0, 3)];
+            var d = v * t;
+            return {
+              scenario: "A minibus leaves Mutare toward Harare at " + v + " km/h for " + t + " hours (steady average). How far does it travel?",
+              given: "v = " + v + " km/h, t = " + t + " h. Find d.",
+              answer: d,
+              unit: "km",
+              vars: { d: d, t: t, v: v },
+              steps: [
+                "Distance: d = v × t.",
+                "d = " + v + " × " + t + " = " + d + " km.",
+                "Multiplying speed by time gives distance on a steady journey."
+              ],
+              wrongFormulaNote: "v=d/t finds speed; t=d/v finds time. Distance needs d = v t."
+            };
+          }
+        },
+        {
+          id: "time_masvingo",
+          find: "t",
+          formula: "t=d/v",
+          formulas: ["v=d/t", "d=vt", "t=d/v"],
+          skill: "t = d / v",
+          build: function () {
+            var d = [180, 240, 300, 360][randInt(0, 3)];
+            var v = [60, 75, 90][randInt(0, 2)];
+            var t = round2(d / v);
+            return {
+              scenario: "A goods truck must cover " + d + " km from Masvingo to Gweru at an average " + v + " km/h. How long will the trip take?",
+              given: "d = " + d + " km, v = " + v + " km/h. Find t.",
+              answer: t,
+              unit: "h",
+              vars: { d: d, t: t, v: v },
+              steps: [
+                "Time: t = d / v.",
+                "t = " + d + " / " + v + " = " + t + " h.",
+                "Dividing distance by speed gives time of travel."
+              ],
+              wrongFormulaNote: "If you picked v=d/t you solved for speed. For time use t=d/v."
+            };
+          }
+        },
+        {
+          id: "speed_beira_corridor",
+          find: "v",
+          formula: "v=d/t",
+          formulas: ["v=d/t", "d=vt", "t=d/v"],
+          skill: "v = d / t",
+          build: function () {
+            var d = randInt(40, 120);
+            var t = randInt(1, 4);
+            var v = round2(d / t);
+            return {
+              scenario: "On a stretch near Forbes Border Post, a car travels " + d + " km in " + t + " h. Calculate average speed.",
+              given: "d = " + d + " km, t = " + t + " h. Find v.",
+              answer: v,
+              unit: "km/h",
+              vars: { d: d, t: t, v: v },
+              steps: [
+                "v = d / t = " + d + " / " + t + " = " + v + " km/h.",
+                "Units: kilometres ÷ hours → km/h.",
+                "Common error: adding d + t instead of dividing."
+              ],
+              wrongFormulaNote: "Wrong unknown selected. Speed is distance over time."
+            };
+          }
+        },
+        {
+          id: "distance_victoria_falls",
+          find: "d",
+          formula: "d=vt",
+          formulas: ["v=d/t", "d=vt", "t=d/v"],
+          skill: "d = v t",
+          build: function () {
+            var v = randInt(50, 100);
+            var t = randInt(2, 6);
+            var d = v * t;
+            return {
+              scenario: "A tourist bus averages " + v + " km/h for " + t + " hours toward Victoria Falls. Find the distance covered.",
+              given: "v = " + v + " km/h, t = " + t + " h. Find d.",
+              answer: d,
+              unit: "km",
+              vars: { d: d, t: t, v: v },
+              steps: [
+                "d = v t = " + v + " × " + t + " = " + d + " km.",
+                "Check: v = d/t = " + d + "/" + t + " = " + v + " km/h."
+              ],
+              wrongFormulaNote: "You chose a formula for a different unknown."
+            };
+          }
+        },
+        {
+          id: "time_chitungwiza",
+          find: "t",
+          formula: "t=d/v",
+          formulas: ["v=d/t", "d=vt", "t=d/v"],
+          skill: "t = d / v",
+          build: function () {
+            var d = [15, 20, 25, 30][randInt(0, 3)];
+            var v = [30, 40, 50][randInt(0, 2)];
+            var t = round2(d / v);
+            return {
+              scenario: "A kombi route of " + d + " km from Harare CBD toward Chitungwiza averages " + v + " km/h. Find travel time in hours.",
+              given: "d = " + d + " km, v = " + v + " km/h. Find t.",
+              answer: t,
+              unit: "h",
+              vars: { d: d, t: t, v: v },
+              steps: [
+                "t = d / v = " + d + " / " + v + " = " + t + " h.",
+                "If you compute v/d you inverted the formula (swapped variables)."
+              ],
+              wrongFormulaNote: "Time is distance divided by speed — t = d/v, not v/d."
+            };
+          }
+        },
+        {
+          id: "density_copper",
+          find: "rho",
+          formula: "ρ=m/V",
+          formulas: ["ρ=m/V", "m=ρV", "V=m/ρ", "v=d/t"],
+          skill: "ρ = m / V",
+          build: function () {
+            var V = [2, 4, 5, 8, 10][randInt(0, 4)];
+            var rho = [2, 3, 4, 5, 8][randInt(0, 4)];
+            var m = rho * V;
+            return {
+              scenario: "A copper sample from a Bindura school lab has mass m = " + m + " g and volume V = " + V + " cm³. Find density ρ.",
+              given: "m = " + m + " g, V = " + V + " cm³. Find ρ in g/cm³.",
+              answer: rho,
+              unit: "g/cm³",
+              vars: { m: m, V: V, rho: rho },
+              steps: [
+                "Density: ρ = m / V.",
+                "ρ = " + m + " / " + V + " = " + rho + " g/cm³.",
+                "Do not use speed formulas (v=d/t) — density is mass per volume."
+              ],
+              wrongFormulaNote: "Speed formulas do not apply. Density is ρ = m/V."
+            };
+          }
+        },
+        {
+          id: "force_newton",
+          find: "F",
+          formula: "F=ma",
+          formulas: ["F=ma", "a=F/m", "m=F/a", "v=d/t"],
+          skill: "F = m a",
+          build: function () {
+            var m = randInt(2, 12);
+            var a = randInt(2, 8);
+            var F = m * a;
+            return {
+              scenario: "A crate of mass " + m + " kg on a loading bay in Bulawayo is accelerated at " + a + " m/s². Find the net force F (N).",
+              given: "m = " + m + " kg, a = " + a + " m/s². Find F.",
+              answer: F,
+              unit: "N",
+              vars: { m: m, a: a, F: F },
+              steps: [
+                "Newton's second law: F = m × a.",
+                "F = " + m + " × " + a + " = " + F + " N.",
+                "Adding m + a is a common slip — force is a product."
+              ],
+              wrongFormulaNote: "v=d/t is for motion averages. Net force uses F = ma."
+            };
+          }
+        },
+        {
+          id: "speed_ms_convert_context",
+          find: "v",
+          formula: "v=d/t",
+          formulas: ["v=d/t", "d=vt", "t=d/v"],
+          skill: "v = d / t",
+          build: function () {
+            var d = [100, 200, 250, 400][randInt(0, 3)];
+            var t = [10, 20, 25, 40][randInt(0, 3)];
+            var v = round2(d / t);
+            return {
+              scenario: "In a Combined Science track trial in Gweru, an athlete runs " + d + " m in " + t + " s. Find speed in m/s.",
+              given: "d = " + d + " m, t = " + t + " s. Find v.",
+              answer: v,
+              unit: "m/s",
+              vars: { d: d, t: t, v: v },
+              steps: [
+                "v = d / t = " + d + " / " + t + " = " + v + " m/s.",
+                "Keep SI units consistent (metres and seconds → m/s).",
+                "Inverted ratio t/d would understate the speed."
+              ],
+              wrongFormulaNote: "Pick v=d/t when speed is the unknown."
+            };
+          }
+        },
+        {
+          id: "distance_lake_kariba",
+          find: "d",
+          formula: "d=vt",
+          formulas: ["v=d/t", "d=vt", "t=d/v"],
+          skill: "d = v t",
+          build: function () {
+            var v = [15, 20, 25, 30][randInt(0, 3)];
+            var t = [2, 3, 4][randInt(0, 2)];
+            var d = v * t;
+            return {
+              scenario: "A ferry on Lake Kariba averages " + v + " km/h for " + t + " hours between lakeside stops. Find distance travelled.",
+              given: "v = " + v + " km/h, t = " + t + " h. Find d.",
+              answer: d,
+              unit: "km",
+              vars: { d: d, t: t, v: v },
+              steps: [
+                "d = v × t = " + v + " × " + t + " = " + d + " km.",
+                "Ferry journeys still use the same distance–speed–time link."
+              ],
+              wrongFormulaNote: "Distance unknown → d = v t."
+            };
+          }
+        },
+        {
+          id: "mass_from_density",
+          find: "m",
+          formula: "m=ρV",
+          formulas: ["ρ=m/V", "m=ρV", "V=m/ρ", "d=vt"],
+          skill: "m = ρ V",
+          build: function () {
+            var rho = [2, 3, 5, 7][randInt(0, 3)];
+            var V = [3, 4, 6, 8][randInt(0, 3)];
+            var m = rho * V;
+            return {
+              scenario: "A rock specimen (density ρ = " + rho + " g/cm³, volume V = " + V + " cm³) is measured in a Kadoma classroom. Find mass m.",
+              given: "ρ = " + rho + " g/cm³, V = " + V + " cm³. Find m.",
+              answer: m,
+              unit: "g",
+              vars: { m: m, V: V, rho: rho },
+              steps: [
+                "Rearrange density: m = ρ × V.",
+                "m = " + rho + " × " + V + " = " + m + " g.",
+                "Using d=vt confuses motion with density — different quantities."
+              ],
+              wrongFormulaNote: "Mass from density: m = ρV, not a speed–distance formula."
+            };
+          }
+        },
+        {
+          id: "accel_from_force",
+          find: "a",
+          formula: "a=F/m",
+          formulas: ["F=ma", "a=F/m", "m=F/a", "t=d/v"],
+          skill: "a = F / m",
+          build: function () {
+            var m = [2, 4, 5, 8, 10][randInt(0, 4)];
+            var F = m * randInt(2, 6);
+            var a = round2(F / m);
+            return {
+              scenario: "A net force of " + F + " N acts on a " + m + " kg trolley in a Harare Combined Science lab. Find acceleration a.",
+              given: "F = " + F + " N, m = " + m + " kg. Find a.",
+              answer: a,
+              unit: "m/s²",
+              vars: { m: m, F: F, a: a },
+              steps: [
+                "From F = ma, rearrange: a = F / m.",
+                "a = " + F + " / " + m + " = " + a + " m/s².",
+                "Swapping to m/F inverts the relationship."
+              ],
+              wrongFormulaNote: "Acceleration from force: a = F/m. t=d/v is unrelated here."
+            };
+          }
+        }
+      ],
+      hints: {
+        wrongFormula: "That formula solves a different unknown. Match the missing quantity to the formula.",
+        added: "You added the values. Speed is distance divided by time (or use the matching product/quotient).",
+        inverted: "You inverted the ratio (swapped numerator and denominator).",
+        swappedVars: "Check which quantity is unknown — do not plug values into the wrong places.",
+        general: "Write the needed formula first, substitute carefully, then compute."
+      }
+    };
+
+    var SKILL_ORDER = ["v = d / t", "d = v t", "t = d / v", "ρ = m / V", "m = ρ V", "F = m a", "a = F / m"];
+
+    var score = 0;
+    var roundIndex = 0;
+    var finished = false;
+    var answered = false;
+    var sessionItems = [];
+    var current = null;
+    var selectedFormula = null;
+    var unlocked = {};
+    var formulaOkCount = 0;
+    var reviewLog = [];
+
+    var scoreBox = document.getElementById("scoreBox");
+    var feedback = document.getElementById("feedback");
+    var checkBtn = document.getElementById("checkBtn");
+    var submitAns = document.getElementById("submitAns");
+    var nextBtn = document.getElementById("nextBtn");
+    var ansInput = document.getElementById("ans");
+
+    function randInt(a, b) {
+      return Math.floor(Math.random() * (b - a + 1)) + a;
+    }
+    function round2(n) {
+      return Math.round(n * 100) / 100;
+    }
+
+    function initializeGameSession(pool) {
+      var shuffledPool = pool.slice();
+      for (var i = shuffledPool.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = shuffledPool[i];
+        shuffledPool[i] = shuffledPool[j];
+        shuffledPool[j] = tmp;
+      }
+      return shuffledPool.slice(0, CONTENT.totalRounds);
+    }
+
+    function updateScore() {
+      scoreBox.textContent = "Score: " + score + " / " + CONTENT.maxScore;
+      document.getElementById("statRound").textContent =
+        Math.min(roundIndex + 1, CONTENT.totalRounds) + " / " + CONTENT.totalRounds;
+      document.getElementById("statCorrect").textContent = String(score);
+      document.getElementById("statFormula").textContent = formulaOkCount + " ok";
+    }
+
+    function renderSkills() {
+      document.getElementById("skills").innerHTML = SKILL_ORDER.map(function (s) {
+        return '<span class="skill' + (unlocked[s] ? " got" : "") + '">' + s + "</span>";
+      }).join("");
+    }
+
+    function renderLog() {
+      var ul = document.getElementById("log");
+      if (!reviewLog.length) {
+        ul.innerHTML = "<li>No attempts yet. Play a round first.</li>";
+        return;
+      }
+      ul.innerHTML = reviewLog.map(function (entry) {
+        return '<li class="' + (entry.pass ? "pass" : "fail") + '">' + entry.html + "</li>";
+      }).join("");
+    }
+
+    function buildRound() {
+      answered = false;
+      selectedFormula = null;
+      submitAns.disabled = false;
+      nextBtn.disabled = true;
+      ansInput.disabled = false;
+      ansInput.value = "";
+      feedback.className = "feedback";
+      feedback.textContent = "";
+
+      var template = sessionItems[roundIndex];
+      var data = template.build();
+      current = { template: template, data: data };
+
+      document.getElementById("scenario").textContent = data.scenario;
+      document.getElementById("given").textContent = data.given;
+
+      var box = document.getElementById("formulas");
+      box.innerHTML = "";
+      template.formulas.forEach(function (f) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "fbtn";
+        b.textContent = f;
+        b.addEventListener("click", function () {
+          if (answered) return;
+          selectedFormula = f;
+          box.querySelectorAll(".fbtn").forEach(function (x) { x.classList.remove("sel"); });
+          b.classList.add("sel");
+        });
+        box.appendChild(b);
+      });
+
+      renderSkills();
+      updateScore();
+    }
+
+    function nearlyEqual(a, b) {
+      return Math.abs(Number(a) - Number(b)) < 0.051;
+    }
+
+    function diagnose(raw, okFormula, okVal) {
+      var d = current.data;
+      var lines = [];
+      var v = d.vars;
+
+      if (okFormula && okVal) {
+        lines.push("Correct! Formula and value both match.");
+      } else {
+        lines.push("Attempt reviewed.");
+        if (!okFormula) {
+          lines.push("Formula: you chose " + selectedFormula + ". Needed " + current.template.formula + ".");
+          lines.push(d.wrongFormulaNote || CONTENT.hints.wrongFormula);
+        } else {
+          lines.push("Formula choice OK (" + selectedFormula + ").");
+        }
+        if (!okVal) {
+          lines.push("Your number: " + raw + ". Correct: " + d.answer + " " + d.unit + ".");
+          if (v.d != null && v.t != null && nearlyEqual(raw, v.d + v.t)) {
+            lines.push("Diagnostic: " + CONTENT.hints.added);
+          } else if (v.d != null && v.t != null && nearlyEqual(raw, v.t / v.d)) {
+            lines.push("Diagnostic: " + CONTENT.hints.inverted);
+          } else if (v.d != null && v.v != null && nearlyEqual(raw, v.v / v.d)) {
+            lines.push("Diagnostic: " + CONTENT.hints.inverted);
+          } else if (v.m != null && v.V != null && nearlyEqual(raw, v.V / v.m)) {
+            lines.push("Diagnostic: " + CONTENT.hints.inverted);
+          } else if (v.F != null && v.m != null && nearlyEqual(raw, v.m / v.F)) {
+            lines.push("Diagnostic: " + CONTENT.hints.swappedVars);
+          } else {
+            lines.push("Diagnostic: " + CONTENT.hints.swappedVars);
+          }
+        }
+      }
+
+      lines.push("");
+      lines.push("Step-by-step correction:");
+      d.steps.forEach(function (s, i) {
+        lines.push((i + 1) + ". " + s);
+      });
+      return lines.join("\n");
+    }
+
+    submitAns.addEventListener("click", function () {
+      if (finished || answered) return;
+      if (!selectedFormula) {
+        feedback.className = "feedback bad";
+        feedback.textContent = "Pick a formula first, then enter your number.";
+        return;
+      }
+      var raw = Number(ansInput.value);
+      if (ansInput.value === "" || isNaN(raw)) {
+        feedback.className = "feedback bad";
+        feedback.textContent = "Enter a numeric answer.";
+        return;
+      }
+
+      answered = true;
+      submitAns.disabled = true;
+      ansInput.disabled = true;
+      document.querySelectorAll(".fbtn").forEach(function (b) { b.disabled = true; });
+
+      var okFormula = selectedFormula === current.template.formula;
+      var okVal = nearlyEqual(raw, current.data.answer);
+      var pass = okFormula && okVal;
+
+      if (okFormula) formulaOkCount += 1;
+      if (pass) {
+        score += 1;
+        unlocked[current.template.skill] = true;
+        feedback.className = "feedback ok";
+      } else {
+        feedback.className = "feedback bad";
+      }
+
+      var msg = diagnose(raw, okFormula, okVal);
+      feedback.textContent = msg;
+      updateScore();
+      renderSkills();
+
+      reviewLog.push({
+        pass: pass,
+        html:
+          "<strong>R" + (roundIndex + 1) + "</strong> · " +
+          (pass ? "Pass" : "Needs review") +
+          " · chose " + selectedFormula +
+          " · ans " + raw +
+          " · truth " + current.data.answer + " " + current.data.unit +
+          "<br><span style='color:#64748b'>" + current.data.scenario.slice(0, 120) + "…</span>"
+      });
+      renderLog();
+
+      nextBtn.disabled = false;
+      if (roundIndex >= CONTENT.totalRounds - 1) {
+        finished = true;
+        checkBtn.disabled = false;
+        nextBtn.disabled = true;
+        feedback.textContent += "\n\nWorkshop complete. Press Submit score to send your result.";
+      }
+    });
+
+    nextBtn.addEventListener("click", function () {
+      if (!answered || finished) return;
+      roundIndex += 1;
+      if (roundIndex >= CONTENT.totalRounds) {
+        finished = true;
+        checkBtn.disabled = false;
+        return;
+      }
+      buildRound();
+    });
+
+    document.getElementById("hintBtn").addEventListener("click", function () {
+      if (answered) return;
+      feedback.className = "feedback";
+      feedback.textContent =
+        "Hint: " + CONTENT.hints.general +
+        " This round asks for \"" + current.template.find +
+        "\". Match that unknown to the correct formula before calculating.";
+    });
+
+    document.querySelectorAll(".tab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        document.querySelectorAll(".tab").forEach(function (t) {
+          t.classList.remove("on");
+          t.setAttribute("aria-selected", "false");
+        });
+        tab.classList.add("on");
+        tab.setAttribute("aria-selected", "true");
+        var name = tab.getAttribute("data-tab");
+        document.getElementById("playPanel").classList.toggle("hidden", name !== "play");
+        document.getElementById("reviewPanel").classList.toggle("hidden", name !== "review");
+        if (name === "review") renderLog();
+      });
+    });
+
+    function submitScore() {
+      var finalScore = score;
+      var maxScore = CONTENT.maxScore;
+      updateScore();
+      if (window.gameScoreSubmit) {
+        window.gameScoreSubmit(finalScore, maxScore);
+      } else if (window.parent && window.parent.submitGameScore) {
+        var gameIdMatch = window.location.pathname.match(/\/play-game\/(\d+)/);
+        if (gameIdMatch) {
+          window.parent.submitGameScore(parseInt(gameIdMatch[1], 10), finalScore, maxScore);
+        }
+      }
+    }
+    checkBtn.addEventListener("click", submitScore);
+
+    function startGame() {
+      score = 0;
+      roundIndex = 0;
+      finished = false;
+      formulaOkCount = 0;
+      unlocked = {};
+      reviewLog = [];
+      sessionItems = initializeGameSession(CONTENT.questionPool);
+      checkBtn.disabled = true;
+      updateScore();
+      renderSkills();
+      renderLog();
+      buildRound();
+    }
+
+    startGame();
+  </script>
+</body>
+</html>

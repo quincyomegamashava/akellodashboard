@@ -14,55 +14,152 @@
 </datalist>
 
 <div class="mn-app-shell">
-<div class="mn-page mn-detail-layout" id="mn-page-detail">
+<div class="mn-page mn-workspace mn-detail-layout" id="mn-page-detail">
   <header class="mn-subheader">
-    <nav class="mn-breadcrumb">
-      <a href="{{ url_for('meeting_notes.index') }}">Meeting notes</a>
-      <span class="text-muted"> / </span>
-      <span class="text-muted">{{ meeting.meeting_date.strftime('%Y-%m-%d') }}</span>
-    </nav>
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
-      <div>
-        <h1 class="mn-hero-title mb-0">{{ meeting.title }}</h1>
-        <p class="mn-hero-sub d-none d-md-block">Track action items, assign owners, and export minutes.</p>
-      </div>
-      <div class="mn-subheader-actions">
-        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-meeting-mode" title="Meeting mode">Meeting mode</button>
-        <span id="mn-presence-avatars" class="d-inline-flex gap-1 ms-1"></span>
-        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-save-meta">Save</button>
-        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-meeting-details" data-bs-toggle="modal" data-bs-target="#mnMeetingDetailsModal">Meeting details</button>
-        <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-ai-extract" title="AI extract tasks"><i class="fas fa-wand-magic-sparkles me-1"></i><span class="d-none d-sm-inline"> Extract</span></button>
-        <button type="button" class="btn btn-sm mn-btn-ghost d-none d-md-inline-flex" data-bs-toggle="modal" data-bs-target="#mn-command-palette"><i class="fas fa-search me-1"></i> Search</button>
-        <div class="mn-overflow-wrap d-lg-none">
-          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-overflow-toggle" aria-label="More actions"><i class="fas fa-ellipsis"></i></button>
-          <div class="mn-overflow-menu" id="mn-overflow-menu">
-            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#mn-command-palette">Search</button>
-            <button type="button" class="dropdown-item" id="mn-btn-meeting-details-overflow">Meeting details</button>
-            <button type="button" class="dropdown-item" id="mn-btn-carry-forward-overflow" {% if not carry_forward_sources %}disabled{% endif %} data-bs-toggle="modal" data-bs-target="#mnCarryForwardModal">Carry forward</button>
-            <button type="button" class="dropdown-item" id="mn-btn-duplicate-meeting-overflow">Duplicate meeting</button>
-            <button type="button" class="dropdown-item" id="mn-btn-export-pdf-overflow">Export PDF</button>
-            <button type="button" class="dropdown-item" id="mn-btn-ai-summarize-overflow" style="display:none;">Summarize</button>
-          </div>
-        </div>
-        <div class="d-none d-lg-flex flex-wrap gap-2">
-          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-ai-summarize" style="display:none;">Summarize</button>
-          <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-toggle="modal" data-bs-target="#mn-command-palette"><i class="fas fa-search"></i></button>
-          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-carry-forward" {% if not carry_forward_sources %}disabled title="No other meetings yet"{% endif %} data-bs-toggle="modal" data-bs-target="#mnCarryForwardModal">Carry forward</button>
-          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-duplicate-meeting">Duplicate</button>
-          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-export-pdf"><i class="fas fa-file-pdf me-1"></i> PDF</button>
-        </div>
-      </div>
-    </div>
-    {% set mn_active = 'detail' %}
+    {% set mn_active = 'meetings' %}
     {% include "meeting_notes/_subnav.html" %}
-    <div class="mn-detail-tabs d-md-none" id="mn-detail-tabs" role="tablist">
-      <button type="button" class="mn-detail-tab active" data-mn-detail-tab="tasks">Tasks</button>
-      <button type="button" class="mn-detail-tab" data-mn-detail-tab="decisions">Decisions</button>
-      <button type="button" class="mn-detail-tab" data-mn-detail-tab="filters">Filters</button>
-    </div>
   </header>
 
-  <div id="mn-carry-suggestions" class="alert alert-info py-2 small d-none mb-2"></div>
+  <div class="mn-rail-backdrop" id="mn-rail-backdrop" aria-hidden="true"></div>
+
+  <div class="mn-detail-workspace">
+  <aside class="mn-context-rail" id="mn-context-rail" aria-label="Meeting context">
+    <div class="mn-context-rail-header">
+      <div class="min-w-0 flex-grow-1">
+        <nav class="mn-breadcrumb">
+          <a href="{{ url_for('meeting_notes.index') }}#meetings">Meetings</a>
+          <span class="text-muted"> / </span>
+          <span class="text-truncate d-inline-block" style="max-width: 10rem; vertical-align: bottom;">{{ meeting.title|e }}</span>
+        </nav>
+        <label class="mn-rail-section-label" for="mn-meta-title">Title</label>
+        <input type="text" class="form-control form-control-sm fw-semibold" id="mn-meta-title" value="{{ meeting.title|e }}" />
+      </div>
+      <button type="button" class="btn-close d-lg-none" id="mn-rail-close" aria-label="Close meeting details"></button>
+    </div>
+
+    <div class="row g-2">
+      <div class="col-6">
+        <label class="mn-rail-section-label" for="mn-meta-date">Date</label>
+        <input type="date" class="form-control form-control-sm" id="mn-meta-date" value="{{ meeting.meeting_date.strftime('%Y-%m-%d') }}" />
+      </div>
+      <div class="col-6">
+        <label class="mn-rail-section-label" for="mn-meta-time">Time</label>
+        <input type="text" class="form-control form-control-sm" id="mn-meta-time" value="{{ meeting.meeting_time or '' }}" placeholder="10:00 AM" />
+      </div>
+      <div class="col-12">
+        <label class="mn-rail-section-label" for="mn-meta-location">Place</label>
+        <input type="text" class="form-control form-control-sm" id="mn-meta-location" value="{{ meeting.location or '' }}" placeholder="Conference room / Zoom" />
+      </div>
+    </div>
+
+    <div>
+      <label class="mn-rail-section-label">Attendees</label>
+      <div id="mn-attendee-picker"></div>
+    </div>
+    <div>
+      <label class="mn-rail-section-label">Guests</label>
+      <div id="mn-guest-picker"></div>
+      <div class="form-text small">Enter + press Enter for guests</div>
+    </div>
+
+    <div>
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <label class="mn-rail-section-label mb-0" for="mn-meta-agenda">Agenda</label>
+        <button type="button" class="btn btn-sm mn-btn-ghost py-0" id="mn-btn-agenda-autofill">Auto-fill</button>
+      </div>
+      <textarea class="form-control form-control-sm" id="mn-meta-agenda" rows="4" placeholder="1. Welcome&#10;2. Project updates">{{ meeting.agenda or '' }}</textarea>
+    </div>
+
+    <div>
+      <label class="mn-rail-section-label" for="mn-meta-summary">Summary</label>
+      <textarea class="form-control form-control-sm" id="mn-meta-summary" rows="3" placeholder="Discussion notes">{{ meeting.summary or '' }}</textarea>
+    </div>
+
+    <div class="mn-rail-stats" id="mn-context-strip" role="group" aria-label="Meeting stats">
+      <div class="mn-rail-stat">
+        <strong>{{ attendee_ids|length }}{% if guest_names %}+{{ guest_names|length }}{% endif %}</strong>
+        <span>Attendees</span>
+      </div>
+      <div class="mn-rail-stat">
+        <strong>{{ meeting_stats.open + meeting_stats.in_progress }}</strong>
+        <span>Open</span>
+      </div>
+      <div class="mn-rail-stat">
+        <strong>{{ meeting_stats.done }}</strong>
+        <span>Done</span>
+      </div>
+      <div class="mn-rail-stat">
+        <strong>{{ meeting.meeting_date.strftime('%d %b') }}</strong>
+        <span>Date</span>
+      </div>
+    </div>
+
+    <div class="mn-rail-actions">
+      <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-save-meta">Save</button>
+      <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-toggle="modal" data-bs-target="#mnFocusModal">Focus row</button>
+      <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-new-item">New item</button>
+      <button type="button" class="btn btn-sm mn-btn-ghost d-none" id="mn-btn-meeting-details" data-bs-toggle="modal" data-bs-target="#mnMeetingDetailsModal">Details</button>
+    </div>
+  </aside>
+
+  <div class="mn-canvas">
+    <div class="mn-canvas-chrome">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div class="d-flex flex-wrap align-items-center gap-2 min-w-0">
+          <button type="button" class="btn btn-sm mn-btn-ghost mn-rail-open-btn" id="mn-rail-open" aria-controls="mn-context-rail">
+            <i class="fas fa-circle-info me-1"></i>Details
+          </button>
+          <h1 class="mn-hero-title mb-0 text-truncate" style="font-size:1.1rem;">{{ meeting.title|e }}</h1>
+          <span id="mn-presence-avatars" class="d-inline-flex gap-1"></span>
+        </div>
+        <div class="mn-canvas-toolbar-right mn-subheader-actions">
+          <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-meeting-mode" title="Meeting mode">Meeting mode</button>
+          <div class="dropdown mn-actions-menu mn-overflow-wrap">
+            <button type="button" class="btn btn-sm mn-btn-ghost dropdown-toggle" id="mn-overflow-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions">
+              Actions
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end mn-overflow-menu" id="mn-overflow-menu" aria-labelledby="mn-overflow-toggle">
+              <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#mn-command-palette">Search</button></li>
+              <li><button type="button" class="dropdown-item" id="mn-btn-ai-extract" title="AI extract tasks"><i class="fas fa-wand-magic-sparkles me-1"></i>Extract</button></li>
+              <li><button type="button" class="dropdown-item" id="mn-btn-email-attendees" data-bs-toggle="modal" data-bs-target="#mnEmailAttendeesModal"><i class="fas fa-envelope me-1"></i>Email attendees</button></li>
+              <li><button type="button" class="dropdown-item" id="mn-btn-share-slack" title="Share updates to Slack"><i class="fas fa-share-nodes me-1"></i>Share to Slack</button></li>
+              <li><button type="button" class="dropdown-item" id="mn-btn-carry-forward" {% if not carry_forward_sources %}disabled title="No earlier meeting to carry from"{% endif %} data-bs-toggle="modal" data-bs-target="#mnCarryForwardModal">Carry forward</button></li>
+              <li><button type="button" class="dropdown-item" id="mn-btn-duplicate-meeting" data-bs-toggle="modal" data-bs-target="#mnDuplicateModal">Duplicate meeting</button></li>
+              <li><button type="button" class="dropdown-item" id="mn-btn-export-pdf"><i class="fas fa-file-pdf me-1"></i>Export PDF</button></li>
+              <li><button type="button" class="dropdown-item" id="mn-btn-ai-summarize" style="display:none;">Summarize</button></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><button type="button" class="dropdown-item" id="mn-btn-meeting-details-overflow">Open details panel</button></li>
+              <li class="d-none"><button type="button" class="dropdown-item" id="mn-btn-email-attendees-overflow">Email</button></li>
+              <li class="d-none"><button type="button" class="dropdown-item" id="mn-btn-share-slack-overflow">Slack</button></li>
+              <li class="d-none"><button type="button" class="dropdown-item" id="mn-btn-carry-forward-overflow">Carry forward</button></li>
+              <li class="d-none"><button type="button" class="dropdown-item" id="mn-btn-duplicate-meeting-overflow">Duplicate</button></li>
+              <li class="d-none"><button type="button" class="dropdown-item" id="mn-btn-export-pdf-overflow">PDF</button></li>
+              <li class="d-none"><button type="button" class="dropdown-item" id="mn-btn-ai-summarize-overflow">Summarize</button></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="mn-view-pills mb-2 d-none d-md-flex" role="group">
+        <button type="button" class="btn btn-sm active" data-mn-detail-tab="tasks">Tasks</button>
+        <button type="button" class="btn btn-sm" data-mn-detail-tab="decisions">Decisions</button>
+      </div>
+      <div class="mn-detail-tabs d-md-none" id="mn-detail-tabs" role="tablist">
+        <button type="button" class="mn-detail-tab active" data-mn-detail-tab="tasks">Tasks</button>
+        <button type="button" class="mn-detail-tab" data-mn-detail-tab="decisions">Decisions</button>
+      </div>
+
+      {% set mn_show_col_presets = true %}
+      {% set mn_show_priority_group = true %}
+      {% include "meeting_notes/_canvas_toolbar.html" %}
+
+      <div class="mn-quick-capture mt-2" id="mn-quick-capture">
+        <input type="text" id="mn-quick-capture-input" placeholder="Quick capture: Fix API @Jane due 2026-06-15 #Platform !high" />
+        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-quick-capture-go">Add task</button>
+      </div>
+    </div>
+
+  <div id="mn-carry-suggestions" class="alert alert-info py-2 small d-none mb-0"></div>
 
   <div id="mn-meeting-mode-shell" class="mn-meeting-mode-shell d-none" aria-hidden="true">
     <div class="mn-live-header">
@@ -146,40 +243,8 @@
     </div>
   </div>
 
-  <div class="mn-view-pills mb-2 d-none d-md-flex" role="group">
-    <button type="button" class="btn btn-sm active" data-mn-detail-tab="tasks">Tasks</button>
-    <button type="button" class="btn btn-sm" data-mn-detail-tab="decisions">Decisions</button>
-  </div>
-
   <div class="mn-detail-grid mn-detail-tab-pane" id="mn-tab-tasks">
     <div class="mn-detail-main" id="mn-detail-pane-tasks">
-      <div class="mn-card mb-3">
-        <div class="mn-card-body py-2">
-          {% include "meeting_notes/_filter_offcanvas.html" %}
-          <div class="mn-toolbar mt-2">
-            <div class="mn-view-pills" role="group">
-              <button type="button" class="btn active" data-mn-view-btn="board">Board</button>
-              <button type="button" class="btn" data-mn-view-btn="table">Table</button>
-              <button type="button" class="btn" data-mn-view-btn="calendar">Calendar</button>
-              <button type="button" class="btn" data-mn-view-btn="gantt">Gantt</button>
-            </div>
-            <div class="mn-view-pills ms-2" role="group">
-              <button type="button" class="btn" data-mn-col-preset="minutes">Minutes</button>
-              <button type="button" class="btn active" data-mn-col-preset="full">Full</button>
-            </div>
-            <div class="mn-view-pills ms-2 mn-board-group-pills" id="mn-board-group-toggle" role="group">
-              <button type="button" class="btn active" data-mn-board-group="status">By status</button>
-              <button type="button" class="btn" data-mn-board-group="platform">By platform</button>
-              <button type="button" class="btn" data-mn-board-group="priority">By priority</button>
-            </div>
-          </div>
-          <div class="mn-quick-capture mt-2" id="mn-quick-capture">
-            <input type="text" id="mn-quick-capture-input" placeholder="Quick capture: Fix API @Jane due 2026-06-15 #Platform !high" />
-            <button type="button" class="btn btn-sm mn-btn-primary" id="mn-quick-capture-go">Add task</button>
-          </div>
-        </div>
-      </div>
-
       <div id="mn-mobile-table-hint" class="mn-mobile-table-hint d-none">
         Wide table view works best on desktop. Switch to <strong>Board</strong> for mobile editing.
       </div>
@@ -301,7 +366,7 @@
     <div id="mn-detail-pane-filters" class="d-none" aria-hidden="true"></div>
   </div>
 
-  <div class="mn-detail-tab-pane d-none mn-card p-3 mb-3" id="mn-tab-decisions">
+  <div class="mn-detail-tab-pane d-none mn-card p-3 mb-0" id="mn-tab-decisions">
     <h2 class="h6">Decision register</h2>
     <p class="small text-muted">Record decisions separately from action items. AI extract can populate these.</p>
     <div id="mn-decisions-list" class="mb-3 mn-decisions-list"></div>
@@ -310,6 +375,8 @@
       <button type="button" class="btn btn-sm mn-btn-primary" id="mn-decision-add">Add</button>
     </div>
   </div>
+  </div>{# /.mn-canvas #}
+  </div>{# /.mn-detail-workspace #}
 </div>
 </div>
 
@@ -418,35 +485,13 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body" id="mn-meta-body">
-        <label class="mn-filter-label">Title</label>
-        <input type="text" class="form-control form-control-sm mb-2" id="mn-meta-title" value="{{ meeting.title|e }}" />
-        <label class="mn-filter-label">Meeting date</label>
-        <input type="date" class="form-control form-control-sm mb-2" id="mn-meta-date" value="{{ meeting.meeting_date.strftime('%Y-%m-%d') }}" />
-        <div class="row g-2 mb-2">
-          <div class="col-md-6">
-            <label class="mn-filter-label">Place</label>
-            <input type="text" class="form-control form-control-sm" id="mn-meta-location" value="{{ meeting.location or '' }}" placeholder="Conference room / Zoom" />
-          </div>
-          <div class="col-md-6">
-            <label class="mn-filter-label">Time</label>
-            <input type="text" class="form-control form-control-sm" id="mn-meta-time" value="{{ meeting.meeting_time or '' }}" placeholder="10:00 AM" />
-          </div>
-        </div>
-        <label class="mn-filter-label">Agenda</label>
-        <div class="d-flex gap-2 mb-1">
-          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-agenda-autofill">Auto-fill from focus rows</button>
-        </div>
-        <textarea class="form-control form-control-sm mb-2" id="mn-meta-agenda" rows="4" placeholder="1. Welcome&#10;2. Project updates">{{ meeting.agenda or '' }}</textarea>
-        <label class="mn-filter-label">Summary</label>
-        <textarea class="form-control form-control-sm mb-2" id="mn-meta-summary" rows="3" placeholder="Discussion notes">{{ meeting.summary or '' }}</textarea>
-        <label class="mn-filter-label">Attendees</label>
-        <div id="mn-attendee-picker" class="mb-2"></div>
-        <label class="mn-filter-label">Guests</label>
-        <div id="mn-guest-picker"></div>
-        <div class="form-text small">Enter + press Enter for guests</div>
-        <div class="mt-3 d-grid gap-2">
+        <p class="small text-muted mb-3">
+          Title, date, attendees, agenda, and summary are edited in the context panel on the left (Details on mobile).
+        </p>
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-sm mn-btn-primary" id="mn-modal-open-rail" data-bs-dismiss="modal">Open context panel</button>
           <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-toggle="modal" data-bs-target="#mnFocusModal">Add focus row</button>
-          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-new-item">New action item</button>
+          <button type="button" class="btn btn-sm mn-btn-ghost" id="mn-btn-new-item-modal">New action item</button>
         </div>
       </div>
       <div class="modal-footer">
@@ -457,7 +502,7 @@
 </div>
 
 <div class="modal fade" id="mnCarryForwardModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content" style="border-radius: 16px;">
       <div class="modal-header">
         <h5 class="modal-title">Carry forward open items</h5>
@@ -465,7 +510,7 @@
       </div>
       <div class="modal-body">
         <p class="small text-muted mb-3">
-          Copy non-completed action items from another meeting into this one. Items already present (same call to action) are skipped.
+          Import open action items from another meeting. Duplicates (same text or already linked) are skipped. Source items are marked done by default so only one open copy remains.
         </p>
         <label class="mn-filter-label" for="mn-cf-source">Source meeting</label>
         <select class="form-select form-select-sm mb-3" id="mn-cf-source">
@@ -475,17 +520,91 @@
           </option>
           {% endfor %}
         </select>
-        <p class="mb-3" id="mn-cf-preview" aria-live="polite">
+        <p class="mb-2" id="mn-cf-preview" aria-live="polite">
           <span class="text-muted">Select a source meeting to preview.</span>
         </p>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label class="mn-filter-label mb-0">Items to import</label>
+          <div class="btn-group btn-group-sm">
+            <button type="button" class="btn mn-btn-ghost" id="mn-cf-select-all">Select all</button>
+            <button type="button" class="btn mn-btn-ghost" id="mn-cf-select-none">Clear</button>
+          </div>
+        </div>
+        <div id="mn-cf-checklist" class="mn-cf-checklist mb-3"></div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="mn-cf-mark-done" />
-          <label class="form-check-label" for="mn-cf-mark-done">Mark copied items as done on the source meeting</label>
+          <input class="form-check-input" type="checkbox" id="mn-cf-mark-done" checked />
+          <label class="form-check-label" for="mn-cf-mark-done">Mark imported items as done on the source meeting</label>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-confirm-carry-forward" disabled>Import items</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="mnDuplicateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius: 16px;">
+      <div class="modal-header">
+        <h5 class="modal-title">Duplicate meeting</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="mn-filter-label" for="mn-dup-title">Title</label>
+        <input type="text" class="form-control form-control-sm mb-3" id="mn-dup-title" value="{{ (meeting.title or 'Meeting')|e }} (copy)" />
+        <label class="mn-filter-label" for="mn-dup-date">Meeting date</label>
+        <input type="date" class="form-control form-control-sm mb-3" id="mn-dup-date" value="{{ meeting.meeting_date.strftime('%Y-%m-%d') if meeting.meeting_date else '' }}" />
+        <label class="mn-filter-label">What to copy</label>
+        <div class="mb-2">
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="mn-dup-mode" id="mn-dup-mode-open" value="open" checked />
+            <label class="form-check-label" for="mn-dup-mode-open">Open action items only (linked, recommended)</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="mn-dup-mode" id="mn-dup-mode-all" value="all" />
+            <label class="form-check-label" for="mn-dup-mode-all">All action items</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="mn-dup-mode" id="mn-dup-mode-structure" value="structure" />
+            <label class="form-check-label" for="mn-dup-mode-structure">Structure only (attendees, agenda, focus areas — no tasks)</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-confirm-duplicate">Create copy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="mnEmailAttendeesModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius: 16px;">
+      <div class="modal-header">
+        <h5 class="modal-title">Email attendees</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">Send meeting updates with open action items and minutes PDF attached.</p>
+        <label class="mn-filter-label">Recipients</label>
+        <div id="mn-email-recipient-chips" class="mn-recipient-chips mb-2"></div>
+        <p class="small text-muted mb-2" id="mn-email-guest-note"></p>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="mn-email-include-assignees" />
+          <label class="form-check-label" for="mn-email-include-assignees">Also include assignees not listed as attendees</label>
+        </div>
+        <label class="mn-filter-label" for="mn-email-attendees-subject">Subject</label>
+        <input type="text" class="form-control form-control-sm mb-2" id="mn-email-attendees-subject"
+          value="Meeting updates: {{ meeting.title|e }} — {{ meeting.meeting_date.strftime('%Y-%m-%d') if meeting.meeting_date else '' }}" />
+        <label class="mn-filter-label" for="mn-email-extra-recipients">Additional emails</label>
+        <input type="text" class="form-control form-control-sm" id="mn-email-extra-recipients" placeholder="optional@example.com" />
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm mn-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm mn-btn-primary" id="mn-btn-send-attendee-email">Send updates</button>
       </div>
     </div>
   </div>
@@ -547,6 +666,7 @@
   window.MN_MINUTES_TAKEN_BY = {{ minutes_taken_by|tojson }};
   window.MN_MEETING_ATTENDEE_IDS = {{ attendee_ids|tojson }};
   window.MN_MEETING_GUEST_NAMES = {{ guest_names|tojson }};
+  window.MN_ATTENDEE_EMAILS = {{ attendee_emails|tojson }};
   window.MN_PREV_MEETING_ID = {{ prev_meeting_id|tojson }};
   window.MN_PLATFORMS = {{ platforms|tojson }};
   window.MN_USER_OPTS = {{ user_opts|tojson }};
@@ -573,9 +693,44 @@
   }
   wireOverflowClone("mn-btn-carry-forward", "mn-btn-carry-forward-overflow");
   wireOverflowClone("mn-btn-duplicate-meeting", "mn-btn-duplicate-meeting-overflow");
+  wireOverflowClone("mn-btn-email-attendees", "mn-btn-email-attendees-overflow");
+  wireOverflowClone("mn-btn-share-slack", "mn-btn-share-slack-overflow");
   wireOverflowClone("mn-btn-export-pdf", "mn-btn-export-pdf-overflow");
   wireOverflowClone("mn-btn-ai-summarize", "mn-btn-ai-summarize-overflow");
-  wireOverflowClone("mn-btn-meeting-details", "mn-btn-meeting-details-overflow");
+
+  function openRail() {
+    var rail = document.getElementById("mn-context-rail");
+    var backdrop = document.getElementById("mn-rail-backdrop");
+    if (rail) rail.classList.add("is-open");
+    if (backdrop) {
+      backdrop.classList.add("is-open");
+      backdrop.setAttribute("aria-hidden", "false");
+    }
+  }
+  function closeRail() {
+    var rail = document.getElementById("mn-context-rail");
+    var backdrop = document.getElementById("mn-rail-backdrop");
+    if (rail) rail.classList.remove("is-open");
+    if (backdrop) {
+      backdrop.classList.remove("is-open");
+      backdrop.setAttribute("aria-hidden", "true");
+    }
+  }
+  var openBtn = document.getElementById("mn-rail-open");
+  var closeBtn = document.getElementById("mn-rail-close");
+  var backdrop = document.getElementById("mn-rail-backdrop");
+  var overflowDetails = document.getElementById("mn-btn-meeting-details-overflow");
+  var modalOpenRail = document.getElementById("mn-modal-open-rail");
+  var newItemModal = document.getElementById("mn-btn-new-item-modal");
+  var newItem = document.getElementById("mn-btn-new-item");
+  if (openBtn) openBtn.addEventListener("click", openRail);
+  if (closeBtn) closeBtn.addEventListener("click", closeRail);
+  if (backdrop) backdrop.addEventListener("click", closeRail);
+  if (overflowDetails) overflowDetails.addEventListener("click", openRail);
+  if (modalOpenRail) modalOpenRail.addEventListener("click", openRail);
+  if (newItemModal && newItem) newItemModal.addEventListener("click", function () { newItem.click(); });
+  window.MN_openContextRail = openRail;
+  window.MN_closeContextRail = closeRail;
 })();
 </script>
 {% endblock %}

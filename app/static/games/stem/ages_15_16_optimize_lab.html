@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HBC: Zimbabwe Map Lab</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --panel2: #243044;
+      --text: #e8eef6;
+      --muted: #8fa3bf;
+      --accent: #c9a227;
+      --ok: #2d8a5e;
+      --bad: #c45c5c;
+      --border: #2e3f56;
+      --input: #121a26;
+    }
+    body.light {
+      --bg: #e8ecef;
+      --panel: #ffffff;
+      --panel2: #f0f3f6;
+      --text: #1a2332;
+      --muted: #5a6b7d;
+      --accent: #8a6d1a;
+      --ok: #1e6b45;
+      --bad: #a33a3a;
+      --border: #c5d0db;
+      --input: #ffffff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", "Candara", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.45;
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 14px; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    h1 { font-size: 1.35rem; letter-spacing: 0.02em; color: var(--accent); }
+    .sub { font-size: 0.85rem; color: var(--muted); max-width: 420px; margin-top: 4px; }
+    .head-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    #scoreBox {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .theme-btn {
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.7fr 1fr;
+      gap: 12px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .panel h2 {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .chip {
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+    #prompt { font-size: 1rem; margin-bottom: 12px; }
+    .map-readout {
+      background: var(--panel2);
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 0.82rem;
+      margin-bottom: 12px;
+      white-space: pre-wrap;
+    }
+    .choices { display: flex; flex-direction: column; gap: 8px; }
+    .choice {
+      text-align: left;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      background: var(--input);
+      color: var(--text);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.92rem;
+      min-height: 44px;
+    }
+    .choice:hover { border-color: var(--accent); }
+    .choice.sel { outline: 2px solid var(--accent); border-color: var(--accent); }
+    .choice.ok { border-color: var(--ok); background: rgba(45, 138, 94, 0.15); }
+    .choice.bad { border-color: var(--bad); background: rgba(196, 92, 92, 0.12); }
+    .num-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+    .num-row label { font-size: 0.85rem; color: var(--muted); }
+    input[type="number"] {
+      width: 140px;
+      padding: 10px;
+      font-size: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--input);
+      color: var(--text);
+      min-height: 44px;
+    }
+    .feedback {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 6px;
+      background: var(--panel2);
+      font-size: 0.88rem;
+      min-height: 72px;
+      border-left: 3px solid var(--accent);
+    }
+    .feedback.correct { border-left-color: var(--ok); }
+    .feedback.wrong { border-left-color: var(--bad); }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .act {
+      min-height: 44px;
+      padding: 10px 14px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    #submitAns { background: var(--accent); color: #111; border-color: var(--accent); }
+    #checkBtn { background: var(--ok); color: #fff; border-color: var(--ok); }
+    #checkBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-row span { color: var(--muted); }
+    .hint-box {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    @media (max-width: 760px) {
+      .layout { grid-template-columns: 1fr; }
+      .head-right { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body class="dark">
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>HBC: Zimbabwe Map Lab</h1>
+        <p class="sub">Map work · scale · gradient · bearing · landforms of Zimbabwe. Hard map-reading drills.</p>
+      </div>
+      <div class="head-right">
+        <button type="button" class="theme-btn" id="themeBtn" aria-label="Toggle dark or light UI">Dark / Light</button>
+        <div id="scoreBox">Score: 0 / 10</div>
+      </div>
+    </header>
+    <div class="layout">
+      <section class="panel" aria-labelledby="labTitle">
+        <h2 id="labTitle">Field scenario</h2>
+        <div class="meta">
+          <span class="chip" id="roundChip">Round 1 / 10</span>
+          <span class="chip" id="skillChip">—</span>
+          <span class="chip" id="siteChip">—</span>
+        </div>
+        <p id="prompt"></p>
+        <div class="map-readout" id="readout" aria-live="polite"></div>
+        <div id="answerArea"></div>
+        <div class="feedback" id="feedback" aria-live="polite"></div>
+        <div class="actions">
+          <button type="button" class="act" id="submitAns">Check answer</button>
+          <button type="button" class="act" id="hintBtn">Show hint</button>
+          <button type="button" class="act" id="checkBtn" disabled>Submit score</button>
+        </div>
+      </section>
+      <aside class="panel" aria-labelledby="statsTitle">
+        <h2 id="statsTitle">Stats / readout</h2>
+        <div class="stat-row"><span>Learning area</span><strong id="sArea">Geography</strong></div>
+        <div class="stat-row"><span>Age range</span><strong id="sAge">15-16</strong></div>
+        <div class="stat-row"><span>Round</span><strong id="sRound">1 / 10</strong></div>
+        <div class="stat-row"><span>Score</span><strong id="sScore">0 / 10</strong></div>
+        <div class="stat-row"><span>Accuracy</span><strong id="sAcc">—</strong></div>
+        <div class="stat-row"><span>Last skill</span><strong id="sSkill">—</strong></div>
+        <div class="stat-row"><span>Last error class</span><strong id="sErr">—</strong></div>
+        <div class="hint-box" id="hintPanel">Hints unlock after you attempt, or via Show hint.</div>
+      </aside>
+    </div>
+  </div>
+  <script>
+    const CONTENT = {
+      learningArea: "Geography",
+      topic: "Map work, scale calculations, and Zimbabwean landform analysis (Victoria Falls, Eastern Highlands, Zambezi, Great Dyke, contour/gradient/bearing/scale)",
+      ageRange: "15-16",
+      totalRounds: 10,
+      maxScore: 10,
+      questionPool: [
+        {
+          id: "scale_ground",
+          skill: "Map scale → ground distance",
+          site: "Victoria Falls / Zambezi gorge",
+          type: "numeric",
+          unit: "km",
+          tolerance: 0.05,
+          build: function () {
+            var mapCm = ri(2, 8);
+            var rfDenom = pick([25000, 50000, 100000]);
+            var groundKm = round2((mapCm / 100000) * rfDenom);
+            return {
+              prompt: "On a 1:" + rfDenom + " topographic sheet covering the Victoria Falls–Zambezi gorge area, a gorge segment measures " + mapCm + " cm on the map. What is the ground distance in kilometres?",
+              readout: "RF = 1:" + rfDenom + "\nMap length = " + mapCm + " cm\nFormula: ground (cm) = map (cm) × RF denominator\nThen convert cm → km (÷ 100000).",
+              answer: groundKm,
+              steps: "Ground cm = " + mapCm + " × " + rfDenom + " = " + (mapCm * rfDenom) + " cm.\nGround km = " + (mapCm * rfDenom) + " ÷ 100000 = " + groundKm + " km.",
+              distractorHint: "scale_cm_only",
+              vars: { mapCm: mapCm, rfDenom: rfDenom }
+            };
+          }
+        },
+        {
+          id: "scale_map",
+          skill: "Ground distance → map length",
+          site: "Harare–Chitungwiza corridor",
+          type: "numeric",
+          unit: "cm",
+          tolerance: 0.05,
+          build: function () {
+            var groundKm = ri(5, 20);
+            var rfDenom = pick([50000, 100000, 250000]);
+            var mapCm = round2((groundKm * 100000) / rfDenom);
+            return {
+              prompt: "A surveyor needs the Harare–Chitungwiza stretch of " + groundKm + " km drawn on a 1:" + rfDenom + " map. What map length (cm) should appear?",
+              readout: "Ground = " + groundKm + " km\nRF = 1:" + rfDenom + "\nmap (cm) = ground (cm) ÷ RF denom",
+              answer: mapCm,
+              steps: "Ground cm = " + groundKm + " × 100000 = " + (groundKm * 100000) + ".\nMap cm = " + (groundKm * 100000) + " ÷ " + rfDenom + " = " + mapCm + " cm.",
+              distractorHint: "forgot_cm_convert",
+              vars: { groundKm: groundKm, rfDenom: rfDenom }
+            };
+          }
+        },
+        {
+          id: "gradient_calc",
+          skill: "Gradient from contour rise",
+          site: "Nyanga (Eastern Highlands)",
+          type: "mcq",
+          build: function () {
+            var rise = pick([100, 150, 200, 250, 300]);
+            var runM = pick([500, 750, 1000, 1250, 1500, 2000]);
+            var ratio = simplifyRatio(rise, runM);
+            var wrong1 = "1:" + Math.round(runM / (rise / 2));
+            var wrong2 = rise + ":" + runM;
+            var wrong3 = "1:" + (runM + rise);
+            var correct = "1:" + ratio;
+            var opts = shuffleArr([correct, wrong1, wrong2, wrong3].filter(uniq));
+            while (opts.length < 4) opts.push("1:" + (runM * 2));
+            return {
+              prompt: "On a Nyanga sheet, a path climbs " + rise + " m vertically over a horizontal ground distance of " + runM + " m. Express the gradient as a ratio 1:n (simplified).",
+              readout: "Vertical interval (VI) = " + rise + " m\nHorizontal equivalent (HE) = " + runM + " m\nGradient = VI:HE = 1:(HE/VI)",
+              answer: correct,
+              steps: "Gradient = " + rise + ":" + runM + " = 1:" + ratio + ".\n(Divide both parts by " + rise + ".)",
+              distractorHint: "gradient_inverted",
+              vars: { rise: rise, runM: runM, ratio: ratio },
+              options: opts.slice(0, 4)
+            };
+          }
+        },
+        {
+          id: "gradient_percent",
+          skill: "Gradient as percentage",
+          site: "Chimanimani escarpment",
+          type: "numeric",
+          unit: "%",
+          tolerance: 0.5,
+          build: function () {
+            var rise = pick([40, 50, 60, 80, 100]);
+            var runM = pick([200, 250, 400, 500, 800]);
+            var pct = round2((rise / runM) * 100);
+            return {
+              prompt: "A Chimanimani trail rises " + rise + " m over " + runM + " m horizontally. What is the gradient as a percentage (nearest 0.1%)?",
+              readout: "% gradient = (vertical ÷ horizontal) × 100\n= (" + rise + " ÷ " + runM + ") × 100",
+              answer: pct,
+              steps: "(" + rise + " / " + runM + ") × 100 = " + pct + "%.",
+              distractorHint: "used_run_over_rise",
+              vars: { rise: rise, runM: runM }
+            };
+          }
+        },
+        {
+          id: "bearing_forward",
+          skill: "Forward bearing",
+          site: "Great Dyke transect",
+          type: "mcq",
+          build: function () {
+            var bearing = pick([45, 90, 135, 180, 225, 270, 315]);
+            var labels = {
+              45: "north-east (045°)",
+              90: "due east (090°)",
+              135: "south-east (135°)",
+              180: "due south (180°)",
+              225: "south-west (225°)",
+              270: "due west (270°)",
+              315: "north-west (315°)"
+            };
+            var from = pick(["Mvurwi", "Bindura", "Shurugwi"]);
+            var to = pick(["Chegutu", "Kadoma", "Gweru"]);
+            var correct = labels[bearing];
+            var wrongs = Object.keys(labels).filter(function (k) { return Number(k) !== bearing; }).map(function (k) { return labels[k]; });
+            var opts = shuffleArr([correct].concat(shuffleArr(wrongs).slice(0, 3)));
+            return {
+              prompt: "Along a Great Dyke field traverse from " + from + " toward " + to + ", the measured forward bearing is " + pad3(bearing) + "°. Which direction does this represent?",
+              readout: "Bearings measured clockwise from north (000°).\n045° NE · 090° E · 135° SE · 180° S · 225° SW · 270° W · 315° NW",
+              answer: correct,
+              steps: pad3(bearing) + "° is " + correct + ".",
+              distractorHint: "bearing_compass_confusion",
+              vars: { bearing: bearing },
+              options: opts
+            };
+          }
+        },
+        {
+          id: "bearing_back",
+          skill: "Back bearing",
+          site: "Lake Kariba shoreline",
+          type: "numeric",
+          unit: "°",
+          tolerance: 0,
+          build: function () {
+            var fwd = pick([30, 55, 110, 160, 200, 245, 300, 340]);
+            var back = (fwd + 180) % 360;
+            return {
+              prompt: "A boat on Lake Kariba steams on a forward bearing of " + pad3(fwd) + "°. What is the back bearing (degrees, 0–359)?",
+              readout: "Back bearing = (forward + 180°) mod 360\nForward = " + pad3(fwd) + "°",
+              answer: back,
+              steps: "(" + fwd + " + 180) mod 360 = " + back + "°.",
+              distractorHint: "bearing_subtract_only",
+              vars: { fwd: fwd, back: back }
+            };
+          }
+        },
+        {
+          id: "contour_spot",
+          skill: "Contour / spot height",
+          site: "Eastern Highlands peaks",
+          type: "mcq",
+          build: function () {
+            var ci = pick([20, 50]);
+            var base = pick([1600, 1800, 2000, 2200]);
+            var nUp = ri(2, 5);
+            var summit = base + nUp * ci;
+            var prompt = "On a " + ci + " m contour interval sheet near Nyanga, a spot height sits " + nUp + " contour intervals above the " + base + " m contour. What is the spot height?";
+            var correct = summit + " m";
+            var opts = shuffleArr([
+              correct,
+              (base + nUp) + " m",
+              (base + ci) + " m",
+              (summit + ci) + " m"
+            ]);
+            return {
+              prompt: prompt,
+              readout: "Contour interval (CI) = " + ci + " m\nSpot ≈ base + (intervals × CI)",
+              answer: correct,
+              steps: base + " + (" + nUp + " × " + ci + ") = " + summit + " m.",
+              distractorHint: "ignored_interval",
+              vars: { ci: ci, base: base, nUp: nUp, summit: summit },
+              options: opts
+            };
+          }
+        },
+        {
+          id: "landform_id",
+          skill: "Zimbabwean landform ID",
+          site: "National landforms",
+          type: "mcq",
+          build: function () {
+            var items = [
+              {
+                q: "Which feature is a major north–south mineralised ridge of mafic/ultramafic rock cutting across Zimbabwe?",
+                a: "Great Dyke",
+                wrong: ["Eastern Highlands", "Save Escarpment", "Kalahari Sandveld"]
+              },
+              {
+                q: "Victoria Falls (Mosi-oa-Tunya) is formed where which river plunges into a basalt gorge?",
+                a: "Zambezi River",
+                wrong: ["Limpopo River", "Save River", "Runde River"]
+              },
+              {
+                q: "Nyanga and Chimanimani belong to which highland belt along Zimbabwe’s eastern border?",
+                a: "Eastern Highlands",
+                wrong: ["Matobo Hills", "Great Dyke", "Hwange plateau"]
+              },
+              {
+                q: "Which landform region is characterised by granite whalebacks and balancing rocks near Bulawayo?",
+                a: "Matobo Hills",
+                wrong: ["Mana Pools floodplain", "Great Dyke", "Eastern Highlands"]
+              }
+            ];
+            var item = pick(items);
+            return {
+              prompt: item.q,
+              readout: "Use physical geography of Zimbabwe: drainage, highlands, and structural ridges.",
+              answer: item.a,
+              steps: "Correct landform: " + item.a + ".",
+              distractorHint: "landform_region_mix",
+              vars: {},
+              options: shuffleArr([item.a].concat(item.wrong))
+            };
+          }
+        },
+        {
+          id: "rf_compare",
+          skill: "Larger / smaller scale",
+          site: "Mutare urban vs regional sheet",
+          type: "mcq",
+          build: function () {
+            var pairs = [
+              { larger: "1:10 000", smaller: "1:50 000", city: "Mutare CBD" },
+              { larger: "1:25 000", smaller: "1:100 000", city: "Masvingo district" },
+              { larger: "1:50 000", smaller: "1:250 000", city: "Gweru region" }
+            ];
+            var p = pick(pairs);
+            var correct = p.larger;
+            var opts = shuffleArr([p.larger, p.smaller, "Same scale", "Cannot tell"]);
+            return {
+              prompt: "For detailed street-level planning in " + p.city + ", which representative fraction is the larger map scale?",
+              readout: "Larger scale = smaller RF denominator (more detail).\nCompare " + p.larger + " vs " + p.smaller + ".",
+              answer: correct,
+              steps: p.larger + " shows more detail than " + p.smaller + " (smaller denominator ⇒ larger scale).",
+              distractorHint: "scale_larger_confused",
+              vars: p,
+              options: opts
+            };
+          }
+        },
+        {
+          id: "cross_section_steep",
+          skill: "Contour spacing → slope",
+          site: "Batoka Gorge (below Victoria Falls)",
+          type: "mcq",
+          build: function () {
+            var variants = [
+              {
+                q: "On a Batoka Gorge sheet, contours along the gorge wall are packed tightly. What does this indicate?",
+                a: "A steep slope",
+                wrong: ["A gentle slope", "Flat floodplain", "Zero relief"]
+              },
+              {
+                q: "Wide spacing between contours on the Zambezi floodplain near Mana Pools usually means:",
+                a: "Gentle or nearly flat land",
+                wrong: ["A vertical cliff", "A knife-edge ridge", "An overhang"]
+              },
+              {
+                q: "V-shaped contours pointing upstream on a Zimbabwean map typically mark:",
+                a: "A valley / river course",
+                wrong: ["A summit peak only", "A depression without water", "A perfect plateau"]
+              }
+            ];
+            var v = pick(variants);
+            return {
+              prompt: v.q,
+              readout: "Close contours → steep; wide → gentle; V points upstream in valleys.",
+              answer: v.a,
+              steps: "Interpretation: " + v.a + ".",
+              distractorHint: "contour_spacing_reversed",
+              vars: {},
+              options: shuffleArr([v.a].concat(v.wrong))
+            };
+          }
+        },
+        {
+          id: "area_estimate",
+          skill: "Grid / area estimate",
+          site: "Hwange National Park block",
+          type: "numeric",
+          unit: "km²",
+          tolerance: 0.5,
+          build: function () {
+            var sideKm = pick([2, 3, 4, 5]);
+            var n = ri(3, 8);
+            var area = n * sideKm * sideKm;
+            return {
+              prompt: "A Hwange park management grid uses squares of side " + sideKm + " km. A woodland block covers " + n + " full squares. Estimate the area in km².",
+              readout: "Area ≈ number of squares × (side)²\n= " + n + " × " + sideKm + "²",
+              answer: area,
+              steps: n + " × " + (sideKm * sideKm) + " = " + area + " km².",
+              distractorHint: "area_perimeter",
+              vars: { sideKm: sideKm, n: n }
+            };
+          }
+        },
+        {
+          id: "time_distance",
+          skill: "Map distance + speed",
+          site: "Beitbridge–Harare corridor (map extract)",
+          type: "numeric",
+          unit: "h",
+          tolerance: 0.05,
+          build: function () {
+            var mapCm = ri(4, 12);
+            var rfDenom = 250000;
+            var speed = pick([60, 80, 100]);
+            var groundKm = round2((mapCm / 100000) * rfDenom);
+            var hours = round2(groundKm / speed);
+            return {
+              prompt: "On a 1:250 000 extract of the Beitbridge–Harare corridor, a road measures " + mapCm + " cm. At an average " + speed + " km/h, how many hours does the journey take?",
+              readout: "1) Convert map → ground km\n2) time = distance ÷ speed\nRF 1:250000; map " + mapCm + " cm; speed " + speed + " km/h",
+              answer: hours,
+              steps: "Ground km = " + mapCm + " × 250000 / 100000 = " + groundKm + " km.\nTime = " + groundKm + " ÷ " + speed + " = " + hours + " h.",
+              distractorHint: "skipped_scale",
+              vars: { mapCm: mapCm, speed: speed, groundKm: groundKm }
+            };
+          }
+        }
+      ],
+      hints: {
+        scale_cm_only: "You may have treated map cm as ground km. Multiply by the RF denominator, then convert cm → km.",
+        forgot_cm_convert: "Convert kilometres to centimetres (×100000) before dividing by the RF denominator.",
+        gradient_inverted: "Gradient as 1:n uses n = horizontal ÷ vertical, not vertical ÷ horizontal.",
+        used_run_over_rise: "% gradient = (rise/run)×100. Inverting gives a wrong steepness.",
+        bearing_compass_confusion: "Bearings are clockwise from north: 090° is east, not north.",
+        bearing_subtract_only: "Back bearing = forward + 180°, then mod 360 (not simply subtract 90°).",
+        ignored_interval: "Multiply the number of intervals by the contour interval, then add to the base contour.",
+        landform_region_mix: "Separate structural ridges (Great Dyke), highlands (east), and drainage (Zambezi/Limpopo).",
+        scale_larger_confused: "A larger scale map has a smaller RF denominator (e.g. 1:10 000 > 1:50 000).",
+        contour_spacing_reversed: "Tight contours = steep; wide = gentle.",
+        area_perimeter: "Area uses side² × count, not perimeter (4 × side).",
+        skipped_scale: "Always convert map length to ground distance before dividing by speed."
+      }
+    };
+
+    var state = {
+      score: 0,
+      roundIndex: 0,
+      attempts: 0,
+      finished: false,
+      answered: false,
+      session: [],
+      current: null,
+      selected: null
+    };
+
+    var els = {
+      scoreBox: document.getElementById("scoreBox"),
+      prompt: document.getElementById("prompt"),
+      readout: document.getElementById("readout"),
+      answerArea: document.getElementById("answerArea"),
+      feedback: document.getElementById("feedback"),
+      checkBtn: document.getElementById("checkBtn"),
+      submitAns: document.getElementById("submitAns"),
+      hintBtn: document.getElementById("hintBtn"),
+      hintPanel: document.getElementById("hintPanel"),
+      roundChip: document.getElementById("roundChip"),
+      skillChip: document.getElementById("skillChip"),
+      siteChip: document.getElementById("siteChip"),
+      sRound: document.getElementById("sRound"),
+      sScore: document.getElementById("sScore"),
+      sAcc: document.getElementById("sAcc"),
+      sSkill: document.getElementById("sSkill"),
+      sErr: document.getElementById("sErr")
+    };
+
+    function ri(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+    function pick(arr) { return arr[ri(0, arr.length - 1)]; }
+    function round2(n) { return Math.round(n * 100) / 100; }
+    function pad3(n) { return String(n).padStart(3, "0"); }
+    function uniq(v, i, a) { return a.indexOf(v) === i; }
+
+    function shuffleArr(arr) {
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a;
+    }
+
+    function gcd(a, b) {
+      a = Math.abs(a); b = Math.abs(b);
+      while (b) { var t = b; b = a % b; a = t; }
+      return a || 1;
+    }
+
+    function simplifyRatio(vi, he) {
+      var g = gcd(vi, he);
+      return Math.round(he / g) / Math.round(vi / g);
+    }
+
+    function fisherYatesSession(pool) {
+      var shuffled = pool.slice();
+      for (var i = shuffled.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = shuffled[i];
+        shuffled[i] = shuffled[j];
+        shuffled[j] = tmp;
+      }
+      return shuffled.slice(0, CONTENT.totalRounds);
+    }
+
+    function updateScoreUI() {
+      els.scoreBox.textContent = "Score: " + state.score + " / " + CONTENT.maxScore;
+      els.sScore.textContent = state.score + " / " + CONTENT.maxScore;
+      var r = Math.min(state.roundIndex + 1, CONTENT.totalRounds);
+      if (state.finished) r = CONTENT.totalRounds;
+      els.roundChip.textContent = "Round " + r + " / " + CONTENT.totalRounds;
+      els.sRound.textContent = r + " / " + CONTENT.totalRounds;
+      if (state.attempts > 0) {
+        els.sAcc.textContent = Math.round((state.score / state.attempts) * 100) + "%";
+      }
+    }
+
+    function renderQuestion() {
+      state.answered = false;
+      state.selected = null;
+      var tpl = state.session[state.roundIndex];
+      var built = tpl.build();
+      state.current = {
+        tpl: tpl,
+        built: built
+      };
+      els.prompt.textContent = built.prompt;
+      els.readout.textContent = built.readout;
+      els.skillChip.textContent = tpl.skill;
+      els.siteChip.textContent = tpl.site;
+      els.sSkill.textContent = tpl.skill;
+      els.feedback.textContent = "";
+      els.feedback.className = "feedback";
+      els.hintPanel.textContent = "Attempt first for a full diagnostic, or press Show hint.";
+      els.submitAns.disabled = false;
+
+      var area = els.answerArea;
+      area.innerHTML = "";
+      if (tpl.type === "mcq") {
+        var box = document.createElement("div");
+        box.className = "choices";
+        built.options.forEach(function (opt, idx) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "choice";
+          b.textContent = (idx + 1) + ". " + opt;
+          b.addEventListener("click", function () {
+            if (state.answered) return;
+            state.selected = opt;
+            box.querySelectorAll(".choice").forEach(function (c) { c.classList.remove("sel"); });
+            b.classList.add("sel");
+          });
+          box.appendChild(b);
+        });
+        area.appendChild(box);
+      } else {
+        var row = document.createElement("div");
+        row.className = "num-row";
+        var lab = document.createElement("label");
+        lab.htmlFor = "numAns";
+        lab.textContent = "Answer (" + (built.unit || "") + ")";
+        var inp = document.createElement("input");
+        inp.type = "number";
+        inp.id = "numAns";
+        inp.step = "any";
+        inp.setAttribute("inputmode", "decimal");
+        row.appendChild(lab);
+        row.appendChild(inp);
+        area.appendChild(row);
+        inp.focus();
+      }
+      updateScoreUI();
+    }
+
+    function getUserAnswer() {
+      var tpl = state.current.tpl;
+      if (tpl.type === "mcq") return state.selected;
+      var inp = document.getElementById("numAns");
+      if (!inp || inp.value === "") return null;
+      return Number(inp.value);
+    }
+
+    function answersMatch(user, correct, tol) {
+      if (typeof correct === "string") {
+        return String(user) === String(correct);
+      }
+      if (user == null || isNaN(user)) return false;
+      return Math.abs(user - correct) <= (tol == null ? 0.05 : tol);
+    }
+
+    function diagnoseWrong(user) {
+      var tpl = state.current.tpl;
+      var built = state.current.built;
+      var key = built.distractorHint;
+      var hint = CONTENT.hints[key] || "Review the formula in the readout and re-apply step by step.";
+      var msg = "Incorrect. Correct answer: " + built.answer + (built.unit ? " " + built.unit : "") + ".\n\n";
+      msg += "Worked solution:\n" + built.steps + "\n\n";
+      msg += "Diagnostic (" + key + "): " + hint;
+      if (user != null) msg = "You entered: " + user + ".\n\n" + msg;
+      els.sErr.textContent = key;
+      return msg;
+    }
+
+    function checkAnswer() {
+      if (state.finished || state.answered) return;
+      var user = getUserAnswer();
+      if (user == null || user === "") {
+        els.feedback.textContent = "Select an option or enter a numeric answer first.";
+        els.feedback.className = "feedback wrong";
+        return;
+      }
+      state.attempts += 1;
+      state.answered = true;
+      els.submitAns.disabled = true;
+      var built = state.current.built;
+      var tpl = state.current.tpl;
+      var ok = answersMatch(user, built.answer, tpl.tolerance);
+
+      if (tpl.type === "mcq") {
+        els.answerArea.querySelectorAll(".choice").forEach(function (c) {
+          var label = c.textContent.replace(/^\d+\.\s*/, "");
+          if (label === String(built.answer)) c.classList.add("ok");
+          else if (label === String(user)) c.classList.add("bad");
+        });
+      }
+
+      if (ok) {
+        state.score += 1;
+        els.sErr.textContent = "none";
+        els.feedback.className = "feedback correct";
+        els.feedback.textContent = "Correct.\n\n" + built.steps;
+        updateScoreUI();
+        advanceSoon();
+      } else {
+        els.feedback.className = "feedback wrong";
+        els.feedback.textContent = diagnoseWrong(user);
+        updateScoreUI();
+        advanceSoon();
+      }
+    }
+
+    function advanceSoon() {
+      if (state.roundIndex >= CONTENT.totalRounds - 1) {
+        state.finished = true;
+        els.checkBtn.disabled = false;
+        els.feedback.textContent += "\n\nLab complete — press Submit score to send your result.";
+        updateScoreUI();
+        return;
+      }
+      setTimeout(function () {
+        state.roundIndex += 1;
+        renderQuestion();
+      }, 1400);
+    }
+
+    function showHint() {
+      if (!state.current) return;
+      var key = state.current.built.distractorHint;
+      els.hintPanel.textContent = CONTENT.hints[key] || "Re-read the map formula in the readout panel.";
+    }
+
+    function submitScore() {
+      if (!state.finished) return;
+      var finalScore = state.score;
+      var maxScore = CONTENT.maxScore;
+      els.scoreBox.textContent = "Score: " + finalScore + " / " + maxScore;
+      if (window.gameScoreSubmit) {
+        window.gameScoreSubmit(finalScore, maxScore);
+      } else if (window.parent && window.parent.submitGameScore) {
+        var gameIdMatch = window.location.pathname.match(/\/play-game\/(\d+)/);
+        if (gameIdMatch) {
+          window.parent.submitGameScore(parseInt(gameIdMatch[1], 10), finalScore, maxScore);
+        }
+      }
+      els.feedback.textContent = "Final score submitted: " + finalScore + " / " + maxScore + ".";
+      els.feedback.className = "feedback correct";
+    }
+
+    document.getElementById("themeBtn").addEventListener("click", function () {
+      document.body.classList.toggle("light");
+      document.body.classList.toggle("dark");
+    });
+    els.submitAns.addEventListener("click", checkAnswer);
+    els.hintBtn.addEventListener("click", showHint);
+    els.checkBtn.addEventListener("click", submitScore);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && document.activeElement && document.activeElement.id === "numAns") {
+        e.preventDefault();
+        checkAnswer();
+      }
+    });
+
+    document.getElementById("sArea").textContent = CONTENT.learningArea;
+    document.getElementById("sAge").textContent = CONTENT.ageRange;
+    state.session = fisherYatesSession(CONTENT.questionPool);
+    updateScoreUI();
+    renderQuestion();
+  </script>
+</body>
+</html>

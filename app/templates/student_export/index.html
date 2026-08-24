@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+
+{% block title %}Student Export | Akello Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+  <div class="bg-white border border-slate-200 rounded-3xl shadow-sm p-8">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 text-violet-700 text-xs font-bold uppercase tracking-wide">
+          <i class="fas fa-file-excel"></i>
+          Learner workbook export
+        </div>
+        <h1 class="mt-4 text-3xl font-black text-slate-900">Student Excel Export</h1>
+        <p class="mt-3 text-slate-600 max-w-2xl">
+          Upload a workbook, choose which sheets and columns to use, then download a cleaned learner import file.
+          Rows with <span class="font-semibold">Status = 3</span> are skipped. Remaining statuses have 3 subtracted internally.
+          Role is always <span class="font-semibold">student</span>, and Subject group is <span class="font-semibold">Sheet name {{ current_month_label }}</span>.
+        </p>
+      </div>
+      <a href="{{ url_for('administration') }}"
+        class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+        <i class="fas fa-arrow-left"></i>
+        Back to Administration
+      </a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
+    <div class="xl:col-span-3 space-y-6">
+      <div class="bg-white border border-slate-200 rounded-3xl shadow-sm p-8">
+        <h2 class="text-xl font-bold text-slate-900">1. Upload workbook</h2>
+        <p class="mt-2 text-sm text-slate-500">Only .xlsx files are accepted. The app will detect sheets and headers so you can map them before processing.</p>
+
+        <form id="studentAnalyzeForm" class="mt-6 space-y-6" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <label for="studentExportFile"
+            class="block border-2 border-dashed border-slate-200 rounded-3xl p-10 text-center hover:border-violet-300 transition-colors cursor-pointer bg-slate-50/60">
+            <div class="w-16 h-16 mx-auto rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center text-2xl">
+              <i class="fas fa-upload"></i>
+            </div>
+            <div class="mt-4 text-lg font-bold text-slate-800">Choose source workbook</div>
+            <div id="studentExportFileName" class="mt-2 text-sm text-slate-500">Click to browse for an Excel file</div>
+            <input id="studentExportFile" name="file" type="file" accept=".xlsx" class="hidden"
+              onchange="document.getElementById('studentExportFileName').textContent = this.files[0] ? this.files[0].name : 'Click to browse for an Excel file'">
+          </label>
+          <button type="submit" id="studentAnalyzeBtn"
+            class="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-bold text-white hover:bg-violet-700 transition-colors">
+            <i class="fas fa-search"></i>
+            Analyze sheets and columns
+          </button>
+        </form>
+        <div id="studentAnalyzeError" class="hidden mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"></div>
+      </div>
+
+      <div id="studentMapPanel" class="hidden bg-white border border-slate-200 rounded-3xl shadow-sm p-8">
+        <h2 class="text-xl font-bold text-slate-900">2. Choose sheets and map columns</h2>
+        <p id="studentOriginalName" class="mt-2 text-sm text-slate-500"></p>
+
+        <form id="studentProcessForm" class="mt-6 space-y-8">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <input type="hidden" name="token" id="studentToken" />
+
+          <div>
+            <label class="block text-sm font-bold text-slate-800 mb-2">Saved file name</label>
+            <input id="studentDisplayName" name="display_name" type="text"
+              class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:border-violet-400 focus:ring-2 focus:ring-violet-100 outline-none"
+              placeholder="Leave blank to append today's date automatically">
+            <p class="mt-2 text-xs text-slate-400">Defaults to the original filename plus today's date and time.</p>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <h3 class="text-sm font-bold text-slate-800">Sheets to process</h3>
+              <button type="button" id="studentToggleSheets" class="text-xs font-semibold text-violet-600">Select suggested</button>
+            </div>
+            <div id="studentSheetList" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+          </div>
+
+          <div>
+            <h3 class="text-sm font-bold text-slate-800 mb-3">Column mapping</h3>
+            <p class="text-xs text-slate-500 mb-4">Map source headers onto the learner import fields. Gender can stay unmapped. Status is used only for filtering and is not exported.</p>
+            <div id="studentMappingList" class="space-y-3"></div>
+          </div>
+
+          <button type="submit" id="studentProcessBtn"
+            class="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-bold text-white hover:bg-violet-700 transition-colors">
+            <i class="fas fa-gears"></i>
+            Process and download
+          </button>
+          <div id="studentProcessError" class="hidden rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="xl:col-span-2 space-y-6">
+      <div class="bg-white border border-slate-200 rounded-3xl shadow-sm p-6">
+        <h2 class="text-lg font-bold text-slate-900">Output columns</h2>
+        <div class="mt-4 space-y-3">
+          {% for column in expected_columns %}
+          <div class="flex items-center justify-between rounded-2xl border border-slate-100 px-4 py-3">
+            <span class="font-semibold text-slate-800">{{ column }}</span>
+            <span class="text-xs font-bold uppercase tracking-wide text-violet-600 bg-violet-50 px-2.5 py-1 rounded-full">Required</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="bg-amber-50 border border-amber-200 rounded-3xl p-6">
+        <h2 class="text-lg font-bold text-amber-900">How it works</h2>
+        <ul class="mt-4 space-y-2 text-sm text-amber-900">
+          <li>Analyze first, then pick any combination of sheets.</li>
+          <li>Sheets like <span class="font-semibold">all students sheet</span> stay unchecked unless you include them.</li>
+          <li>Rows with Status = 3 are excluded as exhausted subscriptions.</li>
+          <li>Each processed run keeps the original upload and the generated export.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-slate-200 rounded-3xl shadow-sm p-8">
+    <div class="flex items-center justify-between gap-4 mb-6">
+      <div>
+        <h2 class="text-xl font-bold text-slate-900">Processed file history</h2>
+        <p class="mt-1 text-sm text-slate-500">Previous uploads and generated exports stay available for download.</p>
+      </div>
+    </div>
+    {% if history %}
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs uppercase tracking-wide text-slate-400 border-b border-slate-100">
+            <th class="py-3 pr-4">Saved name</th>
+            <th class="py-3 pr-4">Original file</th>
+            <th class="py-3 pr-4">Sheets</th>
+            <th class="py-3 pr-4">Results</th>
+            <th class="py-3 pr-4">Date</th>
+            <th class="py-3 text-right">Downloads</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for run in history %}
+          <tr class="border-b border-slate-50 align-top">
+            <td class="py-4 pr-4 font-semibold text-slate-800">{{ run.display_name }}</td>
+            <td class="py-4 pr-4 text-slate-600">{{ run.original_filename }}</td>
+            <td class="py-4 pr-4 text-slate-600">{{ (run.selected_sheets or [])|join(', ') }}</td>
+            <td class="py-4 pr-4 text-slate-600">
+              {% set exported = namespace(value=0) %}
+              {% set exhausted = namespace(value=0) %}
+              {% for item in run.summaries or [] %}
+                {% set exported.value = exported.value + (item.exported_rows or 0) %}
+                {% set exhausted.value = exhausted.value + (item.exhausted_rows or 0) %}
+              {% endfor %}
+              {{ exported.value }} exported, {{ exhausted.value }} exhausted
+            </td>
+            <td class="py-4 pr-4 text-slate-500 whitespace-nowrap">{{ run.created_at.strftime('%Y-%m-%d %H:%M') if run.created_at else '' }}</td>
+            <td class="py-4 text-right whitespace-nowrap">
+              <a class="inline-flex items-center gap-1 text-violet-600 font-semibold mr-3" href="{{ url_for('student_export.download_original', run_id=run.id) }}">
+                <i class="fas fa-file"></i> Original
+              </a>
+              <a class="inline-flex items-center gap-1 text-violet-600 font-semibold" href="{{ url_for('student_export.download_processed', run_id=run.id) }}">
+                <i class="fas fa-download"></i> Processed
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="rounded-2xl border border-dashed border-slate-200 px-6 py-10 text-center text-slate-500">
+      No processed workbooks yet. Analyze a file to create the first history record.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const analyzeForm = document.getElementById('studentAnalyzeForm');
+  const processForm = document.getElementById('studentProcessForm');
+  const mapPanel = document.getElementById('studentMapPanel');
+  const analyzeError = document.getElementById('studentAnalyzeError');
+  const processError = document.getElementById('studentProcessError');
+  const sheetList = document.getElementById('studentSheetList');
+  const mappingList = document.getElementById('studentMappingList');
+  const analyzeBtn = document.getElementById('studentAnalyzeBtn');
+  const processBtn = document.getElementById('studentProcessBtn');
+  const csrfToken = analyzeForm.querySelector('[name="csrf_token"]').value;
+  let analysis = null;
+
+  function showError(el, message) {
+    el.textContent = message;
+    el.classList.remove('hidden');
+  }
+
+  function hideError(el) {
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
+
+  function selectedSheetNames() {
+    return Array.from(sheetList.querySelectorAll('input[type="checkbox"]:checked')).map((el) => el.value);
+  }
+
+  function headersForSelection() {
+    if (!analysis) return [];
+    const selected = selectedSheetNames();
+    const sheets = analysis.sheets.filter((sheet) => selected.includes(sheet.name));
+    const source = sheets[0] || analysis.sheets.find((sheet) => sheet.suggested) || analysis.sheets[0];
+    return source ? source.headers : [];
+  }
+
+  function suggestedMappingForSelection() {
+    if (!analysis) return {};
+    const selected = selectedSheetNames();
+    const sheets = analysis.sheets.filter((sheet) => selected.includes(sheet.name));
+    const source = sheets[0] || analysis.sheets.find((sheet) => sheet.suggested) || analysis.sheets[0];
+    return source ? (source.suggested_mapping || {}) : {};
+  }
+
+  function renderSheets() {
+    sheetList.innerHTML = '';
+    (analysis.sheets || []).forEach((sheet) => {
+      const id = 'sheet-' + encodeURIComponent(sheet.name);
+      const wrap = document.createElement('label');
+      wrap.className = 'flex items-start gap-3 rounded-2xl border border-slate-200 px-4 py-3 cursor-pointer hover:border-violet-300';
+      wrap.innerHTML = `
+        <input type="checkbox" class="mt-1" value="${sheet.name.replace(/"/g, '&quot;')}" ${sheet.suggested ? 'checked' : ''}>
+        <span>
+          <span class="block font-semibold text-slate-800">${sheet.name}</span>
+          <span class="block text-xs text-slate-400">${sheet.headers.length} columns detected</span>
+        </span>
+      `;
+      wrap.querySelector('input').addEventListener('change', renderMapping);
+      sheetList.appendChild(wrap);
+    });
+  }
+
+  function renderMapping() {
+    const headers = headersForSelection();
+    const suggested = suggestedMappingForSelection();
+    mappingList.innerHTML = '';
+    (analysis.mappable_fields || []).forEach((field) => {
+      const options = ['<option value="">' + (field.required ? 'Select a column' : 'Leave blank') + '</option>']
+        .concat(headers.map((header) => {
+          const selected = String(suggested[field.key] ?? '') === String(header.index) ? 'selected' : '';
+          return `<option value="${header.index}" ${selected}>${header.label}</option>`;
+        }));
+      const row = document.createElement('div');
+      row.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3 items-center rounded-2xl border border-slate-100 px-4 py-3';
+      row.innerHTML = `
+        <div>
+          <div class="font-semibold text-slate-800">${field.label}</div>
+          <div class="text-xs text-slate-400">${field.required ? 'Required source column' : 'Optional'}</div>
+        </div>
+        <select data-field="${field.key}" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400">${options.join('')}</select>
+      `;
+      mappingList.appendChild(row);
+    });
+  }
+
+  document.getElementById('studentToggleSheets').addEventListener('click', function () {
+    const boxes = sheetList.querySelectorAll('input[type="checkbox"]');
+    const anyUncheckedSuggested = Array.from(boxes).some((box) => {
+      const sheet = analysis.sheets.find((item) => item.name === box.value);
+      return sheet && sheet.suggested && !box.checked;
+    });
+    boxes.forEach((box) => {
+      const sheet = analysis.sheets.find((item) => item.name === box.value);
+      box.checked = anyUncheckedSuggested ? !!(sheet && sheet.suggested) : false;
+    });
+    renderMapping();
+  });
+
+  analyzeForm.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    hideError(analyzeError);
+    const fileInput = document.getElementById('studentExportFile');
+    if (!fileInput.files[0]) {
+      showError(analyzeError, 'Choose an Excel workbook to process.');
+      return;
+    }
+    const formData = new FormData();
+    formData.append('csrf_token', csrfToken);
+    formData.append('file', fileInput.files[0]);
+    analyzeBtn.disabled = true;
+    analyzeBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Analyzing...';
+    try {
+      const response = await fetch('{{ url_for("student_export.analyze") }}', {
+        method: 'POST',
+        body: formData,
+        headers: { 'Accept': 'application/json' }
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.error) {
+        throw new Error(payload.error || 'Could not analyze workbook.');
+      }
+      analysis = payload;
+      document.getElementById('studentToken').value = payload.token;
+      document.getElementById('studentDisplayName').value = payload.suggested_name || '';
+      document.getElementById('studentOriginalName').textContent = 'Source file: ' + payload.original_filename;
+      renderSheets();
+      renderMapping();
+      mapPanel.classList.remove('hidden');
+      mapPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (error) {
+      showError(analyzeError, error.message);
+    } finally {
+      analyzeBtn.disabled = false;
+      analyzeBtn.innerHTML = '<i class="fas fa-search"></i> Analyze sheets and columns';
+    }
+  });
+
+  processForm.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    hideError(processError);
+    const selectedSheets = selectedSheetNames();
+    if (!selectedSheets.length) {
+      showError(processError, 'Select at least one sheet to process.');
+      return;
+    }
+    const mapping = {};
+    mappingList.querySelectorAll('select[data-field]').forEach((select) => {
+      mapping[select.dataset.field] = select.value === '' ? null : Number(select.value);
+    });
+    const formData = new FormData();
+    formData.append('csrf_token', csrfToken);
+    formData.append('token', document.getElementById('studentToken').value);
+    formData.append('display_name', document.getElementById('studentDisplayName').value);
+    formData.append('selected_sheets', JSON.stringify(selectedSheets));
+    formData.append('mapping', JSON.stringify(mapping));
+    processBtn.disabled = true;
+    processBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Processing...';
+    try {
+      const response = await fetch('{{ url_for("student_export.run_export") }}', {
+        method: 'POST',
+        body: formData,
+        headers: { 'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json' }
+      });
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || contentType.includes('application/json')) {
+        const payload = await response.json();
+        throw new Error(payload.error || 'Could not process workbook.');
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get('content-disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      const filename = match ? match[1] : (document.getElementById('studentDisplayName').value || 'student_export.xlsx');
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      window.location.reload();
+    } catch (error) {
+      showError(processError, error.message);
+    } finally {
+      processBtn.disabled = false;
+      processBtn.innerHTML = '<i class="fas fa-gears"></i> Process and download';
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Ticket #{{ query.id }}{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/help_desk.css') }}">
+{% endblock %}
+{% block content %}
+<div class="hd-app-shell">
+  <div class="hd-page">
+    <header class="hd-subheader">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div>
+          <a href="{{ url_for('help_desk.index') if hd_is_viewer else url_for('help_desk.my_tickets') }}" class="hd-back-link">&larr; Back</a>
+          <h1 class="hd-hero-title mb-1" id="hd-detail-title">{{ query.query_title }}</h1>
+          <div class="hd-meta-row" id="hd-detail-meta"></div>
+        </div>
+      </div>
+      {% include "help_desk/_subnav.html" %}
+    </header>
+
+    <div class="hd-detail-grid">
+      <section class="hub-glass hd-thread-panel">
+        <div id="hd-thread" class="hd-thread"></div>
+        <div class="hd-composer">
+          {% if hd_is_agent %}
+          <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
+            <select class="form-select form-select-sm" id="hd-macro-select" style="max-width:220px">
+              <option value="">Insert macro…</option>
+            </select>
+            <label class="form-check-label small ms-1">
+              <input type="checkbox" class="form-check-input" id="hd-internal-note"> Internal note
+            </label>
+          </div>
+          {% endif %}
+          <textarea class="form-control" id="hd-reply-body" rows="3" placeholder="Write a reply… Use @username to mention"></textarea>
+          <div class="d-flex justify-content-between align-items-center mt-2 gap-2">
+            <input type="file" class="form-control form-control-sm" id="hd-reply-files" multiple style="max-width:260px">
+            <button type="button" class="btn hd-btn-primary btn-sm" id="hd-reply-send">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="hub-glass hd-sidebar">
+        <div class="hd-sidebar-section">
+          <label class="form-label">Status</label>
+          <select class="form-select form-select-sm" id="hd-side-status" {% if not hd_is_agent %}disabled{% endif %}>
+            {% for s in hd_statuses %}
+            <option value="{{ s }}" {% if query.status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="hd-sidebar-section">
+          <label class="form-label">Priority</label>
+          <select class="form-select form-select-sm" id="hd-side-priority" {% if not hd_is_agent %}disabled{% endif %}>
+            {% for p in hd_priorities %}
+            <option value="{{ p }}" {% if (query.priority or 'normal') == p %}selected{% endif %}>{{ p|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="hd-sidebar-section">
+          <label class="form-label">Category</label>
+          <select class="form-select form-select-sm" id="hd-side-category" {% if not hd_is_agent %}disabled{% endif %}>
+            {% for c in hd_categories %}
+            <option value="{{ c }}" {% if (query.category or 'general') == c %}selected{% endif %}>{{ c|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="hd-sidebar-section" id="hd-sla-box"></div>
+        <div class="hd-sidebar-section">
+          <label class="form-label">Assignees</label>
+          <div id="hd-assignees" class="mb-2"></div>
+          {% if hd_is_agent %}
+          <input type="search" class="form-control form-control-sm" id="hd-assign-search" placeholder="Add assignee…">
+          <div id="hd-assign-results" class="hd-user-results"></div>
+          {% endif %}
+        </div>
+        <div class="hd-sidebar-section">
+          <label class="form-label">Watchers</label>
+          <div id="hd-watchers" class="mb-2"></div>
+          {% if hd_is_agent %}
+          <input type="search" class="form-control form-control-sm" id="hd-watch-search" placeholder="Add watcher…">
+          <div id="hd-watch-results" class="hd-user-results"></div>
+          {% endif %}
+        </div>
+        <div class="hd-sidebar-section" id="hd-attachments-box"></div>
+        {% if query.status == 'Resolved' %}
+        <div class="hd-sidebar-section">
+          <a class="btn btn-sm btn-outline-primary w-100" href="{{ url_for('help_desk.csat_page', query_id=query.id) }}">Rate this support</a>
+        </div>
+        {% endif %}
+      </aside>
+    </div>
+  </div>
+  {% include "help_desk/_app_shell.html" %}
+  {% include "help_desk/_new_ticket_modal.html" %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/help_desk.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  HD.initDetail({{ query.id }});
+});
+</script>
+{% endblock %}

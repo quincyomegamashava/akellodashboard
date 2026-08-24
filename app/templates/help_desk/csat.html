@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Rate support{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/help_desk.css') }}">
+{% endblock %}
+{% block content %}
+<div class="hd-app-shell">
+  <div class="hd-page" style="max-width:520px;margin:0 auto">
+    <header class="hd-subheader">
+      <h1 class="hd-hero-title">How was our support?</h1>
+      <p class="hd-hero-sub">Ticket: {{ query.query_title }}</p>
+    </header>
+    {% if done %}
+    <div class="hub-glass p-4 text-center">Thanks for your feedback.</div>
+    {% else %}
+    <form method="post" class="hub-glass p-4">
+      {% if error %}<div class="text-danger mb-2">{{ error }}</div>{% endif %}
+      <div class="mb-3">
+        <label class="form-label">Rating</label>
+        <select name="rating" class="form-select" required>
+          <option value="">Select…</option>
+          <option value="5">5 — Excellent</option>
+          <option value="4">4 — Good</option>
+          <option value="3">3 — Okay</option>
+          <option value="2">2 — Poor</option>
+          <option value="1">1 — Bad</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Comment (optional)</label>
+        <textarea name="comment" class="form-control" rows="3"></textarea>
+      </div>
+      <button type="submit" class="btn hd-btn-primary">Submit</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

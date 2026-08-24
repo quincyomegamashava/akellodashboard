@@ -1,0 +1,16 @@
+<nav class="hd-bottom-nav d-lg-none" aria-label="Help desk mobile navigation">
+  {% if hd_is_viewer %}
+  <a href="{{ url_for('help_desk.index') }}" class="hd-bottom-nav-item{% if hd_active == 'inbox' %} active{% endif %}">
+    <i class="fas fa-inbox"></i><span>Inbox</span>
+  </a>
+  {% endif %}
+  <a href="{{ url_for('help_desk.my_tickets') }}" class="hd-bottom-nav-item{% if hd_active == 'my' %} active{% endif %}">
+    <i class="fas fa-ticket-alt"></i><span>Mine</span>
+  </a>
+  <a href="{{ url_for('help_desk.kb_page') }}" class="hd-bottom-nav-item{% if hd_active == 'kb' %} active{% endif %}">
+    <i class="fas fa-book"></i><span>KB</span>
+  </a>
+  <button type="button" class="hd-bottom-nav-item hd-bottom-nav-fab" id="hd-mobile-new" aria-label="New ticket">
+    <i class="fas fa-plus"></i><span>New</span>
+  </button>
+</nav>

@@ -1,0 +1,42 @@
+{# Set hd_active: inbox | my | email | kb | reports | settings #}
+<nav class="hd-local-nav" aria-label="Help desk">
+  <div class="hd-local-nav-links">
+    {% if hd_is_viewer %}
+    <a href="{{ url_for('help_desk.index') }}"
+       class="hd-local-nav-link{% if hd_active == 'inbox' %} active{% endif %}">
+      <i class="fas fa-inbox" aria-hidden="true"></i><span>Inbox</span>
+    </a>
+    {% endif %}
+    <a href="{{ url_for('help_desk.my_tickets') }}"
+       class="hd-local-nav-link{% if hd_active == 'my' %} active{% endif %}">
+      <i class="fas fa-ticket-alt" aria-hidden="true"></i><span>My tickets</span>
+    </a>
+    {% if hd_is_viewer %}
+    <a href="{{ url_for('help_desk.email_page') }}"
+       class="hd-local-nav-link{% if hd_active == 'email' %} active{% endif %}">
+      <i class="fas fa-envelope" aria-hidden="true"></i><span>Email</span>
+    </a>
+    {% endif %}
+    <a href="{{ url_for('help_desk.kb_page') }}"
+       class="hd-local-nav-link{% if hd_active == 'kb' %} active{% endif %}">
+      <i class="fas fa-book" aria-hidden="true"></i><span>Knowledge base</span>
+    </a>
+    {% if hd_is_viewer %}
+    <a href="{{ url_for('help_desk.reports_page') }}"
+       class="hd-local-nav-link{% if hd_active == 'reports' %} active{% endif %}">
+      <i class="fas fa-chart-line" aria-hidden="true"></i><span>Reports</span>
+    </a>
+    {% endif %}
+    {% if hd_is_admin %}
+    <a href="{{ url_for('help_desk.settings_page') }}"
+       class="hd-local-nav-link{% if hd_active == 'settings' %} active{% endif %}">
+      <i class="fas fa-cog" aria-hidden="true"></i><span>Settings</span>
+    </a>
+    {% endif %}
+  </div>
+  <div class="hd-local-nav-actions">
+    <button type="button" class="btn btn-sm hd-btn-primary" id="hd-new-ticket-btn" title="New ticket">
+      <i class="fas fa-plus me-1"></i><span class="d-none d-sm-inline">New ticket</span>
+    </button>
+  </div>
+</nav>

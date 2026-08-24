@@ -36,6 +36,7 @@ logger = setup_logging(app)
 from app import routes, models, monitoring_routes
 from app import mobile_meeting_sales_routes  # noqa: F401 — /api/mobile/meeting-notes & sales-marketing
 from app import pm_routes  # noqa: F401 — extended PM platform routes
+from app import game_race_routes  # noqa: F401 — multiplayer game races
 
 # Register the global deletion-audit listener (after models are loaded).
 from app.audit import init_audit
@@ -66,6 +67,22 @@ from app.blueprints.meeting_notes import models as meeting_notes_models  # noqa:
 app.register_blueprint(meeting_notes_bp)
 
 try:
+    from app.blueprints.help_desk import bp as help_desk_bp
+    from app.blueprints.help_desk import models as help_desk_models  # noqa: F401
+    app.register_blueprint(help_desk_bp)
+    logger.info("Help Desk blueprint registered (/help-desk/)")
+except Exception:
+    logger.exception("Help Desk blueprint failed to register")
+
+try:
+    from app.blueprints.student_export import bp as student_export_bp
+
+    app.register_blueprint(student_export_bp)
+    logger.info("Student export blueprint registered (/student-export/)")
+except Exception:
+    logger.exception("Student export blueprint failed to register")
+
+try:
     from app.blueprints.sales_marketing import bp as sales_marketing_bp
     from app.blueprints.sales_marketing import models as sales_marketing_models  # noqa: F401
 
@@ -86,6 +103,18 @@ app.register_blueprint(learn_api_bp)
 csrf.exempt(learn_api_bp)
 
 from app.learning_hub import models as learning_hub_models  # noqa: F401
+
+try:
+    with app.app_context():
+        from app.games.seed_stem_games import seed_stem_games
+        _stem_seed = seed_stem_games()
+        logger.info("HBC/STEM games seeded: %s", _stem_seed)
+except Exception:
+    logger.exception("STEM game seed skipped (games table may not exist yet)")
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
 
 # Start helpdesk email fetch scheduler (every 60s)
 from app.scheduler import start_scheduler

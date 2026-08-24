@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Help Desk — Inbox{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/help_desk.css') }}">
+{% endblock %}
+{% block content %}
+<div class="hd-app-shell">
+  <div class="hd-page">
+    <header class="hd-subheader">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div>
+          <h1 class="hd-hero-title mb-0">Inbox</h1>
+          <p class="hd-hero-sub d-none d-md-block">Unified queue for internal queries and email tickets.</p>
+        </div>
+        <div class="hd-stat-strip" id="hd-inbox-stats"></div>
+      </div>
+      {% set hd_active = 'inbox' %}
+      {% include "help_desk/_subnav.html" %}
+    </header>
+
+    <div class="hd-filters hub-glass mb-3">
+      <input type="search" class="form-control form-control-sm" id="hd-filter-q" placeholder="Search tickets…">
+      <select class="form-select form-select-sm" id="hd-filter-status">
+        <option value="">All statuses</option>
+        <option value="Not started">Not started</option>
+        <option value="Looking into it">Looking into it</option>
+        <option value="Resolved">Resolved</option>
+      </select>
+      <select class="form-select form-select-sm" id="hd-filter-priority">
+        <option value="">All priorities</option>
+        <option value="urgent">Urgent</option>
+        <option value="high">High</option>
+        <option value="normal">Normal</option>
+      </select>
+      <select class="form-select form-select-sm" id="hd-filter-category">
+        <option value="">All categories</option>
+        <option value="general">General</option>
+        <option value="access">Access</option>
+        <option value="technical">Technical</option>
+        <option value="billing">Billing</option>
+        <option value="other">Other</option>
+      </select>
+      <select class="form-select form-select-sm" id="hd-filter-source">
+        <option value="">All sources</option>
+        <option value="internal">Internal</option>
+        <option value="email">Email</option>
+      </select>
+    </div>
+
+    <div class="hub-glass hd-table-wrap">
+      <table class="hd-table" id="hd-inbox-table">
+        <thead>
+          <tr>
+            <th>Ticket</th>
+            <th>Status</th>
+            <th>Priority</th>
+            <th>Category</th>
+            <th>Source</th>
+            <th>Assignees</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody id="hd-inbox-body">
+          <tr><td colspan="7" class="hd-muted text-center py-4">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% include "help_desk/_app_shell.html" %}
+  {% include "help_desk/_new_ticket_modal.html" %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/help_desk.js') }}"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { HD.initInbox(); });</script>
+{% endblock %}

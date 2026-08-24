@@ -89,6 +89,7 @@ def project_a_label_detail(project_id, label_id):
     return jsonify(h["label_to_dict"](lbl))
 
 
+@app.route("/api/pm/search", methods=["GET"])
 @login_required
 def pm_global_search():
     q = request.args.get("q", "")

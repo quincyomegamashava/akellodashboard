@@ -72,6 +72,17 @@
       </div>
     </div>
     {% endif %}
+
+    <!-- Races Card -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="openRacesModal()">
+      <div class="p-6">
+        <div class="w-12 h-12 rounded-lg bg-fuchsia-50 text-fuchsia-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+          <i class="fas fa-flag-checkered text-xl"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-slate-900 mb-2">Races</h3>
+        <p class="text-slate-500 text-sm">Create timed multiplayer races mixing puzzles, quizzes, and questions.</p>
+      </div>
+    </div>
     
     {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}
     <!-- Score Tracking Card -->
@@ -223,6 +234,63 @@
           </button>
         </div>
         {% endif %}
+
+        <div class="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Catalog</label>
+            <select id="gamesFilterSource" class="w-full rounded-lg border-slate-200 text-sm py-2" onchange="loadGames()">
+              <option value="">All sources</option>
+              <option value="ruzivo">Smart Learning / Ruzivo</option>
+              <option value="general_knowledge">General Knowledge</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Filter by age</label>
+            <select id="gamesFilterAge" class="w-full rounded-lg border-slate-200 text-sm py-2" onchange="loadGames()">
+              <option value="">All ages</option>
+              <option>Infants</option>
+              <option>9-10</option>
+              <option>11-12</option>
+              <option>13-14</option>
+              <option>15-16</option>
+              <option>17-19</option>
+              <option>9-19</option>
+              <option>Youths & older</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Filter by subject</label>
+            <input id="gamesFilterSubject" type="text" class="w-full rounded-lg border-slate-200 text-sm py-2" placeholder="e.g. Mathematics" oninput="loadGames()">
+          </div>
+        </div>
+        {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}
+        <div class="mb-4 flex flex-wrap items-end gap-3 p-4 rounded-xl bg-indigo-50/80 border border-indigo-100">
+          <div>
+            <label class="block text-xs font-medium text-indigo-700 mb-1">Sync Ruzivo grade</label>
+            <select id="ruzivoSyncGrade" class="rounded-lg border-slate-200 text-sm py-2">
+              <option value="">All grades</option>
+              <option value="4">Grade 4</option>
+              <option value="5">Grade 5</option>
+              <option value="6">Grade 6</option>
+              <option value="7">Grade 7</option>
+              <option value="8">Grade 8</option>
+              <option value="9">Grade 9</option>
+              <option value="10">Grade 10</option>
+              <option value="11">Grade 11</option>
+              <option value="12">Grade 12</option>
+              <option value="13">Grade 13</option>
+            </select>
+          </div>
+          <button type="button" onclick="syncRuzivoExercises()" id="ruzivoSyncBtn" class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
+            <i class="fas fa-cloud-download-alt mr-2"></i> Sync from Ruzivo
+          </button>
+          <button type="button" onclick="syncAllRuzivoGrades()" id="ruzivoSyncAllBtn" class="inline-flex items-center rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500">
+            <i class="fas fa-layer-group mr-2"></i> Sync grades 4–13
+          </button>
+          <p class="text-xs text-indigo-800/80">Imports MCQ exercises into Smart Learning catalog. Titles use Smart Learning branding.</p>
+          <p id="ruzivoSyncStatus" class="text-xs text-indigo-700 w-full"></p>
+        </div>
+        {% endif %}
         
         <div id="gamesList" class="space-y-3">
           <div class="p-8 text-center text-slate-400">
@@ -318,6 +386,118 @@
 </div>
 {% endif %}
 
+<!-- Races list modal -->
+<div id="racesModal" class="fixed inset-0 z-[80] hidden overflow-y-auto" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeRacesModal()"></div>
+  <div class="flex min-h-full items-center justify-center p-4">
+    <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl sm:my-8 sm:w-full sm:max-w-5xl">
+      <div class="px-4 pb-4 pt-5 sm:p-6 border-b border-slate-100 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-slate-900 flex items-center gap-2">
+          <i class="fas fa-flag-checkered text-fuchsia-600"></i> Races
+        </h3>
+        <button type="button" class="text-slate-400 hover:text-slate-500" onclick="closeRacesModal()">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+      <div class="px-4 py-5 sm:p-6 bg-slate-50/50 min-h-[360px]">
+        <div class="mb-6 flex justify-center">
+          <button type="button" onclick="openRaceEditor()" class="inline-flex items-center rounded-lg bg-fuchsia-600 px-6 py-3 text-sm font-semibold text-white hover:bg-fuchsia-500">
+            <i class="fas fa-plus mr-2"></i> Create Race
+          </button>
+        </div>
+        <div id="racesAdminList" class="space-y-3">
+          <div class="p-8 text-center text-slate-400"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>Loading races...</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create/edit race modal -->
+<div id="raceEditorModal" class="fixed inset-0 z-[60] hidden overflow-y-auto" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeRaceEditor()"></div>
+  <div class="flex min-h-full items-center justify-center p-4">
+    <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl sm:my-8 sm:w-full sm:max-w-4xl">
+      <div class="px-4 pb-4 pt-5 sm:p-6 border-b border-slate-100 flex items-center justify-between">
+        <h3 id="raceEditorTitle" class="text-lg font-semibold text-slate-900">Create Race</h3>
+        <button type="button" class="text-slate-400 hover:text-slate-500" onclick="closeRaceEditor()">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+      <div class="px-4 py-5 sm:p-6 max-h-[80vh] overflow-y-auto">
+        <form id="raceForm" class="space-y-4" onsubmit="return false;">
+          <input type="hidden" id="raceEditId" value="">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Title *</label>
+            <input type="text" id="raceTitle" class="w-full rounded-lg border-slate-200 text-sm py-2.5" required>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Age range *</label>
+              <select id="raceAgeRange" class="w-full rounded-lg border-slate-200 text-sm py-2.5" required onchange="onRaceAgeChanged()">
+                <option value="">Select</option>
+                <option>Infants</option>
+                <option>9-10</option>
+                <option>11-12</option>
+                <option>13-14</option>
+                <option>15-16</option>
+                <option>17-19</option>
+                <option>9-19</option>
+                <option>Youths & older</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Start *</label>
+              <input type="datetime-local" id="raceStartsAt" class="w-full rounded-lg border-slate-200 text-sm py-2.5" required>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Duration (minutes) *</label>
+              <input type="number" id="raceDuration" min="1" max="180" value="2" class="w-full rounded-lg border-slate-200 text-sm py-2.5" required>
+            </div>
+          </div>
+
+          <div class="border border-slate-200 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h4 class="font-semibold text-slate-800">Mixed playlist</h4>
+                <p class="text-xs text-slate-500" id="raceMixSummary">Add puzzles, quizzes, and questions in any order.</p>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2 mb-4">
+              <button type="button" onclick="addRacePuzzle()" class="rounded-lg bg-indigo-50 text-indigo-700 px-3 py-2 text-sm font-medium"><i class="fas fa-puzzle-piece mr-1"></i> Add puzzle</button>
+              <button type="button" onclick="addRaceFromBank()" class="rounded-lg bg-sky-50 text-sky-700 px-3 py-2 text-sm font-medium"><i class="fas fa-database mr-1"></i> Add from bank</button>
+              <button type="button" onclick="addRaceQuiz()" class="rounded-lg bg-amber-50 text-amber-700 px-3 py-2 text-sm font-medium"><i class="fas fa-list-ul mr-1"></i> Add quiz</button>
+              <button type="button" onclick="addRaceQuestion()" class="rounded-lg bg-emerald-50 text-emerald-700 px-3 py-2 text-sm font-medium"><i class="fas fa-question mr-1"></i> Add question</button>
+            </div>
+            <div id="raceItemsList" class="space-y-3"></div>
+          </div>
+
+          <div class="flex justify-end gap-3 pt-2">
+            <button type="button" onclick="closeRaceEditor()" class="rounded-lg border px-4 py-2.5 text-sm">Cancel</button>
+            <button type="button" onclick="saveRace()" class="rounded-lg bg-fuchsia-600 text-white px-5 py-2.5 text-sm font-semibold">Save race</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Race results modal -->
+<div id="raceResultsModal" class="fixed inset-0 z-[60] hidden overflow-y-auto" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeRaceResults()"></div>
+  <div class="flex min-h-full items-center justify-center p-4">
+    <div class="relative transform overflow-hidden rounded-xl bg-white shadow-xl sm:my-8 sm:w-full sm:max-w-3xl">
+      <div class="px-4 pb-4 pt-5 sm:p-6 border-b border-slate-100 flex items-center justify-between">
+        <h3 id="raceResultsTitle" class="text-lg font-semibold">Race results</h3>
+        <button type="button" class="text-slate-400" onclick="closeRaceResults()">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+      <div id="raceResultsBody" class="px-4 py-5 sm:p-6"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Create/Edit Game Modal (Nested in functionality, keeps simple structure) -->
 <div id="gameModal" class="fixed inset-0 z-[60] hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
   <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeGameModal()"></div>
@@ -352,7 +532,7 @@
 
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Age Range *</label>
-            <select id="gameAgeRange" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" required>
+            <select id="gameAgeRange" class="w-full p-2 rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" required onchange="refreshGameSubjectOptions()">
               <option value="">Select age range</option>
               <option value="Infants">Infants (under 9)</option>
               <option value="9-10">9-10 years</option>
@@ -362,6 +542,13 @@
               <option value="17-19">17-19 years</option>
               <option value="9-19">9-19 years</option>
               <option value="Youths & older">Youths & older (over 19)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Subject (HBC learning area)</label>
+            <select id="gameSubject" class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5">
+              <option value="">Select subject</option>
             </select>
           </div>
 
@@ -420,16 +607,26 @@
   // Modal Utility Functions
   function toggleModal(modalId, show) {
     const modal = document.getElementById(modalId);
+    if (!modal) {
+      console.error('Modal not found:', modalId);
+      return;
+    }
     if (show) {
       modal.classList.remove('hidden');
-      // Prevent body scrolling
       document.body.style.overflow = 'hidden';
     } else {
       modal.classList.add('hidden');
-      // Restore body scrolling
       document.body.style.overflow = 'auto';
     }
   }
+
+  function openRacesModal() {
+    toggleModal('racesModal', true);
+    if (typeof loadAdminRaces === 'function') loadAdminRaces();
+  }
+  window.openRacesModal = openRacesModal;
+  function closeRacesModal() { toggleModal('racesModal', false); }
+  window.closeRacesModal = closeRacesModal;
 
   // User Registration Modal
   function openUserRegistrationModal() {
@@ -488,6 +685,8 @@
     
     if (gameId) {
       loadGameForEdit(gameId);
+    } else {
+      refreshGameSubjectOptions('');
     }
     toggleModal('gameModal', true);
   }
@@ -658,6 +857,7 @@
         <thead class="bg-slate-50">
           <tr>
             <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Source</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Age</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Phone Number</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Registered</th>
@@ -670,6 +870,11 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm font-medium text-slate-900">${escapeHtml(u.firstname)} ${escapeHtml(u.surname)}</div>
                 <div class="text-xs text-slate-500">@${escapeHtml(u.username)}</div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                ${u.auth_source === 'ruzivo'
+                  ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">Ruzivo${u.ruzivo_student_id ? ' #' + u.ruzivo_student_id : ''}</span>`
+                  : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">Local</span>`}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${u.age || 'N/A'}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${u.phone_number ? escapeHtml(u.phone_number) : '<span class="text-slate-400">—</span>'}</td>
@@ -737,6 +942,7 @@
       document.getElementById('gameDescription').value = data.game.description || '';
       document.getElementById('gameMaxScore').value = data.game.max_score || '';
       document.getElementById('gameAgeRange').value = data.game.age_range || '';
+      refreshGameSubjectOptions(data.game.subject || '');
       document.getElementById('gameDifficulty').value = data.game.difficulty_level || '';
       document.getElementById('gameIsActive').checked = data.game.is_active !== false;
       document.getElementById('gameHtml').value = data.game.html_content || '';
@@ -752,6 +958,7 @@
     const maxScore = document.getElementById('gameMaxScore').value ? parseInt(document.getElementById('gameMaxScore').value) : null;
     const htmlContent = document.getElementById('gameHtml').value.trim();
     const ageRange = document.getElementById('gameAgeRange').value;
+    const subject = (document.getElementById('gameSubject') || {}).value || '';
     const difficulty = document.getElementById('gameDifficulty').value;
     const isActive = document.getElementById('gameIsActive').checked;
 
@@ -771,7 +978,7 @@
       const r = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, max_score: maxScore, html_content: htmlContent, age_range: ageRange, difficulty_level: difficulty, is_active: isActive })
+        body: JSON.stringify({ title, description, max_score: maxScore, html_content: htmlContent, age_range: ageRange, subject, difficulty_level: difficulty, is_active: isActive })
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Failed to save');
@@ -789,7 +996,15 @@
 
   async function loadGames() {
     try {
-      const r = await fetch('/api/games');
+      const age = (document.getElementById('gamesFilterAge') || {}).value || '';
+      const subject = ((document.getElementById('gamesFilterSubject') || {}).value || '').trim();
+      const source = (document.getElementById('gamesFilterSource') || {}).value || '';
+      const params = new URLSearchParams();
+      if (age) params.set('age_range', age);
+      if (subject) params.set('subject', subject);
+      if (source) params.set('content_source', source);
+      const qs = params.toString() ? ('?' + params.toString()) : '';
+      const r = await fetch('/api/games' + qs);
       const data = await r.json();
       const container = document.getElementById('gamesList');
       
@@ -814,7 +1029,13 @@
               <div class="flex-1 min-w-0">
                 <h4 class="text-base font-bold text-slate-900 truncate">${escapeHtml(g.title)}</h4>
                 <div class="flex items-center gap-2 mt-1 flex-wrap">
+                  ${g.content_source === 'ruzivo'
+                    ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100/80 text-violet-700 backdrop-blur-sm"><i class="fas fa-graduation-cap mr-1 text-xs"></i> Smart Learning</span>`
+                    : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100/80 text-emerald-700 backdrop-blur-sm">General Knowledge</span>`}
+                  ${g.grade ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100/80 text-amber-800 backdrop-blur-sm">G${g.grade}</span>` : ''}
                   ${g.age_range ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100/80 text-slate-700 backdrop-blur-sm"><i class="fas fa-users mr-1 text-xs"></i> Ages ${g.age_range}</span>` : ''}
+                  ${g.subject ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100/80 text-indigo-700 backdrop-blur-sm"><i class="fas fa-book mr-1 text-xs"></i> ${escapeHtml(g.subject)}</span>` : ''}
+                  ${g.bank_item_count ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100/80 text-sky-700 backdrop-blur-sm"><i class="fas fa-database mr-1 text-xs"></i> ${g.bank_item_count} bank</span>` : ''}
                   ${g.difficulty_level ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getDifficultyBadgeClass(g.difficulty_level)} backdrop-blur-sm"><i class="fas ${getDifficultyIcon(g.difficulty_level)} mr-1 text-xs"></i> ${getDifficultyLabel(g.difficulty_level)}</span>` : ''}
                   ${g.is_active ? 
                     '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100/80 text-green-700 backdrop-blur-sm">Active</span>' : 
@@ -852,6 +1073,75 @@
       document.getElementById('gamesList').innerHTML = '<div class="col-span-full text-center text-red-500">Error loading games</div>';
     }
   }
+
+  async function syncRuzivoExercises() {
+    const btn = document.getElementById('ruzivoSyncBtn');
+    const gradeEl = document.getElementById('ruzivoSyncGrade');
+    const status = document.getElementById('ruzivoSyncStatus');
+    const gradeVal = gradeEl && gradeEl.value ? parseInt(gradeEl.value, 10) : null;
+    if (!confirm('Import/update Smart Learning exercises into the game catalog?')) return;
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Syncing…';
+    if (status) status.textContent = 'Syncing…';
+    try {
+      const r = await fetch('/api/ruzivo-exercises/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grade: gradeVal, limit_per_band: 80 }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Sync failed');
+      const msg = `Done: ${data.stats.created} created, ${data.stats.updated} updated, ${data.stats.skipped} skipped (${new Date().toLocaleString()}).`;
+      alert(msg);
+      if (status) status.textContent = msg;
+      loadGames();
+    } catch (e) {
+      alert('Sync error: ' + (e.message || ''));
+      if (status) status.textContent = 'Sync failed.';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    }
+  }
+  window.syncRuzivoExercises = syncRuzivoExercises;
+
+  async function syncAllRuzivoGrades() {
+    const btn = document.getElementById('ruzivoSyncAllBtn');
+    const status = document.getElementById('ruzivoSyncStatus');
+    if (!confirm('Sync Smart Learning exercises for grades 4–13? This may take a few minutes.')) return;
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Syncing all…';
+    let created = 0, updated = 0, skipped = 0;
+    try {
+      for (const grade of [4,5,6,7,8,9,10,11,12,13]) {
+        if (status) status.textContent = `Syncing grade ${grade}…`;
+        const hs = grade >= 8;
+        const r = await fetch('/api/ruzivo-exercises/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ grade, hs, limit_per_band: 60 }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || `Grade ${grade} failed`);
+        created += data.stats.created || 0;
+        updated += data.stats.updated || 0;
+        skipped += data.stats.skipped || 0;
+      }
+      const msg = `All grades: ${created} created, ${updated} updated, ${skipped} skipped (${new Date().toLocaleString()}).`;
+      alert(msg);
+      if (status) status.textContent = msg;
+      loadGames();
+    } catch (e) {
+      alert('Sync error: ' + (e.message || ''));
+      if (status) status.textContent = 'Sync failed.';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    }
+  }
+  window.syncAllRuzivoGrades = syncAllRuzivoGrades;
 
   async function deleteGame(id) {
     if (!confirm('Delete this game? This will also delete all scores for this game.')) return;
@@ -1013,6 +1303,430 @@
     const date = new Date(d);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   }
+
+  let raceDraftItems = [];
+  let raceCatalogGames = [];
+  let raceBankItems = [];
+  let editingRaceId = null;
+
+  const HBC_SUBJECTS_BY_AGE = {
+    'Infants': ['English Language', 'Mathematics'],
+    '9-10': ['English Language', 'Mathematics', 'Social Science', 'Science and Technology'],
+    '11-12': ['English Language', 'Mathematics', 'Social Science', 'Science and Technology'],
+    '13-14': ['English Language', 'Mathematics', 'Geography', 'Combined Science', 'ICT'],
+    '15-16': ['English Language', 'Mathematics', 'Geography', 'Combined Science', 'ICT'],
+    '17-19': ['English Language', 'Mathematics', 'Geography', 'Combined Science', 'ICT'],
+    '9-19': ['English Language', 'Mathematics', 'Science and Technology', 'Geography', 'ICT'],
+    'Youths & older': ['English Language', 'Mathematics', 'Geography', 'Combined Science', 'ICT'],
+  };
+
+  function refreshGameSubjectOptions(selected) {
+    const ageEl = document.getElementById('gameAgeRange');
+    const sel = document.getElementById('gameSubject');
+    if (!ageEl || !sel) return;
+    const subjects = HBC_SUBJECTS_BY_AGE[ageEl.value] || [];
+    const current = selected != null ? selected : sel.value;
+    sel.innerHTML = '<option value="">Select subject</option>' +
+      subjects.map((s) => `<option value="${escapeHtml(s)}" ${s === current ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('');
+  }
+  window.refreshGameSubjectOptions = refreshGameSubjectOptions;
+
+  function closeRaceEditor() { toggleModal('raceEditorModal', false); }
+  window.closeRaceEditor = closeRaceEditor;
+  function closeRaceResults() { toggleModal('raceResultsModal', false); }
+  window.closeRaceResults = closeRaceResults;
+
+  function isoToLocalInput(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function mixText(mix) {
+    if (!mix) return '';
+    const parts = [];
+    if (mix.quiz) parts.push(`${mix.quiz} quiz`);
+    if (mix.puzzle) parts.push(`${mix.puzzle} puzzle`);
+    if (mix.question) parts.push(`${mix.question} question`);
+    return parts.join(' · ') || `${mix.total_items || 0} items`;
+  }
+
+  async function loadAdminRaces() {
+    const el = document.getElementById('racesAdminList');
+    try {
+      const r = await fetch('/api/game-races');
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed to load races');
+      const races = data.races || [];
+      if (!races.length) {
+        el.innerHTML = '<div class="p-8 text-center text-slate-400">No races yet. Create one to get started.</div>';
+        return;
+      }
+      el.innerHTML = races.map((race) => `
+        <div class="bg-white rounded-xl border border-slate-200 p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <div class="font-semibold text-slate-800">${escapeHtml(race.title)}</div>
+            <div class="text-xs text-slate-500 mt-1">${escapeHtml(race.status)} · Ages ${escapeHtml(race.age_range)} · ${race.duration_minutes} min · ${escapeHtml(mixText(race.mix))} · ${race.player_count || 0} players</div>
+            <div class="text-xs text-slate-400">${formatDate(race.starts_at)} → ${formatDate(race.ends_at)}</div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            ${race.status === 'upcoming' ? `<button type="button" onclick="openRaceEditor(${race.id})" class="rounded-lg border px-3 py-1.5 text-sm">Edit</button>` : ''}
+            ${!race.is_cancelled && race.status !== 'finished' ? `<button type="button" onclick="cancelRace(${race.id})" class="rounded-lg border border-red-200 text-red-600 px-3 py-1.5 text-sm">Cancel</button>` : ''}
+            <button type="button" onclick="openRaceResults(${race.id})" class="rounded-lg bg-slate-800 text-white px-3 py-1.5 text-sm">Results</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      el.innerHTML = `<div class="p-8 text-center text-red-500">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function openRaceEditor(raceId = null) {
+    editingRaceId = raceId;
+    document.getElementById('raceEditId').value = raceId || '';
+    document.getElementById('raceEditorTitle').textContent = raceId ? 'Edit Race' : 'Create Race';
+    document.getElementById('raceForm').reset();
+    document.getElementById('raceDuration').value = 2;
+    raceDraftItems = [];
+    if (raceId) {
+      const r = await fetch(`/api/game-races/${raceId}`);
+      const data = await r.json();
+      if (!r.ok) {
+        alert(data.error || 'Failed to load race');
+        return;
+      }
+      const race = data.race;
+      document.getElementById('raceTitle').value = race.title || '';
+      document.getElementById('raceAgeRange').value = race.age_range || '';
+      document.getElementById('raceStartsAt').value = isoToLocalInput(race.starts_at);
+      document.getElementById('raceDuration').value = race.duration_minutes || 2;
+      raceDraftItems = (race.items || []).map((item) => ({
+        item_type: item.item_type,
+        points: item.points,
+        game_id: item.game_id,
+        bank_item_id: (item.payload && item.payload.bank_item_id) || null,
+        prompt: item.prompt || '',
+        payload: item.payload || {},
+      }));
+    }
+    await loadRaceCatalogForAge();
+    renderRaceItems();
+    toggleModal('raceEditorModal', true);
+  }
+  window.openRaceEditor = openRaceEditor;
+
+  async function onRaceAgeChanged() {
+    await loadRaceCatalogForAge();
+    renderRaceItems();
+  }
+  window.onRaceAgeChanged = onRaceAgeChanged;
+
+  async function loadRaceCatalogForAge() {
+    const age = document.getElementById('raceAgeRange').value;
+    try {
+      const gamesUrl = age
+        ? `/api/games?active=true&age_range=${encodeURIComponent(age)}&include_cross_age=true`
+        : '/api/games?active=true';
+      const bankUrl = age
+        ? `/api/game-bank-items?age_range=${encodeURIComponent(age)}&include_cross_age=true`
+        : '/api/game-bank-items';
+      const [gr, br] = await Promise.all([fetch(gamesUrl), fetch(bankUrl)]);
+      const gdata = await gr.json();
+      const bdata = await br.json();
+      raceCatalogGames = gdata.games || [];
+      raceBankItems = bdata.items || [];
+    } catch (err) {
+      raceCatalogGames = [];
+      raceBankItems = [];
+    }
+  }
+
+  function puzzleSelectOptions(selectedId) {
+    const groups = {};
+    raceCatalogGames.forEach((g) => {
+      const key = g.subject || 'Other';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(g);
+    });
+    const keys = Object.keys(groups).sort();
+    if (!keys.length) return '<option value="">No games for this age</option>';
+    return keys.map((subject) => {
+      const opts = groups[subject].map((g) =>
+        `<option value="${g.id}" ${Number(selectedId) === g.id ? 'selected' : ''}>${escapeHtml(g.title)} (${escapeHtml(g.age_range || '')})</option>`
+      ).join('');
+      return `<optgroup label="${escapeHtml(subject)}">${opts}</optgroup>`;
+    }).join('');
+  }
+
+  function bankSelectOptions(selectedId) {
+    if (!raceBankItems.length) return '<option value="">No bank items for this age</option>';
+    const groups = {};
+    raceBankItems.forEach((item) => {
+      const key = item.subject || 'Other';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+    return Object.keys(groups).sort().map((subject) => {
+      const opts = groups[subject].map((item) =>
+        `<option value="${item.id}" ${Number(selectedId) === item.id ? 'selected' : ''}>${escapeHtml(item.title)} · ${escapeHtml(item.item_kind)}</option>`
+      ).join('');
+      return `<optgroup label="${escapeHtml(subject)}">${opts}</optgroup>`;
+    }).join('');
+  }
+
+  function addRacePuzzle() {
+    const first = raceCatalogGames[0];
+    raceDraftItems.push({ item_type: 'puzzle', points: 5, game_id: first ? first.id : '', prompt: '', payload: {} });
+    renderRaceItems();
+  }
+  window.addRacePuzzle = addRacePuzzle;
+
+  function addRaceFromBank() {
+    const first = raceBankItems[0];
+    if (!first) {
+      alert('No bank items for this age yet. Seed HBC games or pick another age.');
+      return;
+    }
+    raceDraftItems.push({
+      item_type: first.item_kind === 'puzzle' ? 'puzzle' : (first.item_kind === 'question' ? 'question' : 'quiz'),
+      points: first.points_default || 5,
+      bank_item_id: first.id,
+      game_id: first.game_id,
+      prompt: first.prompt || '',
+      payload: first.payload || {},
+    });
+    renderRaceItems();
+  }
+  window.addRaceFromBank = addRaceFromBank;
+
+  function addRaceQuiz() {
+    raceDraftItems.push({
+      item_type: 'quiz',
+      points: 1,
+      prompt: '',
+      payload: { options: ['', '', '', ''], correct_index: 0 },
+    });
+    renderRaceItems();
+  }
+  window.addRaceQuiz = addRaceQuiz;
+
+  function addRaceQuestion() {
+    raceDraftItems.push({
+      item_type: 'question',
+      points: 1,
+      prompt: '',
+      payload: { kind: 'short', accepted_answers: [''] },
+    });
+    renderRaceItems();
+  }
+  window.addRaceQuestion = addRaceQuestion;
+
+  function moveRaceItem(index, dir) {
+    const next = index + dir;
+    if (next < 0 || next >= raceDraftItems.length) return;
+    const tmp = raceDraftItems[index];
+    raceDraftItems[index] = raceDraftItems[next];
+    raceDraftItems[next] = tmp;
+    renderRaceItems();
+  }
+  window.moveRaceItem = moveRaceItem;
+
+  function removeRaceItem(index) {
+    raceDraftItems.splice(index, 1);
+    renderRaceItems();
+  }
+  window.removeRaceItem = removeRaceItem;
+
+  function syncRaceItemFromDom(index) {
+    const item = raceDraftItems[index];
+    if (!item) return;
+    const root = document.querySelector(`[data-race-item="${index}"]`);
+    if (!root) return;
+    item.points = Number(root.querySelector('.js-points').value || 1);
+    const bankSel = root.querySelector('.js-bank');
+    if (bankSel) {
+      item.bank_item_id = Number(bankSel.value || 0) || null;
+      return;
+    }
+    if (item.item_type === 'puzzle') {
+      item.game_id = Number(root.querySelector('.js-game').value || 0);
+    } else if (item.item_type === 'quiz') {
+      item.prompt = root.querySelector('.js-prompt').value;
+      item.payload.options = Array.from(root.querySelectorAll('.js-option')).map((el) => el.value);
+      const checked = root.querySelector('.js-correct:checked');
+      item.payload.correct_index = checked ? Number(checked.value) : 0;
+    } else {
+      item.prompt = root.querySelector('.js-prompt').value;
+      item.payload.kind = root.querySelector('.js-kind').value;
+      if (item.payload.kind === 'true_false') {
+        item.payload.accepted_answers = [root.querySelector('.js-tf').value];
+      } else {
+        item.payload.accepted_answers = (root.querySelector('.js-answers').value || '').split(',').map((s) => s.trim()).filter(Boolean);
+      }
+    }
+  }
+  window.syncRaceItemFromDom = syncRaceItemFromDom;
+
+  function questionAnswerField(kind, accepted, index) {
+    if (kind === 'true_false') {
+      const trueSel = String(accepted).toLowerCase().indexOf('true') !== -1 ? ' selected' : '';
+      const falseSel = String(accepted).toLowerCase().indexOf('false') !== -1 ? ' selected' : '';
+      return '<select class="js-tf rounded border-slate-200 text-sm mb-2" onchange="syncRaceItemFromDom(' + index + ')">' +
+        '<option value="true"' + trueSel + '>True</option>' +
+        '<option value="false"' + falseSel + '>False</option></select>';
+    }
+    return '<input class="js-answers w-full rounded border-slate-200 text-sm mb-2" placeholder="Accepted answers, comma-separated" value="' + escapeHtml(accepted) + '" onchange="syncRaceItemFromDom(' + index + ')">';
+  }
+
+  function renderRaceItems() {
+    const el = document.getElementById('raceItemsList');
+    const total = raceDraftItems.reduce((sum, item) => sum + Number(item.points || 0), 0);
+    const mix = { puzzle: 0, quiz: 0, question: 0 };
+    raceDraftItems.forEach((item) => { if (mix[item.item_type] != null) mix[item.item_type] += 1; });
+    document.getElementById('raceMixSummary').textContent = `${mixText(mix) || 'Empty playlist'} · ${total} pts`;
+    if (!raceDraftItems.length) {
+      el.innerHTML = '<p class="text-sm text-slate-400">No items yet. Mix puzzles, bank items, quizzes, and questions above.</p>';
+      return;
+    }
+    el.innerHTML = raceDraftItems.map((item, index) => {
+      const label = item.bank_item_id ? ('bank → ' + item.item_type) : item.item_type;
+      const header = `<div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">${escapeHtml(label)} #${index + 1}</span>
+        <div class="flex gap-1">
+          <button type="button" onclick="syncRaceItemFromDom(${index}); moveRaceItem(${index}, -1)" class="px-2 py-1 text-xs border rounded">Up</button>
+          <button type="button" onclick="syncRaceItemFromDom(${index}); moveRaceItem(${index}, 1)" class="px-2 py-1 text-xs border rounded">Down</button>
+          <button type="button" onclick="removeRaceItem(${index})" class="px-2 py-1 text-xs border rounded text-red-600">Remove</button>
+        </div>
+      </div>`;
+      const points = `<label class="text-xs text-slate-500">Points <input type="number" min="1" max="100" class="js-points ml-2 w-20 rounded border-slate-200 text-sm" value="${item.points || 1}" onchange="syncRaceItemFromDom(${index})"></label>`;
+      if (item.bank_item_id) {
+        return `<div class="rounded-lg border border-sky-100 bg-sky-50/40 p-3" data-race-item="${index}">${header}
+          <select class="js-bank w-full rounded border-slate-200 text-sm mb-2" onchange="syncRaceItemFromDom(${index})">${bankSelectOptions(item.bank_item_id)}</select>
+          <p class="text-xs text-slate-500 mb-2">Snapshotted into the race on save.</p>
+          ${points}</div>`;
+      }
+      if (item.item_type === 'puzzle') {
+        return `<div class="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3" data-race-item="${index}">${header}
+          <select class="js-game w-full rounded border-slate-200 text-sm mb-2" onchange="syncRaceItemFromDom(${index})">${puzzleSelectOptions(item.game_id)}</select>
+          ${points}</div>`;
+      }
+      if (item.item_type === 'quiz') {
+        const opts = (item.payload && item.payload.options) || ['', '', '', ''];
+        const correct = (item.payload && item.payload.correct_index) || 0;
+        return `<div class="rounded-lg border border-amber-100 bg-amber-50/40 p-3" data-race-item="${index}">${header}
+          <input class="js-prompt w-full rounded border-slate-200 text-sm mb-2" placeholder="Question" value="${escapeHtml(item.prompt || '')}" onchange="syncRaceItemFromDom(${index})">
+          ${opts.map((opt, i) => `<label class="flex items-center gap-2 mb-1 text-sm"><input type="radio" class="js-correct" name="correct-${index}" value="${i}" ${i === correct ? 'checked' : ''} onchange="syncRaceItemFromDom(${index})"><input class="js-option flex-1 rounded border-slate-200 text-sm" placeholder="Option ${i + 1}" value="${escapeHtml(opt)}" onchange="syncRaceItemFromDom(${index})"></label>`).join('')}
+          <div class="mt-2">${points}</div></div>`;
+      }
+      const kind = (item.payload && item.payload.kind) || 'short';
+      const accepted = ((item.payload && item.payload.accepted_answers) || []).join(', ');
+      return `<div class="rounded-lg border border-emerald-100 bg-emerald-50/40 p-3" data-race-item="${index}">${header}
+        <input class="js-prompt w-full rounded border-slate-200 text-sm mb-2" placeholder="Prompt" value="${escapeHtml(item.prompt || '')}" onchange="syncRaceItemFromDom(${index})">
+        <select class="js-kind rounded border-slate-200 text-sm mb-2" onchange="syncRaceItemFromDom(${index}); renderRaceItems()">
+          <option value="short" ${kind === 'short' ? 'selected' : ''}>Short answer</option>
+          <option value="true_false" ${kind === 'true_false' ? 'selected' : ''}>True / False</option>
+        </select>
+        ${questionAnswerField(kind, accepted, index)}
+        <div>${points}</div></div>`;
+    }).join('');
+  }
+
+  async function saveRace() {
+    raceDraftItems.forEach((_, i) => syncRaceItemFromDom(i));
+    const title = document.getElementById('raceTitle').value.trim();
+    const ageRange = document.getElementById('raceAgeRange').value;
+    const startsAt = document.getElementById('raceStartsAt').value;
+    const duration = Number(document.getElementById('raceDuration').value);
+    if (!title || !ageRange || !startsAt || !duration) {
+      alert('Fill in title, age range, start time, and duration');
+      return;
+    }
+    if (!raceDraftItems.length) {
+      alert('Add at least one puzzle, quiz, or question');
+      return;
+    }
+    const items = raceDraftItems.map((item) => {
+      if (item.bank_item_id) {
+        return {
+          bank_item_id: Number(item.bank_item_id),
+          points: Number(item.points || 1),
+        };
+      }
+      return {
+        item_type: item.item_type,
+        points: Number(item.points || 1),
+        game_id: item.game_id || null,
+        prompt: item.prompt || '',
+        options: item.payload && item.payload.options,
+        correct_index: item.payload && item.payload.correct_index,
+        kind: item.payload && item.payload.kind,
+        accepted_answers: item.payload && item.payload.accepted_answers,
+      };
+    });
+    const payload = {
+      title,
+      age_range: ageRange,
+      starts_at: new Date(startsAt).toISOString(),
+      duration_minutes: duration,
+      items,
+    };
+    const raceId = document.getElementById('raceEditId').value;
+    const url = raceId ? `/api/game-races/${raceId}` : '/api/game-races';
+    const method = raceId ? 'PUT' : 'POST';
+    try {
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed to save race');
+      closeRaceEditor();
+      loadAdminRaces();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+  window.saveRace = saveRace;
+
+  async function cancelRace(raceId) {
+    if (!confirm('Cancel this race? Players will no longer be able to join.')) return;
+    try {
+      const r = await fetch(`/api/game-races/${raceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cancel: true }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed to cancel');
+      loadAdminRaces();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+  window.cancelRace = cancelRace;
+
+  async function openRaceResults(raceId) {
+    toggleModal('raceResultsModal', true);
+    document.getElementById('raceResultsBody').innerHTML = '<p class="text-slate-400">Loading…</p>';
+    try {
+      const r = await fetch(`/api/game-races/${raceId}/results`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed to load results');
+      const race = data.race || {};
+      const board = data.leaderboard || [];
+      document.getElementById('raceResultsTitle').textContent = race.title || 'Results';
+      if (!board.length) {
+        document.getElementById('raceResultsBody').innerHTML = '<p class="text-slate-500">No players yet.</p>';
+        return;
+      }
+      document.getElementById('raceResultsBody').innerHTML = `
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-slate-500"><tr><th class="py-2">Place</th><th>Player</th><th>Score</th><th>Status</th></tr></thead>
+          <tbody>${board.map((row) => `<tr class="border-t"><td class="py-2">#${row.place}</td><td>${escapeHtml(row.firstname)} ${escapeHtml(row.surname)}</td><td>${row.score}</td><td>${row.finished ? 'Finished' : 'In progress'}</td></tr>`).join('')}</tbody>
+        </table>`;
+    } catch (err) {
+      document.getElementById('raceResultsBody').innerHTML = `<p class="text-red-500">${escapeHtml(err.message)}</p>`;
+    }
+  }
+  window.openRaceResults = openRaceResults;
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"]+/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] || c));

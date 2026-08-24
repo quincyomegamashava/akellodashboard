@@ -117,7 +117,7 @@ class User(UserMixin, db.Model):
 
     def get_privileges(self):
         """Ensure all expected privileges exist in dict, default False."""
-        all_privs = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access", "Approve Champion Schools", "Revenue Reports", "Learning Hub Admin", "Sales & Marketing"]
+        all_privs = ["Super-admin", "Manager", "Brand Ambassador", "Read Only", "Higherlife", "Content Development", "Akello Events", "Admin Queries Access", "Help Desk Agent", "Help Desk Viewer", "Approve Champion Schools", "Revenue Reports", "Learning Hub Admin", "Sales & Marketing"]
         if not self.privileges:
             self.privileges = {}
         for p in all_privs:
@@ -333,9 +333,15 @@ class GameUser(db.Model):
     age = db.Column(db.Integer, nullable=False)  # Age of the game user
     age_range = db.Column(db.String(50), nullable=True)  # Age range category: "Infants", "9-19", "Youths & older"
     phone_number = db.Column(db.String(20), nullable=True)  # Optional phone number
+    ruzivo_student_id = db.Column(db.Integer, unique=True, nullable=True, index=True)
+    grade = db.Column(db.Integer, nullable=True)
+    dob = db.Column(db.Date, nullable=True)  # Local DOB (from Ruzivo or learner-entered)
+    auth_source = db.Column(db.String(20), nullable=False, default='local')  # local | ruzivo
+    last_ruzivo_sync_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
     scores = db.relationship('GameScore', backref='game_user', lazy=True, cascade='all, delete-orphan')
+    race_entries = db.relationship('GameRacePlayer', backref='game_user', lazy=True, cascade='all, delete-orphan')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -365,15 +371,47 @@ class Game(db.Model):
     html_content = db.Column(db.Text, nullable=False)  # The HTML game code
     max_score = db.Column(db.Integer, nullable=True)  # Maximum possible score (for percentage calculation)
     age_range = db.Column(db.String(20), nullable=True)  # Age range like "9-10", "11-12", etc.
+    subject = db.Column(db.String(120), nullable=True, index=True)  # HBC learning area
+    content_source = db.Column(db.String(30), nullable=False, default='general_knowledge', index=True)
+    ruzivo_ex_id = db.Column(db.Integer, nullable=True, index=True)
+    ruzivo_source = db.Column(db.String(20), nullable=True)  # primary | hs
+    grade = db.Column(db.Integer, nullable=True, index=True)
     difficulty_level = db.Column(db.String(20), nullable=True)  # Difficulty level: 'easy', 'medium', 'hard'
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     scores = db.relationship('GameScore', backref='game', lazy=True, cascade='all, delete-orphan')
+    bank_items = db.relationship('GameBankItem', backref='game', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Game {self.title}>'
+
+
+class GameBankItem(db.Model):
+    """Selectable race atom (quiz/question/puzzle) sourced from a catalog game."""
+    __tablename__ = 'game_bank_items'
+    id = db.Column(db.Integer, primary_key=True)
+    game_id = db.Column(db.Integer, db.ForeignKey('games.id', ondelete='CASCADE'), nullable=False, index=True)
+    subject = db.Column(db.String(120), nullable=True, index=True)
+    age_range = db.Column(db.String(20), nullable=True, index=True)
+    item_kind = db.Column(db.String(20), nullable=False, default='quiz')  # puzzle | quiz | question
+    slug = db.Column(db.String(80), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    prompt = db.Column(db.Text, nullable=True)
+    payload_json = db.Column(db.JSON, nullable=True)
+    points_default = db.Column(db.Integer, nullable=False, default=5)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('game_id', 'slug', name='uq_game_bank_item_slug'),
+    )
+
+    def __repr__(self):
+        return f'<GameBankItem {self.slug} game:{self.game_id}>'
 
 
 class GameScore(db.Model):
@@ -389,6 +427,110 @@ class GameScore(db.Model):
 
     def __repr__(self):
         return f'<GameScore User:{self.game_user_id} Game:{self.game_id} Score:{self.score}>'
+
+
+class GameRace(db.Model):
+    """Timed multiplayer race built from a mixed playlist of puzzles, quizzes, and questions."""
+    __tablename__ = 'game_races'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    age_range = db.Column(db.String(20), nullable=False)
+    starts_at = db.Column(db.DateTime, nullable=False, index=True)
+    duration_minutes = db.Column(db.Integer, nullable=False)
+    ends_at = db.Column(db.DateTime, nullable=False, index=True)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    is_cancelled = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    items = db.relationship(
+        'GameRaceItem',
+        backref='race',
+        lazy=True,
+        cascade='all, delete-orphan',
+        order_by='GameRaceItem.sort_order',
+    )
+    players = db.relationship(
+        'GameRacePlayer',
+        backref='race',
+        lazy=True,
+        cascade='all, delete-orphan',
+    )
+
+    def status(self, now=None):
+        now = now or datetime.utcnow()
+        if self.is_cancelled:
+            return 'cancelled'
+        if now < self.starts_at:
+            return 'upcoming'
+        if now < self.ends_at:
+            return 'live'
+        return 'finished'
+
+    def remaining_seconds(self, now=None):
+        now = now or datetime.utcnow()
+        if now >= self.ends_at:
+            return 0
+        delta = self.ends_at - now
+        return max(0, int(delta.total_seconds()))
+
+    def seconds_until_start(self, now=None):
+        now = now or datetime.utcnow()
+        if now >= self.starts_at:
+            return 0
+        return max(0, int((self.starts_at - now).total_seconds()))
+
+    def total_points(self):
+        return sum((item.points or 0) for item in self.items)
+
+    def mix_counts(self):
+        counts = {'puzzle': 0, 'quiz': 0, 'question': 0}
+        for item in self.items:
+            if item.item_type in counts:
+                counts[item.item_type] += 1
+        return counts
+
+    def __repr__(self):
+        return f'<GameRace {self.title}>'
+
+
+class GameRaceItem(db.Model):
+    """One playlist entry in a race: catalog puzzle, MCQ quiz, or short-answer question."""
+    __tablename__ = 'game_race_items'
+    id = db.Column(db.Integer, primary_key=True)
+    race_id = db.Column(db.Integer, db.ForeignKey('game_races.id', ondelete='CASCADE'), nullable=False, index=True)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    item_type = db.Column(db.String(20), nullable=False)
+    points = db.Column(db.Integer, nullable=False, default=1)
+    game_id = db.Column(db.Integer, db.ForeignKey('games.id', ondelete='SET NULL'), nullable=True)
+    prompt = db.Column(db.Text, nullable=True)
+    payload_json = db.Column(db.JSON, nullable=True)
+    game = db.relationship('Game', backref=db.backref('race_items', lazy=True))
+
+    def __repr__(self):
+        return f'<GameRaceItem {self.item_type} race:{self.race_id}>'
+
+
+class GameRacePlayer(db.Model):
+    """A GameUser joined to a race, with cumulative score and per-item answers."""
+    __tablename__ = 'game_race_players'
+    id = db.Column(db.Integer, primary_key=True)
+    race_id = db.Column(db.Integer, db.ForeignKey('game_races.id', ondelete='CASCADE'), nullable=False)
+    game_user_id = db.Column(db.Integer, db.ForeignKey('game_users.id', ondelete='CASCADE'), nullable=False)
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    score = db.Column(db.Integer, nullable=False, default=0)
+    max_score = db.Column(db.Integer, nullable=True)
+    percentage = db.Column(db.Float, nullable=True)
+    submitted_at = db.Column(db.DateTime, nullable=True)
+    finished = db.Column(db.Boolean, default=False, nullable=False)
+    place = db.Column(db.Integer, nullable=True)
+    answers_json = db.Column(db.JSON, nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint('race_id', 'game_user_id', name='uq_game_race_player'),
+    )
+
+    def __repr__(self):
+        return f'<GameRacePlayer race:{self.race_id} user:{self.game_user_id} score:{self.score}>'
 
 
 class AppSetting(db.Model):
@@ -1001,6 +1143,57 @@ class AuditLog(db.Model):
 # ----------------------
 # Help Desk Model
 # ----------------------
+# Team/watchers tables live here (not only in the blueprint) so HelpDeskQuery
+# relationships resolve even when mappers configure before blueprints load.
+
+helpdesk_team_members = db.Table(
+    "helpdesk_team_members",
+    db.Column(
+        "team_id",
+        db.Integer,
+        db.ForeignKey("helpdesk_teams.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    db.Column(
+        "user_id",
+        db.Integer,
+        db.ForeignKey("user.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
+helpdesk_watchers = db.Table(
+    "helpdesk_watchers",
+    db.Column(
+        "query_id",
+        db.Integer,
+        db.ForeignKey("helpdesk_queries.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    db.Column(
+        "user_id",
+        db.Integer,
+        db.ForeignKey("user.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
+
+class HelpDeskTeam(db.Model):
+    __tablename__ = "helpdesk_teams"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False, unique=True)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    members = db.relationship(
+        "User",
+        secondary=helpdesk_team_members,
+        backref=db.backref("helpdesk_teams", lazy="dynamic"),
+    )
+
+
 class HelpDeskQuery(db.Model):
     __tablename__ = 'helpdesk_queries'
 
@@ -1010,12 +1203,30 @@ class HelpDeskQuery(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     query_type = db.Column(db.String(20), nullable=False)  # 'anonymous' or 'self'
     created_by = db.Column(db.String(100), nullable=False)
-    image_path = db.Column(db.String(255), nullable=True)  # relative path to static file
+    image_path = db.Column(db.String(255), nullable=True)  # legacy single image
     status = db.Column(db.String(30), nullable=False, default='Not started')  # Not started, Looking into it, Resolved
-    resolved_at = db.Column(db.DateTime, nullable=True)  # Track when query was resolved
-    
+    resolved_at = db.Column(db.DateTime, nullable=True)
+
+    # Unified support hub fields
+    source = db.Column(db.String(20), nullable=False, default='internal', index=True)  # internal | email
+    priority = db.Column(db.String(20), nullable=False, default='normal', index=True)  # urgent | high | normal
+    category = db.Column(db.String(40), nullable=False, default='general', index=True)
+    requester_email = db.Column(db.String(255), nullable=True, index=True)
+    first_response_at = db.Column(db.DateTime, nullable=True)
+    sla_first_response_due = db.Column(db.DateTime, nullable=True, index=True)
+    sla_resolve_due = db.Column(db.DateTime, nullable=True, index=True)
+    sla_breached = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('helpdesk_teams.id', ondelete='SET NULL'), nullable=True, index=True)
+    message_id = db.Column(db.String(500), nullable=True, unique=True, index=True)  # email dedupe
+
     # Many-to-many relationship with User for assignees
     assignees = db.relationship("User", secondary=query_assignees, backref="assigned_queries")
+    team = db.relationship("HelpDeskTeam", foreign_keys=[team_id], backref=db.backref("tickets", lazy="dynamic"))
+    watchers = db.relationship(
+        "User",
+        secondary=helpdesk_watchers,
+        backref=db.backref("watched_helpdesk_queries", lazy="dynamic"),
+    )
 
 
 # ----------------------
@@ -1291,6 +1502,24 @@ class PageAnalytics(db.Model):
             'avg_response_time_ms': self.avg_response_time_ms,
             'last_visited': self.last_visited.isoformat() if self.last_visited else None
         }
+
+class StudentExportRun(db.Model):
+    __tablename__ = "student_export_runs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    display_name = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    original_path = db.Column(db.String(512), nullable=False)
+    processed_filename = db.Column(db.String(255), nullable=False)
+    processed_path = db.Column(db.String(512), nullable=False)
+    selected_sheets = db.Column(db.JSON, default=list)
+    column_mapping = db.Column(db.JSON, default=dict)
+    summaries = db.Column(db.JSON, default=list)
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    creator = db.relationship("User", foreign_keys=[created_by])
+
 
 #new project management ends here
 

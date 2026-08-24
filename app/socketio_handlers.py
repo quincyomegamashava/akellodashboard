@@ -209,6 +209,31 @@ def init_socketio_handlers(socketio):
         room = f"meeting_{meeting_id}"
         emit('item_updated', {'patch': data, 'user': current_user.username}, room=room, include_self=False)
 
+    @socketio.on('join_race', namespace='/game-races')
+    def on_join_race(data):
+        from app.models import GameRacePlayer
+
+        race_id = (data or {}).get('race_id')
+        game_user_id = (data or {}).get('game_user_id')
+        try:
+            race_id = int(race_id)
+            game_user_id = int(game_user_id)
+        except (TypeError, ValueError):
+            emit('error', {'message': 'Invalid race join'})
+            return False
+        player = GameRacePlayer.query.filter_by(race_id=race_id, game_user_id=game_user_id).first()
+        if not player:
+            emit('error', {'message': 'Join the race first'})
+            return False
+        join_room(f'race-{race_id}')
+        emit('joined', {'race_id': race_id})
+
+    @socketio.on('leave_race', namespace='/game-races')
+    def on_leave_race(data):
+        race_id = (data or {}).get('race_id')
+        if race_id:
+            leave_room(f'race-{race_id}')
+
 
 def emit_activity_to_monitoring(activity_data):
     """Emit new activity to all monitoring clients"""
@@ -257,3 +282,25 @@ def emit_meeting_item_event(meeting_id: int, event_type: str, payload: dict):
         )
     except Exception as e:
         print(f"Error emitting meeting notes event: {e}")
+
+
+def emit_race_leaderboard(race_id: int, payload: dict):
+    """Broadcast live race leaderboard to everyone in the race room."""
+    try:
+        from app import socketio
+
+        socketio.emit(
+            "leaderboard_update",
+            payload,
+            room=f"race-{race_id}",
+            namespace="/game-races",
+        )
+        if payload.get("status") == "finished":
+            socketio.emit(
+                "race_ended",
+                payload,
+                room=f"race-{race_id}",
+                namespace="/game-races",
+            )
+    except Exception as e:
+        print(f"Error emitting race leaderboard: {e}")

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Help Desk — Settings{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/help_desk.css') }}">
+{% endblock %}
+{% block content %}
+<div class="hd-app-shell">
+  <div class="hd-page">
+    <header class="hd-subheader">
+      <h1 class="hd-hero-title mb-0">Settings</h1>
+      <p class="hd-hero-sub">SLA policy, macros, and teams.</p>
+      {% set hd_active = 'settings' %}
+      {% include "help_desk/_subnav.html" %}
+    </header>
+
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <section class="hub-glass p-3">
+          <h2 class="h6">SLA policy (hours)</h2>
+          <div id="hd-sla-form"></div>
+          <button type="button" class="btn hd-btn-primary btn-sm mt-2" id="hd-sla-save">Save SLA</button>
+        </section>
+        <section class="hub-glass p-3 mt-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 mb-0">Teams</h2>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="hd-team-add">Add team</button>
+          </div>
+          <div id="hd-teams-list"></div>
+        </section>
+      </div>
+      <div class="col-lg-6">
+        <section class="hub-glass p-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 mb-0">Canned macros</h2>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="hd-macro-add">Add macro</button>
+          </div>
+          <div id="hd-macros-list"></div>
+        </section>
+        <section class="hub-glass p-3 mt-3">
+          <h2 class="h6">Legacy email tickets</h2>
+          <p class="hd-muted small">Import old IMAP <code>tickets</code> rows into the unified inbox.</p>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="hd-migrate-legacy">Migrate legacy tickets</button>
+          <div id="hd-migrate-status" class="small mt-2"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+  {% include "help_desk/_app_shell.html" %}
+  {% include "help_desk/_new_ticket_modal.html" %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/help_desk.js') }}"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { HD.initSettings(); });</script>
+{% endblock %}

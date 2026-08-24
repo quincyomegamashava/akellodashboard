@@ -139,9 +139,22 @@ def api_carry_forward_suggestions(meeting_id: int):
     suggestions = []
     src = db.session.get(MeetingNote, source_id)
     if src:
+        from app.blueprints.meeting_notes.services import (
+            existing_cta_keys_for_meeting,
+            existing_lineage_roots_for_meeting,
+            existing_source_ids_for_meeting,
+            should_skip_carry_item,
+        )
+
+        existing = existing_cta_keys_for_meeting(meeting_id)
+        existing_sources = existing_source_ids_for_meeting(meeting_id)
+        existing_roots = existing_lineage_roots_for_meeting(meeting_id)
         for fr in src.focus_rows.order_by(MeetingFocusRow.sort_order):
             for it in fr.action_items.filter(MeetingActionItem.status != "done"):
                 tags = []
+                already = should_skip_carry_item(it, existing, existing_sources, existing_roots)
+                if already:
+                    tags.append("already_present")
                 if (it.challenges or "").strip() and it.status == "open":
                     tags.append("blocked")
                 updated = getattr(it, "updated_at", None)
@@ -153,6 +166,7 @@ def api_carry_forward_suggestions(meeting_id: int):
                 suggestions.append({
                     "item": item_to_dict(it),
                     "tags": tags,
+                    "already_present": already,
                     "focus_row_id": fr.id,
                     "platform": fr.platform,
                 })

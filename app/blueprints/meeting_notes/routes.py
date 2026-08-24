@@ -34,12 +34,17 @@ from app.blueprints.meeting_notes.models import (
 )
 from app.blueprints.meeting_notes.notifications import (
     notify_assignees,
+    notify_item_completed,
     notify_mentioned_users,
+    notify_repeat_carry,
 )
 from app.blueprints.meeting_notes.email_reports import (
+    attendee_recipient_emails,
+    build_meeting_update_email_bodies,
     normalize_recipients,
     send_meeting_report_email,
 )
+from app.blueprints.meeting_notes.webhooks import get_mn_slack_webhook_url, share_meeting_to_slack
 from app.blueprints.meeting_notes.services import (
     VALID_STATUSES,
     action_items_query,
@@ -48,10 +53,14 @@ from app.blueprints.meeting_notes.services import (
     apply_subtask_parent_rollup,
     carry_forward_preview,
     coalesce_activity_rows,
+    collapse_items_by_lineage,
     comment_to_dict,
     copy_subtasks_to_item,
     distinct_platforms,
     existing_cta_keys_for_meeting,
+    existing_lineage_roots_for_meeting,
+    existing_source_ids_for_meeting,
+    find_or_create_focus_row,
     guest_names_to_text,
     hub_analytics_summary,
     hub_my_tasks_buckets,
@@ -59,6 +68,7 @@ from app.blueprints.meeting_notes.services import (
     items_to_fc_events,
     items_to_gantt_tasks,
     label_to_dict,
+    lineage_root_id,
     meeting_to_dict,
     meetings_index_stats,
     normalize_bullet_text,
@@ -68,6 +78,7 @@ from app.blueprints.meeting_notes.services import (
     parse_mention_user_ids,
     parse_agenda_item_notes,
     saved_view_to_dict,
+    should_skip_carry_item,
     subtask_to_dict,
     template_to_dict,
     user_display_name,
@@ -285,6 +296,16 @@ def detail(meeting_id: int):
         .limit(50)
         .all()
     )
+    stats_map = meetings_index_stats([meeting_id])
+    meeting_stats = stats_map.get(meeting_id) or {"open": 0, "in_progress": 0, "done": 0, "total": 0}
+    attendee_emails = [
+        {
+            "id": u.id,
+            "name": user_display_name(u),
+            "email": (getattr(u, "email", None) or "").strip(),
+        }
+        for u in (mn.attendees or [])
+    ]
     return render_template(
         "meeting_notes/detail.html",
         title=mn.title or "Meeting notes",
@@ -296,6 +317,8 @@ def detail(meeting_id: int):
         meeting_note_id=meeting_id,
         attendee_ids=attendee_ids,
         guest_names=guest_names,
+        attendee_emails=attendee_emails,
+        meeting_stats=meeting_stats,
         is_admin=is_admin,
         can_view_activity=can_view_activity,
         activity_rows=activity_rows,
@@ -403,6 +426,10 @@ def api_action_items():
         marketing_event_id=marketing_event_id,
     )
     items = q.order_by(MeetingNote.meeting_date.desc(), MeetingFocusRow.sort_order, MeetingActionItem.sort_order).all()
+    collapse = request.args.get("collapse_lineage", "1") != "0"
+    # Collapse only on cross-meeting "All items" views (no meeting filter).
+    if collapse and not meeting_note_id:
+        items = collapse_items_by_lineage(items)
     include_threads = request.args.get("include_comment_threads") == "1"
     if not include_threads:
         return jsonify({"items": [item_to_dict(i) for i in items]})
@@ -456,6 +483,8 @@ def api_calendar_events():
         marketing_event_id=_marketing_event_id,
     )
     items = q.all()
+    if not meeting_note_id and request.args.get("collapse_lineage", "1") != "0":
+        items = collapse_items_by_lineage(items)
     return jsonify(items_to_fc_events(items))
 
 
@@ -491,6 +520,8 @@ def api_gantt_tasks():
         marketing_event_id=_marketing_event_id,
     )
     items = q.all()
+    if not meeting_note_id and request.args.get("collapse_lineage", "1") != "0":
+        items = collapse_items_by_lineage(items)
     return jsonify({"tasks": items_to_gantt_tasks(items)})
 
 
@@ -521,12 +552,20 @@ def api_duplicate_meeting(meeting_id: int):
     payload = request.get_json(silent=True) or {}
     title = (payload.get("title") or "").strip() or f"{src.title} (copy)"
     meeting_date = _parse_date_json(payload, "meeting_date") or date.today()
-    copy_items = payload.get("copy_items", True)
-    copy_open_only = payload.get("copy_open_only", False)
+    # structure_only: focus rows + attendees, no action items
+    structure_only = bool(payload.get("structure_only"))
+    # Default: copy open items only with lineage
+    copy_items = False if structure_only else bool(payload.get("copy_items", True))
+    copy_open_only = True if "copy_open_only" not in payload else bool(payload.get("copy_open_only"))
+    if structure_only:
+        copy_items = False
     mn = MeetingNote(
         title=title,
         meeting_date=meeting_date,
-        summary=src.summary,
+        summary=src.summary if not structure_only else None,
+        agenda=getattr(src, "agenda", None),
+        location=getattr(src, "location", None),
+        meeting_time=getattr(src, "meeting_time", None),
         guest_attendees=src.guest_attendees,
         created_by=current_user.id,
         created_at=datetime.utcnow(),
@@ -535,41 +574,51 @@ def api_duplicate_meeting(meeting_id: int):
     db.session.add(mn)
     db.session.flush()
     mn.attendees = list(src.attendees or [])
-    if copy_items:
-        for fr in src.focus_rows.order_by(MeetingFocusRow.sort_order, MeetingFocusRow.id):
-            new_fr = MeetingFocusRow(
-                meeting_note_id=mn.id,
-                platform=fr.platform,
-                focus_area=fr.focus_area,
-                sort_order=fr.sort_order,
+    for fr in src.focus_rows.order_by(MeetingFocusRow.sort_order, MeetingFocusRow.id):
+        new_fr = MeetingFocusRow(
+            meeting_note_id=mn.id,
+            platform=fr.platform,
+            focus_area=fr.focus_area,
+            sort_order=fr.sort_order,
+        )
+        db.session.add(new_fr)
+        db.session.flush()
+        if not copy_items:
+            continue
+        for it in fr.action_items.order_by(MeetingActionItem.sort_order, MeetingActionItem.id):
+            if copy_open_only and it.status == "done":
+                continue
+            new_it = MeetingActionItem(
+                focus_row_id=new_fr.id,
+                call_to_action=it.call_to_action,
+                expected_impact=it.expected_impact,
+                challenges=it.challenges,
+                comments=it.comments,
+                status="open" if copy_open_only else it.status,
+                priority=getattr(it, "priority", None) or "medium",
+                due_date=it.due_date,
+                start_date=it.start_date,
+                sort_order=it.sort_order,
+                source_excerpt=getattr(it, "source_excerpt", None),
+                ai_extracted=bool(getattr(it, "ai_extracted", False)),
+                source_item_id=it.id,
+                carry_forward_count=getattr(it, "carry_forward_count", 0) or 0,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
             )
-            db.session.add(new_fr)
+            db.session.add(new_it)
             db.session.flush()
-            for it in fr.action_items.order_by(MeetingActionItem.sort_order, MeetingActionItem.id):
-                if copy_open_only and it.status == "done":
-                    continue
-                new_it = MeetingActionItem(
-                    focus_row_id=new_fr.id,
-                    call_to_action=it.call_to_action,
-                    expected_impact=it.expected_impact,
-                    challenges=it.challenges,
-                    comments=it.comments,
-                    status="open" if copy_open_only else it.status,
-                    priority=getattr(it, "priority", None) or "medium",
-                    due_date=it.due_date,
-                    start_date=it.start_date,
-                    sort_order=it.sort_order,
-                    source_excerpt=getattr(it, "source_excerpt", None),
-                    ai_extracted=bool(getattr(it, "ai_extracted", False)),
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
-                )
-                db.session.add(new_it)
-                db.session.flush()
-                new_it.assignees = list(it.assignees or [])
-                new_it.labels = list(it.labels or [])
-                copy_subtasks_to_item(it, new_it)
-    _log_activity(mn.id, "create", "meeting_note", mn.id, f"Duplicated meeting from #{meeting_id}: {title}")
+            new_it.assignees = list(it.assignees or [])
+            new_it.labels = list(it.labels or [])
+            copy_subtasks_to_item(it, new_it)
+    mode = "structure" if structure_only else ("open items" if copy_open_only else "all items")
+    _log_activity(
+        mn.id,
+        "create",
+        "meeting_note",
+        mn.id,
+        f"Duplicated meeting from #{meeting_id}: {title} ({mode})",
+    )
     db.session.commit()
     return jsonify({"id": mn.id, "title": mn.title, "meeting_date": mn.meeting_date.isoformat()}), 201
 
@@ -615,11 +664,22 @@ def api_carry_forward(meeting_id: int):
     src = db.session.get(MeetingNote, int(source_id))
     if not src:
         return jsonify({"error": "Source meeting not found"}), 404
-    mark_source_done = bool(payload.get("mark_source_done"))
+    # Default: mark source items done so only one open instance remains
+    mark_source_done = True if "mark_source_done" not in payload else bool(payload.get("mark_source_done"))
+    selected_ids = payload.get("item_ids")
+    selected_set = None
+    if selected_ids is not None:
+        try:
+            selected_set = {int(x) for x in selected_ids}
+        except (TypeError, ValueError):
+            return jsonify({"error": "item_ids must be a list of integers"}), 400
     existing = existing_cta_keys_for_meeting(meeting_id)
+    existing_sources = existing_source_ids_for_meeting(meeting_id)
+    existing_roots = existing_lineage_roots_for_meeting(meeting_id)
     created = 0
     skipped = 0
     copied_source_ids: List[int] = []
+    focus_cache: dict = {}
     for fr in src.focus_rows.order_by(MeetingFocusRow.sort_order, MeetingFocusRow.id):
         open_items = (
             fr.action_items.filter(MeetingActionItem.status != "done")
@@ -628,25 +688,26 @@ def api_carry_forward(meeting_id: int):
         )
         items_to_copy = []
         for it in open_items:
-            key = normalize_cta_key(it.call_to_action)
-            if not key:
-                skipped += 1
+            if selected_set is not None and it.id not in selected_set:
                 continue
-            if key in existing:
+            if should_skip_carry_item(it, existing, existing_sources, existing_roots):
                 skipped += 1
                 continue
             items_to_copy.append(it)
-            existing.add(key)
+            key = normalize_cta_key(it.call_to_action)
+            if key:
+                existing.add(key)
+            existing_sources.add(it.id)
+            existing_roots.add(lineage_root_id(it))
         if not items_to_copy:
             continue
-        new_fr = MeetingFocusRow(
-            meeting_note_id=meeting_id,
-            platform=fr.platform,
-            focus_area=fr.focus_area,
+        new_fr = find_or_create_focus_row(
+            meeting_id,
+            fr.platform,
+            fr.focus_area,
             sort_order=fr.sort_order,
+            cache=focus_cache,
         )
-        db.session.add(new_fr)
-        db.session.flush()
         for it in items_to_copy:
             cta = (it.call_to_action or "").strip()
             if cta:
@@ -663,6 +724,7 @@ def api_carry_forward(meeting_id: int):
                 start_date=it.start_date,
                 sort_order=it.sort_order,
                 carry_forward_count=(getattr(it, "carry_forward_count", 0) or 0) + 1,
+                source_item_id=it.id,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             )
@@ -671,6 +733,7 @@ def api_carry_forward(meeting_id: int):
             new_it.assignees = list(it.assignees or [])
             new_it.labels = list(it.labels or [])
             copy_subtasks_to_item(it, new_it)
+            notify_repeat_carry(new_it, meeting_id)
             created += 1
             copied_source_ids.append(it.id)
     if mark_source_done and copied_source_ids:
@@ -1029,6 +1092,21 @@ def api_create_action_item(row_id: int):
     )
     db.session.commit()
     db.session.refresh(item)
+    mid = fr.meeting_note_id
+    if mid:
+        try:
+            from app.socketio_handlers import emit_meeting_item_event
+
+            emit_meeting_item_event(
+                mid,
+                "item_updated",
+                {"id": item.id, "item": item_to_dict(item)},
+            )
+        except Exception:
+            pass
+    if payload.get("assignee_ids"):
+        notify_assignees(item, mid, [u.id for u in (item.assignees or [])], current_user.id)
+        db.session.commit()
     return jsonify(item_to_dict(item)), 201
 
 
@@ -1081,7 +1159,7 @@ def api_action_item(item_id: int):
                 item.id,
                 f"Assignees updated: {(item.call_to_action or '')[:80]}",
             )
-            notify_assignees(item, mid, new_assignees, current_user.id)
+            notify_assignees(item, mid, new_assignees - prev_assignees, current_user.id)
         elif payload.get("log_text_edit"):
             _log_activity(
                 mid,
@@ -1090,14 +1168,38 @@ def api_action_item(item_id: int):
                 item.id,
                 f"Updated action item: {(item.call_to_action or '')[:120]}",
             )
+    # Automations even for silent status changes (board DnD)
+    if prev_status != item.status and item.status == "done":
+        notify_item_completed(item, mid, current_user.id)
+    new_assignees_silent = {u.id for u in (item.assignees or [])}
+    if prev_assignees != new_assignees_silent and _payload_silent(payload):
+        notify_assignees(item, mid, new_assignees_silent - prev_assignees, current_user.id)
     db.session.commit()
     db.session.refresh(item)
     if mid:
         try:
             from app.socketio_handlers import emit_meeting_item_event
-            emit_meeting_item_event(mid, "item_updated", {"id": item.id})
+            emit_meeting_item_event(
+                mid,
+                "item_updated",
+                {"id": item.id, "item": item_to_dict(item)},
+            )
         except Exception:
             pass
+        if prev_status != item.status and item.status == "done" and get_mn_slack_webhook_url():
+            try:
+                from flask import current_app
+                from app.blueprints.meeting_notes.webhooks import post_slack_webhook
+
+                mn = db.session.get(MeetingNote, mid)
+                cta = (item.call_to_action or "").strip().replace("\n", " ")[:100] or "Action item"
+                base = (current_app.config.get("APP_BASE_URL") or "").rstrip("/")
+                link = f"{base}/meeting-notes/{mid}?view=board&highlight={item.id}" if base else f"/meeting-notes/{mid}"
+                post_slack_webhook({
+                    "text": f"Completed on *{(mn.title if mn else 'meeting') or 'meeting'}*: {cta}\n<{link}|Open task>",
+                })
+            except Exception:
+                pass
     return jsonify(item_to_dict(item))
 
 
@@ -1612,16 +1714,42 @@ def api_meeting_transcript(meeting_id: int):
 @bp.route("/api/meetings/<int:meeting_id>/email-report", methods=["POST"])
 @login_required
 def api_email_meeting_report(meeting_id: int):
-    meeting = db.session.get(MeetingNote, meeting_id)
+    meeting = (
+        MeetingNote.query.options(joinedload(MeetingNote.attendees))
+        .filter_by(id=meeting_id)
+        .first()
+    )
     if not meeting:
         return jsonify({"error": "Not found"}), 404
     payload = request.get_json(silent=True) or {}
+    email_attendees = bool(payload.get("email_attendees"))
+    include_assignees = bool(payload.get("include_assignees"))
     recipients = normalize_recipients(payload.get("recipients") or "")
+    if email_attendees and not recipients:
+        recipients = attendee_recipient_emails(meeting)
+    if include_assignees:
+        assignee_emails = []
+        for it in action_items_query(meeting_note_id=meeting_id, status="all").all():
+            for u in it.assignees or []:
+                em = (getattr(u, "email", None) or "").strip()
+                if em:
+                    assignee_emails.append(em)
+        recipients = normalize_recipients(list(recipients) + assignee_emails)
     if not recipients:
         return jsonify({"error": "At least one valid recipient email is required"}), 400
     subject = (payload.get("subject") or "").strip() or None
     body_html = (payload.get("body_html") or "").strip() or None
     body_text = (payload.get("body_text") or "").strip() or None
+    if email_attendees and (not subject or not body_html):
+        from flask import current_app
+
+        app_base = (current_app.config.get("APP_BASE_URL") or "").rstrip("/")
+        def_subj, def_html, def_text = build_meeting_update_email_bodies(
+            meeting, app_base_url=app_base
+        )
+        subject = subject or def_subj
+        body_html = body_html or def_html
+        body_text = body_text or def_text
     attachment_bytes = None
     attachment_filename = None
     attachment_mimetype = None
@@ -1650,6 +1778,17 @@ def api_email_meeting_report(meeting_id: int):
         attachment_mimetype=attachment_mimetype,
         pdf_format=(payload.get("pdf_format") or "minutes").strip().lower(),
     )
+    slack_result = None
+    if payload.get("also_slack") or email_attendees:
+        try:
+            from flask import current_app
+
+            slack_result = share_meeting_to_slack(
+                meeting,
+                app_base_url=(current_app.config.get("APP_BASE_URL") or "").rstrip("/"),
+            )
+        except Exception as exc:
+            slack_result = {"ok": False, "error": str(exc)[:200]}
     _log_activity(
         meeting_id,
         "create",
@@ -1657,11 +1796,57 @@ def api_email_meeting_report(meeting_id: int):
         meeting_id,
         f"Emailed meeting report to {result.get('sent', 0)} recipient(s)",
     )
+    if slack_result and slack_result.get("ok"):
+        _log_activity(meeting_id, "create", "meeting_note", meeting_id, "Shared meeting updates to Slack")
+    elif slack_result and not slack_result.get("skipped"):
+        _log_activity(
+            meeting_id,
+            "create",
+            "meeting_note",
+            meeting_id,
+            f"Slack share failed: {(slack_result.get('error') or '')[:120]}",
+        )
     db.session.commit()
     if result.get("sent", 0) <= 0:
         failed_details = [r for r in (result.get("results") or []) if r.get("status") != "sent"]
-        return jsonify({"error": "No emails were sent. Please check SMTP configuration.", "details": failed_details, **result}), 502
-    return jsonify({"ok": True, **result})
+        return jsonify({"error": "No emails were sent. Please check SMTP configuration.", "details": failed_details, **result, "slack": slack_result}), 502
+    return jsonify({"ok": True, **result, "slack": slack_result})
+
+
+@bp.route("/api/meetings/<int:meeting_id>/share-slack", methods=["POST"])
+@login_required
+def api_share_meeting_slack(meeting_id: int):
+    meeting = (
+        MeetingNote.query.options(joinedload(MeetingNote.attendees))
+        .filter_by(id=meeting_id)
+        .first()
+    )
+    if not meeting:
+        return jsonify({"error": "Not found"}), 404
+    if not get_mn_slack_webhook_url():
+        return jsonify({
+            "error": "Slack webhook not configured. Set MN_SLACK_WEBHOOK_URL or AppSetting mn_slack_webhook_url.",
+            "configured": False,
+        }), 400
+    from flask import current_app
+
+    result = share_meeting_to_slack(
+        meeting,
+        app_base_url=(current_app.config.get("APP_BASE_URL") or "").rstrip("/"),
+    )
+    if result.get("ok"):
+        _log_activity(meeting_id, "create", "meeting_note", meeting_id, "Shared meeting updates to Slack")
+        db.session.commit()
+        return jsonify({"ok": True, **result})
+    _log_activity(
+        meeting_id,
+        "create",
+        "meeting_note",
+        meeting_id,
+        f"Slack share failed: {(result.get('error') or '')[:120]}",
+    )
+    db.session.commit()
+    return jsonify({"error": result.get("error") or "Slack share failed", **result}), 502
 
 
 @bp.route("/api/pdf-logo")

@@ -11,7 +11,9 @@
     $all(".mn-bottom-nav-item[data-mn-nav]").forEach(function (el) {
       const nav = el.getAttribute("data-mn-nav");
       let active = false;
-      if (nav === "home" && path.match(/\/meeting-notes\/?$/)) active = true;
+      const onHub = !!path.match(/\/meeting-notes\/?$/);
+      const onDetail = !!path.match(/\/meeting-notes\/\d+/);
+      if (nav === "home" && (onHub || onDetail)) active = true;
       if (nav === "tasks" && path.indexOf("/all-items") >= 0) active = true;
       el.classList.toggle("active", active);
     });
@@ -45,13 +47,17 @@
     if (!tabs) return;
     const panes = {
       tasks: $("#mn-detail-pane-tasks"),
-      filters: $("#mn-detail-pane-filters"),
     };
     const KEY = "mn-detail-tab";
     let active = sessionStorage.getItem(KEY) || "tasks";
-    if (active !== "tasks" && active !== "filters") active = "tasks";
+    if (active !== "tasks" && active !== "decisions") active = "tasks";
 
     function showTab(name) {
+      if (name === "filters") {
+        const sheet = document.getElementById("mn-filter-sheet");
+        if (sheet && window.bootstrap) bootstrap.Offcanvas.getOrCreateInstance(sheet).show();
+        return;
+      }
       if (name === "decisions" && typeof window.MN_showDecisionsTab === "function") {
         window.MN_showDecisionsTab();
         active = name;
@@ -69,10 +75,6 @@
       Object.keys(panes).forEach(function (key) {
         if (panes[key]) panes[key].classList.toggle("d-none", key !== name);
       });
-      if (name === "filters") {
-        const sheet = document.getElementById("mn-filter-sheet");
-        if (sheet && window.bootstrap) bootstrap.Offcanvas.getOrCreateInstance(sheet).show();
-      }
     }
 
     $all("[data-mn-detail-tab]", tabs).forEach(function (btn) {

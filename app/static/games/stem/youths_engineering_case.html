@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HBC: Engineering Case Desk</title>
+  <style>
+    :root {
+      --bg: #eceff1;
+      --ink: #1a1d21;
+      --muted: #607080;
+      --panel: #ffffff;
+      --line: #cfd8dc;
+      --accent: #263238;
+      --accent2: #37474f;
+      --ok: #1b5e20;
+      --ok-bg: #e8f5e9;
+      --warn: #e65100;
+      --bad: #b71c1c;
+      --bad-bg: #ffebee;
+      --mono: "Consolas", "Courier New", monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      background:
+        linear-gradient(90deg, rgba(38,50,56,0.04) 1px, transparent 1px) 0 0 / 24px 24px,
+        linear-gradient(rgba(38,50,56,0.04) 1px, transparent 1px) 0 0 / 24px 24px,
+        var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      font-size: 14.5px;
+      line-height: 1.45;
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 18px; }
+    header {
+      display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      align-items: flex-start; border-bottom: 2px solid var(--accent); padding-bottom: 12px;
+    }
+    h1 { font-size: 1.35rem; font-weight: 650; letter-spacing: -0.01em; }
+    .sub { color: var(--muted); font-size: 0.9rem; max-width: 58ch; margin-top: 4px; }
+    .kbd {
+      font-family: var(--mono); font-size: 0.72rem; color: var(--muted); margin-top: 6px;
+    }
+    #scoreBox {
+      background: var(--panel); border: 1px solid var(--line); padding: 10px 14px;
+      font-weight: 700; font-family: var(--mono); white-space: nowrap;
+    }
+    .topline {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+      margin: 12px 0; font-size: 0.82rem; color: var(--muted);
+    }
+    .badge {
+      background: var(--accent); color: #fff; padding: 3px 8px; font-weight: 700;
+      letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.7rem;
+    }
+    .layout {
+      display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px;
+    }
+    .panel {
+      background: var(--panel); border: 1px solid var(--line); padding: 14px 16px;
+    }
+    h2 {
+      font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 8px; font-weight: 700;
+    }
+    #brief { font-size: 0.98rem; margin-bottom: 12px; }
+    .params {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;
+      font-family: var(--mono); font-size: 0.85rem; background: #f7f9fa; padding: 10px;
+      border: 1px solid var(--line);
+    }
+    .params div span { display: block; color: var(--muted); font-size: 0.7rem; font-family: "Segoe UI", sans-serif; text-transform: uppercase; letter-spacing: 0.06em; }
+    label { display: block; font-size: 0.8rem; font-weight: 600; margin: 8px 0 4px; color: var(--muted); }
+    select, input[type=number] {
+      width: 100%; padding: 10px; border: 1px solid var(--line); font-size: 1rem;
+      background: #fff; color: var(--ink);
+    }
+    select:focus, input:focus { outline: 2px solid var(--accent2); outline-offset: 1px; }
+    .tree { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+    .opt {
+      text-align: left; padding: 10px 12px; border: 1px solid var(--line);
+      background: #fafbfc; cursor: pointer; color: var(--ink); font-size: 0.92rem;
+    }
+    .opt:hover { border-color: var(--accent2); }
+    .opt.sel { outline: 2px solid var(--accent); background: #eceff1; }
+    .opt:disabled { opacity: 0.7; cursor: default; }
+    .feedback {
+      margin-top: 12px; padding: 12px; border: 1px solid var(--line);
+      background: #f7f9fa; min-height: 110px; font-size: 0.9rem; line-height: 1.55;
+    }
+    .feedback.ok { background: var(--ok-bg); border-color: #a5d6a7; }
+    .feedback.bad { background: var(--bad-bg); border-color: #ef9a9a; }
+    .feedback .tag-err {
+      display: inline-block; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em;
+      text-transform: uppercase; margin-bottom: 6px; padding: 2px 6px;
+    }
+    .tag-err.foundational { background: #ffe0b2; color: #e65100; }
+    .tag-err.procedural { background: #bbdefb; color: #0d47a1; }
+    .tag-err.ok { background: #c8e6c9; color: #1b5e20; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .act {
+      min-height: 42px; padding: 8px 14px; border: 1px solid var(--accent);
+      background: #fff; font-weight: 650; cursor: pointer; color: var(--ink);
+    }
+    #evalBtn { background: var(--accent); color: #fff; }
+    #checkBtn { background: #0d47a1; color: #fff; border-color: #0d47a1; }
+    #checkBtn:disabled, #evalBtn:disabled, #nextBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .metric {
+      display: flex; justify-content: space-between; gap: 8px;
+      padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 0.86rem;
+    }
+    .metric strong { font-family: var(--mono); }
+    .log {
+      margin-top: 10px; font-size: 0.8rem; line-height: 1.45; max-height: 280px;
+      overflow: auto; white-space: pre-wrap; font-family: var(--mono); color: var(--muted);
+      background: #f7f9fa; border: 1px solid var(--line); padding: 10px;
+    }
+    .pips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 10px; }
+    .pip { width: 18px; height: 6px; background: #b0bec5; }
+    .pip.on { background: var(--accent); }
+    .pip.ok { background: var(--ok); }
+    .pip.bad { background: var(--bad); }
+    @media (max-width: 820px) {
+      .layout, .params { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>HBC: Engineering Case Desk</h1>
+        <p class="sub">Axial stress case studies for Zimbabwe infrastructure — bridges, mine props, farm silos. Use σ = F/A; choose section size or alloy upgrade against allowable stress.</p>
+        <p class="kbd">Shortcuts: 1–3 select decision · Enter evaluate · N next · S submit when enabled</p>
+      </div>
+      <div id="scoreBox">Score: 0 / 10</div>
+    </header>
+    <div class="topline">
+      <span class="badge" id="areaBadge">Combined Science</span>
+      <span id="roundMeta">Case 1 / 10</span>
+      <span>· Youths &amp; older</span>
+      <span id="formulaMeta">σ = F / A</span>
+    </div>
+    <div class="layout">
+      <div class="panel">
+        <h2>Case brief</h2>
+        <p id="brief"></p>
+        <div class="params" id="params"></div>
+        <label for="decision">Decision tree</label>
+        <div class="tree" id="tree" role="listbox" aria-label="Design decision"></div>
+        <label for="areaInput">Your section area A (mm²) — if the decision requires a size</label>
+        <input type="number" id="areaInput" min="50" max="20000" step="10" value="500">
+        <div class="feedback" id="feedback" aria-live="polite">Select a decision path, enter A if needed, then Evaluate (Enter).</div>
+        <div class="actions">
+          <button type="button" class="act" id="evalBtn">Evaluate design</button>
+          <button type="button" class="act" id="hintBtn">Diagnostic hint</button>
+          <button type="button" class="act" id="nextBtn" disabled>Next case</button>
+          <button type="button" class="act" id="checkBtn" disabled>Submit score</button>
+        </div>
+        <div class="pips" id="pips"></div>
+      </div>
+      <div class="panel">
+        <h2>Analytics</h2>
+        <div class="metric"><span>Working stress σ</span><strong id="mSigma">—</strong></div>
+        <div class="metric"><span>Allowable σ_allow</span><strong id="mAllow">—</strong></div>
+        <div class="metric"><span>Utilisation σ/σ_allow</span><strong id="mUtil">—</strong></div>
+        <div class="metric"><span>Last error class</span><strong id="mErr">—</strong></div>
+        <div class="metric"><span>Accuracy</span><strong id="mAcc">—</strong></div>
+        <h2 style="margin-top:14px;">Mastery log</h2>
+        <div class="log" id="log">Awaiting first evaluation.</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const CONTENT = {
+      learningArea: "Combined Science",
+      topic: "Axial stress / materials case studies (bridges, mine props, farm silos — Zimbabwe infrastructure). Stress = F/A; choose section size or alloy upgrade",
+      ageRange: "Youths & older",
+      totalRounds: 10,
+      maxScore: 10,
+      materials: {
+        mild: { id: "mild", name: "Mild steel", Sy: 250 },
+        ht: { id: "ht", name: "High-tensile steel", Sy: 450 },
+        alum: { id: "alum", name: "Aluminium 6061-T6", Sy: 270 },
+        cast: { id: "cast", name: "Cast iron grade", Sy: 200 },
+        ss: { id: "ss", name: "Stainless 304", Sy: 215 }
+      },
+      questionPool: [
+        {
+          id: "bridge_tie_bar",
+          context: "Birchenough Bridge maintenance crew",
+          build: function () {
+            var F = ri(80, 220) * 1000;
+            var n = pick([1.5, 2.0, 2.5]);
+            var mat = CONTENT.materials.mild;
+            var Sy = mat.Sy;
+            var allow = Sy / n;
+            var Areq = Math.ceil(F / allow);
+            return makeCase({
+              title: "Bridge tie-bar",
+              brief: "The " + this.context + " reviews an axial tie-bar. Load F = " + (F / 1000) + " kN, material " + mat.name + " (σ_y = " + Sy + " MPa), required safety factor n = " + n + ". Select a safe design path and a sufficient area.",
+              F: F, n: n, Sy: Sy, matName: mat.name, allow: allow, Areq: Areq,
+              decisions: [
+                { id: "size_ok", label: "1. Keep " + mat.name + "; size A so σ = F/A ≤ σ_y/n", correct: true, needsArea: true },
+                { id: "ignore_n", label: "2. Keep " + mat.name + "; size to σ ≤ σ_y (ignore safety factor)", correct: false, err: "procedural", needsArea: true },
+                { id: "flip_formula", label: "3. Use A = σ/F as the governing relation", correct: false, err: "foundational", needsArea: false }
+              ]
+            });
+          }
+        },
+        {
+          id: "hwange_mine_prop",
+          context: "Hwange colliery temporary prop",
+          build: function () {
+            var F = ri(120, 350) * 1000;
+            var n = pick([2.0, 2.5, 3.0]);
+            var weak = CONTENT.materials.cast;
+            var strong = CONTENT.materials.ht;
+            var allowWeak = weak.Sy / n;
+            var allowStrong = strong.Sy / n;
+            var Afixed = ri(600, 900);
+            var sigmaWeak = F / Afixed;
+            var mustUpgrade = sigmaWeak > allowWeak;
+            return makeCase({
+              title: "Mine prop",
+              brief: "A " + this.context + " carries F = " + (F / 1000) + " kN on a fixed area A = " + Afixed + " mm². Safety factor n = " + n + ". Current alloy " + weak.name + " (σ_y = " + weak.Sy + " MPa). Decide whether to upgrade alloy or enlarge section.",
+              F: F, n: n, Sy: weak.Sy, matName: weak.name, allow: allowWeak, Areq: Math.ceil(F / allowWeak),
+              Afixed: Afixed, strong: strong, allowStrong: allowStrong, mustUpgrade: mustUpgrade,
+              decisions: [
+                { id: "upgrade", label: "1. Upgrade to " + strong.name + " (σ_y = " + strong.Sy + " MPa) at same A", correct: mustUpgrade && (F / Afixed <= allowStrong), needsArea: false, fixedA: Afixed, useSy: strong.Sy },
+                { id: "enlarge", label: "2. Keep " + weak.name + "; enlarge A until σ ≤ σ_y/n", correct: true, needsArea: true },
+                { id: "reduce_n", label: "3. Keep geometry; reduce n below " + n + " to pass inspection", correct: false, err: "procedural", needsArea: false }
+              ],
+              specialCheck: function (decision, A) {
+                if (decision.id === "upgrade") {
+                  var sig = F / Afixed;
+                  var allw = allowStrong;
+                  if (sig <= allw) return { ok: true, sigma: sig, allow: allw, note: "Alloy upgrade keeps σ ≤ σ_allow at fixed A." };
+                  return { ok: false, sigma: sig, allow: allw, class: "procedural", note: "Even high-tensile steel fails at this A — enlarge the section." };
+                }
+                return null;
+              }
+            });
+          }
+        },
+        {
+          id: "mashonaland_silo_leg",
+          context: "Mashonaland grain silo support leg",
+          build: function () {
+            var F = ri(40, 160) * 1000;
+            var n = pick([1.8, 2.0, 2.2]);
+            var mat = CONTENT.materials.mild;
+            var allow = mat.Sy / n;
+            var Areq = Math.ceil(F / allow);
+            return makeCase({
+              title: "Farm silo leg",
+              brief: "Design a " + this.context + ". Axial load F = " + (F / 1000) + " kN, " + mat.name + " σ_y = " + mat.Sy + " MPa, n = " + n + ". Choose the correct stress check.",
+              F: F, n: n, Sy: mat.Sy, matName: mat.name, allow: allow, Areq: Areq,
+              decisions: [
+                { id: "correct", label: "1. Require F/A ≤ σ_y/n and pick A ≥ F/(σ_y/n)", correct: true, needsArea: true },
+                { id: "multiply_n", label: "2. Require F/A ≤ σ_y × n (inflate allowable)", correct: false, err: "procedural", needsArea: true },
+                { id: "force_area", label: "3. Treat stress as A/F", correct: false, err: "foundational", needsArea: false }
+              ]
+            });
+          }
+        },
+        {
+          id: "kariba_gantry_hanger",
+          context: "Kariba Dam gantry hanger rod",
+          build: function () {
+            var F = ri(60, 180) * 1000;
+            var n = 2.5;
+            var mat = CONTENT.materials.ss;
+            var allow = mat.Sy / n;
+            var Areq = Math.ceil(F / allow);
+            return makeCase({
+              title: "Gantry hanger",
+              brief: "A " + this.context + " sees F = " + (F / 1000) + " kN. Material " + mat.name + " (σ_y = " + mat.Sy + " MPa), n = " + n + ". Pick a compliant section.",
+              F: F, n: n, Sy: mat.Sy, matName: mat.name, allow: allow, Areq: Areq,
+              decisions: [
+                { id: "ok", label: "1. Size A using σ_allow = σ_y/n", correct: true, needsArea: true },
+                { id: "sy_only", label: "2. Size A using σ_allow = σ_y only", correct: false, err: "procedural", needsArea: true },
+                { id: "units_skip", label: "3. Compare F (kN) directly to A (mm²) without forming σ", correct: false, err: "foundational", needsArea: false }
+              ]
+            });
+          }
+        },
+        {
+          id: "beira_corridor_bolt",
+          context: "Beira Corridor bridge splice bolt group (single bolt check)",
+          build: function () {
+            var F = ri(25, 90) * 1000;
+            var n = pick([2.0, 3.0]);
+            var mat = CONTENT.materials.ht;
+            var allow = mat.Sy / n;
+            var Areq = Math.ceil(F / allow);
+            return makeCase({
+              title: "Splice bolt",
+              brief: this.context + ": design axial force per bolt F = " + (F / 1000) + " kN. " + mat.name + " σ_y = " + mat.Sy + " MPa, n = " + n + ".",
+              F: F, n: n, Sy: mat.Sy, matName: mat.name, allow: allow, Areq: Areq,
+              decisions: [
+                { id: "tensile", label: "1. Check tensile stress σ = F/A ≤ σ_y/n", correct: true, needsArea: true },
+                { id: "double_area", label: "2. Use σ = F/(2A) without a second path in the model", correct: false, err: "procedural", needsArea: true },
+                { id: "yield_as_stress", label: "3. Set required A = σ_y (numeric coincidence)", correct: false, err: "foundational", needsArea: false }
+              ]
+            });
+          }
+        },
+        {
+          id: "mutare_workshop_crane",
+          context: "Mutare workshop jib-crane tie",
+          build: function () {
+            var F = ri(30, 110) * 1000;
+            var n = pick([1.5, 2.0]);
+            var mat = CONTENT.materials.alum;
+            var allow = mat.Sy / n;
+            var Areq = Math.ceil(F / allow);
+            return makeCase({
+              title: "Crane tie",
+              brief: "For a " + this.context + ", F = " + (F / 1000) + " kN, " + mat.name + " σ_y = " + mat.Sy + " MPa, n = " + n + ". Decide the governing inequality.",
+              F: F, n: n, Sy: mat.Sy, matName: mat.name, allow: allow, Areq: Areq,
+              decisions: [
+                { id: "leq", label: "1. Enforce σ ≤ σ_allow with σ_allow = σ_y/n", correct: true, needsArea: true },
+                { id: "geq", label: "2. Enforce σ ≥ σ_allow (invert the check)", correct: false, err: "procedural", needsArea: true },
+                { id: "force_eq_stress", label: "3. Set F equal to σ_y as a pass criterion", correct: false, err: "foundational", needsArea: false }
+              ]
+            });
+          }
+        },
+        {
+          id: "chinhoyi_silo_ring",
+          context: "Chinhoyi farm silo vertical post",
+          build: function () {
+            var F = ri(50, 200) * 1000;
+            var n = 2.0;
+            var mat = CONTENT.materials.mild;
+            var allow = mat.Sy / n;
+            var Areq = Math.ceil(F / allow);
+            return makeCase({
+              title: "Silo post",
+              brief: this.context + " under F = " + (F / 1000) + " kN. Mild steel σ_y = " + mat.Sy + " MPa, n = " + n + ". Provide A that satisfies the allowable-stress design.",
+              F: F, n: n, Sy: mat.Sy, matName: mat.name, allow: allow, Areq: Areq,
+              decisions: [
+                { id: "asd", label: "1. Allowable-stress design: A ≥ F / (σ_y/n)", correct: true, needsArea: true },
+                { id: "n_times_a", label: "2. Use A ≥ n·F/σ_y then divide A by n again", correct: false, err: "procedural", needsArea: true },
+                { id: "area_is_force", label: "3. Report A = F (same number, mixed units)", correct: false, err: "foundational", needsArea: false }
+              ]
+            });
+          }
+        },
+        {
+          id: "victoria_falls_walkway",
+          context: "Victoria Falls walkway hanger",
+          build: function () {
+            var F = ri(15, 70) * 1000;
+            var n = pick([2.0, 2.5, 3.0]);
+            var mat = CONTENT.materials.ss;
+            var allow = mat.Sy / n;
+            var Areq = Math.ceil(F / allow);
+            return makeCase({
+              title: "Walkway hanger",
+              brief: "Tourism infrastructure — " + this.context + ". F = " + (F / 1000) + " kN, " + mat.name + " σ_y = " + mat.Sy + " MPa, n = " + n + ".",
+              F: F, n: n, Sy: mat.Sy, matName: mat.name, allow: allow, Areq: Areq,
+              decisions: [
+                { id: "ok", label: "1. Compute σ = F/A in N/mm² (= MPa) and compare to σ_y/n", correct: true, needsArea: true },
+                { id: "mpa_wrong", label: "2. Divide F in kN by A in mm² and treat as MPa without ×1000", correct: false, err: "foundational", needsArea: true },
+                { id: "sf_add", label: "3. Use σ_allow = σ_y + n", correct: false, err: "procedural", needsArea: true }
+              ]
+            });
+          }
+        },
+        {
+          id: "great_dyke_shaft_tie",
+          context: "Great Dyke shaft service tie-rod",
+          build: function () {
+            var F = ri(100, 280) * 1000;
+            var n = pick([2.5, 3.0]);
+            var mat = CONTENT.materials.ht;
+            var allow = mat.Sy / n;
+            var Areq = Math.ceil(F / allow);
+            return makeCase({
+              title: "Shaft tie-rod",
+              brief: this.context + " with F = " + (F / 1000) + " kN. " + mat.name + " σ_y = " + mat.Sy + " MPa, n = " + n + ". Select the safe path.",
+              F: F, n: n, Sy: mat.Sy, matName: mat.name, allow: allow, Areq: Areq,
+              decisions: [
+                { id: "safe", label: "1. Enlarge A (or confirm A) so F/A ≤ σ_y/n", correct: true, needsArea: true },
+                { id: "overstress_ok", label: "2. Accept σ up to 1.2·σ_y if inspection is rushed", correct: false, err: "procedural", needsArea: true },
+                { id: "stress_is_fa", label: "3. Define stress as F×A", correct: false, err: "foundational", needsArea: false }
+              ]
+            });
+          }
+        },
+        {
+          id: "harare_overhead_sign",
+          context: "Harare CBD overhead sign gantry rod",
+          build: function () {
+            var F = ri(20, 95) * 1000;
+            var n = 1.75;
+            var mat = CONTENT.materials.mild;
+            var allow = mat.Sy / n;
+            var Areq = Math.ceil(F / allow);
+            return makeCase({
+              title: "Sign gantry rod",
+              brief: this.context + ": wind-induced axial estimate F = " + (F / 1000) + " kN. Mild steel σ_y = " + mat.Sy + " MPa, n = " + n + ".",
+              F: F, n: n, Sy: mat.Sy, matName: mat.name, allow: allow, Areq: Areq,
+              decisions: [
+                { id: "ok", label: "1. Design with σ_allow = σ_y/n and A ≥ F/σ_allow", correct: true, needsArea: true },
+                { id: "wind_skip", label: "2. Ignore axial check; rely on bending only", correct: false, err: "procedural", needsArea: false },
+                { id: "invert", label: "3. Use σ = A/F and compare to n", correct: false, err: "foundational", needsArea: false }
+              ]
+            });
+          }
+        },
+        {
+          id: "bulawayo_rail_link",
+          context: "Bulawayo rail overbridge hangers",
+          build: function () {
+            var F = ri(70, 240) * 1000;
+            var n = pick([2.0, 2.5]);
+            var mat = CONTENT.materials.ht;
+            var allow = mat.Sy / n;
+            var Areq = Math.ceil(F / allow);
+            return makeCase({
+              title: "Rail overbridge hanger",
+              brief: this.context + " — each hanger F = " + (F / 1000) + " kN. " + mat.name + " σ_y = " + mat.Sy + " MPa, n = " + n + ".",
+              F: F, n: n, Sy: mat.Sy, matName: mat.name, allow: allow, Areq: Areq,
+              decisions: [
+                { id: "ok", label: "1. Keep HT steel; set A so utilisation σ/σ_allow ≤ 1", correct: true, needsArea: true },
+                { id: "util_flip", label: "2. Target utilisation σ_allow/σ ≤ 1 by shrinking A aggressively", correct: false, err: "procedural", needsArea: true },
+                { id: "no_area", label: "3. Pass the case without computing A or σ", correct: false, err: "foundational", needsArea: false }
+              ]
+            });
+          }
+        },
+        {
+          id: "gweru_mill_hanger",
+          context: "Gweru milling plant equipment hanger",
+          build: function () {
+            var F = ri(35, 130) * 1000;
+            var n = pick([1.5, 2.0, 2.5]);
+            var mat = CONTENT.materials.mild;
+            var allow = mat.Sy / n;
+            var Areq = Math.ceil(F / allow);
+            return makeCase({
+              title: "Plant hanger",
+              brief: this.context + " with service load F = " + (F / 1000) + " kN. " + mat.name + " σ_y = " + mat.Sy + " MPa, n = " + n + ". Evaluate your section.",
+              F: F, n: n, Sy: mat.Sy, matName: mat.name, allow: allow, Areq: Areq,
+              decisions: [
+                { id: "ok", label: "1. σ = F/A ≤ σ_y/n with consistent N, mm² (MPa)", correct: true, needsArea: true },
+                { id: "pct_sf", label: "2. Apply n as a percent (σ_y × n/100)", correct: false, err: "procedural", needsArea: true },
+                { id: "force_stress", label: "3. Call F itself the stress reading", correct: false, err: "foundational", needsArea: false }
+              ]
+            });
+          }
+        }
+      ],
+      hints: {
+        foundational: "Foundational: axial stress is force over area — σ = F/A. Keep units consistent: F in N and A in mm² gives σ in N/mm² = MPa. Do not invert to A/F or treat F as stress.",
+        procedural: "Procedural: allowable stress is σ_allow = σ_y / n (safety factor divides yield). Do not multiply σ_y by n, ignore n, or invert the inequality σ ≤ σ_allow.",
+        sizing: "Minimum area A_min = F / σ_allow = F / (σ_y/n). Choose A ≥ A_min (round up in practice).",
+        units: "If F is given in kN, convert to N (×1000) before σ = F/A with A in mm²."
+      }
+    };
+
+    function ri(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+    function r2(n) { return Math.round(n * 100) / 100; }
+
+    function makeCase(cfg) {
+      return cfg;
+    }
+
+    function initializeGameSession(pool) {
+      var shuffledPool = pool.slice();
+      for (var i = shuffledPool.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = shuffledPool[i];
+        shuffledPool[i] = shuffledPool[j];
+        shuffledPool[j] = t;
+      }
+      return shuffledPool.slice(0, CONTENT.totalRounds);
+    }
+
+    var state = {
+      session: [],
+      index: 0,
+      score: 0,
+      attempts: 0,
+      finished: false,
+      locked: false,
+      current: null,
+      selectedDecision: null,
+      results: []
+    };
+
+    var els = {
+      scoreBox: document.getElementById("scoreBox"),
+      brief: document.getElementById("brief"),
+      params: document.getElementById("params"),
+      tree: document.getElementById("tree"),
+      areaInput: document.getElementById("areaInput"),
+      feedback: document.getElementById("feedback"),
+      evalBtn: document.getElementById("evalBtn"),
+      hintBtn: document.getElementById("hintBtn"),
+      nextBtn: document.getElementById("nextBtn"),
+      checkBtn: document.getElementById("checkBtn"),
+      roundMeta: document.getElementById("roundMeta"),
+      mSigma: document.getElementById("mSigma"),
+      mAllow: document.getElementById("mAllow"),
+      mUtil: document.getElementById("mUtil"),
+      mErr: document.getElementById("mErr"),
+      mAcc: document.getElementById("mAcc"),
+      log: document.getElementById("log"),
+      pips: document.getElementById("pips")
+    };
+
+    function updateScore() {
+      els.scoreBox.textContent = "Score: " + state.score + " / " + CONTENT.maxScore;
+    }
+
+    function renderPips() {
+      els.pips.innerHTML = "";
+      for (var i = 0; i < CONTENT.totalRounds; i++) {
+        var p = document.createElement("div");
+        p.className = "pip";
+        if (i < state.results.length) p.classList.add(state.results[i] ? "ok" : "bad");
+        else if (i === state.index && !state.finished) p.classList.add("on");
+        els.pips.appendChild(p);
+      }
+    }
+
+    function startGame() {
+      state.session = initializeGameSession(CONTENT.questionPool);
+      state.index = 0;
+      state.score = 0;
+      state.attempts = 0;
+      state.finished = false;
+      state.results = [];
+      els.checkBtn.disabled = true;
+      els.log.textContent = "Session started — " + CONTENT.totalRounds + " non-repeating cases.";
+      updateScore();
+      loadCase();
+    }
+
+    function loadCase() {
+      state.locked = false;
+      state.selectedDecision = null;
+      var tpl = state.session[state.index];
+      var built = tpl.build();
+      built.id = tpl.id;
+      state.current = built;
+
+      els.roundMeta.textContent = "Case " + (state.index + 1) + " / " + CONTENT.totalRounds;
+      els.brief.textContent = built.brief;
+      els.params.innerHTML =
+        "<div><span>Load F</span>" + (built.F / 1000) + " kN</div>" +
+        "<div><span>Yield σ_y</span>" + built.Sy + " MPa</div>" +
+        "<div><span>Safety factor n</span>" + built.n + "</div>" +
+        "<div><span>σ_allow = σ_y/n</span>" + r2(built.allow) + " MPa</div>";
+
+      els.areaInput.value = String(Math.max(100, Math.round(built.Areq * 0.85 / 10) * 10));
+      els.areaInput.disabled = false;
+      els.evalBtn.disabled = false;
+      els.nextBtn.disabled = true;
+      els.feedback.className = "feedback";
+      els.feedback.textContent = "Select a decision path (1–3), adjust A if required, then Evaluate.";
+      els.mSigma.textContent = "—";
+      els.mAllow.textContent = r2(built.allow) + " MPa";
+      els.mUtil.textContent = "—";
+
+      els.tree.innerHTML = "";
+      built.decisions.forEach(function (d, idx) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "opt";
+        btn.textContent = d.label;
+        btn.dataset.idx = String(idx);
+        btn.addEventListener("click", function () { selectDecision(idx); });
+        els.tree.appendChild(btn);
+      });
+      renderPips();
+    }
+
+    function selectDecision(idx) {
+      if (state.locked) return;
+      state.selectedDecision = state.current.decisions[idx];
+      Array.prototype.forEach.call(els.tree.querySelectorAll(".opt"), function (b, i) {
+        b.classList.toggle("sel", i === idx);
+      });
+      if (state.selectedDecision.needsArea) {
+        els.areaInput.disabled = false;
+        els.areaInput.focus();
+      }
+    }
+
+    function evaluate() {
+      if (state.locked || state.finished) return;
+      if (!state.selectedDecision) {
+        els.feedback.textContent = "Select a decision from the tree first.";
+        return;
+      }
+      var c = state.current;
+      var d = state.selectedDecision;
+      var A = Number(els.areaInput.value);
+      state.attempts += 1;
+
+      if (d.needsArea && (!A || A <= 0 || isNaN(A))) {
+        els.feedback.textContent = "Enter a positive cross-section area A (mm²).";
+        return;
+      }
+
+      var result;
+      if (typeof c.specialCheck === "function") {
+        var special = c.specialCheck(d, A);
+        if (special) result = special;
+      }
+      if (!result) {
+        result = standardCheck(c, d, A);
+      }
+
+      state.locked = true;
+      els.evalBtn.disabled = true;
+      els.areaInput.disabled = true;
+      Array.prototype.forEach.call(els.tree.querySelectorAll(".opt"), function (b) { b.disabled = true; });
+
+      els.mSigma.textContent = result.sigma != null ? r2(result.sigma) + " MPa" : "n/a";
+      els.mAllow.textContent = result.allow != null ? r2(result.allow) + " MPa" : r2(c.allow) + " MPa";
+      if (result.sigma != null && result.allow) {
+        els.mUtil.textContent = r2(result.sigma / result.allow);
+      } else {
+        els.mUtil.textContent = "—";
+      }
+
+      var steps = buildSteps(c, d, A, result);
+
+      if (result.ok) {
+        state.score += 1;
+        updateScore();
+        state.results.push(true);
+        els.mErr.textContent = "none";
+        els.feedback.className = "feedback ok";
+        els.feedback.innerHTML = "<span class=\"tag-err ok\">Pass</span><br>" + steps;
+        appendLog("CASE " + (state.index + 1) + " PASS — " + c.title + "\n" + steps.replace(/<[^>]+>/g, "") + "\n");
+      } else {
+        state.results.push(false);
+        var errClass = result.class || d.err || "procedural";
+        els.mErr.textContent = errClass;
+        els.feedback.className = "feedback bad";
+        els.feedback.innerHTML =
+          "<span class=\"tag-err " + errClass + "\">" + errClass + " error</span><br>" +
+          (result.note ? result.note + "<br><br>" : "") +
+          diagnosticBlurb(errClass) + "<br><br>" + steps;
+        appendLog("CASE " + (state.index + 1) + " FAIL [" + errClass + "] — " + c.title + "\n" + (result.note || "") + "\n");
+      }
+
+      els.mAcc.textContent = state.score + "/" + (state.index + 1);
+      els.nextBtn.disabled = false;
+      if (state.index >= CONTENT.totalRounds - 1) {
+        els.nextBtn.textContent = "Finish cases";
+      }
+      renderPips();
+    }
+
+    function standardCheck(c, d, A) {
+      if (!d.correct) {
+        return {
+          ok: false,
+          class: d.err || "procedural",
+          sigma: d.needsArea ? c.F / A : null,
+          allow: c.allow,
+          note: explainWrongDecision(d)
+        };
+      }
+      var sigma = c.F / A;
+      var ok = sigma <= c.allow + 1e-9;
+      if (!ok) {
+        return {
+          ok: false,
+          class: "procedural",
+          sigma: sigma,
+          allow: c.allow,
+          note: "Decision path was right, but A = " + A + " mm² is undersized. Need A ≥ " + c.Areq + " mm² so σ ≤ " + r2(c.allow) + " MPa."
+        };
+      }
+      return { ok: true, sigma: sigma, allow: c.allow, note: "Section satisfies σ ≤ σ_allow." };
+    }
+
+    function explainWrongDecision(d) {
+      if (d.id === "ignore_n" || d.id === "sy_only") return "You dropped the safety factor. Allowable stress must be σ_y/n, not σ_y.";
+      if (d.id === "multiply_n") return "You multiplied yield by n. Safety factor reduces allowable stress: σ_allow = σ_y/n.";
+      if (d.id === "flip_formula" || d.id === "force_area" || d.id === "stress_is_fa" || d.id === "invert") {
+        return "Stress is F/A, not A/F or F×A.";
+      }
+      if (d.id === "mpa_wrong") return "Unit error: F must be in N when A is in mm² to obtain MPa.";
+      if (d.id === "reduce_n") return "Lowering n to pass is not an acceptable design action.";
+      if (d.id === "geq") return "The inequality is inverted — you need σ ≤ σ_allow.";
+      if (d.id === "sf_add") return "n is a divisor of σ_y, not an addend.";
+      if (d.id === "pct_sf") return "n is a factor (e.g. 2.0), not a percent.";
+      if (d.id === "wind_skip" || d.id === "no_area") return "An axial stress check is required for this case.";
+      if (d.id === "overstress_ok") return "Exceeding yield (even by 20%) violates the allowable-stress criterion.";
+      if (d.id === "util_flip") return "Utilisation is σ/σ_allow; shrinking A raises σ and worsens utilisation.";
+      if (d.id === "double_area") return "Do not invent a 2A shear path unless the free-body shows two areas.";
+      if (d.id === "force_eq_stress" || d.id === "yield_as_stress" || d.id === "area_is_force" || d.id === "force_stress") {
+        return "Confusing force, stress, and area — they are related by σ = F/A, not by equating the raw numbers.";
+      }
+      if (d.id === "n_times_a") return "Compute A_min = F/(σ_y/n) once; do not apply n twice.";
+      return "The selected decision path does not satisfy allowable-stress design.";
+    }
+
+    function diagnosticBlurb(errClass) {
+      if (errClass === "foundational") return CONTENT.hints.foundational;
+      return CONTENT.hints.procedural + " " + CONTENT.hints.sizing;
+    }
+
+    function buildSteps(c, d, A, result) {
+      var lines = [];
+      lines.push("<strong>Worked check</strong>");
+      lines.push("1. Convert load: F = " + (c.F / 1000) + " kN = " + c.F + " N.");
+      lines.push("2. Allowable stress: σ_allow = σ_y/n = " + c.Sy + "/" + c.n + " = " + r2(c.allow) + " MPa.");
+      lines.push("3. Minimum area: A_min = F/σ_allow = " + c.F + "/" + r2(c.allow) + " ≈ " + c.Areq + " mm².");
+      if (d.needsArea) {
+        lines.push("4. Your A = " + A + " mm² ⇒ σ = F/A = " + c.F + "/" + A + " = " + r2(c.F / A) + " MPa.");
+        lines.push("5. Criterion: σ ≤ σ_allow → " + r2(c.F / A) + " ≤ " + r2(c.allow) + " ? " + (result.ok ? "YES" : "NO") + ".");
+      } else {
+        lines.push("4. Selected path did not correctly apply σ = F/A with σ_allow = σ_y/n.");
+      }
+      return lines.join("<br>");
+    }
+
+    function appendLog(text) {
+      els.log.textContent = text + "\n" + els.log.textContent;
+    }
+
+    function nextCase() {
+      if (!state.locked) return;
+      if (state.index >= CONTENT.totalRounds - 1) {
+        finishSession();
+        return;
+      }
+      state.index += 1;
+      loadCase();
+    }
+
+    function finishSession() {
+      state.finished = true;
+      els.checkBtn.disabled = false;
+      els.nextBtn.disabled = true;
+      els.evalBtn.disabled = true;
+      els.feedback.className = "feedback ok";
+      els.feedback.innerHTML = "<strong>All cases complete.</strong> Score " + state.score + " / " + CONTENT.maxScore +
+        ". Press Submit score (S) to send results to the host.";
+      renderPips();
+    }
+
+    function submitScore() {
+      if (!state.finished) return;
+      var finalScore = state.score;
+      var maxScore = CONTENT.maxScore;
+      updateScore();
+      if (window.gameScoreSubmit) {
+        window.gameScoreSubmit(finalScore, maxScore);
+      } else if (window.parent && window.parent.submitGameScore) {
+        var gameIdMatch = window.location.pathname.match(/\/play-game\/(\d+)/);
+        if (gameIdMatch) {
+          window.parent.submitGameScore(parseInt(gameIdMatch[1], 10), finalScore, maxScore);
+        }
+      }
+      els.checkBtn.disabled = true;
+      els.feedback.innerHTML = "Submitted <strong>" + finalScore + " / " + maxScore + "</strong>.";
+      appendLog("SUBMIT " + finalScore + "/" + maxScore);
+    }
+
+    els.evalBtn.addEventListener("click", evaluate);
+    els.nextBtn.addEventListener("click", nextCase);
+    els.checkBtn.addEventListener("click", submitScore);
+    els.hintBtn.addEventListener("click", function () {
+      if (state.locked) return;
+      els.feedback.className = "feedback";
+      els.feedback.innerHTML = CONTENT.hints.foundational + "<br><br>" + CONTENT.hints.procedural + "<br><br>" + CONTENT.hints.units;
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "SELECT")) {
+        if (e.key === "Enter") { e.preventDefault(); evaluate(); }
+        return;
+      }
+      if (e.key >= "1" && e.key <= "3" && !state.locked) {
+        selectDecision(parseInt(e.key, 10) - 1);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        evaluate();
+      } else if ((e.key === "n" || e.key === "N") && state.locked && !state.finished) {
+        nextCase();
+      } else if ((e.key === "s" || e.key === "S") && state.finished) {
+        submitScore();
+      }
+    });
+
+    document.getElementById("areaBadge").textContent = CONTENT.learningArea;
+    startGame();
+  </script>
+</body>
+</html>

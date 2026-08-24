@@ -117,8 +117,8 @@
         <i class="fas fa-book"></i> <span class="nav-text">Allocations</span>
       </a>
 
-      <a href="{{ url_for('help_desk') }}" class="nav-item {{ 'active' if title == 'Help desk' else '' }}">
-        <i class="fas fa-bug"></i> <span class="nav-text">Help Desk</span>
+      <a href="{{ url_for('help_desk.index') }}" class="nav-item {{ 'active' if title == 'Help desk' else '' }}">
+        <i class="fas fa-headset"></i> <span class="nav-text">Help Desk</span>
       </a>
 
       <a href="{{ url_for('meeting_notes.index') }}"

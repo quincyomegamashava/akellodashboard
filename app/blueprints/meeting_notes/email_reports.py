@@ -43,6 +43,87 @@ def normalize_recipients(raw: str | Iterable[str]) -> List[str]:
     return cleaned
 
 
+def attendee_recipient_emails(meeting: MeetingNote) -> List[str]:
+    emails: List[str] = []
+    for u in meeting.attendees or []:
+        em = (getattr(u, "email", None) or "").strip()
+        if em:
+            emails.append(em)
+    return normalize_recipients(emails)
+
+
+def build_meeting_update_email_bodies(
+    meeting: MeetingNote,
+    items: List[MeetingActionItem] | None = None,
+    *,
+    app_base_url: str = "",
+) -> tuple[str, str, str]:
+    """Return (subject, html_body, text_body) for attendee meeting updates."""
+    title = meeting.title or "Meeting notes"
+    date_str = meeting.meeting_date.isoformat() if meeting.meeting_date else "N/A"
+    subject = f"Meeting updates: {title} — {date_str}"
+    if items is None:
+        items = (
+            action_items_query(meeting_note_id=meeting.id, status="all")
+            .order_by(MeetingActionItem.sort_order.asc(), MeetingActionItem.id.asc())
+            .all()
+        )
+    open_items = [it for it in items if (it.status or "open") != "done"]
+    base = (app_base_url or "").rstrip("/")
+    link = f"{base}/meeting-notes/{meeting.id}" if base else f"/meeting-notes/{meeting.id}"
+
+    summary = (meeting.summary or "").strip()
+    summary_html = ""
+    if summary:
+        safe = (
+            summary.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\n", "<br/>")
+        )
+        summary_html = f"<h3>Summary</h3><p>{safe}</p>"
+
+    rows_html = []
+    rows_text = []
+    for it in open_items:
+        cta = (it.call_to_action or "").strip() or "Untitled"
+        cta_short = cta.replace("\n", " ")[:160]
+        owners = ", ".join(user_display_name(u) for u in (it.assignees or [])) or "Unassigned"
+        due = it.due_date.isoformat() if it.due_date else "—"
+        status = (it.status or "open").replace("_", " ").title()
+        rows_html.append(
+            f"<tr><td>{cta_short.replace('&', '&amp;').replace('<', '&lt;')}</td>"
+            f"<td>{owners}</td><td>{due}</td><td>{status}</td></tr>"
+        )
+        rows_text.append(f"- {cta_short} | {owners} | due {due} | {status}")
+
+    table = ""
+    if rows_html:
+        table = (
+            "<h3>Open action items</h3>"
+            "<table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;font-size:13px;'>"
+            "<thead><tr><th>Action</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead>"
+            f"<tbody>{''.join(rows_html)}</tbody></table>"
+        )
+    else:
+        table = "<p>No open action items.</p>"
+
+    html = (
+        f"<p>Hello,</p>"
+        f"<p>Here are the updates from <strong>{title}</strong> ({date_str}).</p>"
+        f"{summary_html}{table}"
+        f"<p><a href=\"{link}\">Open meeting notes</a></p>"
+        f"<p>Minutes PDF is attached.</p>"
+    )
+    text = (
+        f"Meeting updates: {title} — {date_str}\n\n"
+        + ((summary[:500] + "\n\n") if summary else "")
+        + ("Open action items:\n" + "\n".join(rows_text) + "\n\n" if rows_text else "No open action items.\n\n")
+        + f"View: {link}\n"
+    )
+    return subject, html, text
+
+
 def _paragraph(text: str, style) -> Paragraph:
     safe = (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     safe = safe.replace("\n", "<br/>")

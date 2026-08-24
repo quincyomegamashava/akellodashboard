@@ -136,6 +136,12 @@ class MeetingActionItem(db.Model):
     source_excerpt = db.Column(db.Text, nullable=True)
     ai_extracted = db.Column(db.Boolean, nullable=False, default=False)
     carry_forward_count = db.Column(db.Integer, nullable=False, default=0)
+    source_item_id = db.Column(
+        db.Integer,
+        db.ForeignKey("meeting_notes_action_items.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     stakeholder_lead_id = db.Column(
         db.Integer,
         db.ForeignKey("sales_marketing_stakeholder_leads.id", ondelete="SET NULL"),
@@ -154,6 +160,12 @@ class MeetingActionItem(db.Model):
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
 
+    source_item = db.relationship(
+        "MeetingActionItem",
+        remote_side=[id],
+        foreign_keys=[source_item_id],
+        backref=db.backref("derived_items", lazy="dynamic"),
+    )
     assignees = db.relationship(
         "User",
         secondary=meeting_notes_action_assignees,

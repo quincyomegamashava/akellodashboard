@@ -18,6 +18,9 @@
     carryForwardPreview: function (id, fromId) {
       return "/meeting-notes/api/meetings/" + id + "/carry-forward/preview?from_meeting_id=" + encodeURIComponent(fromId);
     },
+    carryForwardSuggestions: function (id, fromId) {
+      return "/meeting-notes/api/meetings/" + id + "/carry-forward/suggestions?from_meeting_id=" + encodeURIComponent(fromId);
+    },
     bulkItems: "/meeting-notes/api/action-items/bulk",
     subtasks: function (itemId) { return "/meeting-notes/api/action-items/" + itemId + "/subtasks"; },
     subtask: function (id) { return "/meeting-notes/api/subtasks/" + id; },
@@ -35,6 +38,7 @@
     aiSummarize: function (mid) { return "/meeting-notes/api/meetings/" + mid + "/ai/summarize"; },
     transcript: function (mid) { return "/meeting-notes/api/meetings/" + mid + "/transcript"; },
     emailReport: function (mid) { return "/meeting-notes/api/meetings/" + mid + "/email-report"; },
+    shareSlack: function (mid) { return "/meeting-notes/api/meetings/" + mid + "/share-slack"; },
     templates: "/meeting-notes/api/templates",
     templateCreateMeeting: function (id) { return "/meeting-notes/api/templates/" + id + "/create-meeting"; },
     itemComments: function (id) { return "/meeting-notes/api/action-items/" + id + "/comments"; },
@@ -151,6 +155,26 @@
     const d = document.createElement("div");
     d.textContent = s == null ? "" : String(s);
     return d.innerHTML;
+  }
+
+  function showToast(message, type) {
+    type = type || "info";
+    let host = document.getElementById("mn-toast-host");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "mn-toast-host";
+      host.className = "mn-toast-host";
+      document.body.appendChild(host);
+    }
+    const el = document.createElement("div");
+    el.className = "mn-toast mn-toast-" + type;
+    el.setAttribute("role", "status");
+    el.textContent = message;
+    host.appendChild(el);
+    setTimeout(function () {
+      el.classList.add("mn-toast-out");
+      setTimeout(function () { el.remove(); }, 280);
+    }, 3200);
   }
 
   function normalizeBulletText(value) {
@@ -557,15 +581,28 @@
       empty.className = "mn-board-empty";
       empty.textContent = status === "done" ? "No completed tasks" : status === "in_progress" ? "No tasks in progress" : "No tasks yet";
       body.appendChild(empty);
-      return body;
+    } else {
+      colItems.forEach(function (it) {
+        if (boardGroupMode === "platform") {
+          body.appendChild(buildPlatformAccordionItem(it, status, readOnly));
+        } else {
+          body.appendChild(buildTaskCard(it, { readOnly: readOnly, compact: hubMode }));
+        }
+      });
     }
-    colItems.forEach(function (it) {
-      if (boardGroupMode === "platform") {
-        body.appendChild(buildPlatformAccordionItem(it, status, readOnly));
-      } else {
-        body.appendChild(buildTaskCard(it, { readOnly: readOnly, compact: hubMode }));
-      }
-    });
+    if (!readOnly && canEditItems() && meetingNoteId && boardGroupMode === "status") {
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "btn btn-sm mn-btn-ghost mn-board-add-card";
+      addBtn.setAttribute("data-status", status);
+      addBtn.innerHTML = '<i class="fas fa-plus me-1"></i>Add card';
+      addBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        createBoardCard(status);
+      });
+      body.appendChild(addBtn);
+    }
     return body;
   }
 
@@ -898,11 +935,62 @@
     }).join("");
   }
 
+  function assigneeInitials(name) {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  }
+
   function assigneeChipsHtml(names) {
     if (!names || !names.length) return '<span class="text-muted">—</span>';
     return '<div class="mn-assignee-readonly">' + names.map(function (n) {
-      return '<span class="mn-assignee-chip">' + escapeHtml(n) + "</span>";
+      return '<span class="mn-assignee-chip" title="' + escapeHtml(n) + '">' +
+        '<span class="mn-assignee-avatar" aria-hidden="true">' + escapeHtml(assigneeInitials(n)) + "</span>" +
+        '<span class="mn-assignee-name">' + escapeHtml(n) + "</span></span>";
     }).join("") + "</div>";
+  }
+
+  function assigneeAvatarsHtml(names) {
+    if (!names || !names.length) return "";
+    const shown = names.slice(0, 4);
+    const extra = names.length - shown.length;
+    return '<div class="mn-assignee-avatars">' + shown.map(function (n) {
+      return '<span class="mn-assignee-avatar" title="' + escapeHtml(n) + '">' +
+        escapeHtml(assigneeInitials(n)) + "</span>";
+    }).join("") +
+      (extra > 0 ? '<span class="mn-assignee-avatar mn-assignee-avatar-more" title="' +
+        escapeHtml(names.slice(4).join(", ")) + '">+' + extra + "</span>" : "") +
+      "</div>";
+  }
+
+  function mergeItemIntoCache(item) {
+    if (!item || item.id == null) return false;
+    const id = parseInt(item.id, 10);
+    let found = false;
+    lastItemsCache = (lastItemsCache || []).map(function (it) {
+      if (it.id === id) {
+        found = true;
+        return Object.assign({}, it, item);
+      }
+      return it;
+    });
+    if (!found) lastItemsCache.push(item);
+    return true;
+  }
+
+  function applyRealtimeItemUpdate(payload) {
+    if (payload && payload.item && payload.item.id != null) {
+      mergeItemIntoCache(payload.item);
+      if ($("#mn-view-board") && !$("#mn-view-board").classList.contains("d-none")) {
+        renderBoard(lastItemsCache);
+      } else if ($("#mn-view-table") && !$("#mn-view-table").classList.contains("d-none")) {
+        renderTable(lastItemsCache);
+      }
+      return;
+    }
+    if (window.MN && window.MN.refreshItems) window.MN.refreshItems();
+    else refreshItems();
   }
 
   function buildLabelPicker(selectedIds, onChange) {
@@ -1589,13 +1677,24 @@
       mt.textContent = item.meeting_title;
       meta.appendChild(mt);
     }
+    if (item.source_item_id || (item.carry_forward_count && item.carry_forward_count > 0)) {
+      const cf = document.createElement("span");
+      cf.className = "mn-task-chip mn-task-chip-carried";
+      cf.title = item.source_meeting_title
+        ? ("Carried from " + item.source_meeting_title)
+        : "Carried forward";
+      cf.textContent = item.source_meeting_title
+        ? ("From: " + String(item.source_meeting_title).slice(0, 28))
+        : "Carried forward";
+      meta.appendChild(cf);
+    }
     card.appendChild(meta);
 
     const names = item.assignee_names || getAssigneeLabels(item.assignee_ids);
     if (names.length) {
       const assignWrap = document.createElement("div");
-      assignWrap.className = "mb-1";
-      assignWrap.innerHTML = assigneeChipsHtml(names);
+      assignWrap.className = "mb-1 mn-card-assignees";
+      assignWrap.innerHTML = assigneeAvatarsHtml(names);
       card.appendChild(assignWrap);
     }
 
@@ -1637,19 +1736,27 @@
       });
       statusSel.addEventListener("change", async function () {
         const newStatus = statusSel.value;
+        const prevStatus = item.status || "open";
+        const snapshot = lastItemsCache.map(function (it) { return Object.assign({}, it); });
+        mergeItemIntoCache(Object.assign({}, item, { status: newStatus }));
+        item.status = newStatus;
+        card.setAttribute("data-status", newStatus);
+        if (!hubMode) renderBoard(lastItemsCache);
         try {
           const res = await putActionItem(item.id, { status: newStatus, silent: true });
           if (!res.ok) throw new Error("Status update failed");
-          item.status = newStatus;
-          card.setAttribute("data-status", newStatus);
+          const data = await res.json().catch(function () { return null; });
+          if (data && data.id) mergeItemIntoCache(data);
           if (hubMode) await loadMyTasksHub();
-          else {
-            await refreshItems();
-            loadActivity();
-          }
+          else loadActivity();
         } catch (e) {
           console.error(e);
-          statusSel.value = item.status || "open";
+          lastItemsCache = snapshot;
+          item.status = prevStatus;
+          statusSel.value = prevStatus;
+          if (typeof showToast === "function") showToast("Could not update status", "error");
+          if (hubMode) await loadMyTasksHub();
+          else renderBoard(lastItemsCache);
         }
       });
       footer.appendChild(statusSel);
@@ -1775,11 +1882,24 @@
           empty.className = "mn-board-empty";
           empty.textContent = status === "done" ? "No completed tasks" : status === "in_progress" ? "No tasks in progress" : "No tasks yet";
           body.appendChild(empty);
-          return;
+        } else {
+          colItems.forEach(function (it) {
+            body.appendChild(buildTaskCard(it, { readOnly: readOnly, compact: hubMode }));
+          });
         }
-        colItems.forEach(function (it) {
-          body.appendChild(buildTaskCard(it, { readOnly: readOnly, compact: hubMode }));
-        });
+        if (!readOnly && canEditItems() && meetingNoteId) {
+          const addBtn = document.createElement("button");
+          addBtn.type = "button";
+          addBtn.className = "btn btn-sm mn-btn-ghost mn-board-add-card";
+          addBtn.setAttribute("data-status", status);
+          addBtn.innerHTML = '<i class="fas fa-plus me-1"></i>Add card';
+          addBtn.addEventListener("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            createBoardCard(status);
+          });
+          body.appendChild(addBtn);
+        }
       });
     }
     wireBoardDnD();
@@ -1843,6 +1963,7 @@
   async function handleBoardDrop(itemId, targetStatus, targetPlatform, beforeCard) {
     const item = lastItemsCache.find(function (it) { return it.id === itemId; });
     if (!item) return;
+    const snapshot = lastItemsCache.map(function (it) { return Object.assign({}, it); });
     const colItems = getColumnItemsForDrop(itemId, targetStatus, targetPlatform);
     let insertIdx = colItems.length;
     if (beforeCard && beforeCard.getAttribute("data-item-id")) {
@@ -1852,7 +1973,27 @@
     }
     const nextPlatform = targetPlatform ? normalizePlatformLabel(targetPlatform) : normalizePlatformLabel(item.platform);
     const platformChanged = normalizePlatformLabel(item.platform) !== nextPlatform;
-    colItems.splice(insertIdx, 0, Object.assign({}, item, { status: targetStatus, platform: nextPlatform }));
+    const moved = Object.assign({}, item, { status: targetStatus, platform: nextPlatform });
+    colItems.splice(insertIdx, 0, moved);
+
+    // Optimistic: update cache sort/status then re-render
+    const orderById = {};
+    colItems.forEach(function (it, idx) { orderById[it.id] = idx; });
+    lastItemsCache = lastItemsCache.map(function (it) {
+      if (it.id === itemId) {
+        return Object.assign({}, it, {
+          status: targetStatus,
+          platform: nextPlatform,
+          sort_order: orderById[it.id] != null ? orderById[it.id] : it.sort_order,
+        });
+      }
+      if (orderById[it.id] != null && (it.status || "open") === targetStatus) {
+        return Object.assign({}, it, { sort_order: orderById[it.id] });
+      }
+      return it;
+    });
+    renderBoard(lastItemsCache);
+
     try {
       if (platformChanged && item.focus_row_id) {
         const frRes = await putFocusRow(item.focus_row_id, { platform: nextPlatform, silent: true });
@@ -1861,14 +2002,56 @@
       await Promise.all(colItems.map(function (it, idx) {
         const payload = { sort_order: idx, silent: true };
         if (it.id === itemId) payload.status = targetStatus;
-        return putActionItem(it.id, payload);
+        return putActionItem(it.id, payload).then(function (res) {
+          if (!res.ok) throw new Error("Reorder failed");
+          return res;
+        });
       }));
-      await refreshItems();
       loadActivity();
     } catch (e) {
       console.error(e);
-      alert("Could not update task order");
-      await refreshItems();
+      lastItemsCache = snapshot;
+      renderBoard(lastItemsCache);
+      if (typeof showToast === "function") showToast("Could not update task order", "error");
+      else alert("Could not update task order");
+    }
+  }
+
+  async function createBoardCard(status) {
+    if (!meetingNoteId || !canEditItems()) return;
+    const st = status || "open";
+    try {
+      let focusRowId = null;
+      const rows = (window.MN && window.MN.focusRows) || (typeof MN_FOCUS_ROWS !== "undefined" ? MN_FOCUS_ROWS : []);
+      if (rows && rows.length) focusRowId = rows[0].id;
+      if (!focusRowId) {
+        const frRes = await fetch(API.focusRow(meetingNoteId), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ platform: "General", focus_area: "General", sort_order: 0 }),
+        });
+        if (!frRes.ok) throw new Error("Could not create focus row");
+        const fr = await frRes.json();
+        focusRowId = fr.id;
+        if (window.MN && Array.isArray(window.MN.focusRows)) {
+          window.MN.focusRows.push(fr);
+        }
+      }
+      const itemRes = await fetch(API.createItem(focusRowId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ call_to_action: "New action item", status: st }),
+      });
+      if (!itemRes.ok) throw new Error("Could not create item");
+      const item = await itemRes.json();
+      mergeItemIntoCache(item);
+      renderBoard(lastItemsCache);
+      openTaskPanel(item, false);
+      loadActivity();
+      if (typeof showToast === "function") showToast("Card added", "success");
+    } catch (e) {
+      console.error(e);
+      if (typeof showToast === "function") showToast("Could not add card", "error");
     }
   }
 
@@ -2420,7 +2603,7 @@
       if (!el) return;
       el.innerHTML = "";
       if (!items.length) {
-        el.innerHTML = '<p class="small text-muted mb-0">' + escapeHtml(emptyMsg) + "</p>";
+        el.innerHTML = '<div class="mn-empty-state">' + escapeHtml(emptyMsg) + "</div>";
         return;
       }
       items.slice(0, 8).forEach(function (it) {
@@ -2496,7 +2679,11 @@
         escapeHtml(it.meeting_title || "") + "</a><div class=\"text-muted\">" + escapeHtml(it.meeting_date || "") + "</div></td>" +
         "<td class=\"small\">" + escapeHtml(it.platform || "") + "</td>" +
         "<td class=\"small\">" + formatBulletsHtml(it.focus_area) + "</td>" +
-        "<td>" + formatBulletsHtml(it.call_to_action) + "</td>" +
+        "<td>" + formatBulletsHtml(it.call_to_action) +
+        (it.source_meeting_title
+          ? '<div class="small text-muted mt-1">Carried from ' + escapeHtml(it.source_meeting_title) + "</div>"
+          : (it.source_item_id ? '<div class="small text-muted mt-1">Carried forward</div>' : "")) +
+        "</td>" +
         "<td class=\"small\">" + formatBulletsHtml(it.expected_impact) + "</td>" +
         "<td class=\"small text-nowrap\">" + (it.start_date || "—") + " / " + (it.due_date || "—") + "</td>" +
         "<td class=\"small\">" + formatBulletsHtml(it.challenges) + "</td>" +
@@ -3926,12 +4113,12 @@
 
   async function emailMeetingReport() {
     if (!meetingNoteId) {
-      alert("Open a meeting to email a report.");
+      showToast("Open a meeting to email a report.", "error");
       return;
     }
     const recipientsRaw = (document.getElementById("mn-pdf-email-recipients") || {}).value || "";
     if (!recipientsRaw.trim()) {
-      alert("Enter at least one recipient email.");
+      showToast("Enter at least one recipient email.", "error");
       return;
     }
     const subject = ((document.getElementById("mn-pdf-email-subject") || {}).value || "").trim();
@@ -3970,12 +4157,12 @@
       });
       const data = await res.json().catch(function () { return {}; });
       if (!res.ok) {
-        alert(data.error || "Email send failed.");
+        showToast(data.error || "Email send failed.", "error");
         return;
       }
-      alert("Meeting report emailed. Sent: " + (data.sent || 0) + ", Failed: " + (data.failed || 0));
+      showToast("Meeting report emailed. Sent: " + (data.sent || 0) + ", Failed: " + (data.failed || 0), "success");
     } catch (e) {
-      alert("Could not send report email.");
+      showToast("Could not send report email.", "error");
     }
   }
 
@@ -4329,43 +4516,103 @@
     const cfPreview = $("#mn-cf-preview");
     const cfConfirm = $("#mn-btn-confirm-carry-forward");
     const cfMarkDone = $("#mn-cf-mark-done");
+    const cfChecklist = $("#mn-cf-checklist");
+    let cfSuggestions = [];
+
+    function selectedCarryItemIds() {
+      if (!cfChecklist) return [];
+      return $all(".mn-cf-item-chk:checked", cfChecklist)
+        .map(function (el) { return parseInt(el.value, 10); })
+        .filter(Boolean);
+    }
+
+    function renderCarryChecklist(suggestions) {
+      cfSuggestions = suggestions || [];
+      if (!cfChecklist) return;
+      if (!cfSuggestions.length) {
+        cfChecklist.innerHTML = '<p class="small text-muted mb-0">No open items on the source meeting.</p>';
+        return;
+      }
+      cfChecklist.innerHTML = cfSuggestions.map(function (s) {
+        const it = s.item || {};
+        const tags = s.tags || [];
+        const already = !!s.already_present || tags.indexOf("already_present") >= 0;
+        const tagHtml = tags.filter(function (t) { return t !== "already_present"; }).map(function (t) {
+          return '<span class="mn-task-chip mn-cf-tag">' + escapeHtml(t.replace(/_/g, " ")) + "</span>";
+        }).join(" ");
+        const title = (it.call_to_action || "Untitled").split("\n")[0].slice(0, 120);
+        return (
+          '<label class="mn-cf-item' + (already ? " mn-cf-item-disabled" : "") + '">' +
+          '<input type="checkbox" class="mn-cf-item-chk form-check-input" value="' + it.id + '" ' +
+          (already ? "disabled" : "checked") + " />" +
+          '<span class="mn-cf-item-body"><span class="mn-cf-item-title">' + escapeHtml(title) + "</span>" +
+          (already ? ' <span class="text-muted small">(already present)</span>' : "") +
+          (tagHtml ? '<span class="mn-cf-item-tags">' + tagHtml + "</span>" : "") +
+          "</span></label>"
+        );
+      }).join("");
+    }
 
     async function refreshCarryForwardPreview() {
       if (!cfSource || !cfPreview || !meetingNoteId) return;
       const fromId = parseInt(cfSource.value, 10);
       if (!fromId || isNaN(fromId)) {
         cfPreview.innerHTML = '<span class="text-muted">Select a source meeting.</span>';
+        if (cfChecklist) cfChecklist.innerHTML = "";
         if (cfConfirm) cfConfirm.disabled = true;
         return;
       }
       cfPreview.innerHTML = '<span class="text-muted">Loading preview…</span>';
       if (cfConfirm) cfConfirm.disabled = true;
       try {
-        const res = await fetch(API.carryForwardPreview(meetingNoteId, fromId), {
-          headers: { Accept: "application/json" },
-        });
-        const data = await res.json().catch(function () { return {}; });
-        if (!res.ok) {
+        const [prevRes, sugRes] = await Promise.all([
+          fetch(API.carryForwardPreview(meetingNoteId, fromId), { headers: { Accept: "application/json" } }),
+          fetch(API.carryForwardSuggestions(meetingNoteId, fromId), { headers: { Accept: "application/json" } }),
+        ]);
+        const data = await prevRes.json().catch(function () { return {}; });
+        const sugData = await sugRes.json().catch(function () { return {}; });
+        if (!prevRes.ok) {
           cfPreview.innerHTML = '<span class="text-danger">' + escapeHtml(data.error || "Could not load preview") + "</span>";
           return;
         }
+        renderCarryChecklist(sugData.suggestions || []);
         const count = data.count || 0;
         const skipped = data.skipped_duplicate || 0;
-        let html = "<strong>" + count + "</strong> item" + (count === 1 ? "" : "s") + " will be imported";
+        let html = "<strong>" + count + "</strong> item" + (count === 1 ? "" : "s") + " can be imported";
         if (data.from_meeting_title) {
           html += " from <em>" + escapeHtml(data.from_meeting_title) + "</em>";
         }
         if (skipped) {
-          html += '. <span class="text-muted">' + skipped + " skipped (already on this meeting).</span>";
+          html += '. <span class="text-muted">' + skipped + " already on this meeting.</span>";
         }
         if (!count) {
           html = "No new items to import" + (skipped ? " (" + skipped + " duplicates skipped)." : ".");
         }
         cfPreview.innerHTML = html;
-        if (cfConfirm) cfConfirm.disabled = count < 1;
+        if (cfConfirm) cfConfirm.disabled = selectedCarryItemIds().length < 1;
       } catch (e) {
         cfPreview.innerHTML = '<span class="text-danger">Preview failed.</span>';
       }
+    }
+
+    if (cfChecklist) {
+      cfChecklist.addEventListener("change", function () {
+        if (cfConfirm) cfConfirm.disabled = selectedCarryItemIds().length < 1;
+      });
+    }
+    const cfSelectAll = $("#mn-cf-select-all");
+    const cfSelectNone = $("#mn-cf-select-none");
+    if (cfSelectAll) {
+      cfSelectAll.addEventListener("click", function () {
+        $all(".mn-cf-item-chk:not(:disabled)", cfChecklist).forEach(function (el) { el.checked = true; });
+        if (cfConfirm) cfConfirm.disabled = selectedCarryItemIds().length < 1;
+      });
+    }
+    if (cfSelectNone) {
+      cfSelectNone.addEventListener("click", function () {
+        $all(".mn-cf-item-chk", cfChecklist).forEach(function (el) { el.checked = false; });
+        if (cfConfirm) cfConfirm.disabled = true;
+      });
     }
 
     if (cfSource) {
@@ -4379,8 +4626,17 @@
         if (!cfSource) return;
         const fromId = parseInt(cfSource.value, 10);
         if (!fromId || isNaN(fromId)) return;
+        const itemIds = selectedCarryItemIds();
+        if (!itemIds.length) {
+          showToast("Select at least one item to import.", "error");
+          return;
+        }
         cfConfirm.disabled = true;
-        const body = { from_meeting_id: fromId, mark_source_done: !!(cfMarkDone && cfMarkDone.checked) };
+        const body = {
+          from_meeting_id: fromId,
+          mark_source_done: !!(cfMarkDone && cfMarkDone.checked),
+          item_ids: itemIds,
+        };
         const res = await fetch(API.carryForward(meetingNoteId), {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -4389,13 +4645,13 @@
         const data = await res.json().catch(function () { return {}; });
         cfConfirm.disabled = false;
         if (!res.ok) {
-          alert(data.error || "Carry forward failed");
+          showToast(data.error || "Carry forward failed", "error");
           return;
         }
         let msg = "Added " + (data.created || 0) + " item(s).";
         if (data.skipped) msg += " Skipped " + data.skipped + " duplicate(s).";
         if (data.marked_source_done) msg += " Marked " + data.marked_source_done + " source item(s) done.";
-        alert(msg);
+        showToast(msg, "success");
         if (cfModal && window.bootstrap) bootstrap.Modal.getOrCreateInstance(cfModal).hide();
         refreshItems();
         loadActivity();
@@ -4403,21 +4659,163 @@
       });
     }
 
-    const dupBtn = $("#mn-btn-duplicate-meeting");
-    if (dupBtn) {
-      dupBtn.addEventListener("click", async function () {
-        const title = prompt("Title for duplicated meeting:", (typeof MN_MEETING_TITLE === "string" ? MN_MEETING_TITLE : "") + " (copy)");
-        if (!title) return;
-        const res = await fetch(API.duplicateMeeting(meetingNoteId), {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ title: title, copy_items: true, copy_open_only: false }),
-        });
-        const data = await res.json().catch(function () { return {}; });
-        if (!res.ok) { alert(data.error || "Duplicate failed"); return; }
-        window.location.href = "/meeting-notes/" + data.id + "?view=board";
+    const dupModal = document.getElementById("mnDuplicateModal");
+    const dupConfirm = $("#mn-btn-confirm-duplicate");
+    if (dupConfirm) {
+      dupConfirm.addEventListener("click", async function () {
+        const titleEl = $("#mn-dup-title");
+        const dateEl = $("#mn-dup-date");
+        const title = ((titleEl && titleEl.value) || "").trim() ||
+          ((typeof MN_MEETING_TITLE === "string" ? MN_MEETING_TITLE : "Meeting") + " (copy)");
+        const meetingDate = (dateEl && dateEl.value) || null;
+        const modeEl = document.querySelector('input[name="mn-dup-mode"]:checked');
+        const mode = modeEl ? modeEl.value : "open";
+        const payload = {
+          title: title,
+          meeting_date: meetingDate,
+          structure_only: mode === "structure",
+          copy_items: mode !== "structure",
+          copy_open_only: mode === "open",
+        };
+        dupConfirm.disabled = true;
+        try {
+          const res = await fetch(API.duplicateMeeting(meetingNoteId), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json().catch(function () { return {}; });
+          if (!res.ok) {
+            showToast(data.error || "Duplicate failed", "error");
+            dupConfirm.disabled = false;
+            return;
+          }
+          showToast("Meeting duplicated", "success");
+          window.location.href = "/meeting-notes/" + data.id + "?view=board";
+        } catch (e) {
+          showToast("Duplicate failed", "error");
+          dupConfirm.disabled = false;
+        }
       });
     }
+
+    function initEmailAttendeesModal() {
+      const chipsHost = $("#mn-email-recipient-chips");
+      const guestNote = $("#mn-email-guest-note");
+      const attendees = Array.isArray(window.MN_ATTENDEE_EMAILS) ? window.MN_ATTENDEE_EMAILS.slice() : [];
+      let selected = attendees.filter(function (a) { return a && a.email; }).map(function (a) {
+        return { email: String(a.email).toLowerCase(), name: a.name || a.email };
+      });
+      const guests = Array.isArray(window.MN_MEETING_GUEST_NAMES) ? window.MN_MEETING_GUEST_NAMES : [];
+
+      function renderChips() {
+        if (!chipsHost) return;
+        if (!selected.length) {
+          chipsHost.innerHTML = '<span class="small text-muted">No attendee emails on file.</span>';
+          return;
+        }
+        chipsHost.innerHTML = selected.map(function (r, idx) {
+          return (
+            '<span class="mn-recipient-chip" data-idx="' + idx + '">' +
+            escapeHtml(r.name || r.email) +
+            ' <button type="button" class="mn-recipient-chip-remove" aria-label="Remove">&times;</button></span>'
+          );
+        }).join("");
+      }
+
+      if (chipsHost) {
+        chipsHost.addEventListener("click", function (e) {
+          const btn = e.target.closest(".mn-recipient-chip-remove");
+          if (!btn) return;
+          const chip = btn.closest(".mn-recipient-chip");
+          const idx = chip ? parseInt(chip.getAttribute("data-idx"), 10) : -1;
+          if (idx >= 0) {
+            selected.splice(idx, 1);
+            renderChips();
+          }
+        });
+      }
+      if (guestNote) {
+        guestNote.textContent = guests.length
+          ? (guests.length + " guest(s) have no email on file and will not be emailed: " + guests.join(", "))
+          : "";
+      }
+
+      const emailModal = document.getElementById("mnEmailAttendeesModal");
+      if (emailModal) {
+        emailModal.addEventListener("shown.bs.modal", function () {
+          selected = attendees.filter(function (a) { return a && a.email; }).map(function (a) {
+            return { email: String(a.email).toLowerCase(), name: a.name || a.email };
+          });
+          renderChips();
+        });
+      }
+
+      const sendBtn = $("#mn-btn-send-attendee-email");
+      if (sendBtn) {
+        sendBtn.addEventListener("click", async function () {
+          if (!meetingNoteId) return;
+          const extra = (($("#mn-email-extra-recipients") || {}).value || "");
+          const subject = (($("#mn-email-attendees-subject") || {}).value || "").trim();
+          const includeAssignees = !!($("#mn-email-include-assignees") || {}).checked;
+          const emails = selected.map(function (r) { return r.email; });
+          if (extra) emails.push(extra);
+          if (!emails.length && !includeAssignees) {
+            showToast("Add at least one recipient email.", "error");
+            return;
+          }
+          sendBtn.disabled = true;
+          try {
+            const res = await fetch(API.emailReport(meetingNoteId), {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({
+                email_attendees: true,
+                include_assignees: includeAssignees,
+                recipients: emails.join(","),
+                subject: subject || undefined,
+                pdf_format: "minutes",
+              }),
+            });
+            const data = await res.json().catch(function () { return {}; });
+            if (!res.ok) {
+              showToast(data.error || "Email send failed.", "error");
+              sendBtn.disabled = false;
+              return;
+            }
+            showToast("Meeting updates emailed. Sent: " + (data.sent || 0), "success");
+            if (emailModal && window.bootstrap) bootstrap.Modal.getOrCreateInstance(emailModal).hide();
+            loadActivity();
+          } catch (e) {
+            showToast("Could not send email.", "error");
+          }
+          sendBtn.disabled = false;
+        });
+      }
+    }
+    initEmailAttendeesModal();
+
+    async function shareMeetingToSlack() {
+      if (!meetingNoteId) return;
+      try {
+        const res = await fetch(API.shareSlack(meetingNoteId), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({}),
+        });
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+          showToast(data.error || "Slack share failed", "error");
+          return;
+        }
+        showToast("Shared to Slack", "success");
+        loadActivity();
+      } catch (e) {
+        showToast("Slack share failed", "error");
+      }
+    }
+    const slackBtn = $("#mn-btn-share-slack");
+    if (slackBtn) slackBtn.addEventListener("click", shareMeetingToSlack);
 
     const bulkApply = $("#mn-bulk-apply");
     if (bulkApply) {
@@ -4425,7 +4823,7 @@
         const ids = $all(".mn-row-chk:checked").map(function (c) {
           return parseInt(c.getAttribute("data-item-id"), 10);
         }).filter(Boolean);
-        if (!ids.length) { alert("Select rows first."); return; }
+        if (!ids.length) { showToast("Select rows first.", "error"); return; }
         const payload = { item_ids: ids };
         const st = ($("#mn-bulk-status") || {}).value;
         if (st) payload.status = st;
@@ -4436,7 +4834,7 @@
           headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) { alert("Bulk update failed"); return; }
+        if (!res.ok) { showToast("Bulk update failed", "error"); return; }
         refreshItems();
         loadActivity();
       });
@@ -4502,6 +4900,16 @@
       if (emailExp) {
         emailExp.addEventListener("click", emailMeetingReport);
       }
+      const exportModal = document.getElementById("mnExportModal");
+      if (exportModal) {
+        exportModal.addEventListener("shown.bs.modal", function () {
+          const recip = document.getElementById("mn-pdf-email-recipients");
+          if (!recip || (recip.value || "").trim()) return;
+          const attendees = Array.isArray(window.MN_ATTENDEE_EMAILS) ? window.MN_ATTENDEE_EMAILS : [];
+          const emails = attendees.map(function (a) { return a && a.email; }).filter(Boolean);
+          if (emails.length) recip.value = emails.join(", ");
+        });
+      }
     }
 
     const agendaAutofill = $("#mn-btn-agenda-autofill");
@@ -4551,5 +4959,9 @@
     getViewFromUrl: getViewFromUrl,
     setUrlView: setUrlView,
     getItemsCache: function () { return lastItemsCache; },
+    applyRealtimeItemUpdate: applyRealtimeItemUpdate,
+    getBoardGroupMode: function () { return boardGroupMode; },
+    setBoardGroupMode: setBoardGroupMode,
+    showToast: typeof showToast === "function" ? showToast : function () {},
   };
 })();

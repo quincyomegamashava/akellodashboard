@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Help Desk — Email{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/help_desk.css') }}">
+{% endblock %}
+{% block content %}
+<div class="hd-app-shell">
+  <div class="hd-page">
+    <header class="hd-subheader">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div>
+          <h1 class="hd-hero-title mb-0">Email tickets</h1>
+          <p class="hd-hero-sub">Tickets ingested from the helpdesk mailbox.</p>
+        </div>
+        {% if hd_is_agent %}
+        <button type="button" class="btn hd-btn-primary btn-sm" id="hd-email-sync">Sync inbox now</button>
+        {% endif %}
+      </div>
+      {% set hd_active = 'email' %}
+      {% include "help_desk/_subnav.html" %}
+    </header>
+    <div id="hd-email-status" class="hd-muted mb-2"></div>
+    <div class="hub-glass hd-table-wrap">
+      <table class="hd-table">
+        <thead>
+          <tr>
+            <th>Subject</th>
+            <th>From</th>
+            <th>Status</th>
+            <th>Priority</th>
+            <th>Received</th>
+          </tr>
+        </thead>
+        <tbody id="hd-email-body">
+          <tr><td colspan="5" class="hd-muted text-center py-4">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% include "help_desk/_app_shell.html" %}
+  {% include "help_desk/_new_ticket_modal.html" %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/help_desk.js') }}"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { HD.initEmail(); });</script>
+{% endblock %}

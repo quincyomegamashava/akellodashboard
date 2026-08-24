@@ -5,30 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Play Game</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+  <script src="{{ url_for('static', filename='js/quiz_math.js') }}"></script>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: #ffffff;
       min-height: 100vh;
+      color: #0f172a;
     }
-    
+
     .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 16px 0;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      background: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 14px 0;
       position: sticky;
       top: 0;
       z-index: 100;
     }
-    
+
     .header-content {
       max-width: 1400px;
       margin: 0 auto;
@@ -36,171 +36,180 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 16px;
     }
-    
+
     .header h2 {
-      font-size: 20px;
-      font-weight: 600;
+      font-size: 17px;
+      font-weight: 700;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+      color: #0f172a;
+      min-width: 0;
     }
-    
+
+    .header h2 span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .header h2 i { color: #0f172a; }
+
+    .theme-chip {
+      display: none;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+    @media (min-width: 768px) {
+      .theme-chip { display: inline-flex; align-items: center; gap: 6px; }
+    }
+
     .back-btn {
-      background: rgba(255, 255, 255, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      color: white;
-      padding: 10px 20px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+      padding: 9px 16px;
       border-radius: 10px;
       cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.3s ease;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
       display: flex;
       align-items: center;
       gap: 8px;
       text-decoration: none;
+      white-space: nowrap;
     }
-    
+
     .back-btn:hover {
-      background: rgba(255, 255, 255, 0.3);
-      transform: translateY(-2px);
+      border-color: #0f172a;
+      color: #0f172a;
+      background: #f8fafc;
     }
-    
+
     .game-container {
       max-width: 1400px;
-      margin: 32px auto;
+      margin: 28px auto;
       padding: 0 24px;
     }
-    
+
     #gameContainer {
-      background: white;
-      border-radius: 20px;
-      padding: 32px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px rgba(15, 23, 42, 0.05);
       min-height: 500px;
     }
-    
-    #gameContent {
-      position: relative;
-    }
-    
+
     .loading-state {
       text-align: center;
       padding: 80px 20px;
-      color: #a0aec0;
+      color: #94a3b8;
     }
-    
+
     .loading-state i {
-      font-size: 48px;
+      font-size: 40px;
       margin-bottom: 16px;
+      color: #64748b;
       animation: spin 1s linear infinite;
     }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     #scoreSubmissionStatus {
       display: none;
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(10px);
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(6px);
       z-index: 1000;
       align-items: center;
       justify-content: center;
     }
-    
-    #scoreSubmissionStatus.show {
-      display: flex;
-    }
-    
+
+    #scoreSubmissionStatus.show { display: flex; }
+
     .status-modal {
       background: white;
       border-radius: 20px;
-      padding: 48px;
-      max-width: 500px;
+      padding: 40px 36px;
+      max-width: 440px;
       width: 90%;
       text-align: center;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      animation: slideUp 0.4s ease-out;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+      animation: slideUp 0.35s ease-out;
+      border: 1px solid #e2e8f0;
     }
-    
+
     @keyframes slideUp {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-    
+
     .status-icon {
-      width: 80px;
-      height: 80px;
+      width: 72px;
+      height: 72px;
       border-radius: 50%;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 24px;
-      font-size: 40px;
+      margin-bottom: 20px;
+      font-size: 32px;
     }
-    
-    .status-icon.success {
-      background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-      color: white;
-    }
-    
-    .status-icon.error {
-      background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
-      color: white;
-    }
-    
-    .status-icon.loading {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-    
-    .status-icon.loading i {
-      animation: spin 1s linear infinite;
-    }
-    
+
+    .status-icon.success { background: #f1f5f9; color: #0f172a; }
+    .status-icon.error { background: #fee2e2; color: #e11d48; }
+    .status-icon.loading { background: #f8fafc; color: #475569; }
+    .status-icon.loading i { animation: spin 1s linear infinite; }
+
     #statusTitle {
-      font-size: 24px;
-      font-weight: 700;
-      color: #1a202c;
-      margin-bottom: 12px;
+      font-size: 22px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 10px;
     }
-    
+
     #statusMessage {
-      font-size: 16px;
-      color: #718096;
-      margin-bottom: 32px;
+      font-size: 15px;
+      color: #64748b;
+      margin-bottom: 28px;
       line-height: 1.6;
     }
-    
+
     .status-btn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: #0f172a;
       color: white;
       border: none;
-      padding: 14px 32px;
+      padding: 12px 28px;
       border-radius: 12px;
-      font-size: 16px;
-      font-weight: 600;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: inherit;
       cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      transition: background 0.2s;
     }
-    
-    .status-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+
+    .status-btn:hover { background: #1e293b; }
+
+    .sparkle {
+      position: fixed;
+      pointer-events: none;
+      font-size: 14px;
+      z-index: 1100;
+      animation: sparkleOut 0.9s ease-out forwards;
+    }
+    @keyframes sparkleOut {
+      0% { opacity: 1; transform: translate(0, 0) scale(1); }
+      100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.4); }
     }
   </style>
 </head>
@@ -211,8 +220,9 @@
         <i class="fas fa-gamepad"></i>
         <span id="gameTitleHeader">Game</span>
       </h2>
+      <span class="theme-chip">Powering Growth</span>
       <a href="/game-dashboard" class="back-btn">
-        <i class="fas fa-arrow-left"></i> Back to Dashboard
+        <i class="fas fa-arrow-left"></i> Dashboard
       </a>
     </div>
   </div>
@@ -222,7 +232,7 @@
       <div id="gameContent">
         <div class="loading-state">
           <i class="fas fa-spinner"></i>
-          <p>Loading game...</p>
+          <p>Loading game…</p>
         </div>
       </div>
     </div>
@@ -249,6 +259,23 @@
       window.location.href = '/game-login';
     }
 
+    function burstSparkles() {
+      const icons = ['✦', '✧', '★'];
+      for (let i = 0; i < 10; i++) {
+        const el = document.createElement('span');
+        el.className = 'sparkle';
+        el.textContent = icons[i % icons.length];
+        const dx = (Math.random() - 0.5) * 160;
+        const dy = -40 - Math.random() * 100;
+        el.style.setProperty('--dx', dx + 'px');
+        el.style.setProperty('--dy', dy + 'px');
+        el.style.left = (50 + (Math.random() - 0.5) * 20) + 'vw';
+        el.style.top = '45vh';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 950);
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
       await loadGame();
       setupScoreSubmission();
@@ -259,46 +286,48 @@
         const r = await fetch(`/api/games/${gameId}`);
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || 'Failed to load game');
-        
+
         document.getElementById('gameTitleHeader').textContent = data.game.title;
         const container = document.getElementById('gameContent');
-        
-        // Parse the HTML to separate content, styles, and scripts
+
         const parser = new DOMParser();
         const doc = parser.parseFromString(data.game.html_content, 'text/html');
-        
-        // Extract styles from head
+
         const styles = Array.from(doc.querySelectorAll('style'));
         const styleContents = styles.map(style => style.textContent);
-        
-        // Extract scripts before removing them
+
         const scripts = Array.from(doc.querySelectorAll('script'));
         const scriptContents = scripts.map(script => ({
           src: script.src,
           text: script.textContent,
           type: script.type
-        }));
-        
-        // Remove scripts and styles from the document
+        })).filter((s) => !/katex|quiz_math/i.test(s.src || ''));
+
         scripts.forEach(script => script.remove());
         styles.forEach(style => style.remove());
-        
-        // Inject styles into the page head
+
         styleContents.forEach(styleText => {
           const styleElement = document.createElement('style');
           styleElement.textContent = styleText;
           document.head.appendChild(styleElement);
         });
-        
-        // Inject the HTML content (without scripts and styles)
+        const themeOverride = document.createElement('style');
+        themeOverride.textContent = `
+          body { background: #ffffff !important; color: #0f172a !important; }
+          .choice.sel { border-color: #0f172a !important; background: #f8fafc !important; }
+          .choice.ok { border-color: #334155 !important; background: #f1f5f9 !important; }
+          .pip.on { background: #0f172a !important; }
+          #nextBtn { background: #0f172a !important; color: #fff !important; }
+          #checkBtn { background: #1e293b !important; color: #fff !important; }
+        `;
+        document.head.appendChild(themeOverride);
+
         container.innerHTML = doc.body.innerHTML;
-        
-        // Execute scripts after content is loaded, in order
+        if (window.QuizMath) window.QuizMath.watch(container);
+
         scriptContents.forEach(scriptData => {
           const newScript = document.createElement('script');
-          if (scriptData.type) {
-            newScript.type = scriptData.type;
-          }
+          if (scriptData.type) newScript.type = scriptData.type;
           if (scriptData.src) {
             newScript.src = scriptData.src;
             newScript.onload = () => {
@@ -309,16 +338,13 @@
           }
           container.appendChild(newScript);
         });
-        
-        // If no external scripts, inject score submission after a short delay
+
         if (scriptContents.every(s => !s.src)) {
-          setTimeout(() => {
-            injectScoreSubmissionScript(data.game);
-          }, 200);
+          setTimeout(() => injectScoreSubmissionScript(data.game), 200);
         }
       } catch (e) {
-        document.getElementById('gameContent').innerHTML = 
-          '<div style="text-align:center; padding:48px; color:#e53e3e;"><i class="fas fa-exclamation-triangle" style="font-size:48px; margin-bottom:16px;"></i><p>Error loading game: ' + e.message + '</p></div>';
+        document.getElementById('gameContent').innerHTML =
+          '<div style="text-align:center; padding:48px; color:#e11d48;"><i class="fas fa-exclamation-triangle" style="font-size:40px; margin-bottom:16px;"></i><p>Error loading game: ' + e.message + '</p></div>';
       }
     }
 
@@ -329,27 +355,21 @@
             window.submitGameScore(gameId, score, maxScore || game.max_score || null);
           }
         };
-        
-        const checkBtn = document.getElementById('checkBtn');
-        if (checkBtn) {
-          const newCheckBtn = checkBtn.cloneNode(true);
-          checkBtn.parentNode.replaceChild(newCheckBtn, checkBtn);
-          
-          newCheckBtn.addEventListener('click', function(e) {
+
+        const root = document.getElementById('gameContent');
+        if (root && !root.dataset.scoreClickBound) {
+          root.dataset.scoreClickBound = '1';
+          root.addEventListener('click', function(e) {
+            const btn = e.target.closest('#checkBtn');
+            if (!btn || btn.disabled) return;
             setTimeout(() => {
               const scoreBox = document.getElementById('scoreBox');
-              if (scoreBox) {
-                const text = scoreBox.textContent || '';
-                const match = text.match(/Score:\s*(\d+)\s*\/\s*(\d+)/i);
-                if (match) {
-                  const score = parseInt(match[1]);
-                  const maxScore = parseInt(match[2]);
-                  if (window.gameScoreSubmit) {
-                    window.gameScoreSubmit(score, maxScore);
-                  }
-                }
+              if (!scoreBox) return;
+              const match = (scoreBox.textContent || '').match(/Score:\s*(\d+)\s*\/\s*(\d+)/i);
+              if (match && window.gameScoreSubmit) {
+                window.gameScoreSubmit(parseInt(match[1]), parseInt(match[2]));
               }
-            }, 1000);
+            }, 400);
           });
         }
       }, 500);
@@ -357,12 +377,14 @@
 
     function setupScoreSubmission() {
       window.submitGameScore = async function(gameId, score, maxScore) {
+        if (window._gameScoreSubmitting) return;
+        window._gameScoreSubmitting = true;
         const statusDiv = document.getElementById('scoreSubmissionStatus');
         const statusTitle = document.getElementById('statusTitle');
         const statusMessage = document.getElementById('statusMessage');
         const statusIcon = document.getElementById('statusIcon');
         const statusBtn = document.getElementById('statusBtn');
-        
+
         statusDiv.classList.add('show');
         statusIcon.className = 'status-icon loading';
         statusIcon.innerHTML = '<i class="fas fa-spinner"></i>';
@@ -394,17 +416,19 @@
           });
           const data = await r.json();
           if (!r.ok) throw new Error(data.error || 'Failed to submit score');
-          
+
           statusIcon.className = 'status-icon success';
           statusIcon.innerHTML = '<i class="fas fa-check"></i>';
           statusTitle.textContent = 'Score Submitted!';
           statusMessage.innerHTML = `
-            <strong style="font-size: 20px; color: #48bb78;">${score}${maxScore ? ' / ' + maxScore : ''}</strong><br>
-            ${data.score && data.score.percentage ? '<span style="color: #718096;">Percentage: ' + data.score.percentage.toFixed(1) + '%</span>' : ''}<br><br>
-            Great job! Your score has been saved.
+            <strong style="font-size: 22px; color: #0f172a;">${score}${maxScore ? ' / ' + maxScore : ''}</strong><br>
+            ${data.score && data.score.percentage ? '<span style="color: #64748b;">Percentage: ' + data.score.percentage.toFixed(1) + '%</span>' : ''}<br><br>
+            Great job — keep growing!
           `;
           statusBtn.style.display = 'block';
+          burstSparkles();
         } catch (e) {
+          window._gameScoreSubmitting = false;
           statusIcon.className = 'status-icon error';
           statusIcon.innerHTML = '<i class="fas fa-times"></i>';
           statusTitle.textContent = 'Error';

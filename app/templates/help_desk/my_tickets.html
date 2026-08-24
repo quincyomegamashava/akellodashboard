@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Help Desk — My tickets{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/help_desk.css') }}">
+{% endblock %}
+{% block content %}
+<div class="hd-app-shell">
+  <div class="hd-page">
+    <header class="hd-subheader">
+      <div>
+        <h1 class="hd-hero-title mb-0">My tickets</h1>
+        <p class="hd-hero-sub d-none d-md-block">Tickets you submitted.</p>
+      </div>
+      {% set hd_active = 'my' %}
+      {% include "help_desk/_subnav.html" %}
+    </header>
+    <div class="hub-glass hd-table-wrap">
+      <table class="hd-table">
+        <thead>
+          <tr>
+            <th>Ticket</th>
+            <th>Status</th>
+            <th>Priority</th>
+            <th>Category</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody id="hd-my-body">
+          <tr><td colspan="5" class="hd-muted text-center py-4">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% include "help_desk/_app_shell.html" %}
+  {% include "help_desk/_new_ticket_modal.html" %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/help_desk.js') }}"></script>
+<script>document.addEventListener('DOMContentLoaded', function () { HD.initMyTickets(); });</script>
+{% endblock %}

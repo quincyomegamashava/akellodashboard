@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HBC: Exam Simulation Desk</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --ink: #1c2430;
+      --muted: #5c6b7a;
+      --line: #d5dbe3;
+      --accent: #1f5f8b;
+      --ok: #1f7a4c;
+      --bad: #a33b3b;
+      --track: #eef1f5;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", "Calibri", "Candara", system-ui, sans-serif;
+      background: linear-gradient(180deg, #e9eef3 0%, var(--bg) 40%);
+      color: var(--ink);
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.45;
+    }
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: start;
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--line);
+    }
+    h1 { font-size: 1.4rem; font-weight: 700; color: var(--ink); }
+    .sub { color: var(--muted); font-size: 0.88rem; margin-top: 4px; max-width: 520px; }
+    .kbd {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      background: var(--track);
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--line);
+    }
+    #scoreBox {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      min-width: 120px;
+      text-align: center;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(28, 36, 48, 0.04);
+    }
+    h2 {
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+    .qmeta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .tag {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--track);
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+    #stem { font-size: 1.02rem; margin-bottom: 12px; }
+    .choices { display: flex; flex-direction: column; gap: 8px; }
+    .choice {
+      text-align: left;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      background: #fafbfc;
+      color: var(--ink);
+      border-radius: 6px;
+      cursor: pointer;
+      min-height: 44px;
+      font-size: 0.95rem;
+    }
+    .choice:hover { border-color: var(--accent); }
+    .choice.sel { outline: 2px solid var(--accent); border-color: var(--accent); background: #eef5fa; }
+    .choice.ok { border-color: var(--ok); background: #e8f5ee; }
+    .choice.bad { border-color: var(--bad); background: #f8ecec; }
+    .num-wrap { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .num-wrap label { font-size: 0.85rem; color: var(--muted); }
+    input[type="number"] {
+      width: 160px;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      min-height: 44px;
+      background: #fff;
+      color: var(--ink);
+    }
+    .feedback {
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--track);
+      border-radius: 6px;
+      border-left: 3px solid var(--accent);
+      font-size: 0.88rem;
+      min-height: 88px;
+      white-space: pre-wrap;
+    }
+    .feedback.correct { border-left-color: var(--ok); }
+    .feedback.wrong { border-left-color: var(--bad); }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .act {
+      min-height: 42px;
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #fff;
+      color: var(--ink);
+    }
+    #lockBtn { background: var(--accent); color: #fff; border-color: var(--accent); }
+    #checkBtn { background: var(--ok); color: #fff; border-color: var(--ok); }
+    #checkBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.86rem;
+    }
+    .metric:last-of-type { border-bottom: none; }
+    .metric span { color: var(--muted); }
+    .metric strong { font-variant-numeric: tabular-nums; text-align: right; }
+    .acc-bar {
+      height: 8px;
+      background: #e2e8ef;
+      border-radius: 4px;
+      margin: 10px 0 4px;
+      overflow: hidden;
+    }
+    .acc-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.25s ease;
+    }
+    .note {
+      margin-top: 12px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    @media (max-width: 800px) {
+      header, .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>HBC: Exam Simulation Desk</h1>
+        <p class="sub">Combined Science — exam-aligned kinematics and mole calculations (Zimbabwe-style wording). High-stakes problem loops.</p>
+        <p class="kbd">Shortcuts: 1–4 select · Enter submit answer · N next (after mark) · S submit score when enabled</p>
+      </div>
+      <div id="scoreBox">Score: 0 / 10</div>
+    </header>
+    <div class="grid">
+      <section class="panel" aria-labelledby="qTitle">
+        <h2 id="qTitle">Examination item</h2>
+        <div class="qmeta">
+          <span class="tag" id="roundTag">Item 1 / 10</span>
+          <span class="tag" id="topicTag">—</span>
+          <span class="tag" id="formulaTag">—</span>
+        </div>
+        <p id="stem"></p>
+        <div id="answerArea"></div>
+        <div class="feedback" id="feedback" aria-live="polite"></div>
+        <div class="actions">
+          <button type="button" class="act" id="lockBtn">Submit answer (Enter)</button>
+          <button type="button" class="act" id="nextBtn" disabled>Next (N)</button>
+          <button type="button" class="act" id="checkBtn" disabled>Submit score (S)</button>
+        </div>
+      </section>
+      <aside class="panel" aria-labelledby="anTitle">
+        <h2 id="anTitle">Analytics</h2>
+        <div class="metric"><span>Learning area</span><strong>Combined Science</strong></div>
+        <div class="metric"><span>Age range</span><strong>17-19</strong></div>
+        <div class="metric"><span>Round</span><strong id="mRound">1 / 10</strong></div>
+        <div class="metric"><span>Score</span><strong id="mScore">0 / 10</strong></div>
+        <div class="metric"><span>Attempts</span><strong id="mAtt">0</strong></div>
+        <div class="metric"><span>Accuracy</span><strong id="mAcc">—</strong></div>
+        <div class="acc-bar" aria-hidden="true"><div class="acc-fill" id="accFill"></div></div>
+        <div class="metric"><span>Formula in play</span><strong id="mForm">—</strong></div>
+        <div class="metric"><span>Last error class</span><strong id="mErr">—</strong></div>
+        <div class="metric"><span>Misapplied rule</span><strong id="mRule">—</strong></div>
+        <p class="note">Diagnostics name the exact misapplied formula or concept after each incorrect response.</p>
+      </aside>
+    </div>
+  </div>
+  <script>
+    const CONTENT = {
+      learningArea: "Combined Science",
+      topic: "Exam-aligned kinematics and mole calculations (Zimbabwe exam-style wording)",
+      ageRange: "17-19",
+      totalRounds: 10,
+      maxScore: 10,
+      questionPool: [
+        {
+          id: "suvat_s",
+          topic: "Kinematics",
+          formula: "s = ut + ½at²",
+          type: "mcq",
+          build: function () {
+            var u = ri(2, 18);
+            var a = ri(1, 6);
+            var t = ri(2, 8);
+            var truth = r2(u * t + 0.5 * a * t * t);
+            var forgotHalf = r2(u * t + a * t * t);
+            var usedVt = r2(u + a * t);
+            var usedVu = r2(u * t);
+            var opts = uniqueOpts([truth, forgotHalf, usedVt, usedVu]);
+            return {
+              stem: "A minibus leaves a rank in Harare with initial velocity u = " + u + " m/s and constant acceleration a = " + a + " m/s². Calculate the displacement s after t = " + t + " s. [Use s = ut + ½at².]",
+              answer: truth,
+              options: opts,
+              steps: "s = ut + ½at² = (" + u + ")(" + t + ") + ½(" + a + ")(" + t + ")² = " + (u * t) + " + " + r2(0.5 * a * t * t) + " = " + truth + " m.",
+              errMap: buildErrMap([
+                [forgotHalf, "forgotHalf", "s = ut + at² (dropped the ½ in ½at²)"],
+                [usedVt, "usedVt", "v = u + at (final speed) used instead of displacement"],
+                [usedVu, "usedVu", "s = ut only (ignored acceleration term)"]
+              ]),
+              unit: "m"
+            };
+          }
+        },
+        {
+          id: "suvat_v",
+          topic: "Kinematics",
+          formula: "v = u + at",
+          type: "mcq",
+          build: function () {
+            var u = ri(0, 20);
+            var a = ri(1, 5);
+            var t = ri(2, 10);
+            var truth = r2(u + a * t);
+            var usedS = r2(u * t + 0.5 * a * t * t);
+            var minus = r2(u - a * t);
+            var product = r2(u * a * t);
+            var opts = uniqueOpts([truth, usedS, minus, product]);
+            return {
+              stem: "A learner on a bicycle along Samora Machel Avenue starts at u = " + u + " m/s and accelerates at a = " + a + " m/s² for t = " + t + " s. Find the final velocity v.",
+              answer: truth,
+              options: opts,
+              steps: "v = u + at = " + u + " + (" + a + ")(" + t + ") = " + truth + " m/s.",
+              errMap: buildErrMap([
+                [usedS, "usedS_for_v", "s = ut + ½at² applied where v = u + at was required"],
+                [minus, "wrong_sign", "Used v = u − at (incorrect sign for speeding up)"],
+                [product, "multiplied_uat", "Multiplied u·a·t instead of adding u + at"]
+              ]),
+              unit: "m/s"
+            };
+          }
+        },
+        {
+          id: "suvat_a",
+          topic: "Kinematics",
+          formula: "a = (v − u) / t",
+          type: "numeric",
+          tolerance: 0.05,
+          build: function () {
+            var u = ri(4, 16);
+            var t = ri(2, 8);
+            var a = ri(1, 5);
+            var v = u + a * t;
+            var truth = a;
+            return {
+              stem: "A truck on the Bulawayo road increases speed from u = " + u + " m/s to v = " + v + " m/s in t = " + t + " s. Calculate the acceleration a in m/s².",
+              answer: truth,
+              steps: "a = (v − u) / t = (" + v + " − " + u + ") / " + t + " = " + truth + " m/s².",
+              commonWrong: function (user) {
+                if (near(user, (v + u) / t)) return ["avg_over_t", "(v + u)/t — average of speeds divided by time, not acceleration"];
+                if (near(user, v - u)) return ["forgot_divide_t", "v − u without dividing by t"];
+                if (near(user, (u - v) / t)) return ["inverted_delta_v", "(u − v)/t — reversed velocity change"];
+                return ["accel_arithmetic", "Misapplied a = (v − u)/t"];
+              },
+              unit: "m/s²"
+            };
+          }
+        },
+        {
+          id: "suvat_v2",
+          topic: "Kinematics",
+          formula: "v² = u² + 2as",
+          type: "mcq",
+          build: function () {
+            var u = ri(2, 10);
+            var a = ri(1, 4);
+            var s = ri(5, 20);
+            var truth = r2(Math.sqrt(u * u + 2 * a * s));
+            var noSqrt = r2(u * u + 2 * a * s);
+            var half = r2(Math.sqrt(u * u + a * s));
+            var linear = r2(u + a * s);
+            var opts = uniqueOpts([truth, noSqrt, half, linear]);
+            return {
+              stem: "A particle starts at u = " + u + " m/s and accelerates at a = " + a + " m/s² over displacement s = " + s + " m. Find final speed v using v² = u² + 2as.",
+              answer: truth,
+              options: opts,
+              steps: "v² = u² + 2as = " + (u * u) + " + 2(" + a + ")(" + s + ") = " + (u * u + 2 * a * s) + ".\nv = √" + (u * u + 2 * a * s) + " = " + truth + " m/s.",
+              errMap: buildErrMap([
+                [noSqrt, "forgot_sqrt", "Computed v² = u² + 2as but did not take the square root"],
+                [half, "missing_2", "Used u² + as (missing the factor 2 in 2as)"],
+                [linear, "used_v_uat_like", "Used a linear mix u + as instead of v² = u² + 2as"]
+              ]),
+              unit: "m/s"
+            };
+          }
+        },
+        {
+          id: "moles_n",
+          topic: "Mole calculations",
+          formula: "n = m / M",
+          type: "mcq",
+          build: function () {
+            var M = pick([16, 18, 23, 24, 28, 32, 40, 44, 58.5]);
+            var nTarget = pick([0.25, 0.5, 1, 1.5, 2, 2.5]);
+            var m = r2(nTarget * M);
+            var truth = r2(m / M);
+            var mult = r2(m * M);
+            var inv = r2(M / m);
+            var diff = r2(Math.abs(m - M));
+            var opts = uniqueOpts([truth, mult, inv, diff]);
+            var substance = pick(["oxygen gas (O₂)", "water (H₂O)", "carbon dioxide (CO₂)", "sodium (Na)", "calcium (Ca)"]);
+            return {
+              stem: "In a ZIMSEC-style mole question: a sample of " + substance + " has mass m = " + m + " g and molar mass M = " + M + " g/mol. Calculate the amount of substance n in moles.",
+              answer: truth,
+              options: opts,
+              steps: "n = m / M = " + m + " / " + M + " = " + truth + " mol.",
+              errMap: buildErrMap([
+                [mult, "multiplied_mM", "Used n = m × M instead of n = m / M"],
+                [inv, "inverted_mole", "Inverted formula: used M / m"],
+                [diff, "subtracted_mM", "Subtracted m − M instead of dividing"]
+              ]),
+              unit: "mol"
+            };
+          }
+        },
+        {
+          id: "moles_m",
+          topic: "Mole calculations",
+          formula: "m = n × M",
+          type: "numeric",
+          tolerance: 0.05,
+          build: function () {
+            var M = pick([12, 16, 18, 24, 32, 40, 44]);
+            var n = pick([0.5, 1, 1.5, 2, 2.5, 3]);
+            var truth = r2(n * M);
+            return {
+              stem: "Calculate the mass m (in grams) of a substance if n = " + n + " mol and M = " + M + " g/mol. [m = nM]",
+              answer: truth,
+              steps: "m = n × M = " + n + " × " + M + " = " + truth + " g.",
+              commonWrong: function (user) {
+                if (near(user, n / M)) return ["used_n_over_M", "Used m = n / M (confused with n = m / M)"];
+                if (near(user, M / n)) return ["used_M_over_n", "Used m = M / n"];
+                if (near(user, n + M)) return ["added_nM", "Added n + M instead of multiplying"];
+                return ["mass_from_moles", "Misapplied m = n × M"];
+              },
+              unit: "g"
+            };
+          }
+        },
+        {
+          id: "moles_M",
+          topic: "Mole calculations",
+          formula: "M = m / n",
+          type: "numeric",
+          tolerance: 0.05,
+          build: function () {
+            var n = pick([0.25, 0.5, 1, 2]);
+            var M = pick([17, 18, 28, 32, 44, 58, 64]);
+            var m = r2(n * M);
+            var truth = r2(m / n);
+            return {
+              stem: "A laboratory sample has mass m = " + m + " g and amount n = " + n + " mol. Determine the molar mass M in g/mol.",
+              answer: truth,
+              steps: "M = m / n = " + m + " / " + n + " = " + truth + " g/mol.",
+              commonWrong: function (user) {
+                if (near(user, n / m)) return ["inverted_Mn", "Used n / m instead of m / n"];
+                if (near(user, m * n)) return ["multiplied_mn", "Used M = m × n"];
+                if (near(user, m - n)) return ["subtracted_mn", "Subtracted instead of dividing"];
+                return ["molar_mass_formula", "Misapplied M = m / n"];
+              },
+              unit: "g/mol"
+            };
+          }
+        },
+        {
+          id: "moles_particles",
+          topic: "Mole calculations",
+          formula: "N = n × L (L ≈ 6.02 × 10²³)",
+          type: "mcq",
+          build: function () {
+            var n = pick([0.5, 1, 1.5, 2]);
+            var L = 6.02e23;
+            var truth = n * L;
+            var noL = n;
+            var div = n / L;
+            var twice = 2 * n * L;
+            var label = function (x) {
+              if (x === truth) return n + " × 6.02 × 10²³";
+              if (x === noL) return String(n);
+              if (x === div) return n + " / 6.02 × 10²³";
+              return "2 × " + n + " × 6.02 × 10²³";
+            };
+            var raw = [truth, noL, div, twice];
+            var opts = shuffleArr(raw.map(label));
+            var answerLabel = label(truth);
+            var errMap = {};
+            errMap[label(noL)] = { cls: "forgot_avagadro", rule: "Gave n only — omitted N = n × L (Avogadro)" };
+            errMap[label(div)] = { cls: "divided_by_L", rule: "Used n / L instead of n × L" };
+            errMap[label(twice)] = { cls: "doubled_N", rule: "Inserted an extra factor of 2 without justification" };
+            return {
+              stem: "How many particles are in n = " + n + " mol of a gas? (Take L = 6.02 × 10²³ mol⁻¹.)",
+              answer: answerLabel,
+              options: opts,
+              steps: "N = n × L = " + n + " × 6.02 × 10²³ = " + n + " × 6.02 × 10²³ particles.",
+              errMap: errMap,
+              unit: "particles"
+            };
+          }
+        },
+        {
+          id: "suvat_t",
+          topic: "Kinematics",
+          formula: "t = (v − u) / a",
+          type: "numeric",
+          tolerance: 0.05,
+          build: function () {
+            var u = ri(0, 12);
+            var a = ri(2, 6);
+            var t = ri(2, 7);
+            var v = u + a * t;
+            var truth = t;
+            return {
+              stem: "A train near Gweru station changes speed from u = " + u + " m/s to v = " + v + " m/s with constant acceleration a = " + a + " m/s². Find the time t taken in seconds.",
+              answer: truth,
+              steps: "t = (v − u) / a = (" + v + " − " + u + ") / " + a + " = " + truth + " s.",
+              commonWrong: function (user) {
+                if (near(user, a / (v - u))) return ["inverted_time", "Used a / (v − u) — inverted t = (v − u)/a"];
+                if (near(user, (v + u) / a)) return ["sum_over_a", "Used (v + u)/a instead of (v − u)/a"];
+                if (near(user, v - u)) return ["forgot_divide_a", "Computed Δv but forgot to divide by a"];
+                return ["time_from_vat", "Misapplied t = (v − u)/a"];
+              },
+              unit: "s"
+            };
+          }
+        },
+        {
+          id: "mixed_units_s",
+          topic: "Kinematics",
+          formula: "s = ut + ½at² (check units)",
+          type: "mcq",
+          build: function () {
+            var uKmh = pick([36, 54, 72, 90]);
+            var u = uKmh / 3.6;
+            var a = pick([1, 2, 2.5]);
+            var t = pick([4, 5, 6, 8]);
+            var truth = r2(u * t + 0.5 * a * t * t);
+            var noConvert = r2(uKmh * t + 0.5 * a * t * t);
+            var onlyUt = r2(u * t);
+            var halfWrong = r2(u * t + a * t * t);
+            var opts = uniqueOpts([truth, noConvert, onlyUt, halfWrong]);
+            return {
+              stem: "A kombi travelling at " + uKmh + " km/h (= " + r2(u) + " m/s) accelerates at a = " + a + " m/s² for t = " + t + " s. Calculate displacement s in metres.",
+              answer: truth,
+              options: opts,
+              steps: "Convert: u = " + uKmh + " / 3.6 = " + r2(u) + " m/s.\ns = ut + ½at² = (" + r2(u) + ")(" + t + ") + ½(" + a + ")(" + t + ")² = " + truth + " m.",
+              errMap: buildErrMap([
+                [noConvert, "no_unit_convert", "Used km/h directly in s = ut + ½at² without converting to m/s"],
+                [onlyUt, "ignored_accel", "Used s = ut only (ignored ½at²)"],
+                [halfWrong, "forgotHalf", "Dropped ½ in ½at²"]
+              ]),
+              unit: "m"
+            };
+          }
+        },
+        {
+          id: "conc_moles",
+          topic: "Mole calculations",
+          formula: "n = c × V (V in dm³)",
+          type: "mcq",
+          build: function () {
+            var c = pick([0.1, 0.2, 0.5, 1, 2]);
+            var Vcm3 = pick([100, 200, 250, 500]);
+            var V = Vcm3 / 1000;
+            var truth = r2(c * V);
+            var noConvert = r2(c * Vcm3);
+            var div = r2(c / V);
+            var invV = r2(V / c);
+            var opts = uniqueOpts([truth, noConvert, div, invV]);
+            return {
+              stem: "A titration solution has concentration c = " + c + " mol/dm³. Volume used is V = " + Vcm3 + " cm³. Calculate n (mol). [Recall 1000 cm³ = 1 dm³; n = cV.]",
+              answer: truth,
+              options: opts,
+              steps: "V = " + Vcm3 + " / 1000 = " + V + " dm³.\nn = cV = " + c + " × " + V + " = " + truth + " mol.",
+              errMap: buildErrMap([
+                [noConvert, "volume_not_dm3", "Used cm³ directly in n = cV without converting to dm³"],
+                [div, "used_c_over_V", "Used n = c / V"],
+                [invV, "used_V_over_c", "Used n = V / c"]
+              ]),
+              unit: "mol"
+            };
+          }
+        },
+        {
+          id: "free_fall",
+          topic: "Kinematics",
+          formula: "s = ½gt² (u = 0)",
+          type: "numeric",
+          tolerance: 0.2,
+          build: function () {
+            var g = 10;
+            var t = ri(2, 6);
+            var truth = r2(0.5 * g * t * t);
+            return {
+              stem: "A stone is dropped (u = 0) from a cliff overlooking the Zambezi. Taking g = " + g + " m/s², how far has it fallen after t = " + t + " s? [s = ½gt²]",
+              answer: truth,
+              steps: "s = ½gt² = ½(" + g + ")(" + t + ")² = " + truth + " m.",
+              commonWrong: function (user) {
+                if (near(user, g * t * t)) return ["forgot_half_g", "Used s = gt² (dropped ½)"];
+                if (near(user, g * t)) return ["used_v_equals_gt", "Used v = gt (speed) instead of s = ½gt²"];
+                if (near(user, 0.5 * g * t)) return ["missing_t_square", "Used ½gt instead of ½gt²"];
+                return ["free_fall_s", "Misapplied s = ½gt² for free fall from rest"];
+              },
+              unit: "m"
+            };
+          }
+        }
+      ],
+      hints: {
+        forgotHalf: "Kinematics: the displacement equation needs the factor ½ on at².",
+        usedVt: "v = u + at gives final velocity, not displacement.",
+        multiplied_mM: "Amount of substance: divide mass by molar mass, n = m/M.",
+        inverted_mole: "Do not invert; n = m/M, not M/m.",
+        no_unit_convert: "Convert km/h → m/s (÷ 3.6) before substituting into SUVAT.",
+        volume_not_dm3: "Convert cm³ to dm³ (÷ 1000) when using n = cV."
+      }
+    };
+
+    var state = {
+      score: 0,
+      roundIndex: 0,
+      attempts: 0,
+      finished: false,
+      locked: false,
+      canNext: false,
+      session: [],
+      current: null,
+      selected: null
+    };
+
+    var els = {
+      scoreBox: document.getElementById("scoreBox"),
+      stem: document.getElementById("stem"),
+      answerArea: document.getElementById("answerArea"),
+      feedback: document.getElementById("feedback"),
+      lockBtn: document.getElementById("lockBtn"),
+      nextBtn: document.getElementById("nextBtn"),
+      checkBtn: document.getElementById("checkBtn"),
+      roundTag: document.getElementById("roundTag"),
+      topicTag: document.getElementById("topicTag"),
+      formulaTag: document.getElementById("formulaTag"),
+      mRound: document.getElementById("mRound"),
+      mScore: document.getElementById("mScore"),
+      mAtt: document.getElementById("mAtt"),
+      mAcc: document.getElementById("mAcc"),
+      mForm: document.getElementById("mForm"),
+      mErr: document.getElementById("mErr"),
+      mRule: document.getElementById("mRule"),
+      accFill: document.getElementById("accFill")
+    };
+
+    function ri(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+    function pick(arr) { return arr[ri(0, arr.length - 1)]; }
+    function r2(n) { return Math.round(n * 100) / 100; }
+    function near(a, b, tol) {
+      if (a == null || isNaN(a)) return false;
+      return Math.abs(a - b) <= (tol == null ? 0.08 : tol);
+    }
+
+    function shuffleArr(arr) {
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a;
+    }
+
+    function uniqueOpts(vals) {
+      var seen = {};
+      var out = [];
+      vals.forEach(function (v) {
+        var k = String(v);
+        if (!seen[k]) { seen[k] = true; out.push(v); }
+      });
+      while (out.length < 4) out.push(r2(out[0] + out.length + 1));
+      return shuffleArr(out).slice(0, 4);
+    }
+
+    function buildErrMap(pairs) {
+      var map = {};
+      pairs.forEach(function (p) {
+        map[String(p[0])] = { cls: p[1], rule: p[2] };
+      });
+      return map;
+    }
+
+    function fisherYatesSession(pool) {
+      var shuffled = pool.slice();
+      for (var i = shuffled.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = shuffled[i];
+        shuffled[i] = shuffled[j];
+        shuffled[j] = tmp;
+      }
+      return shuffled.slice(0, CONTENT.totalRounds);
+    }
+
+    function updateAnalytics() {
+      els.scoreBox.textContent = "Score: " + state.score + " / " + CONTENT.maxScore;
+      els.mScore.textContent = state.score + " / " + CONTENT.maxScore;
+      var displayRound = Math.min(state.roundIndex + 1, CONTENT.totalRounds);
+      if (state.finished) displayRound = CONTENT.totalRounds;
+      els.mRound.textContent = displayRound + " / " + CONTENT.totalRounds;
+      els.roundTag.textContent = "Item " + displayRound + " / " + CONTENT.totalRounds;
+      els.mAtt.textContent = String(state.attempts);
+      if (state.attempts > 0) {
+        var pct = Math.round((state.score / state.attempts) * 100);
+        els.mAcc.textContent = pct + "%";
+        els.accFill.style.width = Math.min(100, pct) + "%";
+      } else {
+        els.mAcc.textContent = "—";
+        els.accFill.style.width = "0%";
+      }
+    }
+
+    function renderQuestion() {
+      state.locked = false;
+      state.canNext = false;
+      state.selected = null;
+      els.nextBtn.disabled = true;
+      els.lockBtn.disabled = false;
+      els.feedback.textContent = "";
+      els.feedback.className = "feedback";
+
+      var tpl = state.session[state.roundIndex];
+      var built = tpl.build();
+      state.current = { tpl: tpl, built: built };
+
+      els.stem.textContent = built.stem;
+      els.topicTag.textContent = tpl.topic;
+      els.formulaTag.textContent = tpl.formula;
+      els.mForm.textContent = tpl.formula;
+      els.mErr.textContent = "—";
+      els.mRule.textContent = "—";
+
+      var area = els.answerArea;
+      area.innerHTML = "";
+      if (tpl.type === "mcq") {
+        var box = document.createElement("div");
+        box.className = "choices";
+        built.options.forEach(function (opt, idx) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "choice";
+          b.dataset.idx = String(idx);
+          b.textContent = (idx + 1) + ". " + formatOpt(opt, built.unit);
+          b.addEventListener("click", function () {
+            if (state.locked) return;
+            state.selected = opt;
+            box.querySelectorAll(".choice").forEach(function (c) { c.classList.remove("sel"); });
+            b.classList.add("sel");
+          });
+          box.appendChild(b);
+        });
+        area.appendChild(box);
+      } else {
+        var row = document.createElement("div");
+        row.className = "num-wrap";
+        var lab = document.createElement("label");
+        lab.htmlFor = "numAns";
+        lab.textContent = "Answer (" + (built.unit || "") + ")";
+        var inp = document.createElement("input");
+        inp.type = "number";
+        inp.id = "numAns";
+        inp.step = "any";
+        inp.setAttribute("inputmode", "decimal");
+        row.appendChild(lab);
+        row.appendChild(inp);
+        area.appendChild(row);
+        inp.focus();
+      }
+      updateAnalytics();
+    }
+
+    function formatOpt(opt, unit) {
+      if (typeof opt === "string") return opt;
+      return opt + (unit ? " " + unit : "");
+    }
+
+    function getUserAnswer() {
+      var tpl = state.current.tpl;
+      if (tpl.type === "mcq") return state.selected;
+      var inp = document.getElementById("numAns");
+      if (!inp || inp.value === "") return null;
+      return Number(inp.value);
+    }
+
+    function isCorrect(user, built, tpl) {
+      if (tpl.type === "mcq") {
+        return String(user) === String(built.answer);
+      }
+      return near(user, built.answer, tpl.tolerance == null ? 0.05 : tpl.tolerance);
+    }
+
+    function lockAnswer() {
+      if (state.finished || state.locked) return;
+      var user = getUserAnswer();
+      if (user == null || user === "") {
+        els.feedback.textContent = "Select an option (1–4) or enter a numeric value, then press Enter.";
+        els.feedback.className = "feedback wrong";
+        return;
+      }
+      state.locked = true;
+      state.attempts += 1;
+      els.lockBtn.disabled = true;
+
+      var tpl = state.current.tpl;
+      var built = state.current.built;
+      var ok = isCorrect(user, built, tpl);
+
+      if (tpl.type === "mcq") {
+        els.answerArea.querySelectorAll(".choice").forEach(function (c) {
+          var raw = state.current.built.options[Number(c.dataset.idx)];
+          if (String(raw) === String(built.answer)) c.classList.add("ok");
+          else if (String(raw) === String(user)) c.classList.add("bad");
+        });
+      }
+
+      if (ok) {
+        state.score += 1;
+        els.mErr.textContent = "none";
+        els.mRule.textContent = "—";
+        els.feedback.className = "feedback correct";
+        els.feedback.textContent = "Correct.\n\n" + built.steps;
+      } else {
+        var diag = diagnose(user, built, tpl);
+        els.mErr.textContent = diag.cls;
+        els.mRule.textContent = diag.rule;
+        els.feedback.className = "feedback wrong";
+        els.feedback.textContent =
+          "Incorrect. You answered: " + formatOpt(user, built.unit) + ".\n" +
+          "Correct answer: " + formatOpt(built.answer, built.unit) + ".\n\n" +
+          "Worked solution:\n" + built.steps + "\n\n" +
+          "Diagnostic — misapplied: " + diag.rule + "\n(Error class: " + diag.cls + ")";
+      }
+
+      updateAnalytics();
+      if (state.roundIndex >= CONTENT.totalRounds - 1) {
+        state.finished = true;
+        els.checkBtn.disabled = false;
+        els.nextBtn.disabled = true;
+        els.feedback.textContent += "\n\nPaper complete. Press S or Submit score.";
+      } else {
+        state.canNext = true;
+        els.nextBtn.disabled = false;
+      }
+    }
+
+    function diagnose(user, built, tpl) {
+      if (tpl.type === "mcq" && built.errMap) {
+        var hit = built.errMap[String(user)];
+        if (hit) return hit;
+      }
+      if (tpl.type === "numeric" && typeof built.commonWrong === "function") {
+        var pair = built.commonWrong(user);
+        if (pair) return { cls: pair[0], rule: pair[1] };
+      }
+      var hintKey = Object.keys(CONTENT.hints)[0];
+      return {
+        cls: "general_concept",
+        rule: CONTENT.hints[hintKey] || ("Misapplied " + tpl.formula)
+      };
+    }
+
+    function goNext() {
+      if (!state.canNext || state.finished) return;
+      state.roundIndex += 1;
+      renderQuestion();
+    }
+
+    function submitScore() {
+      if (!state.finished) return;
+      var finalScore = state.score;
+      var maxScore = CONTENT.maxScore;
+      els.scoreBox.textContent = "Score: " + finalScore + " / " + maxScore;
+      if (window.gameScoreSubmit) {
+        window.gameScoreSubmit(finalScore, maxScore);
+      } else if (window.parent && window.parent.submitGameScore) {
+        var gameIdMatch = window.location.pathname.match(/\/play-game\/(\d+)/);
+        if (gameIdMatch) {
+          window.parent.submitGameScore(parseInt(gameIdMatch[1], 10), finalScore, maxScore);
+        }
+      }
+      els.feedback.textContent = "Final score submitted: " + finalScore + " / " + maxScore + ".";
+      els.feedback.className = "feedback correct";
+    }
+
+    els.lockBtn.addEventListener("click", lockAnswer);
+    els.nextBtn.addEventListener("click", goNext);
+    els.checkBtn.addEventListener("click", submitScore);
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key >= "1" && e.key <= "4" && state.current && state.current.tpl.type === "mcq" && !state.locked) {
+        var i = Number(e.key) - 1;
+        var opts = state.current.built.options;
+        if (opts[i] != null) {
+          state.selected = opts[i];
+          var buttons = els.answerArea.querySelectorAll(".choice");
+          buttons.forEach(function (b, idx) {
+            b.classList.toggle("sel", idx === i);
+          });
+        }
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        lockAnswer();
+      }
+      if (e.key === "n" || e.key === "N") {
+        if (state.canNext) goNext();
+      }
+      if ((e.key === "s" || e.key === "S") && !els.checkBtn.disabled) {
+        submitScore();
+      }
+    });
+
+    state.session = fisherYatesSession(CONTENT.questionPool);
+    updateAnalytics();
+    renderQuestion();
+  </script>
+</body>
+</html>

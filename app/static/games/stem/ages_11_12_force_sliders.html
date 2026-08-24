@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HBC: Energy &amp; Circuits Lab</title>
+  <style>
+    :root {
+      --bg: #e8f1f0;
+      --surface: #ffffff;
+      --ink: #1a2e2b;
+      --muted: #4a6560;
+      --accent: #0d7377;
+      --accent-dark: #095456;
+      --ok: #1b7a3d;
+      --bad: #b33a3a;
+      --warn: #b7791f;
+      --badge: #d97706;
+      --track: #c5d9d5;
+      --shadow: 0 8px 24px rgba(26, 46, 43, 0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(ellipse at 10% 0%, #cfe8e4 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 10%, #d4e4f0 0%, transparent 45%),
+        var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      line-height: 1.45;
+    }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 16px; }
+    header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 12px; flex-wrap: wrap; margin-bottom: 12px;
+    }
+    header h1 { font-size: 1.45rem; letter-spacing: -0.02em; }
+    header .sub { color: var(--muted); font-size: 0.92rem; margin-top: 4px; max-width: 34rem; }
+    #scoreBox {
+      background: var(--surface); padding: 10px 16px; border-radius: 12px;
+      font-weight: 800; box-shadow: var(--shadow); white-space: nowrap;
+    }
+    .dash {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px;
+    }
+    .card {
+      background: var(--surface); border-radius: 14px; padding: 12px 14px;
+      box-shadow: var(--shadow);
+    }
+    .card h3 {
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--muted); margin-bottom: 4px;
+    }
+    .card p { font-weight: 700; font-size: 0.95rem; }
+    .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+    .badge-chip {
+      display: inline-block; background: #fef3c7; color: #92400e;
+      border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; font-weight: 800;
+    }
+    .badge-chip.off { background: var(--track); color: var(--muted); opacity: 0.7; }
+    .lab {
+      background: var(--surface); border-radius: 16px; padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .meta-row {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;
+      font-size: 0.8rem; color: var(--muted);
+    }
+    .pill {
+      background: #e6f4f2; color: var(--accent-dark); padding: 4px 10px;
+      border-radius: 8px; font-weight: 700;
+    }
+    #prompt { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+    #context { color: var(--muted); font-size: 0.92rem; margin-bottom: 14px; }
+    .choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .choice {
+      min-height: 44px; padding: 10px 14px; border: 2px solid var(--track);
+      border-radius: 10px; background: #f7fbfa; color: var(--ink);
+      cursor: pointer; font-weight: 700; font-size: 0.95rem;
+    }
+    .choice:hover { border-color: var(--accent); background: #e6f4f2; }
+    .choice.sel { border-color: var(--accent); background: #cfe8e4; }
+    .choice:disabled { opacity: 0.55; cursor: default; }
+    .slider-block { margin: 12px 0; }
+    .slider-block label {
+      display: flex; justify-content: space-between; gap: 8px;
+      font-size: 0.9rem; font-weight: 700; margin-bottom: 6px;
+    }
+    input[type=range] {
+      width: 100%; accent-color: var(--accent); height: 28px; cursor: pointer;
+    }
+    .readout {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;
+    }
+    .readout div {
+      background: #f0f7f6; border-radius: 10px; padding: 10px; font-size: 0.88rem;
+    }
+    .readout strong { display: block; color: var(--accent-dark); font-size: 1.05rem; }
+    .feedback {
+      margin-top: 14px; min-height: 88px; font-size: 0.92rem;
+      padding: 12px; border-radius: 12px; background: #f5f9f8;
+      white-space: pre-wrap;
+    }
+    .feedback.ok { background: #e8f6ec; color: var(--ok); }
+    .feedback.bad { background: #fceaea; color: var(--bad); }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .act {
+      min-height: 44px; padding: 10px 16px; border: none; border-radius: 10px;
+      font-weight: 800; cursor: pointer; font-size: 0.95rem;
+    }
+    #submitAns { background: var(--accent); color: #fff; }
+    #submitAns:disabled { opacity: 0.45; cursor: default; }
+    #hintBtn, #nextBtn { background: #e8eeed; color: var(--ink); }
+    #nextBtn:disabled { opacity: 0.4; }
+    #checkBtn { background: #1b7a3d; color: #fff; }
+    #checkBtn:disabled { opacity: 0.4; cursor: default; }
+    .nodes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .node {
+      width: 28px; height: 28px; border-radius: 50%; background: var(--track);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 800; color: var(--muted);
+    }
+    .node.done { background: var(--accent); color: #fff; }
+    .node.cur { outline: 2px solid var(--badge); background: #fef3c7; color: #92400e; }
+    @media (max-width: 700px) {
+      .dash { grid-template-columns: 1fr; }
+      .readout { grid-template-columns: 1fr; }
+      header h1 { font-size: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="gameRoot">
+    <header>
+      <div>
+        <h1>HBC: Energy &amp; Circuits Lab</h1>
+        <p class="sub">Science and Technology · Ages 11–12 · Renewable energy and circuits with Zimbabwe examples (Kariba, solar, wind).</p>
+      </div>
+      <div id="scoreBox">Score: 0 / 10</div>
+    </header>
+
+    <div class="dash">
+      <div class="card">
+        <h3>Progress</h3>
+        <p id="progressText">Round 1 of 10</p>
+      </div>
+      <div class="card">
+        <h3>Lab status</h3>
+        <p id="statusText">Collect energy badges</p>
+      </div>
+      <div class="card">
+        <h3>Resource badges</h3>
+        <div class="badges" id="badges"></div>
+      </div>
+    </div>
+
+    <div class="lab">
+      <div class="nodes" id="nodes" aria-hidden="true"></div>
+      <div class="meta-row">
+        <span class="pill" id="typePill">Puzzle</span>
+        <span class="pill" id="areaPill">Circuits</span>
+      </div>
+      <p id="prompt"></p>
+      <p id="context"></p>
+      <div id="interactive"></div>
+      <div class="feedback" id="feedback" aria-live="polite"></div>
+      <div class="actions">
+        <button type="button" class="act" id="submitAns">Check answer</button>
+        <button type="button" class="act" id="hintBtn">Hint</button>
+        <button type="button" class="act" id="nextBtn" disabled>Next round</button>
+        <button type="button" class="act" id="checkBtn" disabled>Submit score</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CONTENT = {
+      learningArea: "Science and Technology",
+      topic: "Renewable energy systems and electrical circuits (solar, hydro, wind in Zimbabwe; series/parallel; energy transforms)",
+      ageRange: "11-12",
+      totalRounds: 10,
+      maxScore: 10,
+      questionPool: [
+        {
+          id: "series_current",
+          type: "mcq",
+          badge: "Series",
+          area: "Circuits",
+          build: function () {
+            var R1 = randInt(2, 8);
+            var R2 = randInt(2, 8);
+            var V = randInt(6, 18);
+            var I = round2(V / (R1 + R2));
+            return {
+              prompt: "Series circuit current",
+              context: "A classroom demo in Harare uses two resistors in series (R1 = " + R1 + " Ω, R2 = " + R2 + " Ω) on a " + V + " V battery. What is the current I through the circuit?",
+              answer: I,
+              unit: "A",
+              choices: uniqNums([I, round2(V / R1), round2(V / R2), round2(V * (R1 + R2))], 4),
+              steps: [
+                "In series, total resistance R_total = R1 + R2 = " + R1 + " + " + R2 + " = " + (R1 + R2) + " Ω.",
+                "Ohm's law: I = V / R_total = " + V + " / " + (R1 + R2) + " = " + I + " A.",
+                "Same current flows through both resistors in series."
+              ],
+              distractorHints: {
+                add: "You may have multiplied V by resistance instead of dividing.",
+                oneR: "You used only one resistor. Series needs R1 + R2."
+              }
+            };
+          }
+        },
+        {
+          id: "parallel_current",
+          type: "mcq",
+          badge: "Parallel",
+          area: "Circuits",
+          build: function () {
+            var R1 = [4, 6, 8, 10, 12][randInt(0, 4)];
+            var R2 = [4, 6, 8, 10, 12][randInt(0, 4)];
+            var V = randInt(6, 12);
+            var I1 = round2(V / R1);
+            var I2 = round2(V / R2);
+            var Itot = round2(I1 + I2);
+            return {
+              prompt: "Parallel branch currents",
+              context: "Two bulbs in parallel across " + V + " V at a Mutare science fair: R1 = " + R1 + " Ω, R2 = " + R2 + " Ω. Total current from the supply?",
+              answer: Itot,
+              unit: "A",
+              choices: uniqNums([Itot, I1, I2, round2(V / (R1 + R2))], 4),
+              steps: [
+                "In parallel, each branch sees the full voltage " + V + " V.",
+                "I1 = V/R1 = " + V + "/" + R1 + " = " + I1 + " A; I2 = " + I2 + " A.",
+                "I_total = I1 + I2 = " + Itot + " A (currents add in parallel)."
+              ],
+              distractorHints: {
+                series: "You treated them as series (V/(R1+R2)). Parallel currents add.",
+                oneBranch: "That is one branch only — total current is the sum of both."
+              }
+            };
+          }
+        },
+        {
+          id: "ohm_slider",
+          type: "slider",
+          badge: "Ohm",
+          area: "Circuits",
+          build: function () {
+            var R = randInt(3, 12);
+            var I = randInt(1, 5);
+            var V = R * I;
+            return {
+              prompt: "Set the voltage for Ohm's law",
+              context: "A copper wire sample (R = " + R + " Ω) needs current I = " + I + " A for a Gweru lab demo. Slide voltage V so that V = I × R.",
+              answer: V,
+              unit: "V",
+              slider: { min: 1, max: 60, step: 1, label: "Voltage V (V)", start: randInt(1, 20) },
+              showCalc: function (val) {
+                return "If V = " + val + " V and R = " + R + " Ω, then I = V/R = " + round2(val / R) + " A (target I = " + I + " A).";
+              },
+              steps: [
+                "Ohm's law: V = I × R.",
+                "V = " + I + " × " + R + " = " + V + " V.",
+                "Check: I = V/R = " + V + "/" + R + " = " + I + " A."
+              ],
+              distractorHints: {
+                swap: "You may have set V = I + R or I/R. Multiply current by resistance.",
+                off: "Move the slider until V exactly equals I × R."
+              }
+            };
+          }
+        },
+        {
+          id: "kariba_hydro",
+          type: "mcq",
+          badge: "Hydro",
+          area: "Renewables",
+          build: function () {
+            var h = randInt(20, 80);
+            var m = randInt(100, 400);
+            var g = 10;
+            var Ep = m * g * h;
+            return {
+              prompt: "Hydro potential energy at Kariba",
+              context: "Near Kariba Dam, " + m + " kg of water falls through an effective height of " + h + " m. Using g = " + g + " N/kg, gravitational potential energy Ep = mgh is:",
+              answer: Ep,
+              unit: "J",
+              choices: uniqNums([Ep, m * h, m + g + h, m * g + h], 4),
+              steps: [
+                "Gravitational potential energy: Ep = m × g × h.",
+                "Ep = " + m + " × " + g + " × " + h + " = " + Ep + " J.",
+                "At hydro plants like Kariba, falling water's Ep converts to kinetic then electrical energy."
+              ],
+              distractorHints: {
+                missG: "You omitted g — use Ep = m × g × h.",
+                add: "Energy is a product (multiply), not a sum of m, g, and h."
+              }
+            };
+          }
+        },
+        {
+          id: "solar_panel",
+          type: "slider",
+          badge: "Solar",
+          area: "Renewables",
+          build: function () {
+            var power = [40, 50, 60, 80, 100][randInt(0, 4)];
+            var hours = randInt(3, 7);
+            var energy = power * hours;
+            return {
+              prompt: "Solar energy collected (Wh)",
+              context: "A " + power + " W rooftop panel in Bulawayo runs for " + hours + " sunny hours. Energy E = P × t. Set the slider to the energy in watt-hours.",
+              answer: energy,
+              unit: "Wh",
+              slider: { min: 40, max: 800, step: 10, label: "Energy E (Wh)", start: power },
+              showCalc: function (val) {
+                return "You set E = " + val + " Wh. Target: " + power + " W × " + hours + " h = " + energy + " Wh.";
+              },
+              steps: [
+                "Electrical energy from a constant power: E = P × t.",
+                "E = " + power + " W × " + hours + " h = " + energy + " Wh.",
+                "Sunshine hours in Zimbabwe vary by season; multiply power by hours of useful output."
+              ],
+              distractorHints: {
+                divide: "Do not divide — multiply power by time.",
+                off: "Slide until E equals P × t exactly."
+              }
+            };
+          }
+        },
+        {
+          id: "wind_ke",
+          type: "mcq",
+          badge: "Wind",
+          area: "Renewables",
+          build: function () {
+            var m = randInt(2, 10);
+            var v = randInt(4, 12);
+            var Ke = round2(0.5 * m * v * v);
+            return {
+              prompt: "Wind kinetic energy",
+              context: "A parcel of air (mass " + m + " kg) moves at " + v + " m/s past a small wind turbine near Mwenezi. Kinetic energy Ke = ½mv² is:",
+              answer: Ke,
+              unit: "J",
+              choices: uniqNums([Ke, m * v, m * v * v, round2(0.5 * m * v)], 4),
+              steps: [
+                "Kinetic energy: Ke = ½ × m × v².",
+                "v² = " + v + "² = " + (v * v) + ".",
+                "Ke = 0.5 × " + m + " × " + (v * v) + " = " + Ke + " J.",
+                "Wind turbines transform Ke of moving air into electrical energy."
+              ],
+              distractorHints: {
+                noHalf: "You forgot the ½ — Ke = ½mv², not mv².",
+                noSquare: "Speed must be squared (v²), not left as v."
+              }
+            };
+          }
+        },
+        {
+          id: "energy_chain",
+          type: "mcq",
+          badge: "Transform",
+          area: "Energy",
+          build: function () {
+            var opts = [
+              {
+                q: "Kariba Dam: which best describes the main energy transfer to the generator?",
+                answer: "Gravitational potential → kinetic → electrical",
+                wrong: [
+                  "Chemical → thermal → sound",
+                  "Nuclear → light → electrical",
+                  "Electrical → chemical → kinetic"
+                ],
+                steps: [
+                  "Stored water has gravitational potential energy.",
+                  "Falling water gains kinetic energy.",
+                  "Turbines and generators convert that motion into electrical energy."
+                ]
+              },
+              {
+                q: "A solar cooker on a school roof in Masvingo mainly transforms:",
+                answer: "Light (radiant) → thermal",
+                wrong: [
+                  "Chemical → kinetic",
+                  "Electrical → nuclear",
+                  "Sound → light"
+                ],
+                steps: [
+                  "Sunlight is radiant (light) energy.",
+                  "The cooker absorbs it and heats food — thermal energy.",
+                  "No generator is needed for a passive solar cooker."
+                ]
+              },
+              {
+                q: "A battery-powered torch used on a night walk near Victoria Falls mainly transforms:",
+                answer: "Chemical → electrical → light",
+                wrong: [
+                  "Light → chemical → electrical",
+                  "Kinetic → nuclear → sound",
+                  "Thermal → gravitational → chemical"
+                ],
+                steps: [
+                  "The battery stores chemical energy.",
+                  "The circuit carries electrical energy.",
+                  "The bulb/LED emits light energy."
+                ]
+              }
+            ];
+            var pick = opts[randInt(0, opts.length - 1)];
+            var choices = shuffleArr([pick.answer].concat(pick.wrong));
+            return {
+              prompt: "Energy transformation chain",
+              context: pick.q,
+              answer: pick.answer,
+              unit: "",
+              choices: choices,
+              steps: pick.steps,
+              distractorHints: {
+                reverse: "Check the order — energy flows from source form to useful form.",
+                wrong: "That chain does not match the device or plant described."
+              }
+            };
+          }
+        },
+        {
+          id: "series_voltage_share",
+          type: "slider",
+          badge: "Voltage",
+          area: "Circuits",
+          build: function () {
+            var R1 = randInt(2, 6);
+            var R2 = R1;
+            var V = randInt(8, 16);
+            if (V % 2 !== 0) V += 1;
+            var V1 = V / 2;
+            return {
+              prompt: "Equal series resistors — voltage on one",
+              context: "Two equal resistors (each " + R1 + " Ω) share " + V + " V in series for a Bindura LED strip demo. Set the voltage across ONE resistor.",
+              answer: V1,
+              unit: "V",
+              slider: { min: 1, max: V, step: 1, label: "Voltage across one resistor (V)", start: 1 },
+              showCalc: function (val) {
+                return "You set " + val + " V. Equal series resistors share voltage equally: each gets V/2.";
+              },
+              steps: [
+                "Equal resistors in series: voltage divides equally.",
+                "V_one = V_total / 2 = " + V + " / 2 = " + V1 + " V.",
+                "Current is the same; voltage drops add to " + V + " V."
+              ],
+              distractorHints: {
+                full: "One resistor does not get the full supply voltage in series.",
+                off: "With equal R, each drop is half the supply."
+              }
+            };
+          }
+        },
+        {
+          id: "power_calc",
+          type: "mcq",
+          badge: "Power",
+          area: "Circuits",
+          build: function () {
+            var V = randInt(6, 24);
+            var I = randInt(1, 5);
+            var P = V * I;
+            return {
+              prompt: "Electrical power",
+              context: "A water pump controller near Lake Chivero draws " + I + " A from a " + V + " V supply. Power P = V × I is:",
+              answer: P,
+              unit: "W",
+              choices: uniqNums([P, V + I, round2(V / I), V * I * 2], 4),
+              steps: [
+                "Electrical power: P = V × I.",
+                "P = " + V + " × " + I + " = " + P + " W.",
+                "Power is the rate of energy transfer in the circuit."
+              ],
+              distractorHints: {
+                add: "Power is a product V×I, not V+I.",
+                divide: "You divided — use multiply for P = VI."
+              }
+            };
+          }
+        },
+        {
+          id: "efficiency",
+          type: "mcq",
+          badge: "Efficiency",
+          area: "Energy",
+          build: function () {
+            var useful = [60, 70, 75, 80, 90][randInt(0, 4)];
+            var total = 100;
+            var eff = useful;
+            return {
+              prompt: "Device efficiency",
+              context: "A small hydro micro-turbine model for a Chinhoyi school fair delivers " + useful + " J of useful electrical energy from " + total + " J of input energy. Efficiency (%) is:",
+              answer: eff,
+              unit: "%",
+              choices: uniqNums([eff, 100 - useful, Math.round((total / useful) * 10), useful + 10], 4),
+              steps: [
+                "Efficiency (%) = (useful energy / total energy) × 100.",
+                "= (" + useful + " / " + total + ") × 100 = " + eff + "%.",
+                "Lost energy becomes heat, sound, or friction — not counted as useful output."
+              ],
+              distractorHints: {
+                waste: "That looks like waste percentage (100 − useful), not efficiency.",
+                invert: "Do not invert the fraction — useful goes on top."
+              }
+            };
+          }
+        },
+        {
+          id: "resistance_slider",
+          type: "slider",
+          badge: "Resistance",
+          area: "Circuits",
+          build: function () {
+            var V = [9, 12, 15, 18, 24][randInt(0, 4)];
+            var I = [1, 2, 3][randInt(0, 2)];
+            var R = V / I;
+            return {
+              prompt: "Find resistance with sliders",
+              context: "A heater coil on a " + V + " V line draws " + I + " A during a Hwange workshop demo. Set R so that R = V / I.",
+              answer: R,
+              unit: "Ω",
+              slider: { min: 1, max: 30, step: 1, label: "Resistance R (Ω)", start: randInt(1, 8) },
+              showCalc: function (val) {
+                return "R set to " + val + " Ω. Check: I = V/R = " + V + "/" + val + " ≈ " + round2(V / val) + " A (need " + I + " A).";
+              },
+              steps: [
+                "Rearrange Ohm's law: R = V / I.",
+                "R = " + V + " / " + I + " = " + R + " Ω.",
+                "Higher resistance at the same voltage means smaller current."
+              ],
+              distractorHints: {
+                product: "Do not multiply V×I for resistance — divide V÷I.",
+                off: "Slide until R equals V/I exactly."
+              }
+            };
+          }
+        },
+        {
+          id: "renewable_id",
+          type: "mcq",
+          badge: "Source",
+          area: "Renewables",
+          build: function () {
+            var items = [
+              {
+                q: "Which Zimbabwe site is famous for large-scale hydroelectric generation on the Zambezi?",
+                answer: "Kariba Dam",
+                wrong: ["Great Zimbabwe ruins", "Chinhoyi Caves", "Matobo Hills"],
+                steps: [
+                  "Kariba Dam on the Zambezi stores water at height.",
+                  "Hydro plants convert falling-water energy into electricity.",
+                  "Great Zimbabwe, caves, and Matobo are heritage/landscape sites, not hydro plants."
+                ]
+              },
+              {
+                q: "A farm near Beitbridge installs panels that make electricity from sunlight. The renewable source is:",
+                answer: "Solar (radiant) energy",
+                wrong: ["Coal chemical energy", "Petrol chemical energy", "Nuclear fission"],
+                steps: [
+                  "Photovoltaic panels convert sunlight to electricity.",
+                  "Sunlight is a renewable radiant source.",
+                  "Coal and petrol are non-renewable chemical fuels."
+                ]
+              }
+            ];
+            var pick = items[randInt(0, items.length - 1)];
+            return {
+              prompt: "Identify the renewable source",
+              context: pick.q,
+              answer: pick.answer,
+              unit: "",
+              choices: shuffleArr([pick.answer].concat(pick.wrong)),
+              steps: pick.steps,
+              distractorHints: {
+                wrong: "Link the place or device to the energy source that actually powers it."
+              }
+            };
+          }
+        }
+      ],
+      hints: {
+        general: "Read what is asked (I, V, R, E, or the energy chain). Use the matching formula.",
+        ohm: "Ohm's law: V = I R, so I = V/R and R = V/I.",
+        series: "Series: same current; resistances add; voltages share.",
+        parallel: "Parallel: same voltage; currents add.",
+        energy: "Track the form: potential, kinetic, electrical, light, thermal, chemical."
+      }
+    };
+
+    var score = 0;
+    var roundIndex = 0;
+    var finished = false;
+    var answered = false;
+    var sessionItems = [];
+    var current = null;
+    var selectedChoice = null;
+    var earnedBadges = {};
+
+    var scoreBox = document.getElementById("scoreBox");
+    var feedback = document.getElementById("feedback");
+    var checkBtn = document.getElementById("checkBtn");
+    var submitAns = document.getElementById("submitAns");
+    var nextBtn = document.getElementById("nextBtn");
+    var interactive = document.getElementById("interactive");
+
+    function randInt(a, b) {
+      return Math.floor(Math.random() * (b - a + 1)) + a;
+    }
+    function round2(n) {
+      return Math.round(n * 100) / 100;
+    }
+    function shuffleArr(arr) {
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = a[i];
+        a[i] = a[j];
+        a[j] = t;
+      }
+      return a;
+    }
+    function uniqNums(arr, n) {
+      var out = [];
+      arr.forEach(function (v) {
+        var x = typeof v === "number" ? round2(v) : v;
+        if (out.indexOf(x) === -1) out.push(x);
+      });
+      var guard = 0;
+      while (out.length < n && guard < 40) {
+        var pad = round2(out[0] + randInt(1, 9));
+        if (out.indexOf(pad) === -1) out.push(pad);
+        guard++;
+      }
+      return shuffleArr(out).slice(0, n);
+    }
+
+    function initializeGameSession(pool) {
+      var shuffledPool = pool.slice();
+      for (var i = shuffledPool.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = shuffledPool[i];
+        shuffledPool[i] = shuffledPool[j];
+        shuffledPool[j] = tmp;
+      }
+      return shuffledPool.slice(0, CONTENT.totalRounds);
+    }
+
+    function updateScore() {
+      scoreBox.textContent = "Score: " + score + " / " + CONTENT.maxScore;
+    }
+
+    function renderNodes() {
+      var el = document.getElementById("nodes");
+      el.innerHTML = "";
+      for (var i = 0; i < CONTENT.totalRounds; i++) {
+        var n = document.createElement("div");
+        n.className = "node";
+        if (i < roundIndex) n.className += " done";
+        else if (i === roundIndex && !finished) n.className += " cur";
+        n.textContent = String(i + 1);
+        el.appendChild(n);
+      }
+    }
+
+    function renderBadges() {
+      var keys = ["Series", "Parallel", "Ohm", "Hydro", "Solar", "Wind", "Transform", "Voltage", "Power", "Efficiency", "Resistance", "Source"];
+      var html = "";
+      keys.forEach(function (k) {
+        html += '<span class="badge-chip' + (earnedBadges[k] ? "" : " off") + '">' + k + "</span>";
+      });
+      document.getElementById("badges").innerHTML = html;
+    }
+
+    function nearlyEqual(a, b) {
+      return Math.abs(Number(a) - Number(b)) < 0.051;
+    }
+
+    function buildRound() {
+      answered = false;
+      selectedChoice = null;
+      submitAns.disabled = false;
+      nextBtn.disabled = true;
+      feedback.className = "feedback";
+      feedback.textContent = "";
+
+      var template = sessionItems[roundIndex];
+      var built = template.build();
+      current = {
+        template: template,
+        data: built,
+        type: template.type,
+        badge: template.badge
+      };
+
+      document.getElementById("prompt").textContent = built.prompt;
+      document.getElementById("context").textContent = built.context;
+      document.getElementById("typePill").textContent = template.type === "slider" ? "Slider lab" : "Multiple choice";
+      document.getElementById("areaPill").textContent = template.area;
+      document.getElementById("progressText").textContent =
+        "Round " + (roundIndex + 1) + " of " + CONTENT.totalRounds;
+      document.getElementById("statusText").textContent =
+        finished ? "Lab complete" : "Solve to earn the " + template.badge + " badge";
+
+      interactive.innerHTML = "";
+      if (template.type === "mcq") {
+        var box = document.createElement("div");
+        box.className = "choices";
+        built.choices.forEach(function (c) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "choice";
+          b.textContent = built.unit ? (c + " " + built.unit) : String(c);
+          b.addEventListener("click", function () {
+            if (answered) return;
+            selectedChoice = c;
+            box.querySelectorAll(".choice").forEach(function (x) { x.classList.remove("sel"); });
+            b.classList.add("sel");
+          });
+          box.appendChild(b);
+        });
+        interactive.appendChild(box);
+      } else {
+        var block = document.createElement("div");
+        block.className = "slider-block";
+        var lab = document.createElement("label");
+        var span = document.createElement("span");
+        span.id = "sliderVal";
+        span.textContent = String(built.slider.start);
+        lab.innerHTML = built.slider.label + ": ";
+        lab.appendChild(span);
+        var range = document.createElement("input");
+        range.type = "range";
+        range.id = "valueSlider";
+        range.min = built.slider.min;
+        range.max = built.slider.max;
+        range.step = built.slider.step;
+        range.value = built.slider.start;
+        range.addEventListener("input", function () {
+          span.textContent = range.value;
+          document.getElementById("liveCalc").textContent = built.showCalc(Number(range.value));
+        });
+        var readout = document.createElement("div");
+        readout.className = "readout";
+        readout.innerHTML =
+          "<div><span>Live check</span><strong id='liveCalc'>" +
+          built.showCalc(Number(built.slider.start)) +
+          "</strong></div><div><span>Target skill</span><strong>" +
+          template.badge +
+          "</strong></div>";
+        block.appendChild(lab);
+        block.appendChild(range);
+        block.appendChild(readout);
+        interactive.appendChild(block);
+      }
+
+      renderNodes();
+      renderBadges();
+    }
+
+    function diagnosticMessage(ok, userVal) {
+      var d = current.data;
+      var lines = [];
+      if (ok) {
+        lines.push("Correct! +" + 1 + " point.");
+      } else {
+        lines.push("Not quite. Your answer: " + userVal + (d.unit ? " " + d.unit : "") + ".");
+        lines.push("Correct answer: " + d.answer + (d.unit ? " " + d.unit : "") + ".");
+        if (d.distractorHints) {
+          if (typeof userVal === "number") {
+            if (nearlyEqual(userVal, Number(d.answer) + Number(d.answer)) && d.distractorHints.noHalf) {
+              lines.push("Hint: " + d.distractorHints.noHalf);
+            } else if (d.distractorHints.off) {
+              lines.push("Hint: " + d.distractorHints.off);
+            } else if (d.distractorHints.wrong) {
+              lines.push("Hint: " + d.distractorHints.wrong);
+            }
+          } else if (d.distractorHints.wrong) {
+            lines.push("Hint: " + d.distractorHints.wrong);
+          } else if (d.distractorHints.reverse) {
+            lines.push("Hint: " + d.distractorHints.reverse);
+          }
+        }
+      }
+      lines.push("");
+      lines.push("Step-by-step:");
+      d.steps.forEach(function (s, i) {
+        lines.push((i + 1) + ". " + s);
+      });
+      return lines.join("\n");
+    }
+
+    function getUserAnswer() {
+      if (current.type === "mcq") return selectedChoice;
+      var sl = document.getElementById("valueSlider");
+      return sl ? Number(sl.value) : null;
+    }
+
+    function isCorrect(userVal) {
+      var ans = current.data.answer;
+      if (typeof ans === "number") return nearlyEqual(userVal, ans);
+      return userVal === ans;
+    }
+
+    submitAns.addEventListener("click", function () {
+      if (finished || answered) return;
+      var userVal = getUserAnswer();
+      if (userVal === null || userVal === undefined || (current.type === "mcq" && selectedChoice === null)) {
+        feedback.className = "feedback bad";
+        feedback.textContent = "Select a choice or set the slider, then check.";
+        return;
+      }
+      answered = true;
+      submitAns.disabled = true;
+      var ok = isCorrect(userVal);
+      if (ok) {
+        score += 1;
+        earnedBadges[current.badge] = true;
+        updateScore();
+        feedback.className = "feedback ok";
+      } else {
+        feedback.className = "feedback bad";
+      }
+      feedback.textContent = diagnosticMessage(ok, userVal);
+      interactive.querySelectorAll(".choice, input").forEach(function (el) {
+        el.disabled = true;
+      });
+      nextBtn.disabled = false;
+      if (roundIndex >= CONTENT.totalRounds - 1) {
+        finished = true;
+        checkBtn.disabled = false;
+        nextBtn.disabled = true;
+        document.getElementById("statusText").textContent = "All rounds done — submit your score";
+        feedback.textContent += "\n\nLab complete. Press Submit score to send your result.";
+      }
+      renderNodes();
+      renderBadges();
+    });
+
+    nextBtn.addEventListener("click", function () {
+      if (!answered || finished) return;
+      roundIndex += 1;
+      if (roundIndex >= CONTENT.totalRounds) {
+        finished = true;
+        checkBtn.disabled = false;
+        return;
+      }
+      buildRound();
+    });
+
+    document.getElementById("hintBtn").addEventListener("click", function () {
+      if (answered) return;
+      var h = CONTENT.hints;
+      var area = current.template.area;
+      var msg = h.general;
+      if (area === "Circuits") msg = h.ohm + " " + h.series + " " + h.parallel;
+      if (area === "Renewables" || area === "Energy") msg = h.energy;
+      feedback.className = "feedback";
+      feedback.textContent = "Hint: " + msg;
+    });
+
+    function submitScore() {
+      var finalScore = score;
+      var maxScore = CONTENT.maxScore;
+      updateScore();
+      if (window.gameScoreSubmit) {
+        window.gameScoreSubmit(finalScore, maxScore);
+      } else if (window.parent && window.parent.submitGameScore) {
+        var gameIdMatch = window.location.pathname.match(/\/play-game\/(\d+)/);
+        if (gameIdMatch) {
+          window.parent.submitGameScore(parseInt(gameIdMatch[1], 10), finalScore, maxScore);
+        }
+      }
+    }
+    checkBtn.addEventListener("click", submitScore);
+
+    function startGame() {
+      score = 0;
+      roundIndex = 0;
+      finished = false;
+      earnedBadges = {};
+      sessionItems = initializeGameSession(CONTENT.questionPool);
+      checkBtn.disabled = true;
+      updateScore();
+      buildRound();
+    }
+
+    startGame();
+  </script>
+</body>
+</html>

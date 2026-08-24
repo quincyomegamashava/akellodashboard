@@ -3,178 +3,289 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Game Dashboard</title>
+  <title>Game Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
   <style>
-    /* Glassmorphism styles */
-    .glass {
-      background: rgba(255, 255, 255, 0.7);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: #ffffff;
+      min-height: 100vh;
     }
-    
-    .glass-card {
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+    .portal-card {
+      background: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
     }
-    
-    .glass-hover:hover {
-      background: rgba(255, 255, 255, 0.85);
-      box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.15);
-      transform: translateY(-2px);
-      transition: all 0.3s ease;
+    .portal-card-hover {
+      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
     }
-    
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+    .portal-card-hover:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 4px 8px rgba(15, 23, 42, 0.06), 0 16px 32px rgba(15, 23, 42, 0.08);
+      border-color: #cbd5e1;
     }
-    ::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.1);
+    .theme-banner {
+      animation: bannerIn 0.55s ease-out;
     }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 4px;
+    @keyframes bannerIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(0, 0, 0, 0.3);
+    .progress-fill {
+      transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
     }
-    
-    /* Smooth transitions */
-    * {
-      transition: all 0.2s ease;
+    .live-pulse {
+      width: 8px; height: 8px; border-radius: 9999px;
+      background: #0f172a;
+      box-shadow: 0 0 0 0 rgba(15, 23, 42, 0.35);
+      animation: pulseDot 1.6s infinite;
     }
+    @keyframes pulseDot {
+      0% { box-shadow: 0 0 0 0 rgba(15, 23, 42, 0.35); }
+      70% { box-shadow: 0 0 0 8px rgba(15, 23, 42, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(15, 23, 42, 0); }
+    }
+    .seg-track {
+      background: #F1F5F9;
+      border-radius: 9999px;
+      padding: 4px;
+      display: inline-flex;
+      gap: 2px;
+    }
+    .seg-btn {
+      border-radius: 9999px;
+      padding: 0.5rem 1.1rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #475569;
+      transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .seg-btn.active {
+      background: #0f172a;
+      color: #fff;
+    }
+    .chip {
+      border-radius: 9999px;
+      padding: 0.35rem 0.85rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid #E2E8F0;
+      background: #fff;
+      color: #475569;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .chip.active {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: #fff;
+    }
+    .race-card {
+      border-style: dashed;
+      border-width: 1.5px;
+      border-color: #cbd5e1;
+    }
+    .slate-edge { border-left: 3px solid #e2e8f0; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+    details.history-panel > summary { list-style: none; cursor: pointer; }
+    details.history-panel > summary::-webkit-details-marker { display: none; }
   </style>
 </head>
-<body class="bg-gradient-to-br from-white via-gray-50 to-white min-h-screen font-sans">
-  
-  <!-- Sticky Header -->
-  <header class="sticky top-0 z-50 w-full glass border-b border-white/20">
+<body class="font-sans text-slate-800">
+
+  <header class="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b border-slate-100">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl overflow-hidden shadow-lg">
-          <img src="{{ url_for('static', filename='smartlearning.webp') }}" alt="Game Portal Logo" class="w-full h-full object-cover">
+        <div class="w-10 h-10 rounded-xl overflow-hidden ring-2 ring-slate-200 shadow-sm">
+          <img src="{{ url_for('static', filename='smartlearning.webp') }}" alt="Game Portal" class="w-full h-full object-cover">
         </div>
-        <h1 class="text-xl font-bold text-gray-800 tracking-tight">Game Portal</h1>
+        <div>
+          <h1 class="text-lg font-extrabold text-slate-900 tracking-tight leading-none">Game Portal</h1>
+          <p class="text-[11px] text-slate-800 font-semibold tracking-wide mt-0.5 hidden sm:block">Powering Growth</p>
+        </div>
       </div>
-      
-      <div class="flex items-center gap-4">
-        <span id="userNameDisplay" class="text-sm font-medium text-gray-600 hidden sm:block">Welcome, Player!</span>
-        <button onclick="logout()" class="group relative inline-flex items-center justify-center rounded-lg glass-card px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50/50 transition-all">
-          <i class="fas fa-sign-out-alt mr-2 group-hover:translate-x-0.5 transition-transform"></i>
-          Logout
+      <div class="flex items-center gap-3">
+        <span id="userNameDisplay" class="text-sm font-medium text-slate-600 hidden sm:block">Welcome!</span>
+        <button onclick="logout()" class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:border-rose-200 hover:text-rose-600 hover:bg-rose-50">
+          <i class="fas fa-sign-out-alt mr-2"></i> Logout
         </button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    
-    <!-- User Stats Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-      <!-- Games Played -->
-      <div class="glass-card rounded-2xl p-6 glass-hover relative overflow-hidden">
-        <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-indigo-100/30 rounded-full blur-2xl"></div>
-        <div class="relative">
-          <div class="text-3xl font-bold text-indigo-600 mb-1" id="totalGamesPlayed">0</div>
-          <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-            <i class="fas fa-gamepad"></i> Games Played
-          </div>
-        </div>
-      </div>
-
-      <!-- Average Score -->
-      <div class="glass-card rounded-2xl p-6 glass-hover relative overflow-hidden">
-        <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-emerald-100/30 rounded-full blur-2xl"></div>
-        <div class="relative">
-          <div class="text-3xl font-bold text-emerald-600 mb-1" id="averageScore">0</div>
-          <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-            <i class="fas fa-chart-line"></i> Average Score
-          </div>
-        </div>
-      </div>
-
-      <!-- Best Score -->
-      <div class="glass-card rounded-2xl p-6 glass-hover relative overflow-hidden">
-        <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-amber-100/30 rounded-full blur-2xl"></div>
-        <div class="relative">
-          <div class="text-3xl font-bold text-amber-600 mb-1" id="bestScore">0</div>
-          <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-            <i class="fas fa-trophy"></i> Best Score
-          </div>
-        </div>
-      </div>
+  <div class="theme-banner border-b border-slate-100 bg-gradient-to-r from-white via-white to-slate-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center gap-2 sm:gap-3">
+      <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-800">
+        <i class="fas fa-calendar-week"></i> This week
+      </span>
+      <span class="text-sm font-semibold text-slate-800">
+        Powering Growth: Where Agriculture, Technology &amp; Commerce Converge
+      </span>
+      <span class="hidden md:inline-flex items-center gap-2 ml-auto text-[11px] font-medium text-slate-500">
+        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-900"></span> Agriculture</span>
+        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-900"></span> Technology</span>
+        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-700"></span> Commerce</span>
+      </span>
     </div>
+  </div>
 
-    <!-- Two Column Layout: Games and Leaderboard -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-      
-      <!-- Available Games Section (2/3 width) -->
-      <div class="lg:col-span-2">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="p-2 bg-indigo-100/50 text-indigo-600 rounded-lg glass-card">
-            <i class="fas fa-play-circle"></i>
-          </div>
-          <h2 class="text-2xl font-bold text-gray-800">Available Games</h2>
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- Greeting + primary CTA -->
+    <section class="portal-card rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Keep growing</p>
+        <h2 id="greetingTitle" class="text-xl sm:text-2xl font-extrabold text-slate-900">Welcome back</h2>
+        <p id="greetingSub" class="text-sm text-slate-500 mt-1">Pick a quiz or jump into a live race.</p>
+      </div>
+      <div class="flex flex-wrap gap-2" id="primaryCtas">
+        <a href="#gamesSection" class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800">
+          <i class="fas fa-play mr-2"></i> Play a quiz
+        </a>
+        <a href="#racesSection" class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-bold text-slate-800 hover:bg-slate-900 hover:text-white hover:border-slate-400">
+          <i class="fas fa-flag-checkered mr-2"></i> Live races
+        </a>
+      </div>
+    </section>
+
+    <!-- Compact stats -->
+    <section class="grid grid-cols-3 gap-3 sm:gap-4">
+      <div class="portal-card rounded-xl p-3 sm:p-4 slate-edge">
+        <div class="text-xl sm:text-2xl font-extrabold text-slate-800" id="totalGamesPlayed">0</div>
+        <div class="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide mt-0.5">Played</div>
+      </div>
+      <div class="portal-card rounded-xl p-3 sm:p-4 slate-edge">
+        <div class="text-xl sm:text-2xl font-extrabold text-slate-700" id="averageScore">0</div>
+        <div class="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide mt-0.5">Avg score</div>
+      </div>
+      <div class="portal-card rounded-xl p-3 sm:p-4 slate-edge">
+        <div class="text-xl sm:text-2xl font-extrabold text-slate-700" id="bestScore">0</div>
+        <div class="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide mt-0.5">Best</div>
+      </div>
+    </section>
+
+    <!-- Live Races -->
+    <section id="racesSection">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
+          <i class="fas fa-flag-checkered"></i>
         </div>
-        
-        <div id="gamesList" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- Loading State -->
-          <div class="col-span-full glass-card rounded-xl border border-white/30 p-12 text-center">
-            <i class="fas fa-spinner fa-spin text-3xl text-indigo-500 mb-4"></i>
-            <p class="text-gray-500">Loading available games...</p>
+        <div>
+          <h2 class="text-xl font-extrabold text-slate-900">Growth Races</h2>
+          <p class="text-xs text-slate-500">Field challenges · compete live</p>
+        </div>
+      </div>
+      <div id="racesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="col-span-full portal-card rounded-xl p-8 text-center">
+          <i class="fas fa-spinner fa-spin text-2xl text-slate-700 mb-3"></i>
+          <p class="text-slate-500 text-sm">Loading races…</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Games + Leaderboard -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="gamesSection">
+      <div class="lg:col-span-2">
+        <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center">
+              <i class="fas fa-th-large"></i>
+            </div>
+            <div>
+              <h2 class="text-xl font-extrabold text-slate-900">Available Games</h2>
+              <p class="text-xs text-slate-500">Grow your knowledge, one quiz at a time</p>
+            </div>
+          </div>
+          <div class="seg-track" id="gameSourceTabs">
+            <button type="button" data-source="ruzivo" class="seg-btn game-tab active">Smart Learning</button>
+            <button type="button" data-source="general_knowledge" class="seg-btn game-tab">General Knowledge</button>
+          </div>
+        </div>
+
+        <div id="slToolbar" class="mb-4 space-y-3">
+          <div id="progressSummary" class="text-sm font-medium text-slate-600"></div>
+          <div id="progressBarWrap" class="hidden h-2 rounded-full bg-slate-100 overflow-hidden">
+            <div id="progressBarFill" class="progress-fill h-full rounded-full bg-gradient-to-r from-slate-700 to-slate-900" style="width:0%"></div>
+          </div>
+          <div class="flex flex-wrap gap-2 items-center">
+            <div class="relative flex-1 min-w-[160px]">
+              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input id="gameSearch" type="search" placeholder="Search the field…"
+                class="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-800">
+            </div>
+            <label class="inline-flex items-center gap-2 text-sm text-slate-600 bg-white px-3 py-2.5 rounded-xl border border-slate-200">
+              <input type="checkbox" id="preferMyGrade" checked class="rounded border-slate-300 text-slate-800 focus:ring-slate-400">
+              My grade only
+            </label>
+          </div>
+          <div id="subjectChips" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <div id="gamesList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="col-span-full portal-card rounded-xl p-12 text-center">
+            <i class="fas fa-spinner fa-spin text-3xl text-slate-800 mb-4"></i>
+            <p class="text-slate-500">Loading games…</p>
           </div>
         </div>
       </div>
 
-      <!-- Leaderboard Section (1/3 width) -->
-      <div class="lg:col-span-1">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="p-2 bg-amber-100/50 text-amber-600 rounded-lg glass-card">
+      <aside class="lg:col-span-1">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
             <i class="fas fa-trophy"></i>
           </div>
-          <h2 class="text-2xl font-bold text-gray-800">Leaderboard</h2>
+          <div>
+            <h2 class="text-xl font-extrabold text-slate-900">Harvest Board</h2>
+            <p class="text-xs text-slate-500">Top growers in your age band</p>
+          </div>
         </div>
-        
-        <div class="glass-card rounded-2xl overflow-hidden">
-          <div id="leaderboard" class="p-6">
-            <div class="text-center text-gray-400 py-8">
+        <div class="portal-card rounded-2xl overflow-hidden sticky top-24">
+          <div id="leaderboard" class="p-5">
+            <div class="text-center text-slate-400 py-8">
               <i class="fas fa-spinner fa-spin text-2xl mb-4"></i>
-              <p class="text-sm">Loading leaderboard...</p>
+              <p class="text-sm">Loading…</p>
             </div>
           </div>
         </div>
-      </div>
+      </aside>
     </div>
 
-    <!-- User Scores Section -->
-    <div class="glass-card rounded-2xl overflow-hidden">
-      <div class="px-6 py-5 border-b border-white/20 flex items-center gap-3 bg-white/30">
-        <div class="p-2 bg-amber-100/50 text-amber-600 rounded-lg">
-          <i class="fas fa-history"></i>
+    <!-- History (collapsed by default) -->
+    <details class="history-panel portal-card rounded-2xl overflow-hidden">
+      <summary class="px-6 py-4 flex items-center justify-between gap-3 bg-white hover:bg-slate-50/80">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
+            <i class="fas fa-history"></i>
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Your Performance History</h2>
+            <p class="text-xs text-slate-500">Past attempts &amp; scores</p>
+          </div>
         </div>
-        <h2 class="text-lg font-bold text-gray-800">Your Performance History</h2>
-      </div>
-      
-      <div id="myScores" class="overflow-x-auto">
-        <div class="p-12 text-center text-gray-400">
+        <i class="fas fa-chevron-down text-slate-400 text-sm"></i>
+      </summary>
+      <div id="myScores" class="overflow-x-auto border-t border-slate-100">
+        <div class="p-12 text-center text-slate-400">
           <i class="fas fa-spinner fa-spin text-3xl mb-4"></i>
-          <p>Loading your scores...</p>
+          <p>Loading your scores…</p>
         </div>
       </div>
-    </div>
-
+    </details>
   </main>
 
-  <footer class="mt-12 py-8 text-center text-sm text-gray-400">
-    <p>&copy; <span id="year"></span> Akello Game Portal. All rights reserved.</p>
+  <footer class="mt-4 py-8 text-center text-sm text-slate-400">
+    <p>&copy; <span id="year"></span> Akello Game Portal · Powering Growth</p>
   </footer>
 
   <script>
@@ -188,120 +299,334 @@
 
     document.getElementById('userNameDisplay').textContent = `Welcome, ${gameUserName || 'Player'}!`;
 
-    document.addEventListener('DOMContentLoaded', () => {
+    let userScores = [];
+    let bestByGame = {};
+    let userStats = null;
+    let activeGameSource = 'ruzivo';
+    let activeSubject = '';
+    let searchQuery = '';
+    let preferMyGrade = true;
+    let learnerGrade = null;
+    let allLoadedGames = [];
+    let liveRaceCount = 0;
+
+    function setTabActive(source) {
+      document.querySelectorAll('#gameSourceTabs .game-tab').forEach((b) => {
+        b.classList.toggle('active', b.dataset.source === source);
+      });
+    }
+
+    function growthStage(pct) {
+      if (pct >= 80) return { icon: 'fa-trophy', label: 'All caught up' };
+      if (pct >= 40) return { icon: 'fa-chart-line', label: 'In progress' };
+      if (pct > 0) return { icon: 'fa-play', label: 'Getting started' };
+      return { icon: 'fa-circle', label: 'Ready to play' };
+    }
+
+    function subjectIcon(subject) {
+      const s = (subject || '').toLowerCase();
+      if (/math|numer/.test(s)) return 'fa-calculator';
+      if (/science|biology|chem|phys/.test(s)) return 'fa-flask';
+      if (/english|lang|lit/.test(s)) return 'fa-book-open';
+      if (/geo|social|history/.test(s)) return 'fa-globe-africa';
+      if (/ict|comp|tech/.test(s)) return 'fa-microchip';
+      if (/agri|farm/.test(s)) return 'fa-seedling';
+      if (/commerce|business|account/.test(s)) return 'fa-chart-line';
+      return 'fa-book';
+    }
+
+    async function ensureSession() {
+      try {
+        const r = await fetch(`/api/game-users/${gameUserId}/session`);
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Session invalid');
+        if (data.user.needs_dob) {
+          sessionStorage.removeItem('gameUserDob');
+          window.location.href = '/game-login';
+          return false;
+        }
+        if (data.user.dob) sessionStorage.setItem('gameUserDob', data.user.dob);
+        learnerGrade = data.user.grade;
+        const name = `${data.user.firstname} ${data.user.surname}`;
+        document.getElementById('userNameDisplay').textContent =
+          `Welcome, ${name}!` + (learnerGrade ? ` · Grade ${learnerGrade}` : '');
+        document.getElementById('greetingTitle').textContent =
+          `Welcome, ${data.user.firstname}` + (learnerGrade ? ` · Grade ${learnerGrade}` : '');
+        return true;
+      } catch (e) {
+        console.error(e);
+        window.location.href = '/game-login';
+        return false;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const ok = await ensureSession();
+      if (!ok) return;
+      try {
+        const probe = await fetch(`/api/games?active=true&user_id=${gameUserId}&content_source=ruzivo&prefer_user_grade=true`);
+        const probeData = await probe.json();
+        if (!probeData.games || probeData.games.length === 0) {
+          activeGameSource = 'general_knowledge';
+          setTabActive('general_knowledge');
+        }
+      } catch (e) { /* keep default */ }
+      updateToolbarVisibility();
       loadGames();
+      loadRaces();
       loadUserStats();
       loadMyScores();
       loadLeaderboard();
+      setInterval(loadRaces, 15000);
     });
 
-    let userScores = [];
-    let userStats = null;
+    function updateToolbarVisibility() {
+      const tb = document.getElementById('slToolbar');
+      if (!tb) return;
+      if (activeGameSource === 'ruzivo') tb.classList.remove('hidden');
+      else tb.classList.add('hidden');
+    }
 
-    // Helper functions for difficulty level display
+    document.querySelectorAll('#gameSourceTabs .game-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeGameSource = btn.dataset.source;
+        activeSubject = '';
+        searchQuery = '';
+        const searchEl = document.getElementById('gameSearch');
+        if (searchEl) searchEl.value = '';
+        setTabActive(activeGameSource);
+        updateToolbarVisibility();
+        loadGames();
+      });
+    });
+
+    const preferEl = document.getElementById('preferMyGrade');
+    if (preferEl) preferEl.addEventListener('change', (e) => {
+      preferMyGrade = !!e.target.checked;
+      loadGames();
+    });
+    let searchTimer = null;
+    const searchEl = document.getElementById('gameSearch');
+    if (searchEl) searchEl.addEventListener('input', (e) => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        searchQuery = (e.target.value || '').trim().toLowerCase();
+        renderGamesList(allLoadedGames);
+      }, 200);
+    });
+
     function getDifficultyBadgeClass(level) {
       const classes = {
-        'easy': 'bg-green-100/80 text-green-700',
-        'medium': 'bg-yellow-100/80 text-yellow-700',
-        'hard': 'bg-red-100/80 text-red-700'
+        'easy': 'bg-slate-100 text-slate-800',
+        'medium': 'bg-slate-100 text-slate-700',
+        'hard': 'bg-rose-50 text-rose-700'
       };
-      return classes[level] || 'bg-gray-100/80 text-gray-600';
+      return classes[level] || 'bg-slate-100 text-slate-600';
     }
 
     function getDifficultyIcon(level) {
-      const icons = {
-        'easy': 'fa-seedling',
-        'medium': 'fa-fire',
-        'hard': 'fa-mountain'
-      };
-      return icons[level] || 'fa-circle';
+      return { easy: 'fa-check', medium: 'fa-fire', hard: 'fa-mountain' }[level] || 'fa-circle';
     }
 
     function getDifficultyLabel(level) {
-      const labels = {
-        'easy': 'Easy',
-        'medium': 'Medium',
-        'hard': 'Hard'
-      };
-      return labels[level] || level;
+      return { easy: 'Easy', medium: 'Medium', hard: 'Hard' }[level] || level;
     }
 
     async function loadGames() {
       try {
-        // Load user scores first to check which games they've played
         const scoresRes = await fetch(`/api/game-users/${gameUserId}/scores`);
         if (scoresRes.ok) {
           const scoresData = await scoresRes.json();
           userScores = scoresData.scores || [];
+          bestByGame = scoresData.best_by_game || {};
         }
-        
-        // Pass user_id to filter games by user's age
-        const r = await fetch(`/api/games?active=true&user_id=${gameUserId}`);
+
+        let url = `/api/games?active=true&user_id=${gameUserId}&content_source=${activeGameSource}`;
+        if (activeGameSource === 'ruzivo' && preferMyGrade) url += '&prefer_user_grade=true';
+        const r = await fetch(url);
         const data = await r.json();
-        const container = document.getElementById('gamesList');
-        
-        if (!data.games || data.games.length === 0) {
-          container.innerHTML = `
-            <div class="col-span-full glass-card rounded-xl p-12 text-center border border-white/30">
-              <div class="w-16 h-16 bg-gray-100/50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
-                <i class="fas fa-gamepad text-2xl"></i>
+        if (data.learner && data.learner.needs_dob) {
+          window.location.href = '/game-login';
+          return;
+        }
+        if (data.learner && data.learner.grade != null) learnerGrade = data.learner.grade;
+
+        const emptyLabel = activeGameSource === 'ruzivo'
+          ? 'No quizzes in this field yet — try another subject or turn off “My grade only”.'
+          : 'No general knowledge games for your age yet.';
+
+        allLoadedGames = data.games || [];
+        if (!allLoadedGames.length) {
+          const prog = document.getElementById('progressSummary');
+          if (prog) prog.textContent = '';
+          const bar = document.getElementById('progressBarWrap');
+          if (bar) bar.classList.add('hidden');
+          const chips = document.getElementById('subjectChips');
+          if (chips) chips.innerHTML = '';
+          document.getElementById('gamesList').innerHTML = `
+            <div class="col-span-full portal-card rounded-xl p-12 text-center">
+              <div class="w-14 h-14 mx-auto mb-4 rounded-full bg-slate-100 text-slate-800 flex items-center justify-center text-2xl">
+                <i class="fas fa-inbox"></i>
               </div>
-              <h3 class="text-lg font-medium text-gray-800">No Games Available</h3>
-              <p class="text-gray-500 mt-2">There are no active games for your age group at the moment.</p>
+              <h3 class="text-lg font-bold text-slate-800">Empty field</h3>
+              <p class="text-slate-500 mt-2 text-sm">${emptyLabel}</p>
             </div>`;
           return;
         }
-        
-        // Create a map of game_id to check if user has played
-        const playedGames = new Set(userScores.map(s => s.game_id));
-        
-        container.innerHTML = data.games.map(g => {
-          const hasPlayed = playedGames.has(g.id);
-          const difficultyBadge = g.difficulty_level ? 
-            `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getDifficultyBadgeClass(g.difficulty_level)} whitespace-nowrap"><i class="fas ${getDifficultyIcon(g.difficulty_level)} mr-1.5"></i> ${getDifficultyLabel(g.difficulty_level)}</span>` : '';
-          return `
-          <div class="group glass-card rounded-xl glass-hover flex flex-col h-full relative overflow-hidden ${hasPlayed ? 'opacity-90' : ''}">
-            <!-- Decorative top border -->
-            <div class="h-1 w-full bg-gradient-to-r ${hasPlayed ? 'from-amber-400 to-amber-500' : 'from-indigo-500 to-purple-600'}"></div>
-            
-            <div class="p-6 flex-grow flex flex-col">
-              <div class="flex justify-between items-start mb-4">
-                <h3 class="text-lg font-bold text-gray-800 line-clamp-1 group-hover:text-indigo-600 transition-colors">${escapeHtml(g.title)}</h3>
-                <div class="flex items-center gap-2 flex-wrap justify-end">
-                  ${g.age_range ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100/80 text-gray-600 whitespace-nowrap"><i class="fas fa-users mr-1.5"></i> Ages ${g.age_range}</span>` : ''}
-                  ${difficultyBadge}
-                </div>
-              </div>
-              
-              <p class="text-gray-600 text-sm mb-6 line-clamp-3 flex-grow">${escapeHtml(g.description || 'Test your skills with this exciting educational game!')}</p>
-              
-              <div class="mt-auto">
-                ${hasPlayed ? `
-                  <div class="rounded-lg bg-amber-50/80 border border-amber-200/50 p-4 text-center">
-                    <div class="flex items-center justify-center text-amber-600 mb-1">
-                      <i class="fas fa-check-circle mr-2"></i>
-                      <span class="font-semibold">Completed</span>
-                    </div>
-                    <p class="text-xs text-amber-700">You cannot replay this game.</p>
-                  </div>
-                ` : `
-                  <button onclick="playGame(${g.id})" class="w-full inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-all duration-200 transform active:scale-[0.98]">
-                    <i class="fas fa-play mr-2"></i> Play Now
-                  </button>
-                `}
-              </div>
-            </div>
-          </div>
-        `;
-        }).join('');
+        renderSubjectChips(allLoadedGames);
+        renderGamesList(allLoadedGames);
       } catch (e) {
         console.error(e);
         document.getElementById('gamesList').innerHTML = `
-          <div class="col-span-full glass-card rounded-xl p-8 text-center border border-red-200/50 text-red-600 bg-red-50/50">
-            <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
-            <p>Error loading games. Please try refreshing the page.</p>
+          <div class="col-span-full portal-card rounded-xl p-8 text-center text-rose-600">
+            <p>Error loading games. Please refresh.</p>
           </div>`;
       }
+    }
+
+    function renderSubjectChips(games) {
+      const chips = document.getElementById('subjectChips');
+      if (!chips) return;
+      if (activeGameSource !== 'ruzivo') { chips.innerHTML = ''; return; }
+      const counts = {};
+      games.forEach((g) => {
+        const s = (g.subject || 'Other').trim() || 'Other';
+        counts[s] = (counts[s] || 0) + 1;
+      });
+      const subjects = Object.keys(counts).sort((a, b) => a.localeCompare(b));
+      chips.innerHTML = [
+        `<button type="button" data-subject="" class="chip subject-chip ${!activeSubject ? 'active' : ''}">All (${games.length})</button>`,
+        ...subjects.map((s) =>
+          `<button type="button" data-subject="${escapeHtml(s)}" class="chip subject-chip ${activeSubject === s ? 'active' : ''}">${escapeHtml(s)} (${counts[s]})</button>`
+        ),
+      ].join('');
+      chips.querySelectorAll('.subject-chip').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          activeSubject = btn.dataset.subject || '';
+          renderSubjectChips(allLoadedGames);
+          renderGamesList(allLoadedGames);
+        });
+      });
+    }
+
+    function filteredGames(games) {
+      return games.filter((g) => {
+        if (activeSubject && (g.subject || 'Other') !== activeSubject) return false;
+        if (!searchQuery) return true;
+        const hay = `${g.title || ''} ${g.subject || ''} ${g.description || ''}`.toLowerCase();
+        return hay.includes(searchQuery);
+      });
+    }
+
+    function renderGamesList(games) {
+      const container = document.getElementById('gamesList');
+      const list = filteredGames(games);
+      const completed = list.filter((g) => bestByGame[g.id]).length;
+      const pct = list.length ? Math.round((completed / list.length) * 100) : 0;
+      const stage = growthStage(pct);
+      const prog = document.getElementById('progressSummary');
+      const barWrap = document.getElementById('progressBarWrap');
+      const barFill = document.getElementById('progressBarFill');
+      if (prog) {
+        if (activeGameSource === 'ruzivo') {
+          prog.innerHTML = `<i class="fas ${stage.icon} text-slate-800 mr-1.5"></i>` +
+            (learnerGrade
+              ? `Grade ${learnerGrade}: <strong>${completed}</strong> of <strong>${list.length}</strong> done · ${stage.label}`
+              : `<strong>${completed}</strong> of <strong>${list.length}</strong> quizzes · ${stage.label}`);
+        } else {
+          prog.innerHTML = `<i class="fas ${stage.icon} text-slate-800 mr-1.5"></i><strong>${completed}</strong> of <strong>${list.length}</strong> games · ${stage.label}`;
+        }
+      }
+      if (barWrap && barFill) {
+        barWrap.classList.remove('hidden');
+        requestAnimationFrame(() => { barFill.style.width = `${pct}%`; });
+      }
+
+      function renderGameCard(g) {
+        const best = bestByGame[g.id];
+        const hasPlayed = !!best;
+        const isSL = g.content_source === 'ruzivo';
+        const edge = isSL ? 'slate-edge' : 'slate-edge';
+        const pctBest = best && best.percentage != null ? Math.round(best.percentage) : (best && best.max_score ? Math.round(100 * best.score / best.max_score) : 0);
+        const metaBits = [];
+        if (g.grade) metaBits.push(`G${g.grade}`);
+        if (g.difficulty_level) metaBits.push(getDifficultyLabel(g.difficulty_level));
+        const icon = subjectIcon(g.subject);
+        return `
+          <div class="group portal-card portal-card-hover rounded-xl flex flex-col h-full relative overflow-hidden ${edge}">
+            <div class="p-5 flex-grow flex flex-col">
+              <div class="flex items-start gap-3 mb-3">
+                <div class="w-10 h-10 rounded-lg ${isSL ? 'bg-slate-100 text-slate-700' : 'bg-slate-100 text-slate-800'} flex items-center justify-center shrink-0">
+                  <i class="fas ${icon}"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <h3 class="text-base font-bold text-slate-900 line-clamp-2 group-hover:text-slate-700">${escapeHtml(g.title)}</h3>
+                  <div class="flex flex-wrap gap-1.5 mt-1.5">
+                    <span class="text-[10px] font-bold uppercase tracking-wide ${isSL ? 'text-slate-700' : 'text-slate-800'}">${isSL ? 'Smart Learning' : 'General Knowledge'}</span>
+                    ${metaBits.map((m) => `<span class="text-[10px] font-semibold text-slate-400">· ${escapeHtml(m)}</span>`).join('')}
+                  </div>
+                </div>
+              </div>
+              <p class="text-slate-500 text-sm mb-3 line-clamp-2 flex-grow">${escapeHtml(g.description || 'Practice and power your growth.')}</p>
+              ${hasPlayed ? `
+                <div class="mb-3">
+                  <div class="flex justify-between text-[11px] font-semibold text-slate-700 mb-1">
+                    <span>Best ${best.score}${best.max_score != null ? ' / ' + best.max_score : ''}</span>
+                    <span>${pctBest}% · ${best.attempts || 1} attempt${(best.attempts || 1) === 1 ? '' : 's'}</span>
+                  </div>
+                  <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                    <div class="h-full rounded-full bg-slate-700 progress-fill" style="width:${Math.min(100, pctBest)}%"></div>
+                  </div>
+                </div>` : ''}
+              <div class="mt-auto">
+                ${hasPlayed
+                  ? `<button onclick="playGame(${g.id})" class="w-full inline-flex items-center justify-center rounded-xl border-2 border-slate-800 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-900 hover:text-white">
+                      <i class="fas fa-redo mr-2"></i> Play again
+                    </button>`
+                  : `<button onclick="playGame(${g.id})" class="w-full inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 shadow-sm">
+                      <i class="fas fa-play mr-2"></i> Play now
+                    </button>`}
+              </div>
+            </div>
+          </div>`;
+      }
+
+      if (!list.length) {
+        container.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
+        container.innerHTML = `<div class="col-span-full portal-card rounded-xl p-8 text-center text-slate-500">
+          <i class="fas fa-search mb-2 text-slate-300"></i>
+          <p>No quizzes match your filters.</p>
+        </div>`;
+        return;
+      }
+
+      if (activeGameSource === 'ruzivo') {
+        const bySubject = {};
+        list.forEach((g) => {
+          const key = (g.subject || 'Other').trim() || 'Other';
+          if (!bySubject[key]) bySubject[key] = [];
+          bySubject[key].push(g);
+        });
+        const subjects = Object.keys(bySubject).sort((a, b) => a.localeCompare(b));
+        container.className = 'space-y-8';
+        container.innerHTML = subjects.map((subject) => {
+          const gamesIn = bySubject[subject];
+          const done = gamesIn.filter((g) => bestByGame[g.id]).length;
+          return `
+            <section>
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center text-sm"><i class="fas ${subjectIcon(subject)}"></i></div>
+                <h3 class="text-base font-bold text-slate-900">${escapeHtml(subject)}</h3>
+                <span class="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">${done}/${gamesIn.length} done</span>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${gamesIn.map(renderGameCard).join('')}</div>
+            </section>`;
+        }).join('');
+        return;
+      }
+
+      container.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
+      container.innerHTML = list.map(renderGameCard).join('');
     }
 
     function playGame(gameId) {
@@ -309,34 +634,114 @@
     }
     window.playGame = playGame;
 
+    function mixLabel(mix) {
+      if (!mix) return '';
+      const parts = [];
+      if (mix.quiz) parts.push(`${mix.quiz} quiz${mix.quiz === 1 ? '' : 'zes'}`);
+      if (mix.puzzle) parts.push(`${mix.puzzle} puzzle${mix.puzzle === 1 ? '' : 's'}`);
+      if (mix.question) parts.push(`${mix.question} question${mix.question === 1 ? '' : 's'}`);
+      return parts.join(' · ') || `${mix.total_items || 0} items`;
+    }
+
+    function formatCountdown(total) {
+      const m = Math.floor(Math.max(0, total) / 60);
+      const s = Math.max(0, total) % 60;
+      if (m >= 60) {
+        const h = Math.floor(m / 60);
+        return `${h}h ${m % 60}m`;
+      }
+      return `${m}:${String(s).padStart(2, '0')}`;
+    }
+
+    function updatePrimaryCta() {
+      const sub = document.getElementById('greetingSub');
+      if (!sub) return;
+      if (liveRaceCount > 0) {
+        sub.textContent = `${liveRaceCount} live race${liveRaceCount === 1 ? '' : 's'} waiting — jump in or keep growing with quizzes.`;
+      } else {
+        sub.textContent = 'Pick a quiz or check back for the next growth race.';
+      }
+    }
+
+    async function loadRaces() {
+      const container = document.getElementById('racesList');
+      if (!container) return;
+      try {
+        const r = await fetch(`/api/game-races/available?user_id=${gameUserId}`);
+        const data = await r.json();
+        const races = data.races || [];
+        liveRaceCount = races.filter((x) => x.status === 'live').length;
+        updatePrimaryCta();
+        if (!races.length) {
+          container.innerHTML = `
+            <div class="col-span-full portal-card rounded-xl p-8 text-center">
+              <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center"><i class="fas fa-flag"></i></div>
+              <p class="text-slate-500 text-sm">No races in the field right now. Check back soon.</p>
+            </div>`;
+          return;
+        }
+        container.innerHTML = races.map((race) => {
+          const live = race.status === 'live';
+          const upcoming = race.status === 'upcoming';
+          const finished = race.status === 'finished';
+          const when = upcoming
+            ? `Starts in ${formatCountdown(race.seconds_until_start)}`
+            : live
+              ? `${formatCountdown(race.remaining_seconds)} left`
+              : 'Finished';
+          let action = '';
+          if (finished) {
+            action = `<a href="/play-race/${race.id}" class="w-full inline-flex items-center justify-center rounded-xl bg-slate-700 px-4 py-2.5 text-sm font-bold text-white">View harvest</a>`;
+          } else if (live) {
+            action = `<a href="/play-race/${race.id}" class="w-full inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800">${race.finished ? 'View board' : 'Join race'}</a>`;
+          } else {
+            action = `<a href="/play-race/${race.id}" class="w-full inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800">Enter lobby</a>`;
+          }
+          return `
+            <div class="portal-card portal-card-hover race-card rounded-xl flex flex-col overflow-hidden">
+              <div class="p-5 flex-grow flex flex-col">
+                <div class="flex items-start justify-between gap-2 mb-2">
+                  <h3 class="font-bold text-slate-900">${escapeHtml(race.title)}</h3>
+                  <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-1 ${live ? 'bg-slate-100 text-slate-800' : upcoming ? 'bg-slate-100 text-slate-700' : 'bg-slate-100 text-slate-600'}">
+                    ${live ? '<span class="live-pulse"></span>' : ''}${race.status}
+                  </span>
+                </div>
+                <p class="text-sm text-slate-500 mb-1">${escapeHtml(mixLabel(race.mix))}</p>
+                <p class="text-xs text-slate-400 mb-4">${when} · ${race.player_count || 0} joined · Ages ${escapeHtml(race.age_range || '')} · ${race.duration_minutes} min</p>
+                <div class="mt-auto">${action}</div>
+              </div>
+            </div>`;
+        }).join('');
+      } catch (e) {
+        console.error(e);
+        container.innerHTML = `<div class="col-span-full portal-card rounded-xl p-8 text-center text-rose-600">Could not load races.</div>`;
+      }
+    }
+
     async function loadUserStats() {
       try {
         const r = await fetch(`/api/game-users/${gameUserId}/stats`);
         const data = await r.json();
         if (r.ok && data.stats) {
           userStats = data.stats;
-          // Animate numbers slightly
-          animateValue(document.getElementById('totalGamesPlayed'), 0, data.stats.total_games || 0, 1000);
+          animateValue(document.getElementById('totalGamesPlayed'), 0, data.stats.total_games || 0, 800);
           document.getElementById('averageScore').textContent = data.stats.average_score ? data.stats.average_score.toFixed(1) : '0';
-          animateValue(document.getElementById('bestScore'), 0, data.stats.best_score || 0, 1000);
+          animateValue(document.getElementById('bestScore'), 0, data.stats.best_score || 0, 800);
         }
       } catch (e) {
         console.error(e);
       }
     }
-    
+
     function animateValue(obj, start, end, duration) {
-      if (start === end) return;
+      if (start === end) { obj.innerHTML = end; return; }
       let startTimestamp = null;
       const step = (timestamp) => {
         if (!startTimestamp) startTimestamp = timestamp;
         const progress = Math.min((timestamp - startTimestamp) / duration, 1);
         obj.innerHTML = Math.floor(progress * (end - start) + start);
-        if (progress < 1) {
-          window.requestAnimationFrame(step);
-        } else {
-          obj.innerHTML = end;
-        }
+        if (progress < 1) window.requestAnimationFrame(step);
+        else obj.innerHTML = end;
       };
       window.requestAnimationFrame(step);
     }
@@ -344,155 +749,136 @@
     async function loadLeaderboard() {
       try {
         const r = await fetch(`/api/game-users/${gameUserId}/leaderboard`);
-        if (!r.ok) {
-          throw new Error('Failed to load leaderboard');
-        }
+        if (!r.ok) throw new Error('Failed to load leaderboard');
         const data = await r.json();
         const container = document.getElementById('leaderboard');
-        
+
         if (!data.leaderboard || data.leaderboard.length === 0) {
           container.innerHTML = `
-            <div class="text-center text-gray-400 py-8">
-              <div class="w-16 h-16 bg-gray-100/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="fas fa-trophy text-2xl text-gray-300"></i>
+            <div class="text-center text-slate-400 py-8">
+              <div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-700 text-xl">
+                <i class="fas fa-trophy"></i>
               </div>
-              <p class="text-sm">No leaderboard data available for your age group (${data.age_range || 'N/A'}).</p>
+              <p class="text-sm">No harvest ranks yet for ${data.age_range || 'your age group'}.</p>
             </div>`;
           return;
         }
-        
+
         const currentUserRank = data.leaderboard.findIndex(u => u.user_id == gameUserId) + 1;
         const topThree = data.leaderboard.slice(0, 3);
-        const rest = data.leaderboard.slice(3, 10); // Show top 10
-        
+        const rest = data.leaderboard.slice(3, 10);
+        const medals = [
+          { bg: 'bg-slate-100', text: 'text-slate-700', label: '1st' },
+          { bg: 'bg-slate-100', text: 'text-slate-600', label: '2nd' },
+          { bg: 'bg-amber-50', text: 'text-amber-800', label: '3rd' },
+        ];
+
         let html = `
           <div class="mb-4">
-            <p class="text-xs text-gray-500 mb-2">Age Group: <span class="font-semibold text-gray-700">${data.age_range}</span></p>
-            ${currentUserRank > 0 ? `<p class="text-xs text-gray-500">Your Rank: <span class="font-semibold text-indigo-600">#${currentUserRank}</span></p>` : ''}
+            <p class="text-xs text-slate-500">Age band <span class="font-semibold text-slate-700">${escapeHtml(data.age_range || '')}</span></p>
+            ${currentUserRank > 0 ? `<p class="text-xs text-slate-500 mt-0.5">Your rank <span class="font-bold text-slate-800">#${currentUserRank}</span></p>` : ''}
           </div>
-        `;
-        
-        // Top 3 with special styling
-        if (topThree.length > 0) {
-          const medals = ['🥇', '🥈', '🥉'];
-          html += '<div class="space-y-3 mb-4">';
-          topThree.forEach((user, index) => {
-            const isCurrentUser = user.user_id == gameUserId;
-            html += `
-              <div class="glass-card rounded-lg p-3 ${isCurrentUser ? 'ring-2 ring-indigo-500 bg-indigo-50/50' : ''}">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2 flex-1 min-w-0">
-                    <span class="text-lg">${medals[index]}</span>
-                    <div class="flex-1 min-w-0">
-                      <div class="text-sm font-semibold text-gray-800 truncate">${escapeHtml(user.firstname)} ${escapeHtml(user.surname)}</div>
-                      <div class="text-xs text-gray-500 truncate">@${escapeHtml(user.username)}</div>
-                    </div>
-                  </div>
-                  <div class="text-right">
-                    <div class="text-sm font-bold text-indigo-600">${user.best_score}</div>
-                    <div class="text-xs text-gray-500">${user.total_games} games</div>
+          <div class="space-y-2.5 mb-3">`;
+
+        topThree.forEach((user, index) => {
+          const isCurrentUser = user.user_id == gameUserId;
+          const m = medals[index];
+          html += `
+            <div class="rounded-xl p-3 border ${isCurrentUser ? 'border-slate-800 bg-slate-100' : 'border-slate-100 bg-white'}">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="text-[10px] font-extrabold ${m.bg} ${m.text} w-8 h-8 rounded-full flex items-center justify-center shrink-0">${m.label}</span>
+                  <div class="min-w-0">
+                    <div class="text-sm font-bold text-slate-800 truncate">${escapeHtml(user.firstname)} ${escapeHtml(user.surname)}</div>
+                    <div class="text-[11px] text-slate-400 truncate">@${escapeHtml(user.username)}</div>
                   </div>
                 </div>
+                <div class="text-right shrink-0">
+                  <div class="text-sm font-extrabold text-slate-800">${user.best_score}</div>
+                  <div class="text-[10px] text-slate-400">${user.total_games} played</div>
+                </div>
               </div>
-            `;
-          });
-          html += '</div>';
-        }
-        
-        // Rest of the leaderboard
+            </div>`;
+        });
+        html += '</div>';
+
         if (rest.length > 0) {
-          html += '<div class="space-y-2">';
+          html += '<div class="space-y-1.5">';
           rest.forEach((user, index) => {
             const rank = index + 4;
             const isCurrentUser = user.user_id == gameUserId;
             html += `
-              <div class="glass-card rounded-lg p-2.5 ${isCurrentUser ? 'ring-2 ring-indigo-500 bg-indigo-50/50' : ''}">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2 flex-1 min-w-0">
-                    <span class="text-xs font-medium text-gray-500 w-6">#${rank}</span>
-                    <div class="flex-1 min-w-0">
-                      <div class="text-xs font-semibold text-gray-800 truncate">${escapeHtml(user.firstname)} ${escapeHtml(user.surname)}</div>
-                    </div>
+              <div class="rounded-lg px-2.5 py-2 ${isCurrentUser ? 'bg-slate-100 ring-1 ring-slate-300' : ''}">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-[11px] font-semibold text-slate-400 w-5">#${rank}</span>
+                    <span class="text-xs font-semibold text-slate-800 truncate">${escapeHtml(user.firstname)} ${escapeHtml(user.surname)}</span>
                   </div>
-                  <div class="text-right">
-                    <div class="text-xs font-bold text-indigo-600">${user.best_score}</div>
-                  </div>
+                  <span class="text-xs font-bold text-slate-700">${user.best_score}</span>
                 </div>
-              </div>
-            `;
+              </div>`;
           });
           html += '</div>';
         }
-        
+
         container.innerHTML = html;
       } catch (e) {
         console.error('Error loading leaderboard:', e);
         document.getElementById('leaderboard').innerHTML = `
-          <div class="text-center text-red-500 py-8">
-            <i class="fas fa-exclamation-triangle mb-2"></i>
-            <p class="text-sm">Error loading leaderboard. Please try again.</p>
-          </div>`;
+          <div class="text-center text-rose-500 py-8 text-sm">Could not load leaderboard.</div>`;
       }
     }
 
     async function loadMyScores() {
       try {
         const r = await fetch(`/api/game-users/${gameUserId}/scores`);
-        if (!r.ok) {
-          throw new Error('Failed to load scores');
-        }
+        if (!r.ok) throw new Error('Failed to load scores');
         const data = await r.json();
         const container = document.getElementById('myScores');
-        
+
         if (!data.scores || data.scores.length === 0) {
           container.innerHTML = `
-            <div class="p-12 text-center text-gray-400">
-              <div class="w-16 h-16 bg-gray-100/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="fas fa-trophy text-2xl text-gray-300"></i>
+            <div class="p-12 text-center text-slate-400">
+              <div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-800 text-xl">
+                <i class="fas fa-inbox"></i>
               </div>
-              <p>You haven't played any games yet. Start playing to track your progress!</p>
+              <p class="text-sm">Play a quiz to start your history.</p>
             </div>`;
           return;
         }
-        
+
         container.innerHTML = `
-          <table class="min-w-full divide-y divide-white/20">
-            <thead class="bg-white/30">
+          <table class="min-w-full divide-y divide-slate-100">
+            <thead class="bg-slate-50/80">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Game Title</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Score</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Accuracy</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Attempt</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date Played</th>
+                <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Game</th>
+                <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Score</th>
+                <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Accuracy</th>
+                <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Attempt</th>
+                <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
               </tr>
             </thead>
-            <tbody class="bg-white/20 divide-y divide-white/20">
+            <tbody class="divide-y divide-slate-50">
               ${data.scores.map(s => `
-                <tr class="hover:bg-white/30 transition-colors">
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-bold text-gray-800">${escapeHtml(s.game_title || 'Unknown')}</div>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-indigo-50/80 text-indigo-700 border border-indigo-100/50">
-                      ${s.score} <span class="text-indigo-400 ml-1 text-xs font-normal">/ ${s.max_score || '?'}</span>
+                <tr class="hover:bg-slate-50">
+                  <td class="px-6 py-3 whitespace-nowrap text-sm font-semibold text-slate-800">${escapeHtml(s.game_title || 'Unknown')}</td>
+                  <td class="px-6 py-3 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-sm font-semibold bg-slate-100 text-slate-800">
+                      ${s.score}<span class="text-slate-400 ml-1 text-xs font-normal">/ ${s.max_score || '?'}</span>
                     </span>
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
+                  <td class="px-6 py-3 whitespace-nowrap">
                     ${s.percentage ? `
                       <div class="flex items-center">
-                        <span class="text-sm font-medium ${s.percentage >= 80 ? 'text-green-600' : s.percentage >= 50 ? 'text-amber-600' : 'text-red-600'}">${s.percentage.toFixed(1)}%</span>
-                        <div class="w-16 h-1.5 bg-gray-100/50 rounded-full ml-2 overflow-hidden">
-                          <div class="h-full rounded-full ${s.percentage >= 80 ? 'bg-green-500' : s.percentage >= 50 ? 'bg-amber-500' : 'bg-red-500'}" style="width: ${s.percentage}%"></div>
+                        <span class="text-sm font-semibold ${s.percentage >= 80 ? 'text-slate-800' : s.percentage >= 50 ? 'text-slate-700' : 'text-rose-600'}">${s.percentage.toFixed(1)}%</span>
+                        <div class="w-16 h-1.5 bg-slate-100 rounded-full ml-2 overflow-hidden">
+                          <div class="h-full rounded-full ${s.percentage >= 80 ? 'bg-slate-900' : s.percentage >= 50 ? 'bg-slate-700' : 'bg-rose-500'}" style="width: ${s.percentage}%"></div>
                         </div>
                       </div>
-                    ` : '<span class="text-gray-400 text-sm">N/A</span>'}
+                    ` : '<span class="text-slate-400 text-sm">N/A</span>'}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    <span class="font-mono text-xs bg-gray-100/50 px-2 py-1 rounded">#${s.attempt_number}</span>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    ${formatDate(s.played_at)}
-                  </td>
+                  <td class="px-6 py-3 whitespace-nowrap text-sm text-slate-500"><span class="font-mono text-xs bg-slate-100 px-2 py-1 rounded">#${s.attempt_number}</span></td>
+                  <td class="px-6 py-3 whitespace-nowrap text-sm text-slate-500">${formatDate(s.played_at)}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -500,10 +886,7 @@
       } catch (e) {
         console.error('Error loading scores:', e);
         document.getElementById('myScores').innerHTML = `
-          <div class="p-8 text-center text-red-500">
-            <i class="fas fa-exclamation-triangle mb-2"></i>
-            <p>Error loading scores. Please try again.</p>
-          </div>`;
+          <div class="p-8 text-center text-rose-500 text-sm">Error loading scores.</div>`;
       }
     }
 
@@ -516,14 +899,8 @@
     function formatDate(d) {
       if (!d) return 'N/A';
       const date = new Date(d);
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric'
-      }) + ' at ' + date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        + ' at ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     }
 
     function escapeHtml(s) {
