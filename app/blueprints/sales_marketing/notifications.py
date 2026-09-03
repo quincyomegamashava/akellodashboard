@@ -9,6 +9,9 @@ from app.models import Notification, User
 
 from app.blueprints.sales_marketing.models import StakeholderLead
 
+_SM_STAFF_CACHE_KEY = "sm_staff_user_ids"
+_SM_STAFF_CACHE_TTL = 300
+
 
 def can_access_sales_marketing_for_user(user: User) -> bool:
     role = (getattr(user, "userRole", None) or "").strip()
@@ -16,8 +19,39 @@ def can_access_sales_marketing_for_user(user: User) -> bool:
 
 
 def _sm_staff_user_ids() -> list[int]:
-    users = User.query.all()
-    return [u.id for u in users if can_access_sales_marketing_for_user(u)]
+    """Return SM staff user IDs (Admins + Sales & Marketing privilege), cached briefly."""
+    try:
+        from app.routes import cache
+
+        cached = cache.get(_SM_STAFF_CACHE_KEY)
+        if cached is not None:
+            return list(cached)
+    except Exception:
+        cache = None
+
+    ids: list[int] = []
+    seen: set[int] = set()
+
+    for user in User.query.filter(User.userRole == "Admin").all():
+        if user.id not in seen:
+            seen.add(user.id)
+            ids.append(user.id)
+
+    candidates = User.query.filter(
+        User.userRole != "Admin",
+        User.privileges.isnot(None),
+    ).all()
+    for user in candidates:
+        if can_access_sales_marketing_for_user(user) and user.id not in seen:
+            seen.add(user.id)
+            ids.append(user.id)
+
+    if cache is not None:
+        try:
+            cache.set(_SM_STAFF_CACHE_KEY, ids, timeout=_SM_STAFF_CACHE_TTL)
+        except Exception:
+            pass
+    return ids
 
 
 def _dedupe_sm_notification(

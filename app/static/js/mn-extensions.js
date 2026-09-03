@@ -5,6 +5,70 @@
   const API = window.MN_API || (window.MN && window.MN.API);
   if (!API) return;
 
+  window.MN = window.MN || {};
+  window.MN._socketJoined = false;
+  window.MN._socketIntentionalLeave = false;
+  window.MN._socketJoinedMeetingId = null;
+
+  function getMeetingSocket() {
+    if (typeof io === "undefined") return null;
+    if (window.MN._socketIntentionalLeave) return null;
+    if (!window.MN_SOCKET) {
+      window.MN_SOCKET = io("/meeting-notes");
+      window.MN.socket = window.MN_SOCKET;
+      window.MN_SOCKET.on("connect", function () {
+        if (window.MN._socketIntentionalLeave) return;
+        const mid = window.MN._socketJoinedMeetingId;
+        if (mid && !window.MN._socketJoined) {
+          window.MN._socketJoined = true;
+          window.MN_SOCKET.emit("join_meeting", { meeting_id: mid });
+          window.MN_SOCKET.emit("presence_join", {
+            meeting_id: mid,
+            username: window.MN_CURRENT_USER || "User",
+          });
+        }
+      });
+    }
+    return window.MN_SOCKET;
+  }
+
+  function joinMeetingSocket(meetingId) {
+    if (!meetingId || window.MN._socketIntentionalLeave) return null;
+    const socket = getMeetingSocket();
+    if (!socket) return null;
+    window.MN._socketJoinedMeetingId = meetingId;
+    if (socket.connected) {
+      if (!window.MN._socketJoined) {
+        window.MN._socketJoined = true;
+        socket.emit("join_meeting", { meeting_id: meetingId });
+        socket.emit("presence_join", {
+          meeting_id: meetingId,
+          username: window.MN_CURRENT_USER || "User",
+        });
+      }
+    } else {
+      socket.connect();
+    }
+    return socket;
+  }
+
+  function leaveMeetingSocket() {
+    const socket = window.MN_SOCKET;
+    window.MN._socketIntentionalLeave = true;
+    const mid = window.MN._socketJoinedMeetingId;
+    if (socket && mid && window.MN._socketJoined) {
+      socket.emit("presence_leave", { meeting_id: mid });
+      socket.emit("leave_meeting", { meeting_id: mid });
+    }
+    window.MN._socketJoined = false;
+    window.MN._socketJoinedMeetingId = null;
+    if (socket) socket.disconnect();
+  }
+
+  window.MN.getMeetingSocket = getMeetingSocket;
+  window.MN.joinMeetingSocket = joinMeetingSocket;
+  window.MN.leaveMeetingSocket = leaveMeetingSocket;
+
   function $(sel, root) { return (root || document).querySelector(sel); }
   function escapeHtml(s) {
     const d = document.createElement("div");
@@ -20,6 +84,8 @@
     if (!modal || !input || !results) return;
 
     let items = [];
+    let searchTimer = null;
+    let searchAbort = null;
 
     function openPalette() {
       input.value = "";
@@ -29,31 +95,66 @@
       search("");
     }
 
+    function renderLocalActions(qq) {
+      items = [];
+      if (window.MN && window.MN.meetingNoteId && qq.indexOf("extract") >= 0) {
+        items.push({ type: "action", label: "Extract tasks from notes (AI)", action: "ai-extract" });
+      }
+      renderResults();
+    }
+
     function search(q) {
       const qq = (q || "").trim().toLowerCase();
-      Promise.all([
-        fetch(API.meetingsSearch + "?q=" + encodeURIComponent(qq) + "&limit=15").then(function (r) { return r.json(); }),
-        fetch(API.items + "?q=" + encodeURIComponent(qq)).then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
-      ]).then(function (pair) {
-        const meetings = pair[0] || [];
-        const actionItems = (pair[1].items || []).slice(0, 10);
-        items = [];
-        meetings.forEach(function (m) {
-          items.push({ type: "meeting", label: m.title, sub: m.meeting_date, href: "/meeting-notes/" + m.id + "?view=board" });
-        });
-        actionItems.forEach(function (it) {
-          items.push({
-            type: "task",
-            label: (it.call_to_action || "").split("\n")[0],
-            sub: (it.meeting_title || "") + " · " + (it.status || ""),
-            href: "/meeting-notes/" + it.meeting_note_id + "?view=board&highlight=" + it.id,
-          });
-        });
-        if (window.MN && window.MN.meetingNoteId && qq.indexOf("extract") >= 0) {
-          items.unshift({ type: "action", label: "Extract tasks from notes (AI)", action: "ai-extract" });
+      if (searchTimer) clearTimeout(searchTimer);
+      if (searchAbort) {
+        searchAbort.abort();
+        searchAbort = null;
+      }
+      searchTimer = setTimeout(function () {
+        searchTimer = null;
+        if (qq.length < 2) {
+          if (!qq.length) {
+            items = [];
+            results.innerHTML = '<p class="small text-muted mb-0 px-2">Type at least 2 characters to search</p>';
+            return;
+          }
+          renderLocalActions(qq);
+          return;
         }
-        renderResults();
-      });
+        searchAbort = new AbortController();
+        const signal = searchAbort.signal;
+        Promise.all([
+          fetch(API.meetingsSearch + "?q=" + encodeURIComponent(qq) + "&limit=15", { signal: signal })
+            .then(function (r) { return r.json(); }),
+          fetch(API.items + "?q=" + encodeURIComponent(qq) + "&limit=10", { signal: signal })
+            .then(function (r) { return r.json(); })
+            .catch(function () { return { items: [] }; }),
+        ]).then(function (pair) {
+          if (signal.aborted) return;
+          const meetings = pair[0] || [];
+          const actionItems = (pair[1].items || []).slice(0, 10);
+          items = [];
+          meetings.forEach(function (m) {
+            items.push({ type: "meeting", label: m.title, sub: m.meeting_date, href: "/meeting-notes/" + m.id + "?view=board" });
+          });
+          actionItems.forEach(function (it) {
+            items.push({
+              type: "task",
+              label: (it.call_to_action || "").split("\n")[0],
+              sub: (it.meeting_title || "") + " · " + (it.status || ""),
+              href: "/meeting-notes/" + it.meeting_note_id + "?view=board&highlight=" + it.id,
+            });
+          });
+          if (window.MN && window.MN.meetingNoteId && qq.indexOf("extract") >= 0) {
+            items.unshift({ type: "action", label: "Extract tasks from notes (AI)", action: "ai-extract" });
+          }
+          renderResults();
+        }).catch(function (err) {
+          if (err && err.name === "AbortError") return;
+          items = [];
+          renderResults();
+        });
+      }, 200);
     }
 
     function renderResults() {
@@ -561,12 +662,11 @@
   function initTemplates() {
     const sel = $("#mn-template-select");
     const selMobile = $("#mn-template-select-mobile");
-    const selMobileTab = $("#mn-template-select-mobile-tab");
     const btn = $("#mn-template-create");
-    if (!sel && !selMobile && !selMobileTab) return;
+    if (!sel && !selMobile) return;
     fetch(API.templates).then(function (r) { return r.json(); }).then(function (rows) {
       rows.forEach(function (t) {
-        [sel, selMobile, selMobileTab].forEach(function (target) {
+        [sel, selMobile].forEach(function (target) {
           if (!target) return;
           const opt = document.createElement("option");
           opt.value = String(t.id);
@@ -608,10 +708,11 @@
   /* --- SocketIO realtime --- */
   function initRealtime() {
     const meetingId = window.MN && window.MN.meetingNoteId;
-    if (!meetingId || typeof io === "undefined") return;
+    if (!meetingId) return;
     try {
-      const socket = io("/meeting-notes");
-      socket.emit("join_meeting", { meeting_id: meetingId });
+      const socket = joinMeetingSocket(meetingId);
+      if (!socket || window.MN._socketItemWired) return;
+      window.MN._socketItemWired = true;
       socket.on("item_updated", function (payload) {
         if (window.MN && window.MN.applyRealtimeItemUpdate) {
           window.MN.applyRealtimeItemUpdate(payload || {});
@@ -619,6 +720,12 @@
           window.MN.refreshItems();
         }
       });
+      if (!window.MN._socketUnloadWired) {
+        window.MN._socketUnloadWired = true;
+        function onPageLeave() { leaveMeetingSocket(); }
+        window.addEventListener("pagehide", onPageLeave);
+        window.addEventListener("beforeunload", onPageLeave);
+      }
     } catch (e) {
       console.warn("Meeting notes realtime unavailable", e);
     }

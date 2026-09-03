@@ -8,19 +8,19 @@
   const schoolList = document.getElementById("sm-school-list");
   const prefillId = window.SM_PREFILL_EVENT_ID;
   const prefillEvent = window.SM_PREFILL_EVENT;
+  const isPrefillLocked = Boolean(prefillId && prefillEvent);
 
   const stepPanels = form ? Array.from(form.querySelectorAll(".sm-step-panel")) : [];
   const wizardSteps = document.querySelectorAll(".sm-wizard-step");
-  const stepNumEl = document.getElementById("sm-step-num");
-  const stepLabelEl = document.getElementById("sm-step-label");
   const barFill = document.getElementById("sm-wizard-bar-fill");
   const backBtn = document.getElementById("sm-back-btn");
   const nextBtn = document.getElementById("sm-next-btn");
   const submitBtn = document.getElementById("sm-submit-btn");
 
-  const STEP_LABELS = ["Contact details", "Your context", "Your interest"];
   const TOTAL_STEPS = 3;
   let currentStep = 1;
+  let eventsAbort = null;
+  let schoolsAbort = null;
 
   function showAlert(msg, type) {
     if (!alertEl) return;
@@ -91,9 +91,6 @@
       if (step === currentStep) el.classList.add("is-active");
     });
 
-    if (stepNumEl) stepNumEl.textContent = String(currentStep);
-    if (stepLabelEl) stepLabelEl.textContent = STEP_LABELS[currentStep - 1] || "";
-
     if (barFill) {
       const pct = currentStep === 1 ? 0 : ((currentStep - 1) / (TOTAL_STEPS - 1)) * 100;
       barFill.style.width = pct + "%";
@@ -139,24 +136,21 @@
   }
 
   async function loadEvents() {
-    if (!eventDate || !eventSelect) return;
+    if (isPrefillLocked || !eventDate || !eventSelect || eventSelect.tagName !== "SELECT") return;
     const d = eventDate.value || new Date().toISOString().slice(0, 10);
+    if (eventsAbort) eventsAbort.abort();
+    eventsAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
     try {
-      const res = await fetch("/api/public/marketing-events?date=" + encodeURIComponent(d));
+      const res = await fetch(
+        "/api/public/marketing-events?date=" + encodeURIComponent(d),
+        eventsAbort ? { signal: eventsAbort.signal } : undefined
+      );
+      if (!res.ok) throw new Error("Could not load events");
       const events = await res.json();
+      if (!Array.isArray(events)) return;
       const cur = eventSelect.value;
       eventSelect.innerHTML = '<option value="">Not at an event / General enquiry</option>';
-      const seen = {};
-      if (prefillEvent && prefillId) {
-        const opt = document.createElement("option");
-        opt.value = String(prefillId);
-        opt.textContent = prefillEvent.name + (prefillEvent.location ? " — " + prefillEvent.location : "");
-        eventSelect.appendChild(opt);
-        seen[prefillId] = true;
-        eventSelect.value = String(prefillId);
-      }
       events.forEach(function (ev) {
-        if (seen[ev.id]) return;
         const opt = document.createElement("option");
         opt.value = String(ev.id);
         opt.textContent = ev.name + (ev.location ? " — " + ev.location : "");
@@ -164,29 +158,43 @@
       });
       if (cur) eventSelect.value = cur;
     } catch (e) {
+      if (e && e.name === "AbortError") return;
       console.error(e);
     }
   }
 
-  if (eventDate) {
+  async function loadSchools(provinceName) {
+    if (!provinceName || !schoolList) return;
+    if (schoolsAbort) schoolsAbort.abort();
+    schoolsAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
+    try {
+      const res = await fetch(
+        "/api/public/schools/" + encodeURIComponent(provinceName),
+        schoolsAbort ? { signal: schoolsAbort.signal } : undefined
+      );
+      if (!res.ok) return;
+      const schools = await res.json();
+      if (!Array.isArray(schools)) return;
+      schoolList.innerHTML = "";
+      schools.slice(0, 200).forEach(function (s) {
+        const opt = document.createElement("option");
+        opt.value = typeof s === "string" ? s : (s.name || s.school_name || "");
+        if (opt.value) schoolList.appendChild(opt);
+      });
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+      /* optional autocomplete */
+    }
+  }
+
+  if (!isPrefillLocked && eventDate) {
     eventDate.addEventListener("change", loadEvents);
     loadEvents();
   }
 
   if (province) {
-    province.addEventListener("change", async function () {
-      const p = province.value;
-      if (!p || !schoolList) return;
-      try {
-        const res = await fetch("/api/schools/" + encodeURIComponent(p));
-        const schools = await res.json();
-        schoolList.innerHTML = "";
-        (schools || []).slice(0, 200).forEach(function (s) {
-          const opt = document.createElement("option");
-          opt.value = typeof s === "string" ? s : (s.name || s.school_name || "");
-          schoolList.appendChild(opt);
-        });
-      } catch (e) { /* optional */ }
+    province.addEventListener("change", function () {
+      loadSchools(province.value);
     });
   }
 
@@ -194,9 +202,19 @@
     form.querySelectorAll(".sm-field").forEach(function (field) {
       field.addEventListener("input", function () {
         field.classList.remove("is-invalid");
+        const hp = form.querySelector('[name="sm_hp_field"]');
+        if (hp) {
+          hp.dataset.smUserInteracted = "1";
+          hp.value = "";
+        }
       });
       field.addEventListener("change", function () {
         field.classList.remove("is-invalid");
+        const hp = form.querySelector('[name="sm_hp_field"]');
+        if (hp) {
+          hp.dataset.smUserInteracted = "1";
+          hp.value = "";
+        }
       });
     });
   }
@@ -242,8 +260,15 @@
         heard_about: fd.get("heard_about"),
         comments: fd.get("comments"),
         consent_marketing: fd.get("consent_marketing") === "1",
-        website: fd.get("website"),
+        sm_hp_field: "",
       };
+
+      // Ignore autofill in the honeypot; only treat as bot if it was filled
+      // without the user interacting with real fields (see hpTouchedBelow).
+      const hpInput = form.querySelector('[name="sm_hp_field"]');
+      if (hpInput && hpInput.dataset.smUserInteracted !== "1" && (hpInput.value || "").trim()) {
+        payload.sm_hp_field = hpInput.value.trim();
+      }
 
       try {
         const res = await fetch("/api/public/stakeholder-leads", {
@@ -252,7 +277,11 @@
           body: JSON.stringify(payload),
         });
         const data = await res.json().catch(function () { return {}; });
-        if (!res.ok) throw new Error(data.error || "Submission failed");
+        // Real saves return 201. Honeypot returns 200 {"ok":true} without a save.
+        if (res.status !== 201 || data.ok !== true) {
+          const detail = data.error || ("Submission failed (HTTP " + res.status + "). Please try again.");
+          throw new Error(detail);
+        }
         if (data.duplicate_warning) {
           showAlert("Submitted — we already have a recent entry from this email.", "warning");
           setTimeout(showThankYou, 2500);

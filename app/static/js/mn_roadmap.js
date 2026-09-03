@@ -989,11 +989,13 @@
 
   function initPresence() {
     const mid = meetingId();
-    if (!mid || typeof io === "undefined") return;
+    if (!mid) return;
     try {
-      meetingSocket = io("/meeting-notes");
-      meetingSocket.emit("presence_join", { meeting_id: mid, username: window.MN_CURRENT_USER || "User" });
-      meetingSocket.emit("join_meeting", { meeting_id: mid });
+      const joinFn = window.MN && window.MN.joinMeetingSocket;
+      meetingSocket = joinFn ? joinFn(mid) : null;
+      if (!meetingSocket) return;
+      if (window.MN._socketPresenceWired) return;
+      window.MN._socketPresenceWired = true;
 
       function renderPresence(users, targetId) {
         const el = $(targetId);
@@ -1055,7 +1057,7 @@
   function switchDetailTab(t) {
     document.querySelectorAll(".mn-detail-tab-pane").forEach(function (p) {
       if (p.id === "mn-tab-tasks") {
-        p.classList.toggle("d-none", t !== "tasks" && t !== "filters");
+        p.classList.toggle("d-none", t !== "tasks");
       } else {
         p.classList.toggle("d-none", p.id !== "mn-tab-" + t);
       }
@@ -1064,10 +1066,6 @@
       b.classList.toggle("active", b.getAttribute("data-mn-detail-tab") === t);
     });
     if (t === "decisions") loadDecisions();
-    if (t === "filters") {
-      const sheet = document.getElementById("mn-filter-sheet");
-      if (sheet && window.bootstrap) bootstrap.Offcanvas.getOrCreateInstance(sheet).show();
-    }
   }
 
   function initDecisionsTab() {
@@ -1092,15 +1090,6 @@
     if (decisionInput) {
       decisionInput.addEventListener("keydown", function (e) {
         if (e.key === "Enter") { e.preventDefault(); addBtn && addBtn.click(); }
-      });
-    }
-    const filterSheet = document.getElementById("mn-filter-sheet");
-    if (filterSheet) {
-      filterSheet.addEventListener("hidden.bs.offcanvas", function () {
-        const active = document.querySelector("[data-mn-detail-tab].active");
-        if (active && active.getAttribute("data-mn-detail-tab") === "filters") {
-          switchDetailTab("tasks");
-        }
       });
     }
   }

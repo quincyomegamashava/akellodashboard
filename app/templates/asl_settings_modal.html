@@ -96,13 +96,28 @@
 
             const result = await response.json();
             if (result.success) {
-                showToast('Settings updated successfully', 'success');
+                if (typeof showToast === 'function') {
+                    showToast('Settings updated successfully', 'success');
+                } else {
+                    console.log('ASL settings updated successfully');
+                }
                 document.getElementById('aslSettingsModal').style.display = 'none';
+                if (typeof window.refreshChampionsOverviewAfterAslSettings === 'function') {
+                    window.refreshChampionsOverviewAfterAslSettings();
+                }
             } else {
-                showToast('Failed to update settings', 'error');
+                if (typeof showToast === 'function') {
+                    showToast('Failed to update settings', 'error');
+                } else {
+                    alert('Failed to update settings');
+                }
             }
         } catch (error) {
-            showToast('Error: ' + error.message, 'error');
+            if (typeof showToast === 'function') {
+                showToast('Error: ' + error.message, 'error');
+            } else {
+                alert('Error: ' + error.message);
+            }
         }
     });
 

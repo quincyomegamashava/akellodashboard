@@ -191,6 +191,19 @@
     padding: 2px 6px;
     border-radius: 4px;
   }
+
+  .avatar-circle {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #e0e7ff; color: #3730a3;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.85rem; margin-right: 10px; flex-shrink: 0;
+  }
+  .bg-soft-primary { background: #eff6ff; }
+  .bg-soft-success { background: #ecfdf5; }
+  .bg-soft-danger { background: #fef2f2; }
+  .bg-soft-warning { background: #fffbeb; }
+  .text-mini { font-size: 0.7rem; line-height: 1.2; }
+  .alert-soft-light { background: #f8fafc; color: #64748b; }
 </style>
 {% endblock %}
 
@@ -257,15 +270,16 @@
         </div>
       </div>
 
-      <!-- Date Range Filter (Sidebar placement for better UX) -->
+      <!-- Date Range Filter (Overview & Ask Akello only) -->
       <div class="card border-0 shadow-sm">
         <div class="card-header bg-white border-bottom-0 pb-0">
           <div class="small fw-bold text-uppercase text-muted ls-1">Date Range</div>
+          <div class="small text-muted fw-normal mt-1">Applies to Overview &amp; Ask Akello</div>
         </div>
         <div class="card-body pt-3">
           <div class="d-flex flex-wrap gap-2 mb-3">
-            <span class="date-chip active" data-range="last_30" onclick="setRange('last_30')">Last 30 Days</span>
-            <span class="date-chip" data-range="this_month" onclick="setRange('this_month')">This Month</span>
+            <span class="date-chip" data-range="last_30" onclick="setRange('last_30')">Last 30 Days</span>
+            <span class="date-chip active" data-range="this_month" onclick="setRange('this_month')">This Month</span>
             <span class="date-chip" data-range="ytd" onclick="setRange('ytd')">YTD</span>
           </div>
           <div class="mb-2">
@@ -408,13 +422,19 @@
               </div>
             </div>
 
-            <!-- Compare with file -->
+            <!-- Compare with file (collapsed) -->
             <div class="card border-0 shadow-sm mb-4">
-              <div class="card-header bg-white py-3">
-                <span class="fw-bold text-dark">Compare with file</span>
-                <p class="text-muted small fw-normal mt-1 mb-0">Upload a CSV or Excel file with columns: Asl School ID, AL ID, Akello Champion, School, Province, ASL Scholarship check, Duration on scholarship, Validity of scholarship</p>
+              <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center"
+                   style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#compareCollapse" aria-expanded="false">
+                <div>
+                  <span class="fw-bold text-dark"><i class="fa fa-exchange-alt me-2 opacity-50"></i>Compare with file</span>
+                  <p class="text-muted small fw-normal mt-1 mb-0">Optional: upload CSV/Excel to compare against School Tracker</p>
+                </div>
+                <i class="fa fa-chevron-down text-muted"></i>
               </div>
+              <div id="compareCollapse" class="collapse">
               <div class="card-body">
+                <p class="text-muted small mb-3">Expected columns: Asl School ID, AL ID, Akello Champion, School, Province, ASL Scholarship check, Duration on scholarship, Validity of scholarship</p>
                 <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
                   <input type="file" id="compareFileInput" accept=".csv,.xlsx,.xls" class="form-control form-control-sm" style="max-width: 280px;">
                   <button type="button" class="btn btn-primary btn-sm" id="btnCompareUpload">
@@ -448,6 +468,7 @@
                     </table>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
 
@@ -598,6 +619,16 @@
     const championsCacheKey = 'allChampions_champions_v1';
     const schoolTrackerCacheKey = 'allChampions_schooltracker_v5';
 
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     // In-memory state for fast filtering and virtualization
     let analyticsVT = null, analyticsAllRows = [], analyticsFilteredRows = [];
     let championsVT = null, championsAllRows = [], championsFilteredRows = [];
@@ -606,6 +637,37 @@
     let schoolExactDateFilterEnabled = false; // only filter by exact added-at date after user applies in School Tracker
     let analyticsController = null, championsLoaded = false, schoolTrackerLoaded = false, checkinsLoaded = false;
     let lastCompareReport = null, lastCompareSummary = null;
+    let analyticsRowRenderer = null;
+    let championsRowRenderer = null;
+
+    function invalidateChampionsClientCaches() {
+      try {
+        localStorage.removeItem(analyticsCacheKey);
+        localStorage.removeItem(championsCacheKey);
+        localStorage.removeItem(schoolTrackerCacheKey);
+      } catch (_) {}
+    }
+
+    window.refreshChampionsOverviewAfterAslSettings = async function () {
+      invalidateChampionsClientCaches();
+      showSkeleton('analytics-table', 8, 6);
+      setStatus('analytics-status', 'Refreshing after ASL settings…');
+      try {
+        const s = document.getElementById('startDate')?.value;
+        const e = document.getElementById('endDate')?.value;
+        if (analyticsController) analyticsController.abort();
+        analyticsController = new AbortController();
+        const live = await fetchAnalytics(s, e, { signal: analyticsController.signal });
+        const payload = Array.isArray(live) ? { data: live } : live;
+        renderAnalytics(payload, { replaceSource: true });
+        setCache(analyticsCacheKey, payload);
+        setStatus('analytics-status', `Loaded ${(payload.data || []).length} records`);
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.error(err);
+        setStatus('analytics-status', 'Failed to refresh');
+      }
+    };
 
     // Initialize Date Objects
     const today = new Date();
@@ -786,33 +848,47 @@
       return await response.json();
     }
 
-    function renderAnalytics(data) {
+    function renderAnalytics(data, opts = {}) {
       const rows = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
-      const renderRow = (row) => `
+      const replaceSource = opts.replaceSource !== false;
+
+      analyticsRowRenderer = (row) => `
     <tr>
       <td>
         <div class="d-flex align-items-center">
-            <div class="avatar-circle">${(row.champion || 'U').charAt(0)}</div>
+            <div class="avatar-circle">${escapeHtml((row.champion || 'U').charAt(0))}</div>
             <div>
-                <div class="fw-semibold text-dark">${row.champion}</div>
-                <div class="small text-muted"><a href="/profile/${row.username || ""}" class="text-decoration-none text-muted">${row.username || "@username"}</a></div>
+                <div class="fw-semibold text-dark">${escapeHtml(row.champion)}</div>
+                <div class="small text-muted"><a href="/profile/${encodeURIComponent(row.username || '')}" class="text-decoration-none text-muted">${escapeHtml(row.username || '@username')}</a></div>
             </div>
         </div>
       </td>
-      <td><span class="badge bg-light text-dark border">${row.province}</span></td>
-      <td class="text-center fw-medium">${row.school_count}</td>
-      <td class="text-center text-muted">${row.asl_student_count}</td>
-      <td class="text-center text-muted">${row.library_student_count}</td>
-      <td class="text-center fw-bold text-primary">${row.overall_student_count}</td>
+      <td><span class="badge bg-light text-dark border">${escapeHtml(row.province)}</span></td>
+      <td class="text-center fw-medium">${escapeHtml(row.school_count)}</td>
+      <td class="text-center text-muted">${escapeHtml(row.asl_student_count)}</td>
+      <td class="text-center text-muted">${escapeHtml(row.library_student_count)}</td>
+      <td class="text-center fw-bold text-primary">${escapeHtml(row.overall_student_count)}</td>
     </tr>`;
 
-      analyticsAllRows = rows;
+      if (replaceSource) {
+        analyticsAllRows = rows;
+      }
       analyticsFilteredRows = rows;
       if (!analyticsVT) {
-        analyticsVT = mountVirtualTable('analytics-table', rows, renderRow, 6, { rowHeight: 60, buffer: 12 });
+        analyticsVT = mountVirtualTable('analytics-table', rows, analyticsRowRenderer, 6, { rowHeight: 60, buffer: 12 });
       } else {
         analyticsVT.update(rows);
       }
+    }
+
+    function applyAnalyticsSearch() {
+      const term = ((document.getElementById('search') || {}).value || '').toLowerCase().trim();
+      const filtered = !term ? analyticsAllRows : analyticsAllRows.filter(r =>
+        (r.champion || '').toLowerCase().includes(term) || (r.province || '').toLowerCase().includes(term)
+      );
+      analyticsFilteredRows = filtered;
+      if (analyticsVT) analyticsVT.update(filtered);
+      else renderAnalytics({ data: filtered }, { replaceSource: false });
     }
 
     // Lazy-load Champions table on first open or with date range
@@ -825,14 +901,15 @@
     <tr>
       <td>
         <div class="d-flex align-items-center">
-            <div class="avatar-circle bg-soft-success text-success">${(c.champion || 'U').charAt(0)}</div>
-            <div class="fw-medium text-dark">${c.champion}</div>
+            <div class="avatar-circle bg-soft-success text-success">${escapeHtml((c.champion || 'U').charAt(0))}</div>
+            <div class="fw-medium text-dark">${escapeHtml(c.champion)}</div>
         </div>
       </td>
-      <td><span class="badge bg-light text-dark border">${c.province}</span></td>
-      <td class="text-center fw-medium">${c.school_count}</td>
-      <td class="text-center fw-bold text-success">${c.chatlog_count}</td>
+      <td><span class="badge bg-light text-dark border">${escapeHtml(c.province)}</span></td>
+      <td class="text-center fw-medium">${escapeHtml(c.school_count)}</td>
+      <td class="text-center fw-bold text-success">${escapeHtml(c.chatlog_count)}</td>
     </tr>`;
+      championsRowRenderer = champsRenderRow;
 
       // Only use cache if not forcing reload
       if (!forceReload) {
@@ -923,8 +1000,10 @@
         } else if (s.status === 'Expired') {
           statusBadge = '<span class="badge bg-warning text-dark">Expired</span>';
           if (s.active_subscriptions > 0) {
-            statusBadge += ` <span class="badge bg-soft-warning text-warning border border-warning ms-1">${s.active_subscriptions} sub</span>`;
+            statusBadge += ` <span class="badge bg-soft-warning text-warning border border-warning ms-1">${escapeHtml(s.active_subscriptions)} sub</span>`;
           }
+        } else if (s.status === 'Never Assigned') {
+          statusBadge = '<span class="badge bg-info text-dark">Never Assigned</span>';
         } else {
           statusBadge = '<span class="badge bg-secondary">Inactive</span>';
         }
@@ -934,21 +1013,21 @@
 
         return `
         <tr class="${s.is_over_12_months ? 'long-term-row' : ''}">
-          <td><div class="fw-medium text-dark">${s.champion || 'U'}</div></td>
+          <td><div class="fw-medium text-dark">${escapeHtml(s.champion || 'U')}</div></td>
           <td>
             <div class="fw-medium text-dark">
                 ${s.is_over_12_months ? '<i class="fa fa-trophy text-amber-500 me-1" title="Long-term Scholar (1yr+)"></i>' : ''}
-                ${s.school_name}
+                ${escapeHtml(s.school_name)}
             </div>
           </td>
-          <td><span class="badge bg-light text-dark border">${s.province}</span></td>
+          <td><span class="badge bg-light text-dark border">${escapeHtml(s.province)}</span></td>
           <td>${statusBadge}</td>
-          <td class="small text-muted">${s.first_awarded_at || '-'}</td>
-          <td class="small text-muted">${s.expiry_date || '-'}</td>
-          <td class="small text-muted">${addedTxt}</td>
-          <td class="small text-muted">${s.duration || '0'} mo</td>
-          <td class="small">${(s.days_left_until_12 != null && s.days_left_until_12 > 0) ? '<span class="months-left-highlight">' + s.days_left_until_12 + ' days</span>' : '—'}</td>
-          <td class="small text-muted">${s.scholarship_type || '-'}</td>
+          <td class="small text-muted">${escapeHtml(s.first_awarded_at || '-')}</td>
+          <td class="small text-muted">${escapeHtml(s.expiry_date || '-')}</td>
+          <td class="small text-muted">${escapeHtml(addedTxt)}</td>
+          <td class="small text-muted">${escapeHtml(s.duration || '0')} mo</td>
+          <td class="small">${(s.days_left_until_12 != null && s.days_left_until_12 > 0) ? '<span class="months-left-highlight">' + escapeHtml(s.days_left_until_12) + ' days</span>' : '—'}</td>
+          <td class="small text-muted">${escapeHtml(s.scholarship_type || '-')}</td>
         </tr>`;
       };
 
@@ -1006,19 +1085,19 @@
 
     function formatVisitLocation(text, lat, lng, source) {
       const parts = [];
-      if (text) parts.push(text);
+      if (text) parts.push(String(text));
       if (lat != null && lng != null) parts.push(`${lat}, ${lng}`);
       if (source) parts.push(`[${source}]`);
-      return parts.length ? parts.join(' ') : '-';
+      return parts.length ? escapeHtml(parts.join(' ')) : '-';
     }
 
     function formatCheckinDeviceId(row) {
       const checkinId = row.checkin_device_install_id;
       const checkoutId = row.checkout_device_install_id;
       if (checkinId && checkoutId && checkoutId !== checkinId) {
-        return `${checkinId} -> ${checkoutId}`;
+        return escapeHtml(`${checkinId} -> ${checkoutId}`);
       }
-      return checkinId || checkoutId || '-';
+      return escapeHtml(checkinId || checkoutId || '-');
     }
 
     function renderCheckinMonitoringRow(r) {
@@ -1030,17 +1109,17 @@
       return `
         <tr>
           <td>
-            <div class="fw-medium text-dark">${r.champion || r.username || '-'}</div>
-            <div class="small text-muted"><a href="/profile/${r.username || ''}" class="text-decoration-none text-muted">${r.username || ''}</a></div>
+            <div class="fw-medium text-dark">${escapeHtml(r.champion || r.username || '-')}</div>
+            <div class="small text-muted"><a href="/profile/${encodeURIComponent(r.username || '')}" class="text-decoration-none text-muted">${escapeHtml(r.username || '')}</a></div>
           </td>
-          <td class="small text-muted">${r.school_name || '-'}</td>
-          <td><span class="badge bg-light text-dark border">${r.province || '-'}</span></td>
+          <td class="small text-muted">${escapeHtml(r.school_name || '-')}</td>
+          <td><span class="badge bg-light text-dark border">${escapeHtml(r.province || '-')}</span></td>
           <td>${statusBadge}</td>
-          <td class="small text-muted">${r.checkin_at ? String(r.checkin_at).replace('T', ' ').slice(0, 19) : '-'}</td>
-          <td class="small text-muted">${r.checkout_at ? String(r.checkout_at).replace('T', ' ').slice(0, 19) : '-'}</td>
-          <td class="small text-muted">${r.duration_minutes != null ? r.duration_minutes : '-'}</td>
-          <td class="small text-muted">${r.asl_school_id || '-'}</td>
-          <td class="small text-muted">${r.library_id || '-'}</td>
+          <td class="small text-muted">${escapeHtml(r.checkin_at ? String(r.checkin_at).replace('T', ' ').slice(0, 19) : '-')}</td>
+          <td class="small text-muted">${escapeHtml(r.checkout_at ? String(r.checkout_at).replace('T', ' ').slice(0, 19) : '-')}</td>
+          <td class="small text-muted">${escapeHtml(r.duration_minutes != null ? r.duration_minutes : '-')}</td>
+          <td class="small text-muted">${escapeHtml(r.asl_school_id || '-')}</td>
+          <td class="small text-muted">${escapeHtml(r.library_id || '-')}</td>
           <td class="small text-muted">${checkinLocation}</td>
           <td class="small text-muted">${checkoutLocation}</td>
           <td class="small text-muted">${formatCheckinDeviceId(r)}</td>
@@ -1061,42 +1140,6 @@
       });
       checkinsFilteredRows = filtered;
       if (checkinsVT) checkinsVT.update(filtered);
-    }
-
-    async function loadCheckins(forceReload = false) {
-      if (checkinsLoaded && !forceReload) return;
-      checkinsLoaded = true;
-      setStatus('checkins-status', 'Loading...');
-
-      try {
-        const startDate = document.querySelector("#startDate").value;
-        const endDate = document.querySelector("#endDate").value;
-        let url = "/api/all-champions-checkins";
-        if (startDate && endDate) {
-          url += `?start_date=${startDate}&end_date=${endDate}`;
-        }
-
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`API error ${resp.status}`);
-        const rows = await resp.json();
-
-        checkinsAllRows = Array.isArray(rows) ? rows : [];
-        checkinsFilteredRows = checkinsAllRows;
-        if (!checkinsVT) {
-          checkinsVT = mountVirtualTable('checkins-table', checkinsAllRows, renderCheckinMonitoringRow, CHECKINS_TABLE_COLS, { rowHeight: 54, buffer: 12 });
-        } else {
-          checkinsVT.update(checkinsAllRows);
-        }
-        setStatus(
-          'checkins-status',
-          checkinsAllRows.length
-            ? `Updated just now (${checkinsAllRows.length} rows)`
-            : 'No check-ins found for the selected date range.'
-        );
-      } catch (e) {
-        console.error(e);
-        setStatus('checkins-status', 'Failed to load check-in data.');
-      }
     }
 
     async function loadWeeklyCheckinsByFriday() {
@@ -1147,15 +1190,22 @@
       return name.replace(/[\\\/*?:\[\]]/g, '_').slice(0, 28);
     }
 
-    function exportBothAsExcel() {
+    async function ensureExportDatasetsLoaded() {
+      const tasks = [];
+      if (!championsLoaded || !championsAllRows.length) tasks.push(loadChampions(true));
+      if (!schoolTrackerLoaded || !schoolAllRows.length) tasks.push(loadSchoolTracker(true));
+      if (!checkinsLoaded || !checkinsAllRows.length) tasks.push(loadWeeklyCheckinsByFriday());
+      if (tasks.length) await Promise.all(tasks);
+    }
+
+    async function exportBothAsExcel() {
       try {
+        await ensureExportDatasetsLoaded();
         const wb = XLSX.utils.book_new();
-        // Tables are virtualized, so DOM table only has visible rows.
-        // We must export from *data* sources (analyticsAllRows, championsAllRows, schoolAllRows)
 
         const s1 = XLSX.utils.json_to_sheet(analyticsAllRows);
         const s2 = XLSX.utils.json_to_sheet(championsAllRows);
-        const schoolSource = schoolTrackerLoaded ? schoolFilteredRows : schoolAllRows;
+        const schoolSource = schoolFilteredRows.length ? schoolFilteredRows : schoolAllRows;
         const schoolExportRows = schoolSource.map(s => ({
           Champion: s.champion,
           School: s.school_name,
@@ -1169,10 +1219,25 @@
           Type: s.scholarship_type || '-'
         }));
         const s3 = XLSX.utils.json_to_sheet(schoolExportRows);
+        const checkinSource = checkinsFilteredRows.length ? checkinsFilteredRows : checkinsAllRows;
+        const checkinExportRows = checkinSource.map(r => ({
+          Champion: r.champion || r.username || '',
+          Username: r.username || '',
+          School: r.school_name || '',
+          Province: r.province || '',
+          Status: r.status || '',
+          "Check-in": r.checkin_at || '',
+          "Check-out": r.checkout_at || '',
+          "Duration (min)": r.duration_minutes != null ? r.duration_minutes : '',
+          "ASL School ID": r.asl_school_id || '',
+          "Library ID": r.library_id || ''
+        }));
+        const s4 = XLSX.utils.json_to_sheet(checkinExportRows);
 
         XLSX.utils.book_append_sheet(wb, s1, "Analytics Overview");
         XLSX.utils.book_append_sheet(wb, s2, "Ask Akello Engagement");
         XLSX.utils.book_append_sheet(wb, s3, "School Tracker");
+        XLSX.utils.book_append_sheet(wb, s4, "Check-ins");
 
         XLSX.writeFile(wb, `akello_champions_report_${buildRangeLabel()}.xlsx`);
       } catch (e) {
@@ -1181,15 +1246,11 @@
       }
     }
 
-    function exportBothAsPDF() {
-      // PDF export logic usually relies on autoTable parsing the DOM. 
-      // Since we are virtualized, this will fail to print all rows.
-      // We would need to generate the PDF from JSON data. 
-      // For simplicity given instructions, providing alert if using virtual DOM or implementing basic data-based method.
-      // Let's implement a basic JSON based export for PDF.
+    async function exportBothAsPDF() {
       try {
+        await ensureExportDatasetsLoaded();
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('l', 'mm', 'a4'); // Use landscape for wider tables
+        const doc = new jsPDF('l', 'mm', 'a4');
         const range = buildRangeLabel();
 
         doc.setFontSize(18);
@@ -1197,7 +1258,6 @@
         doc.setFontSize(11);
         doc.text(`Period: ${range}`, 14, 28);
 
-        // Table 1: Analytics Overview
         doc.setFontSize(14);
         doc.text("1. Analytics Overview", 14, 40);
         const cols1 = ["Champion", "Username", "Province", "Schools", "ASL Students", "Lib Students", "Total"];
@@ -1212,7 +1272,6 @@
           headStyles: { fillStyle: [37, 99, 235] }
         });
 
-        // Table 2: Ask Akello Engagement
         let nextY = doc.lastAutoTable.finalY + 15;
         if (nextY > 150) { doc.addPage(); nextY = 20; }
 
@@ -1230,13 +1289,12 @@
           headStyles: { fillStyle: [111, 66, 193] }
         });
 
-        // Table 3: School Tracker
         nextY = doc.lastAutoTable.finalY + 15;
         if (nextY > 150) { doc.addPage(); nextY = 20; }
 
         doc.setFontSize(14);
         doc.text("3. School Tracker", 14, nextY);
-        const schoolSource = schoolTrackerLoaded ? schoolFilteredRows : schoolAllRows;
+        const schoolSource = schoolFilteredRows.length ? schoolFilteredRows : schoolAllRows;
 
         const cols3 = ["Champion", "School", "Province", "Status", "First Awarded", "Expiry", "Added At", "Duration", "Days left to 12", "Type"];
         const rows3 = schoolSource.map(s => [
@@ -1257,8 +1315,34 @@
           body: rows3,
           startY: nextY + 5,
           theme: 'grid',
-          styles: { fontSize: 7 }, // Smaller font to fit many columns
+          styles: { fontSize: 7 },
           headStyles: { fillStyle: [20, 161, 153] }
+        });
+
+        nextY = doc.lastAutoTable.finalY + 15;
+        if (nextY > 150) { doc.addPage(); nextY = 20; }
+
+        doc.setFontSize(14);
+        doc.text("4. Check-ins (weekly)", 14, nextY);
+        const checkinSource = checkinsFilteredRows.length ? checkinsFilteredRows : checkinsAllRows;
+        const cols4 = ["Champion", "School", "Province", "Status", "Check-in", "Check-out", "Duration"];
+        const rows4 = checkinSource.map(r => [
+          r.champion || r.username || '',
+          r.school_name || '',
+          r.province || '',
+          r.status || '',
+          r.checkin_at ? String(r.checkin_at).replace('T', ' ').slice(0, 19) : '',
+          r.checkout_at ? String(r.checkout_at).replace('T', ' ').slice(0, 19) : '',
+          r.duration_minutes != null ? r.duration_minutes : ''
+        ]);
+
+        doc.autoTable({
+          head: [cols4],
+          body: rows4,
+          startY: nextY + 5,
+          theme: 'grid',
+          styles: { fontSize: 7 },
+          headStyles: { fillStyle: [59, 130, 246] }
         });
 
         doc.save(`akello_champions_report_${range.replace(/\s+/g, '_')}.pdf`);
@@ -1291,35 +1375,36 @@
       // Load Initial Analytics
       try {
         const cached = getCache(analyticsCacheKey);
-        if (cached) renderAnalytics(cached.data);
+        if (cached) renderAnalytics(cached.data, { replaceSource: true });
 
         const startDate = document.querySelector("#startDate").value;
         const endDate = document.querySelector("#endDate").value;
-        const live = await fetchAnalytics(startDate, endDate);
+        if (analyticsController) analyticsController.abort();
+        analyticsController = new AbortController();
+        const live = await fetchAnalytics(startDate, endDate, { signal: analyticsController.signal });
         const payload = Array.isArray(live) ? { data: live } : live;
-        renderAnalytics(payload);
-        setCache(analyticsCacheKey, payload);
-        setStatus('analytics-status', `Loaded ${payload.data.length} records`);
+        const rows = Array.isArray(payload.data) ? payload.data : (Array.isArray(live) ? live : []);
+        renderAnalytics(payload, { replaceSource: true });
+        if (rows.length) setCache(analyticsCacheKey, payload);
+        setStatus(
+          'analytics-status',
+          rows.length
+            ? `Loaded ${rows.length} records`
+            : 'No champions found in the app database for this environment.'
+        );
       } catch (e) {
-        console.error(e);
-        setStatus('analytics-status', 'Failed to load data');
+        if (e.name !== 'AbortError') {
+          console.error(e);
+          setStatus('analytics-status', 'Failed to load data');
+        }
       }
 
       // Search Listeners
-      document.getElementById('search').addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        if (!term) { renderAnalytics({ data: analyticsAllRows }); return; }
-        const filtered = analyticsAllRows.filter(r =>
-          (r.champion || '').toLowerCase().includes(term) || (r.province || '').toLowerCase().includes(term)
-        );
-        renderAnalytics({ data: filtered });
-      });
+      document.getElementById('search').addEventListener('input', () => applyAnalyticsSearch());
 
       document.getElementById('searchChampions').addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        if (!term) { if (championsLoaded) loadChampions(); return; } // naive reload or re-render
-        // better to filter in memory
-        const filtered = championsAllRows.filter(r =>
+        const term = (e.target.value || '').toLowerCase().trim();
+        const filtered = !term ? championsAllRows : championsAllRows.filter(r =>
           (r.champion || '').toLowerCase().includes(term) || (r.province || '').toLowerCase().includes(term)
         );
         championsFilteredRows = filtered;
@@ -1365,7 +1450,7 @@
         });
       }
 
-      // Filter Button
+      // Filter Button — Overview & Ask only (Check-ins use weekly week-ending control)
       document.getElementById('loadData').addEventListener('click', async () => {
         showSkeleton('analytics-table', 8, 6);
         setStatus('analytics-status', 'Reloading...');
@@ -1374,26 +1459,22 @@
         const e = document.getElementById('endDate').value;
 
         try {
-          const live = await fetchAnalytics(s, e);
+          if (analyticsController) analyticsController.abort();
+          analyticsController = new AbortController();
+          const live = await fetchAnalytics(s, e, { signal: analyticsController.signal });
           const payload = Array.isArray(live) ? { data: live } : live;
-          renderAnalytics(payload);
+          renderAnalytics(payload, { replaceSource: true });
           setCache(analyticsCacheKey, payload);
-          setStatus('analytics-status', `Loaded ${payload.data.length} records`);
+          setStatus('analytics-status', `Loaded ${(payload.data || []).length} records`);
+          applyAnalyticsSearch();
         } catch (err) {
+          if (err.name === 'AbortError') return;
           console.error(err);
           setStatus('analytics-status', 'Error loading data');
         }
 
         if (championsLoaded) {
           loadChampions(true);
-        }
-
-        if (schoolTrackerLoaded) {
-          applySchoolTrackerFilters();
-        }
-
-        if (checkinsLoaded) {
-          loadCheckins(true);
         }
       });
 
@@ -1419,19 +1500,19 @@
         tbody.innerHTML = report.map(r => {
           const fr = r.file_row || {};
           const sr = r.system_row || {};
-          const asl = (fr.asl_school_id || sr.asl_school_id || '').toString();
-          const alId = (fr.library_school_id || sr.library_school_id || '').toString();
-          const champ = fr.champion || sr.champion || '';
-          const school = fr.school_name || sr.school_name || '';
-          const prov = fr.province || sr.province || '';
-          const checkF = (fr.asl_scholarship_check ?? '').toString();
-          const checkS = (sr.asl_scholarship_check ?? '').toString();
-          const durF = (fr.duration_on_scholarship ?? '').toString();
-          const durS = (sr.duration_on_scholarship ?? '').toString();
-          const valF = (fr.validity_of_scholarship ?? '').toString();
-          const valS = (sr.validity_of_scholarship ?? '').toString();
-          const status = r.status || '';
-          const statusClass = status === 'Match' ? 'text-success' : status === 'Mismatch' ? 'text-warning' : status === 'File only' ? 'text-info' : 'text-secondary';
+          const asl = escapeHtml((fr.asl_school_id || sr.asl_school_id || '').toString());
+          const alId = escapeHtml((fr.library_school_id || sr.library_school_id || '').toString());
+          const champ = escapeHtml(fr.champion || sr.champion || '');
+          const school = escapeHtml(fr.school_name || sr.school_name || '');
+          const prov = escapeHtml(fr.province || sr.province || '');
+          const checkF = escapeHtml((fr.asl_scholarship_check ?? '').toString());
+          const checkS = escapeHtml((sr.asl_scholarship_check ?? '').toString());
+          const durF = escapeHtml((fr.duration_on_scholarship ?? '').toString());
+          const durS = escapeHtml((sr.duration_on_scholarship ?? '').toString());
+          const valF = escapeHtml((fr.validity_of_scholarship ?? '').toString());
+          const valS = escapeHtml((sr.validity_of_scholarship ?? '').toString());
+          const status = escapeHtml(r.status || '');
+          const statusClass = r.status === 'Match' ? 'text-success' : r.status === 'Mismatch' ? 'text-warning' : r.status === 'File only' ? 'text-info' : 'text-secondary';
           return `<tr><td>${asl}</td><td>${alId}</td><td>${champ}</td><td>${school}</td><td>${prov}</td><td>${checkF} vs ${checkS}</td><td>${durF} vs ${durS}</td><td>${valF} vs ${valS}</td><td class="${statusClass}">${status}</td></tr>`;
         }).join('');
         wrap.style.display = 'block';

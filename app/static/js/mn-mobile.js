@@ -53,11 +53,6 @@
     if (active !== "tasks" && active !== "decisions") active = "tasks";
 
     function showTab(name) {
-      if (name === "filters") {
-        const sheet = document.getElementById("mn-filter-sheet");
-        if (sheet && window.bootstrap) bootstrap.Offcanvas.getOrCreateInstance(sheet).show();
-        return;
-      }
       if (name === "decisions" && typeof window.MN_showDecisionsTab === "function") {
         window.MN_showDecisionsTab();
         active = name;
@@ -82,13 +77,6 @@
         showTab(btn.getAttribute("data-mn-detail-tab"));
       });
     });
-
-    const filterSheet = document.getElementById("mn-filter-sheet");
-    if (filterSheet) {
-      filterSheet.addEventListener("hidden.bs.offcanvas", function () {
-        if (active === "filters") showTab("tasks");
-      });
-    }
 
     showTab(active);
   }

@@ -78,6 +78,70 @@
   let columnPreset = "full";
   let lastDeletedItem = null;
   const DEBOUNCE_MS = 400;
+  let refreshItemsSeq = 0;
+  let refreshItemsAbort = null;
+
+  const MN_CDN = {
+    fullcalendarCss: "https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css",
+    fullcalendarJs: "https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js",
+    ganttCss: "https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.css",
+    ganttJs: "https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js",
+    jspdfJs: "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
+    jspdfAutotableJs: "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js",
+  };
+  const _scriptPromises = {};
+  const _cssPromises = {};
+
+  function loadScript(src) {
+    if (_scriptPromises[src]) return _scriptPromises[src];
+    _scriptPromises[src] = new Promise(function (resolve, reject) {
+      if (document.querySelector('script[src="' + src + '"]')) {
+        resolve();
+        return;
+      }
+      const el = document.createElement("script");
+      el.src = src;
+      el.onload = function () { resolve(); };
+      el.onerror = function () { reject(new Error("Failed to load " + src)); };
+      document.head.appendChild(el);
+    });
+    return _scriptPromises[src];
+  }
+
+  function loadCss(href) {
+    if (_cssPromises[href]) return _cssPromises[href];
+    _cssPromises[href] = new Promise(function (resolve, reject) {
+      if (document.querySelector('link[href="' + href + '"]')) {
+        resolve();
+        return;
+      }
+      const el = document.createElement("link");
+      el.rel = "stylesheet";
+      el.href = href;
+      el.onload = function () { resolve(); };
+      el.onerror = function () { reject(new Error("Failed to load " + href)); };
+      document.head.appendChild(el);
+    });
+    return _cssPromises[href];
+  }
+
+  function ensureCalendarLibs() {
+    return loadCss(MN_CDN.fullcalendarCss).then(function () {
+      return loadScript(MN_CDN.fullcalendarJs);
+    });
+  }
+
+  function ensureGanttLibs() {
+    return loadCss(MN_CDN.ganttCss).then(function () {
+      return loadScript(MN_CDN.ganttJs);
+    });
+  }
+
+  function ensurePdfLibs() {
+    return loadScript(MN_CDN.jspdfJs).then(function () {
+      return loadScript(MN_CDN.jspdfAutotableJs);
+    });
+  }
 
   let mnMeetingAttendeeIds = Array.isArray(typeof MN_MEETING_ATTENDEE_IDS !== "undefined" ? MN_MEETING_ATTENDEE_IDS : null)
     ? MN_MEETING_ATTENDEE_IDS.slice()
@@ -859,9 +923,13 @@
     });
     setUrlView(mode);
     updateBoardGroupToggleVisibility(mode);
-    if (mode === "calendar") refreshCalendar();
-    if (mode === "gantt") refreshGantt();
-    if (mode === "board" && lastItemsCache.length) renderBoard(lastItemsCache);
+    if (mode === "calendar") {
+      ensureCalendarLibs().then(refreshCalendar).catch(function (e) { console.error(e); });
+    } else if (mode === "gantt") {
+      ensureGanttLibs().then(refreshGantt).catch(function (e) { console.error(e); });
+    } else if (mode === "board" && lastItemsCache.length) {
+      renderBoard(lastItemsCache);
+    }
   }
 
   function setRowSaveState(tr, state, msg) {
@@ -2788,9 +2856,11 @@
     applyHighlightScroll();
   }
 
-  async function fetchItems() {
+  async function fetchItems(signal) {
     const p = readFilters();
-    const res = await fetch(API.items + "?" + p.toString(), { headers: { Accept: "application/json" } });
+    const opts = { headers: { Accept: "application/json" } };
+    if (signal) opts.signal = signal;
+    const res = await fetch(API.items + "?" + p.toString(), opts);
     if (!res.ok) throw new Error("Failed to load items");
     const data = await res.json();
     return data.items || [];
@@ -2801,10 +2871,17 @@
   }
 
   async function refreshItems() {
+    const seq = ++refreshItemsSeq;
+    if (refreshItemsAbort) refreshItemsAbort.abort();
+    refreshItemsAbort = new AbortController();
+    const signal = refreshItemsAbort.signal;
     try {
-      const items = await fetchItems();
+      const items = await fetchItems(signal);
+      if (seq !== refreshItemsSeq) return;
       renderTable(items);
     } catch (e) {
+      if (e && e.name === "AbortError") return;
+      if (seq !== refreshItemsSeq) return;
       console.error(e);
       const tb = $("#mn-table-body");
       if (tb) {
@@ -2885,72 +2962,88 @@
 
   function refreshGantt() {
     const el = $("#mn-gantt");
-    if (!el || typeof Gantt === "undefined") return;
-    const p = readFilters();
-    const viewMode = getGanttModeFromUrl();
-    syncGanttToolbarActive();
-    fetch(API.gantt + "?" + p.toString())
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        ganttTasksCache = data.tasks || [];
-        const monthInput = $("#mn-gantt-month");
-        let monthVal = monthInput && monthInput.value;
-        if (!monthVal && ganttTasksCache.length) {
-          monthVal = ganttTasksCache[0].start.slice(0, 7);
-          if (monthInput) monthInput.value = monthVal;
-        }
-        if (!monthVal) {
-          const now = new Date();
-          monthVal = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
-          if (monthInput) monthInput.value = monthVal;
-        }
-        let tasks = filterTasksByMonth(ganttTasksCache, monthVal);
-        el.innerHTML = "";
-        ganttInst = null;
-        if (!tasks.length) {
-          el.innerHTML = '<p class="text-muted p-3 mb-0">No dated tasks for this month. Set start/due dates on action items or pick another month.</p>';
-          return;
-        }
-        ganttInst = new Gantt(el, tasks, {
-          view_mode: viewMode,
-          date_format: "YYYY-MM-DD",
-          language: "en",
-          bar_height: 28,
-          padding: 20,
-          column_width: viewMode === "Day" ? 36 : viewMode === "Week" ? 48 : 42,
+    if (!el) return;
+    const run = function () {
+      if (typeof Gantt === "undefined") return;
+      const p = readFilters();
+      const viewMode = getGanttModeFromUrl();
+      syncGanttToolbarActive();
+      fetch(API.gantt + "?" + p.toString())
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          ganttTasksCache = data.tasks || [];
+          const monthInput = $("#mn-gantt-month");
+          let monthVal = monthInput && monthInput.value;
+          if (!monthVal && ganttTasksCache.length) {
+            monthVal = ganttTasksCache[0].start.slice(0, 7);
+            if (monthInput) monthInput.value = monthVal;
+          }
+          if (!monthVal) {
+            const now = new Date();
+            monthVal = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+            if (monthInput) monthInput.value = monthVal;
+          }
+          let tasks = filterTasksByMonth(ganttTasksCache, monthVal);
+          el.innerHTML = "";
+          ganttInst = null;
+          if (!tasks.length) {
+            el.innerHTML = '<p class="text-muted p-3 mb-0">No dated tasks for this month. Set start/due dates on action items or pick another month.</p>';
+            return;
+          }
+          ganttInst = new Gantt(el, tasks, {
+            view_mode: viewMode,
+            date_format: "YYYY-MM-DD",
+            language: "en",
+            bar_height: 28,
+            padding: 20,
+            column_width: viewMode === "Day" ? 36 : viewMode === "Week" ? 48 : 42,
+          });
+        })
+        .catch(function (e) {
+          console.error(e);
+          el.innerHTML = '<p class="text-danger p-3">Could not load Gantt.</p>';
         });
-      })
-      .catch(function (e) {
-        console.error(e);
-        el.innerHTML = '<p class="text-danger p-3">Could not load Gantt.</p>';
-      });
+    };
+    if (typeof Gantt === "undefined") {
+      ensureGanttLibs().then(run).catch(function (e) { console.error(e); });
+    } else {
+      run();
+    }
   }
 
   function refreshCalendar() {
     const el = $("#mn-calendar");
-    if (!el || typeof FullCalendar === "undefined") return;
-    if (calendar) {
-      calendar.refetchEvents();
-      return;
+    if (!el) return;
+    const run = function () {
+      if (typeof FullCalendar === "undefined") return;
+      if (calendar) {
+        calendar.refetchEvents();
+        return;
+      }
+      calendar = new FullCalendar.Calendar(el, {
+        initialView: "dayGridMonth",
+        height: "auto",
+        headerToolbar: { left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,listWeek" },
+        events: function (info, successCallback) {
+          const p = readFilters();
+          fetch(API.cal + "?" + p.toString())
+            .then(function (r) { return r.json(); })
+            .then(function (evs) { successCallback(evs); })
+            .catch(function () { successCallback([]); });
+        },
+        eventClick: function (info) {
+          info.jsEvent.preventDefault();
+          const url = info.event.url;
+          if (url) window.location.href = url;
+        },
+      });
+      calendar.render();
+    };
+    if (typeof FullCalendar === "undefined") {
+      ensureCalendarLibs().then(run).catch(function (e) { console.error(e); });
+    } else {
+      run();
     }
-    calendar = new FullCalendar.Calendar(el, {
-      initialView: "dayGridMonth",
-      height: "auto",
-      headerToolbar: { left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,listWeek" },
-      events: function (info, successCallback) {
-        const p = readFilters();
-        fetch(API.cal + "?" + p.toString())
-          .then(function (r) { return r.json(); })
-          .then(function (evs) { successCallback(evs); })
-          .catch(function () { successCallback([]); });
-      },
-      eventClick: function (info) {
-        info.jsEvent.preventDefault();
-        const url = info.event.url;
-        if (url) window.location.href = url;
-      },
-    });
-    calendar.render();
   }
 
   async function deleteItem(id, tr) {
@@ -4044,6 +4137,7 @@
   }
 
   async function buildExportPdfDocument() {
+    await ensurePdfLibs();
     if (!window.jspdf || !window.jspdf.jsPDF) {
       throw new Error("PDF library not loaded.");
     }
@@ -4963,5 +5057,10 @@
     getBoardGroupMode: function () { return boardGroupMode; },
     setBoardGroupMode: setBoardGroupMode,
     showToast: typeof showToast === "function" ? showToast : function () {},
+    loadScript: loadScript,
+    loadCss: loadCss,
+    ensureCalendarLibs: ensureCalendarLibs,
+    ensureGanttLibs: ensureGanttLibs,
+    ensurePdfLibs: ensurePdfLibs,
   };
 })();

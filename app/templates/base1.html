@@ -196,7 +196,7 @@ li a:hover:not(.active) {
           </a>
         </li>
         <li class="w3-hide-small w3-hide-medium w3-hover-shadow w3-margin-right" style="border-radius: 25px;">
-          <a class="{% if title == 'Home' %} active {% endif %} w3-border w3-padding  " style="border-radius: 25px; text-decoration: none;" href="{{url_for('welcome')}}">
+          <a class="{% if title == 'Home' %} active {% endif %} w3-border w3-padding  " style="border-radius: 25px; text-decoration: none;" href="{{url_for('overview')}}">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-house-door" viewBox="0 0 16 16">
               <path d="M8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4.5a.5.5 0 0 0 .5-.5v-4h2v4a.5.5 0 0 0 .5.5H14a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293zM2.5 14V7.707l5.5-5.5 5.5 5.5V14H10v-4a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5v4z"/>
             </svg>
@@ -239,7 +239,7 @@ li a:hover:not(.active) {
             </a>
         </li>
         <li class="w3-hide-small w3-hide-medium w3-hover-shadow w3-margin-right" style="border-radius: 25px;">
-          <a disabled class="{% if title == 'Champions' %} active {% endif %} w3-border w3-padding disabled-link" style="border-radius: 25px; text-decoration: none;" href="{{url_for('all_champion_details')}}">
+          <a class="{% if title == 'Champions' %} active {% endif %} w3-border w3-padding" style="border-radius: 25px; text-decoration: none;" href="{{url_for('all_champion_details')}}">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-mortarboard" viewBox="0 0 16 16">
               <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917zM8 8.46 1.758 5.965 8 3.052l6.242 2.913z"/>
               <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466zm-.068 1.873.22-.748 3.496 1.311a.5.5 0 0 0 .352 0l3.496-1.311.22.748L8 12.46z"/>
@@ -347,7 +347,7 @@ li a:hover:not(.active) {
   <div class="w3-bar-block w3-padding-top-0">
     
     <!-- Home -->
-    <a href="{{ url_for('welcome') }}" 
+    <a href="{{ url_for('overview') }}" 
        class="w3-bar-item w3-button w3-padding {% if title == 'Home' %}w3-theme-l1 w3-border-left active{% endif %}"
        style="border-left-width: 4px !important;">
       <i class="bi bi-house-door w3-margin-right"></i> Home
@@ -367,8 +367,7 @@ li a:hover:not(.active) {
 
     <!-- School Tracker -->
     <a href="{{ url_for('all_champion_details') }}" 
-       class="w3-bar-item w3-button w3-padding {% if title == 'Champions' %}w3-theme-l1 w3-border-left active{% endif %}"
-       disabled>
+       class="w3-bar-item w3-button w3-padding {% if title == 'Champions' %}w3-theme-l1 w3-border-left active{% endif %}">
       <i class="bi bi-mortarboard w3-margin-right"></i> Champions
     </a>
 
@@ -454,7 +453,7 @@ li a:hover:not(.active) {
 
   <!-- Navigation -->
   <div class="w3-padding-small">
-    <a href="{{ url_for('welcome') }}"
+    <a href="{{ url_for('overview') }}"
        class="nav-link {% if title == 'Home' %} active {% endif %}">
       <i class="bi bi-house-door nav-icon"></i>
       <span>Home</span>
@@ -473,10 +472,9 @@ li a:hover:not(.active) {
     </a>
 
     <a href="{{ url_for('all_champion_details') }}"
-       class="nav-link {% if title == 'Champions' %} active {% endif %} disabled-link" title="Coming soon">
+       class="nav-link {% if title == 'Champions' %} active {% endif %}">
       <i class="bi bi-mortarboard nav-icon"></i>
       <span>Champions</span>
-      <span class="w3-badge w3-light-grey w3-round-small nav-badge">Beta</span>
     </a>
 
     <a href="{{ url_for('bookallocations') }}"

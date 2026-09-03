@@ -13,6 +13,8 @@ $(document).ready(function () {
 
     function renderChart(type) {
         if (!chartData) return;
+        const chartEl = document.getElementById('provlibraryChart');
+        if (!chartEl || typeof Plotly === 'undefined') return;
 
         // The logic to build labels and values remains the same
         const firstRow = chartData[0] || {};

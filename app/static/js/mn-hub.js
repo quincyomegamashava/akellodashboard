@@ -43,6 +43,12 @@
         if (pane) pane.classList.toggle("d-none", key !== name);
       });
       syncLocalNav(name);
+      if (name === "new" && window.innerWidth < 768) {
+        const sheet = document.getElementById("mn-new-meeting-sheet");
+        if (sheet && window.bootstrap) {
+          bootstrap.Offcanvas.getOrCreateInstance(sheet).show();
+        }
+      }
       if (window.location.hash !== "#" + name) {
         history.replaceState(null, "", window.location.pathname + window.location.search + "#" + name);
       }

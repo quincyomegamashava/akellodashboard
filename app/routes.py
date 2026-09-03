@@ -290,6 +290,25 @@ def before_request():
 # Initialize cache for API endpoints
 cache = Cache(app)
 
+
+def _json_response_has_rows(resp):
+    """Only cache successful JSON list/dict payloads that contain rows."""
+    try:
+        if getattr(resp, 'status_code', 200) != 200:
+            return False
+        data = resp.get_json(silent=True)
+        if isinstance(data, list):
+            return len(data) > 0
+        if isinstance(data, dict):
+            if 'error' in data:
+                return False
+            if 'data' in data:
+                return bool(data.get('data'))
+            return bool(data)
+        return False
+    except Exception:
+        return False
+
 @app.route("/generate_lesson", methods=["POST"])
 def generate_lesson():
     """Legacy endpoint for lesson plan generation - now uses Ollama instead of OpenAI"""
@@ -688,7 +707,7 @@ def upload_users():
 @app.route('/welcome', methods=['GET'])
 @login_required
 def welcome():
-    return render_template('overview.html', title='Welcome')
+    return redirect(url_for('overview'))
 
 
 @app.route('/index', methods=['GET', 'POST'])
@@ -1972,15 +1991,15 @@ def create_tables():
             db.session.add(t)
         db.session.commit()
 
-@app.route("/projectmanagemnt", methods=["GET", "POST"])
-@login_required
-def projectmanagement():
-    return render_template("aplanforprojects.html")
-
-
 @app.route("/projectmanagement", methods=["GET", "POST"])
 @login_required
-def projectmanagement_alias():
+def projectmanagement():
+    return render_template("aplanforprojects.html", title="Workspaces")
+
+
+@app.route("/projectmanagemnt", methods=["GET", "POST"])
+@login_required
+def projectmanagement_typo_redirect():
     return redirect(url_for("projectmanagement"))
 
 
@@ -2777,6 +2796,8 @@ def project_a_labels(project_id):
     if request.method == "GET":
         labels = TaskALabel.query.filter_by(project_id=p.id).order_by(TaskALabel.name).all()
         return jsonify([label_to_dict(l) for l in labels])
+    if not user_can_manage_project_a(p):
+        return project_manage_denied()
     data = request.get_json() or {}
     name = (data.get("name") or "").strip()
     if not name:
@@ -2863,7 +2884,12 @@ def task_a_activities(task_id):
 @login_required
 def meeting_action_item_to_pm_task(action_item_id):
     from app.blueprints.meeting_notes.models import MeetingActionItem
-    item = MeetingActionItem.query.get_or_404(action_item_id)
+    from sqlalchemy.orm import joinedload as jl
+    item = (
+        MeetingActionItem.query.options(jl(MeetingActionItem.assignees))
+        .filter_by(id=action_item_id)
+        .first_or_404()
+    )
     data = request.get_json() or {}
     project_id = data.get("project_id")
     column_id = data.get("column_id")
@@ -2877,10 +2903,19 @@ def meeting_action_item_to_pm_task(action_item_id):
         return jsonify({"error": "Invalid column for project"}), 400
     maxpos = db.session.query(db.func.max(TaskA.position)).filter_by(column_id=col.id).scalar()
     pos = (maxpos + 1) if maxpos is not None else 0
+    cta = (getattr(item, "call_to_action", None) or "").strip()
+    title_line = next((ln.strip() for ln in cta.splitlines() if ln.strip()), "") or "Action item"
+    if len(title_line) > 255:
+        title_line = title_line[:252] + "…"
+    desc_parts = []
+    if cta and cta != title_line:
+        desc_parts.append(cta)
+    if getattr(item, "comments", None):
+        desc_parts.append(str(item.comments))
     t = TaskA(
         column_id=col.id,
-        title=item.title or "Action item",
-        description=item.comments or "",
+        title=title_line,
+        description="\n\n".join(desc_parts) if desc_parts else "",
         position=pos,
         start_date=None,
         end_date=datetime.combine(item.due_date, datetime.min.time()) if item.due_date else None,
@@ -2888,11 +2923,9 @@ def meeting_action_item_to_pm_task(action_item_id):
         source_action_item_id=item.id,
         created_by=current_user.id,
     )
-    assignee_ids = []
-    if item.assignee_user_id:
-        assignee_ids = [item.assignee_user_id]
-    if assignee_ids:
-        users, err = validate_assignee_user_ids(assignee_ids)
+    assignees = list(getattr(item, "assignees", None) or [])
+    if assignees:
+        users, err = validate_assignee_user_ids([u.id for u in assignees])
         if not err:
             t.assignees = users
     db.session.add(t)
@@ -2961,24 +2994,9 @@ def new_dash_layout():
 @app.route('/overview', methods=['GET'])
 @login_required
 def overview():
-    sm_overview = None
-    mn_overview = None
-    try:
-        from app.blueprints.sales_marketing.services import can_access_sales_marketing, stakeholders_stats
-        if can_access_sales_marketing():
-            sm_overview = stakeholders_stats()
-    except Exception:
-        sm_overview = None
-    try:
-        from app.blueprints.meeting_notes.services import hub_analytics_summary
-        mn_overview = hub_analytics_summary()
-    except Exception:
-        mn_overview = None
     return render_template(
         'overview.html',
         title="Akello Internal Dashboard",
-        sm_overview=sm_overview,
-        mn_overview=mn_overview,
     )
 
 
@@ -3089,24 +3107,24 @@ def champion_school_requests_admin():
 @app.route('/provincestats/<provincename>', methods=['GET', 'POST'])
 @login_required
 def provincestats(provincename):
-        province_champions = ChampionSchool.query.filter(ChampionSchool.province == provincename)
-        local_province_champion = ChampionSchool.query.filter(ChampionSchool.province == provincename)
         today = datetime.today().date()
         nhasi = today.strftime('%y- %m- %d')
         month_name = today.strftime('%B')
-        
 
         return render_template('simone_province_stats.html',
                                provincename=provincename,
-                               province_champions=province_champions,
-                               local_province_champion=local_province_champion,
-                               nhasi = nhasi,
+                               nhasi=nhasi,
                                month_name=month_name,
-                           title='School Tracker')
+                               title='School Tracker')
 
 
 @app.route('/api/all-champions-ask-data', methods=['GET'])
 @login_required
+@cache.cached(
+    timeout=300,
+    key_prefix=lambda: f'all_champions_ask_{request.args.get("start_date", "")}_{request.args.get("end_date", "")}',
+    response_filter=lambda resp: _json_response_has_rows(resp)
+)
 def all_champions_ask_data():
     """Fast aggregated Ask Akello chatlog counts per champion.
     Allows optional ?start_date and ?end_date query params.
@@ -3441,15 +3459,19 @@ def ask_akello_chosen_school(school_id):
         if end_date_str:
             try:
                 end_date = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
+                display_end = end_date
             except ValueError:
-                end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+                # Inclusive calendar day → exclusive next-day bound
+                day = datetime.strptime(end_date_str, "%Y-%m-%d")
+                display_end = day
+                end_date = day + timedelta(days=1)
         else:
             end_date = today
+            display_end = today
     except ValueError:
         return jsonify({"error": "Invalid date format. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS."}), 400
 
     try:
-        # Connect to ruzivo database
         pool = get_ruzivo_pool()
         if pool is None:
             return jsonify({"error": "Database connection not available"}), 500
@@ -3458,26 +3480,24 @@ def ask_akello_chosen_school(school_id):
         import pymysql.cursors
         cursor = conn.cursor(pymysql.cursors.DictCursor)
 
-        # Updated query (Ask Akello style)
         chatlog_query = """
-            SELECT 
+            SELECT
                 sc.school_id,
                 sc.school_name,
                 sc.school_province,
                 COUNT(DISTINCT tl.student_id) AS chatlog_count
             FROM tblask_akello_chat_logs tl
-            LEFT JOIN tblstudents ts 
+            LEFT JOIN tblstudents ts
                 ON ts.student_id = tl.student_id
-            LEFT JOIN tblschools sc 
+            LEFT JOIN tblschools sc
                 ON sc.school_id = ts.school_id
-            WHERE 
-                tl.created_at BETWEEN %s AND %s
+            WHERE
+                tl.created_at >= %s AND tl.created_at < %s
                 AND sc.school_id = %s
-            GROUP BY 
+            GROUP BY
                 sc.school_id, sc.school_name, sc.school_province
         """
 
-        # Execute query
         cursor.execute(chatlog_query, (start_date, end_date, school_id))
         result = cursor.fetchone()
 
@@ -3486,14 +3506,13 @@ def ask_akello_chosen_school(school_id):
             "school_name": result["school_name"] if result else None,
             "school_province": result["school_province"] if result else None,
             "chatlog_count": result["chatlog_count"] if result else 0,
-            "start_date": str(start_date),
-            "end_date": str(end_date),
+            "start_date": str(start_date.date() if hasattr(start_date, 'date') else start_date),
+            "end_date": str(display_end.date() if hasattr(display_end, 'date') else display_end),
         }
 
         return jsonify(response)
 
     except Exception as e:
-        # Error logging disabled - silently return error response
         return jsonify({"error": str(e)}), 500
 
     finally:
@@ -3509,17 +3528,15 @@ def ask_akello_chosen_school(school_id):
 @app.route('/api/champion-schools-data/<province_name>', methods=['GET'])
 @login_required
 @cache.cached(
-    timeout=300, 
-    key_prefix=lambda: f'ask_akello_{request.view_args["province_name"]}_{request.args.get("start_date", "")}_{request.args.get("end_date", "")}'
+    timeout=300,
+    key_prefix=lambda: f'ask_akello_{request.view_args["province_name"]}_{request.args.get("start_date", "")}_{request.args.get("end_date", "")}',
+    response_filter=lambda resp: _json_response_has_rows(resp)
 )
 def champion_schools_data(province_name):
     """
     Returns total Ask Akello chat log counts per Champion within a province.
-    Uses optional ?start_date and ?end_date (with hours).
-    Defaults to first day of current month through now().
+    Bulk query once for all ASL school IDs (no per-champion reconnect).
     """
-
-    # --- Handle date range ---
     today = datetime.now()
     default_start_date = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
@@ -3539,7 +3556,7 @@ def champion_schools_data(province_name):
             try:
                 end_date = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
             except ValueError:
-                end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d") + timedelta(days=1)
         else:
             end_date = today
     except ValueError:
@@ -3548,80 +3565,78 @@ def champion_schools_data(province_name):
         }), 400
 
     try:
-        # --- Load champions & local Brand Ambassadors for this province ---
         champions = ChampionSchool.query.filter_by(province=province_name).all()
         local_champions = User.query.filter(
             User.province == province_name,
             User.userRole == 'Brand Ambassador'
         ).all()
+        user_index = {(
+            (u.firstname or '').strip().lower(),
+            (u.lastname or '').strip().lower()
+        ): u.username for u in local_champions}
 
-        results = []
-
+        champ_to_asl = {}
+        all_asl_ids = []
         for champ in champions:
             schools = champ.get_schools() or []
-            asl_ids = [s.get('asl_school_id') for s in schools if s.get('asl_school_id')]
+            ids = []
+            for s in schools:
+                raw = str(s.get('asl_school_id') or '').strip()
+                if raw.isdigit():
+                    sid = int(raw)
+                    ids.append(sid)
+                    all_asl_ids.append(sid)
+            if ids:
+                champ_to_asl[champ.id] = ids
 
-            if not asl_ids:
-                continue
-
-            conn = None
-            cursor = None
+        counts_by_school = {}
+        if all_asl_ids:
+            all_asl_ids = sorted(set(all_asl_ids))
+            conn = get_ruzivo_conn()
+            if conn is None:
+                return jsonify({"error": "Database connection not available"}), 500
             try:
-                pool = get_ruzivo_pool()
-                if pool is None:
-                    raise Exception("Database connection not available")
-                conn = pool.connection()
                 import pymysql.cursors
                 cursor = conn.cursor(pymysql.cursors.DictCursor)
-
-                # --- Updated Ask Akello query ---
-                format_strings = ','.join(['%s'] * len(asl_ids))
-                chatlog_query = f"""
-                    SELECT 
-                        sc.school_id,
-                        sc.school_name,
-                        sc.school_province,
-                        COUNT(DISTINCT tl.student_id) AS chatlog_count
-                    FROM tblask_akello_chat_logs tl
-                    LEFT JOIN tblstudents ts 
-                        ON ts.student_id = tl.student_id
-                    LEFT JOIN tblschools sc 
-                        ON sc.school_id = ts.school_id
-                    WHERE 
-                        sc.school_id IN ({format_strings})
-                        AND tl.created_at BETWEEN %s AND %s
-                    GROUP BY 
-                        sc.school_id, sc.school_name, sc.school_province;
-                """
-
-                params = tuple(asl_ids) + (start_date, end_date)
-                cursor.execute(chatlog_query, params)
-                result_rows = cursor.fetchall()
-                chatlog_count = sum(r['chatlog_count'] for r in result_rows) if result_rows else 0
-
-            except Exception as e:
-                logging.error(
-                    f"Error fetching chatlog for champion {champ.firstname} {champ.lastname}: {e}"
-                )
-                chatlog_count = 0
-
+                CHUNK = 1000
+                for i in range(0, len(all_asl_ids), CHUNK):
+                    chunk = all_asl_ids[i:i + CHUNK]
+                    placeholders = ','.join(['%s'] * len(chunk))
+                    chatlog_query = f"""
+                        SELECT
+                            sc.school_id,
+                            COUNT(DISTINCT tl.student_id) AS chatlog_count
+                        FROM tblask_akello_chat_logs tl
+                        LEFT JOIN tblstudents ts ON ts.student_id = tl.student_id
+                        LEFT JOIN tblschools sc ON sc.school_id = ts.school_id
+                        WHERE sc.school_id IN ({placeholders})
+                          AND tl.created_at >= %s AND tl.created_at < %s
+                        GROUP BY sc.school_id
+                    """
+                    cursor.execute(chatlog_query, (*chunk, start_date, end_date))
+                    for row in cursor.fetchall() or []:
+                        sid = int(row['school_id'])
+                        counts_by_school[sid] = counts_by_school.get(sid, 0) + int(row['chatlog_count'] or 0)
             finally:
-                if cursor:
+                try:
                     cursor.close()
-                if conn:
+                except Exception:
+                    pass
+                try:
                     conn.close()
+                except Exception:
+                    pass
 
-            # --- Match champion to local Brand Ambassador username ---
-            username = None
-            for local in local_champions:
-                if (
-                    (local.firstname or '').strip().lower() == (champ.firstname or '').strip().lower() and
-                    (local.lastname or '').strip().lower() == (champ.lastname or '').strip().lower()
-                ):
-                    username = getattr(local, 'username', None)
-                    break
-
-            # --- Build result entry ---
+        results = []
+        for champ in champions:
+            asl_ids = champ_to_asl.get(champ.id, [])
+            if not asl_ids:
+                continue
+            chatlog_count = sum(counts_by_school.get(sid, 0) for sid in asl_ids)
+            username = user_index.get((
+                (champ.firstname or '').strip().lower(),
+                (champ.lastname or '').strip().lower()
+            ))
             results.append({
                 "champion": f"{champ.firstname} {champ.lastname}",
                 "username": username,
@@ -3790,6 +3805,15 @@ def publisher_library_amount():
 
 @app.route('/api/champion-schools-smartlearning-usage-analytics', methods=['GET'])
 @login_required
+@cache.cached(
+    timeout=300,
+    key_prefix=lambda: (
+        f'champ_overview_{request.args.get("start_date", "")}_{request.args.get("end_date", "")}_'
+        f'{AppSetting.get_value("asl_mtd_exclude_12_months", "true")}_'
+        f'{AppSetting.get_value("asl_mtd_exclude_1_year_awarded", "true")}'
+    ),
+    response_filter=lambda resp: _json_response_has_rows(resp)
+)
 def champion_schools_smartlearning_usage_analytics():
     """Fast aggregated analytics for champions across ASL and Library.
     Performs grouped queries across all relevant schools, then reduces per champion.
@@ -4120,7 +4144,7 @@ def champ_library_usage():
 
 @app.route('/api/champion-schools-smartlearning-usage/<province_name>', methods=['GET'])
 @login_required
-@cache.cached(timeout=300, key_prefix=lambda: f'champion_usage_{request.view_args["province_name"]}_{request.args.get("start_date", "")}_{request.args.get("end_date", "")}')
+@cache.cached(timeout=300, key_prefix=lambda: f'champion_usage_{request.view_args["province_name"]}_{request.args.get("start_date", "")}_{request.args.get("end_date", "")}', response_filter=lambda resp: _json_response_has_rows(resp))
 def champion_schools_smartlearning_usage(province_name):
     """OPTIMIZED: Bulk queries instead of N+1 - fetches all data in 2 queries total."""
     # Get date range from query parameters or default to MTD
@@ -4306,8 +4330,9 @@ def normalize_province_name(name):
 @app.route('/api/platforms/quick_custom_date', methods=['GET'])
 @login_required
 def platforms_quick_custom_date():
+    import concurrent.futures
+
     try:
-        # --- Parse dates ---
         end_date = request.args.get("end_date")
         start_date = request.args.get("start_date")
 
@@ -4324,149 +4349,161 @@ def platforms_quick_custom_date():
         else:
             start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
 
-        # ---------------------------
-        # Helper to normalize gender
-        # ---------------------------
+        cache_key = f"platforms_quick_{start_date}_{end_date}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return jsonify(cached)
+
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_dt_exclusive = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
+
         def normalize_gender(g):
             if not g:
                 return "Unknown"
-            g = g.strip().lower()
+            g = str(g).strip().lower()
             if g in ["f", "female", "girl", "woman"]:
                 return "Female"
             elif g in ["m", "male", "boy", "man"]:
                 return "Male"
             return "Unknown"
 
-        # ---------------------------
-        # 1) ASL PLATFORM (Ruzivo DB)
-        # ---------------------------
-        conn_asl = get_ruzivo_conn()
-        cursor_asl = conn_asl.cursor(pymysql.cursors.DictCursor)
+        def fetch_asl_and_ask():
+            conn = get_ruzivo_conn()
+            cursor = conn.cursor(pymysql.cursors.DictCursor)
+            try:
+                asl_query = """
+                    SELECT
+                        sch.school_province,
+                        COUNT(DISTINCT sl.student_id) AS active_learners
+                    FROM tblstudents_login sl
+                    INNER JOIN tblstudents st ON sl.student_id = st.student_id
+                    INNER JOIN tblschools sch ON st.school_id = sch.school_id
+                    WHERE sl.login_date >= %s AND sl.login_date < %s
+                    GROUP BY sch.school_province
+                """
+                cursor.execute(asl_query, (start_dt, end_dt_exclusive))
+                asl_results = cursor.fetchall() or []
 
-        asl_query = """
-            SELECT 
-                sch.school_id,
-                sch.school_name,
-                sch.school_province,
-                COUNT(DISTINCT sl.student_id) AS active_learners
-            FROM tblstudents_login sl
-            INNER JOIN tblstudents st ON sl.student_id = st.student_id
-            INNER JOIN tblschools sch ON st.school_id = sch.school_id
-            WHERE DATE(sl.login_date) BETWEEN %s AND %s
-            GROUP BY sch.school_id, sch.school_name, sch.school_province
-        """
-        cursor_asl.execute(asl_query, (start_date, end_date))
-        asl_results = cursor_asl.fetchall()
+                asl_gender_query = """
+                    SELECT st.gender, COUNT(DISTINCT sl.student_id) AS count
+                    FROM tblstudents_login sl
+                    INNER JOIN tblstudents st ON sl.student_id = st.student_id
+                    WHERE sl.login_date >= %s AND sl.login_date < %s
+                    GROUP BY st.gender
+                """
+                cursor.execute(asl_gender_query, (start_dt, end_dt_exclusive))
+                asl_gender_raw = cursor.fetchall() or []
 
-        # Gender distribution
-        asl_gender_query = """
-            SELECT st.gender, COUNT(DISTINCT sl.student_id) AS count
-            FROM tblstudents_login sl
-            INNER JOIN tblstudents st ON sl.student_id = st.student_id
-            WHERE DATE(sl.login_date) BETWEEN %s AND %s
-            GROUP BY st.gender
-        """
-        cursor_asl.execute(asl_gender_query, (start_date, end_date))
-        asl_gender_raw = cursor_asl.fetchall()
-        asl_gender = {"Female": 0, "Male": 0, "Unknown": 0}
-        for row in asl_gender_raw:
-            g = normalize_gender(row["gender"])
-            asl_gender[g] += row["count"]
+                ask_query = """
+                    SELECT COUNT(DISTINCT student_id) AS unique_students_count
+                    FROM tblask_akello_chat_logs
+                    WHERE created_at >= %s AND created_at < %s
+                """
+                cursor.execute(ask_query, (start_dt, end_dt_exclusive))
+                ask_result = cursor.fetchone() or {}
 
-        # ---------------------------
-        # 2) LIBRARY PLATFORM
-        # ---------------------------
-        conn_lib = get_direct_library_conn()
-        cursor_lib = conn_lib.cursor(pymysql.cursors.DictCursor)
+                ask_province_query = """
+                    SELECT sch.school_province, COUNT(DISTINCT acl.student_id) AS count
+                    FROM tblask_akello_chat_logs acl
+                    INNER JOIN tblstudents st ON acl.student_id = st.student_id
+                    INNER JOIN tblschools sch ON st.school_id = sch.school_id
+                    WHERE acl.created_at >= %s AND acl.created_at < %s
+                    GROUP BY sch.school_province
+                """
+                cursor.execute(ask_province_query, (start_dt, end_dt_exclusive))
+                ask_province = cursor.fetchall() or []
 
-        lib_query = """
-            SELECT 
-                inst.id,
-                inst.name AS institution_name,
-                inst.province AS institution_province,
-                COUNT(DISTINCT la.user_id) AS active_users
-            FROM logins la
-            INNER JOIN institution_user iu ON la.user_id = iu.user_id
-            INNER JOIN institutions inst ON iu.institution_id = inst.id
-            WHERE DATE(la.created_at) BETWEEN %s AND %s
-            GROUP BY inst.id, inst.name, inst.province
-        """
-        cursor_lib.execute(lib_query, (start_date, end_date))
-        lib_results = cursor_lib.fetchall()
+                ask_gender_query = """
+                    SELECT st.gender, COUNT(DISTINCT acl.student_id) AS count
+                    FROM tblask_akello_chat_logs acl
+                    INNER JOIN tblstudents st ON acl.student_id = st.student_id
+                    WHERE acl.created_at >= %s AND acl.created_at < %s
+                    GROUP BY st.gender
+                """
+                cursor.execute(ask_gender_query, (start_dt, end_dt_exclusive))
+                ask_gender_raw = cursor.fetchall() or []
 
-        lib_gender_query = """
-            SELECT u.sex AS gender, COUNT(DISTINCT la.user_id) AS count
-            FROM logins la
-            INNER JOIN users u ON la.user_id = u.id
-            WHERE DATE(la.created_at) BETWEEN %s AND %s
-            GROUP BY u.sex
-        """
-        cursor_lib.execute(lib_gender_query, (start_date, end_date))
-        lib_gender_raw = cursor_lib.fetchall()
-        lib_gender = {"Female": 0, "Male": 0, "Unknown": 0}
-        for row in lib_gender_raw:
-            g = normalize_gender(row["gender"])
-            lib_gender[g] += row["count"]
+                return {
+                    "asl_results": asl_results,
+                    "asl_gender_raw": asl_gender_raw,
+                    "ask_result": ask_result,
+                    "ask_province": ask_province,
+                    "ask_gender_raw": ask_gender_raw,
+                }
+            finally:
+                cursor.close()
+                conn.close()
 
-        # ---------------------------
-        # 3) ASK AKELLO CHAT LOGS
-        # ---------------------------
-        ask_query = """
-            SELECT COUNT(DISTINCT student_id) AS unique_students_count
-            FROM tblask_akello_chat_logs
-            WHERE DATE(created_at) BETWEEN %s AND %s
-        """
-        cursor_asl.execute(ask_query, (start_date, end_date))
-        ask_result = cursor_asl.fetchone()
-        total_ask_users = ask_result["unique_students_count"] if ask_result else 0
+        def fetch_library():
+            conn = get_direct_library_conn()
+            cursor = conn.cursor(pymysql.cursors.DictCursor)
+            try:
+                lib_query = """
+                    SELECT
+                        inst.province AS institution_province,
+                        COUNT(DISTINCT la.user_id) AS active_users
+                    FROM logins la
+                    INNER JOIN institution_user iu ON la.user_id = iu.user_id
+                    INNER JOIN institutions inst ON iu.institution_id = inst.id
+                    WHERE la.created_at >= %s AND la.created_at < %s
+                    GROUP BY inst.province
+                """
+                cursor.execute(lib_query, (start_dt, end_dt_exclusive))
+                lib_results = cursor.fetchall() or []
 
-        # Province distribution for AskAkello
-        ask_province_query = """
-            SELECT sch.school_province, COUNT(DISTINCT acl.student_id) AS count
-            FROM tblask_akello_chat_logs acl
-            INNER JOIN tblstudents st ON acl.student_id = st.student_id
-            INNER JOIN tblschools sch ON st.school_id = sch.school_id
-            WHERE DATE(acl.created_at) BETWEEN %s AND %s
-            GROUP BY sch.school_province
-        """
-        cursor_asl.execute(ask_province_query, (start_date, end_date))
-        ask_province = cursor_asl.fetchall()
+                lib_gender_query = """
+                    SELECT u.sex AS gender, COUNT(DISTINCT la.user_id) AS count
+                    FROM logins la
+                    INNER JOIN users u ON la.user_id = u.id
+                    WHERE la.created_at >= %s AND la.created_at < %s
+                    GROUP BY u.sex
+                """
+                cursor.execute(lib_gender_query, (start_dt, end_dt_exclusive))
+                lib_gender_raw = cursor.fetchall() or []
 
-        # Gender distribution for AskAkello
-        ask_gender_query = """
-            SELECT st.gender, COUNT(DISTINCT acl.student_id) AS count
-            FROM tblask_akello_chat_logs acl
-            INNER JOIN tblstudents st ON acl.student_id = st.student_id
-            WHERE DATE(acl.created_at) BETWEEN %s AND %s
-            GROUP BY st.gender
-        """
-        cursor_asl.execute(ask_gender_query, (start_date, end_date))
-        ask_gender_raw = cursor_asl.fetchall()
-        ask_gender = {"Female": 0, "Male": 0, "Unknown": 0}
-        for row in ask_gender_raw:
-            g = normalize_gender(row["gender"])
-            ask_gender[g] += row["count"]
+                return {
+                    "lib_results": lib_results,
+                    "lib_gender_raw": lib_gender_raw,
+                }
+            finally:
+                cursor.close()
+                conn.close()
 
-        # ---------------------------
-        # Normalize province names
-        # ---------------------------
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            asl_future = executor.submit(fetch_asl_and_ask)
+            lib_future = executor.submit(fetch_library)
+            asl_data = asl_future.result()
+            lib_data = lib_future.result()
+
+        asl_results = asl_data["asl_results"]
+        lib_results = lib_data["lib_results"]
+        ask_province = asl_data["ask_province"]
+
         for row in asl_results:
-            row["school_province"] = normalize_province_name(row["school_province"])
+            row["school_province"] = normalize_province_name(row.get("school_province"))
         for row in lib_results:
-            row["institution_province"] = normalize_province_name(row["institution_province"])
+            row["institution_province"] = normalize_province_name(row.get("institution_province"))
         for row in ask_province:
-            row["school_province"] = normalize_province_name(row["school_province"])
+            row["school_province"] = normalize_province_name(row.get("school_province"))
 
-        # Totals
-        total_asl_users = sum([r["active_learners"] for r in asl_results])
-        total_lib_users = sum([r["active_users"] for r in lib_results])
-        total_askakello_users = total_ask_users
+        asl_gender = {"Female": 0, "Male": 0, "Unknown": 0}
+        for row in asl_data["asl_gender_raw"]:
+            asl_gender[normalize_gender(row.get("gender"))] += int(row.get("count") or 0)
+
+        lib_gender = {"Female": 0, "Male": 0, "Unknown": 0}
+        for row in lib_data["lib_gender_raw"]:
+            lib_gender[normalize_gender(row.get("gender"))] += int(row.get("count") or 0)
+
+        ask_gender = {"Female": 0, "Male": 0, "Unknown": 0}
+        for row in asl_data["ask_gender_raw"]:
+            ask_gender[normalize_gender(row.get("gender"))] += int(row.get("count") or 0)
+
+        total_asl_users = sum(int(r.get("active_learners") or 0) for r in asl_results)
+        total_lib_users = sum(int(r.get("active_users") or 0) for r in lib_results)
+        total_askakello_users = int(asl_data["ask_result"].get("unique_students_count") or 0)
         overall_total = total_asl_users + total_lib_users + total_askakello_users
 
-        # ---------------------------
-        # FINAL RESPONSE
-        # ---------------------------
-        return jsonify({
+        payload = {
             "date_range": {"start": str(start_date), "end": str(end_date)},
             "totals": {
                 "asl": total_asl_users,
@@ -4484,18 +4521,14 @@ def platforms_quick_custom_date():
                 "library": lib_gender,
                 "ask_akello": ask_gender
             }
-        })
+        }
+        cache.set(cache_key, payload, timeout=600)
+        return jsonify(payload)
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
-    finally:
-        if 'cursor_asl' in locals(): cursor_asl.close()
-        if 'conn_asl' in locals(): conn_asl.close()
-        if 'cursor_lib' in locals(): cursor_lib.close()
-        if 'conn_lib' in locals(): conn_lib.close()
 
 
 
@@ -4505,45 +4538,53 @@ def platforms_quick_custom_date():
 
 @app.route('/api/platforms_overall_yearly', methods=['GET'])
 @login_required
-@cache.cached(timeout=60 * 60 * 6, key_prefix='platforms_overall_yearly')  # Reduced to 6 hours
 def platforms_overall_yearly():
+    """Yearly platform usage. Only successful real payloads are cached (never sample/timeout)."""
     import time
-    import pymysql
-    import threading
     import concurrent.futures
-    
+
+    cache_key = f"platforms_overall_yearly_{datetime.today().year}"
+    cached = cache.get(cache_key)
+    if cached is not None and isinstance(cached, dict) and not cached.get('_sample_data'):
+        payload = dict(cached)
+        payload['_debug'] = {
+            "execution_time_seconds": 0,
+            "query_count": 3,
+            "cache_status": "cached"
+        }
+        return jsonify(payload)
+
     start_time = time.time()
-    
-    def execute_query():
-        """Execute the actual database queries"""
-        return _platforms_overall_yearly_impl()
-    
-    # Use ThreadPoolExecutor for timeout functionality (works on Windows)
+
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            # Submit the query execution to thread pool
-            future = executor.submit(execute_query)
-            
-            # Wait for result with 20-second timeout for faster fallback
+            future = executor.submit(_platforms_overall_yearly_impl)
             try:
                 result = future.result(timeout=20)
                 execution_time = round(time.time() - start_time, 2)
-                
-                # Add debug information to successful response
-                if isinstance(result, dict) and 'year' in result:
+
+                if isinstance(result, dict) and result.get('_sample_data'):
                     result['_debug'] = {
                         "execution_time_seconds": execution_time,
-                        "query_count": 36,  # 3 queries per month
-                        "cache_status": "fresh" if execution_time > 1 else "cached"
+                        "query_count": 0,
+                        "cache_status": "fallback_sample_data",
+                        "timeout_occurred": False
+                    }
+                    return jsonify(result)
+
+                if isinstance(result, dict) and 'year' in result:
+                    cache.set(cache_key, result, timeout=60 * 60 * 6)
+                    result = dict(result)
+                    result['_debug'] = {
+                        "execution_time_seconds": execution_time,
+                        "query_count": 3,
+                        "cache_status": "fresh"
                     }
                 return jsonify(result)
-                
+
             except concurrent.futures.TimeoutError:
-                # Cancel the future to clean up resources
                 future.cancel()
-                print(f"Query timeout after 20 seconds - providing sample data")
-                
-                # Instead of failing, return sample data
+                print("Query timeout after 20 seconds - providing sample data (not cached)")
                 try:
                     sample_data = _get_sample_chart_data(datetime.today().year)
                     sample_data['_debug'] = {
@@ -4556,24 +4597,23 @@ def platforms_overall_yearly():
                 except Exception as e:
                     print(f"Sample data generation failed: {e}")
                     return jsonify({
-                        "error": "Database queries are taking too long. Showing sample data to ensure charts display.",
+                        "error": "Database queries are taking too long. Please try again later.",
                         "timeout": True,
                         "suggestion": "Please try refreshing the page later when server load is lower.",
                         "retry_recommended": True
-                    }), 408  # Request Timeout
-                
+                    }), 408
+
     except Exception as e:
         import traceback
         traceback.print_exc()
-        
-        # Provide more helpful error messages
+
         if "Connection" in str(e) or "connect" in str(e).lower():
             error_msg = "Unable to connect to the database. Please try again later."
         elif "timeout" in str(e).lower():
             error_msg = "Database query timed out. Please try refreshing the page."
         else:
             error_msg = f"An error occurred while loading chart data: {str(e)}"
-            
+
         return jsonify({
             "error": error_msg,
             "technical_error": str(e) if app.debug else None
@@ -4581,167 +4621,110 @@ def platforms_overall_yearly():
 
 
 def _platforms_overall_yearly_impl():
-    """Implementation of the platforms_overall_yearly logic"""
-    conn_asl = None
-    cursor_asl = None
-    conn_lib = None
-    cursor_lib = None
-    
-    try:
-        import time
-        query_start = time.time()
-        
-        today = datetime.today().date()
-        current_year = today.year
-        months = [datetime(current_year, m, 1) for m in range(1, 13)]
-        
-        print(f"Starting database connections for year {current_year}...")
-        
-        # Test database connections with timeout
-        try:
-            conn_asl = get_ruzivo_conn()
-            cursor_asl = conn_asl.cursor(pymysql.cursors.DictCursor)
-            print("✓ ASL database connected")
-        except Exception as e:
-            print(f"✗ ASL database connection failed: {e}")
-            return _get_sample_chart_data(current_year)
-        
-        try:
-            conn_lib = get_direct_library_conn()
-            cursor_lib = conn_lib.cursor(pymysql.cursors.DictCursor)
-            print("✓ Library database connected")
-        except Exception as e:
-            print(f"✗ Library database connection failed: {e}")
-            return _get_sample_chart_data(current_year)
+    """Implementation of the platforms_overall_yearly logic with index-friendly ranges."""
+    import concurrent.futures
 
-        def month_range(dt):
-            start = dt.replace(day=1)
-            if dt.month == 12:
-                end = datetime(dt.year + 1, 1, 1) - timedelta(days=1)
-            else:
-                end = datetime(dt.year, dt.month + 1, 1) - timedelta(days=1)
-            return start, end
+    today = datetime.today().date()
+    current_year = today.year
+    year_start = datetime(current_year, 1, 1)
+    year_end_exclusive = datetime(current_year + 1, 1, 1)
+    months = [datetime(current_year, m, 1) for m in range(1, 13)]
 
-        monthly_data = []
-        total_asl_year = 0
-        total_lib_year = 0
-        total_ask_year = 0
-
-        # Optimized approach: Use single queries with CASE statements for better performance
-        print(f"Starting optimized database queries for year {current_year}...")
-        
+    def fetch_asl_and_ask():
+        conn = get_ruzivo_conn()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
         try:
-            # --- OPTIMIZED ASL QUERY (single query for all months) ---
-            print("Executing ASL query...")
-            cursor_asl.execute("""
-                SELECT 
-                    MONTH(login_date) as month_num,
+            cursor.execute("""
+                SELECT
+                    MONTH(login_date) AS month_num,
                     COUNT(DISTINCT student_id) AS active_learners
                 FROM tblstudents_login
-                WHERE YEAR(login_date) = %s
+                WHERE login_date >= %s AND login_date < %s
                 GROUP BY MONTH(login_date)
-                ORDER BY MONTH(login_date)
-            """, (current_year,))
-            asl_results = cursor_asl.fetchall()
-            print(f"ASL query completed, got {len(asl_results)} months")
-            
-            # Convert to dict for easy lookup
-            asl_by_month = {row['month_num']: row['active_learners'] for row in asl_results}
-            
-            # --- OPTIMIZED LIBRARY QUERY (single query for all months) ---
-            print("Executing Library query...")
-            cursor_lib.execute("""
-                SELECT 
-                    MONTH(created_at) as month_num,
-                    COUNT(DISTINCT user_id) AS active_users
-                FROM logins
-                WHERE YEAR(created_at) = %s
-                GROUP BY MONTH(created_at)
-                ORDER BY MONTH(created_at)
-            """, (current_year,))
-            lib_results = cursor_lib.fetchall()
-            print(f"Library query completed, got {len(lib_results)} months")
-            
-            # Convert to dict for easy lookup
-            lib_by_month = {row['month_num']: row['active_users'] for row in lib_results}
-            
-            # --- OPTIMIZED ASK AKELLO QUERY (single query for all months) ---
-            print("Executing Ask Akello query...")
-            cursor_asl.execute("""
-                SELECT 
-                    MONTH(created_at) as month_num,
+                ORDER BY month_num
+            """, (year_start, year_end_exclusive))
+            asl_results = cursor.fetchall() or []
+
+            cursor.execute("""
+                SELECT
+                    MONTH(created_at) AS month_num,
                     COUNT(DISTINCT student_id) AS unique_students_count
                 FROM tblask_akello_chat_logs
-                WHERE YEAR(created_at) = %s
+                WHERE created_at >= %s AND created_at < %s
                 GROUP BY MONTH(created_at)
-                ORDER BY MONTH(created_at)
-            """, (current_year,))
-            ask_results = cursor_asl.fetchall()
-            print(f"Ask Akello query completed, got {len(ask_results)} months")
-            
-            # Convert to dict for easy lookup
-            ask_by_month = {row['month_num']: row['unique_students_count'] for row in ask_results}
-            
-        except Exception as query_error:
-            print(f"Database query error: {query_error}")
-            # If optimized queries fail, fall back to sample data
-            return _get_sample_chart_data(current_year)
-        
-        # Build monthly data from results
-        for m in months:
-            month_num = m.month
-            
-            asl_count = asl_by_month.get(month_num, 0)
-            lib_count = lib_by_month.get(month_num, 0)
-            ask_count = ask_by_month.get(month_num, 0)
-            
-            total_asl_year += asl_count
-            total_lib_year += lib_count
-            total_ask_year += ask_count
-            
-            total = asl_count + lib_count + ask_count
+                ORDER BY month_num
+            """, (year_start, year_end_exclusive))
+            ask_results = cursor.fetchall() or []
+            return asl_results, ask_results
+        finally:
+            cursor.close()
+            conn.close()
 
-            monthly_data.append({
-                "month": m.strftime("%B"),
-                "asl": asl_count,
-                "library": lib_count,
-                "ask_akello": ask_count,
-                "overall": total
-            })
-        
-        print(f"Monthly data compilation completed for {len(monthly_data)} months")
+    def fetch_library():
+        conn = get_direct_library_conn()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        try:
+            cursor.execute("""
+                SELECT
+                    MONTH(created_at) AS month_num,
+                    COUNT(DISTINCT user_id) AS active_users
+                FROM logins
+                WHERE created_at >= %s AND created_at < %s
+                GROUP BY MONTH(created_at)
+                ORDER BY month_num
+            """, (year_start, year_end_exclusive))
+            return cursor.fetchall() or []
+        finally:
+            cursor.close()
+            conn.close()
 
-        # --- Compute Overall Year Totals ---
-        overall_total_year = total_asl_year + total_lib_year + total_ask_year
-
-        # Return data as dictionary (not jsonify, that's handled in the main function)
-        return {
-            "year": current_year,
-            "monthly_usage": monthly_data,
-            "yearly_totals": {
-                "asl": total_asl_year,
-                "library": total_lib_year,
-                "ask_akello": total_ask_year,
-                "overall": overall_total_year
-            }
-        }
-
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            asl_future = executor.submit(fetch_asl_and_ask)
+            lib_future = executor.submit(fetch_library)
+            asl_results, ask_results = asl_future.result()
+            lib_results = lib_future.result()
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        # Re-raise the exception to be handled by the main function
-        raise e
-        
-    finally:
-        # Clean up database connections
-        if cursor_asl:
-            cursor_asl.close()
-        if conn_asl:
-            conn_asl.close()
-        if cursor_lib:
-            cursor_lib.close()
-        if conn_lib:
-            conn_lib.close()
+        print(f"Yearly platforms query error: {e}")
+        return _get_sample_chart_data(current_year)
+
+    asl_by_month = {int(row['month_num']): int(row['active_learners'] or 0) for row in asl_results}
+    lib_by_month = {int(row['month_num']): int(row['active_users'] or 0) for row in lib_results}
+    ask_by_month = {int(row['month_num']): int(row['unique_students_count'] or 0) for row in ask_results}
+
+    monthly_data = []
+    total_asl_year = 0
+    total_lib_year = 0
+    total_ask_year = 0
+
+    for m in months:
+        month_num = m.month
+        asl_count = asl_by_month.get(month_num, 0)
+        lib_count = lib_by_month.get(month_num, 0)
+        ask_count = ask_by_month.get(month_num, 0)
+
+        total_asl_year += asl_count
+        total_lib_year += lib_count
+        total_ask_year += ask_count
+
+        monthly_data.append({
+            "month": m.strftime("%B"),
+            "asl": asl_count,
+            "library": lib_count,
+            "ask_akello": ask_count,
+            "overall": asl_count + lib_count + ask_count
+        })
+
+    return {
+        "year": current_year,
+        "monthly_usage": monthly_data,
+        "yearly_totals": {
+            "asl": total_asl_year,
+            "library": total_lib_year,
+            "ask_akello": total_ask_year,
+            "overall": total_asl_year + total_lib_year + total_ask_year
+        }
+    }
 
 
 def _get_sample_chart_data(current_year):
@@ -5069,6 +5052,7 @@ def normalize_province_name(name):
 
 
 @app.route('/api/askakello/custom_date', methods=['GET'])
+@login_required
 def askakello_custom_date():
     try:
         # --- Parse dates ---
@@ -5107,13 +5091,16 @@ def askakello_custom_date():
         conn = get_ruzivo_conn()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
 
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_dt_exclusive = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
+
         # Unique students
         ask_query = """
             SELECT COUNT(DISTINCT student_id) AS unique_students_count
             FROM tblask_akello_chat_logs
-            WHERE DATE(created_at) BETWEEN %s AND %s
+            WHERE created_at >= %s AND created_at < %s
         """
-        cursor.execute(ask_query, (start_date, end_date))
+        cursor.execute(ask_query, (start_dt, end_dt_exclusive))
         ask_result = cursor.fetchone()
         total_ask_users = ask_result["unique_students_count"] if ask_result else 0
 
@@ -5123,10 +5110,10 @@ def askakello_custom_date():
             FROM tblask_akello_chat_logs acl
             INNER JOIN tblstudents st ON acl.student_id = st.student_id
             INNER JOIN tblschools sch ON st.school_id = sch.school_id
-            WHERE DATE(acl.created_at) BETWEEN %s AND %s
+            WHERE acl.created_at >= %s AND acl.created_at < %s
             GROUP BY sch.school_province
         """
-        cursor.execute(ask_province_query, (start_date, end_date))
+        cursor.execute(ask_province_query, (start_dt, end_dt_exclusive))
         ask_province = cursor.fetchall()
 
         # Normalize province names
@@ -5138,10 +5125,10 @@ def askakello_custom_date():
             SELECT st.gender, COUNT(DISTINCT acl.student_id) AS count
             FROM tblask_akello_chat_logs acl
             INNER JOIN tblstudents st ON acl.student_id = st.student_id
-            WHERE DATE(acl.created_at) BETWEEN %s AND %s
+            WHERE acl.created_at >= %s AND acl.created_at < %s
             GROUP BY st.gender
         """
-        cursor.execute(ask_gender_query, (start_date, end_date))
+        cursor.execute(ask_gender_query, (start_dt, end_dt_exclusive))
         ask_gender_raw = cursor.fetchall()
 
         ask_gender = {"Female": 0, "Male": 0, "Unknown": 0}
@@ -5540,20 +5527,30 @@ def get_province_details(provincename):
 
 
 @app.route('/api/province-school-active-logins', methods=['GET'])
+@login_required
 def province_school_active_logins():
     try:
         province = request.args.get("province")
-        start_date = request.args.get("start_date")
-        end_date = request.args.get("end_date")
+        start_date_str = request.args.get("start_date")
+        end_date_str = request.args.get("end_date")
 
-        if not province or not start_date or not end_date:
+        if not province or not start_date_str or not end_date_str:
             return jsonify({"error": "Missing required parameters (province, start_date, end_date)"}), 400
+
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_dt_exclusive = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
 
         conn = get_ruzivo_conn()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
 
         query = """
-            SELECT 
+            SELECT
                 sch.school_id,
                 sch.school_name,
                 sch.school_province,
@@ -5561,23 +5558,22 @@ def province_school_active_logins():
             FROM tblstudents_login sl
             INNER JOIN tblstudents st ON sl.student_id = st.student_id
             INNER JOIN tblschools sch ON st.school_id = sch.school_id
-            WHERE DATE(sl.login_date) BETWEEN %s AND %s
+            WHERE sl.login_date >= %s AND sl.login_date < %s
               AND sch.school_province = %s
             GROUP BY sch.school_id, sch.school_name, sch.school_province
             ORDER BY active_learners DESC
         """
 
-        cursor.execute(query, (start_date, end_date, province))
+        cursor.execute(query, (start_dt, end_dt_exclusive, province))
         results = cursor.fetchall()
 
-        # Province total learners
         province_total = sum([row["active_learners"] for row in results])
 
         return jsonify({
             "province": province,
             "date_range": {
-                "start": start_date,
-                "end": end_date
+                "start": start_date_str,
+                "end": end_date_str
             },
             "province_total": province_total,
             "schools": results
@@ -5596,6 +5592,7 @@ def province_school_active_logins():
 
 
 @app.route('/api/overall_school_active_logins', methods=['GET'])
+@login_required
 def overall_school_active_logins():
     try:
         # Validate and normalize input dates
@@ -5983,17 +5980,18 @@ def askakello_daily_chats():
         conn = get_ruzivo_conn()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
 
+        end_exclusive = today + timedelta(days=1)
         query = """
             SELECT 
-                DATE(l.updated_at) AS chat_date,
+                DATE(l.created_at) AS chat_date,
                 COUNT(DISTINCT l.student_id) AS learner_count
             FROM tblask_akello_chat_logs l
-            WHERE l.updated_at BETWEEN %s AND %s
-            GROUP BY DATE(l.updated_at)
+            WHERE l.created_at >= %s AND l.created_at < %s
+            GROUP BY DATE(l.created_at)
             ORDER BY chat_date
         """
 
-        cursor.execute(query, (start_date, today))
+        cursor.execute(query, (start_date, end_exclusive))
         results = cursor.fetchall()
 
         return jsonify({
@@ -6006,9 +6004,14 @@ def askakello_daily_chats():
         print("Error querying daily chats:", e)
         return jsonify({"error": "Internal server error"}), 500
 
-    # finally:
-    #     if conn:
-    #         conn.close()
+    finally:
+        try:
+            if 'cursor' in locals() and cursor:
+                cursor.close()
+            if 'conn' in locals() and conn:
+                conn.close()
+        except Exception:
+            pass
 
 # -------------------------------
 # 2️⃣ MONTHLY CHATS API
@@ -6025,19 +6028,18 @@ def askakello_monthly_chats():
 
         query = """
             SELECT 
-                YEAR(l.updated_at) AS year_num,
-                MONTH(l.updated_at) AS month_num,
+                YEAR(l.created_at) AS year_num,
+                MONTH(l.created_at) AS month_num,
                 COUNT(DISTINCT l.student_id) AS learner_count
             FROM tblask_akello_chat_logs l
-            WHERE YEAR(l.updated_at) = %s
-            GROUP BY YEAR(l.updated_at), MONTH(l.updated_at)
+            WHERE YEAR(l.created_at) = %s
+            GROUP BY YEAR(l.created_at), MONTH(l.created_at)
             ORDER BY year_num, month_num
         """
 
         cursor.execute(query, (current_year,))
         results = cursor.fetchall()
 
-        # Add month name
         for r in results:
             r["month"] = calendar.month_name[r["month_num"]]
 
@@ -6050,9 +6052,14 @@ def askakello_monthly_chats():
         print("Error querying monthly chats:", e)
         return jsonify({"error": "Internal server error"}), 500
 
-    # finally:
-    #     if conn:
-    #         conn.close()
+    finally:
+        try:
+            if 'cursor' in locals() and cursor:
+                cursor.close()
+            if 'conn' in locals() and conn:
+                conn.close()
+        except Exception:
+            pass
 
 
 
@@ -6153,9 +6160,12 @@ def api_library_daily_logins():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-    # finally:
-    #     if 'conn' in locals():
-    #         conn.close()
+    finally:
+        try:
+            if 'conn' in locals() and conn:
+                conn.close()
+        except Exception:
+            pass
 
 
 
@@ -6231,10 +6241,11 @@ def library_vaya_daily_logins():
 @app.route('/api/library-monthly-logins', methods=['GET'])
 @login_required
 def api_library_monthly_logins():
+    conn = None
     try:
         today = datetime.today()
-        start_date = datetime(today.year, 1, 1).date()   # Jan 1 of current year
-        end_date = today.date()  # today
+        start_date = datetime(today.year, 1, 1).date()
+        end_date = today.date()
 
         conn = get_direct_library_conn()
 
@@ -6251,14 +6262,13 @@ def api_library_monthly_logins():
             cursor.execute(query, (start_date, end_date))
             results = cursor.fetchall()
 
-        # Fill missing months with 0
         results_dict = {r['month_num']: r['total_logins'] for r in results}
         monthly_data = []
         for m in range(1, 13):
             if datetime(today.year, m, 1).date() > end_date:
                 break
             monthly_data.append({
-                "month": month_name[m],
+                "month": calendar.month_name[m],
                 "total_logins": results_dict.get(m, 0)
             })
 
@@ -6269,26 +6279,31 @@ def api_library_monthly_logins():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-    # finally:
-    #     if 'conn' in locals():
-    #         conn.close()
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 
 
 
 @app.route("/api/library/school_profile", methods=["GET", "POST"])
+@login_required
 def library_school_profile():
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
     else:
-        data = request.args  
+        data = request.args
 
     asl_school_id = data.get("asl_school_id")
+    library_school_id = data.get("library_school_id")
     start_date = data.get("start_date")
     end_date = data.get("end_date")
 
-    if not asl_school_id:
+    if not asl_school_id and not library_school_id:
         return jsonify({"error": "asl_school_id is required"}), 400
 
     from datetime import date, timedelta, datetime
@@ -6299,59 +6314,62 @@ def library_school_profile():
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
-    # --- Find champions with matching asl_school_id ---
-    champions = ChampionSchool.query.all()
-    matching_champions = []
+    start_dt = datetime.combine(start_date, datetime.min.time())
+    end_exclusive = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
+
     library_ids = []
-
-    for champ in champions:
-        for school in champ.get_schools():
-            if str(school.get("asl_school_id")) == str(asl_school_id):
-                matching_champions.append(champ)
-                if school.get("library_school_id"):
-                    library_ids.append(school.get("library_school_id"))
-
-    if not matching_champions:
-        return jsonify({
-            "message": f"No champions found for asl_school_id {asl_school_id}",
-            "total_active_users": 0
-        }), 200
+    if library_school_id:
+        library_ids = [str(library_school_id).strip()]
+    else:
+        # Prefer matching by ASL id without scanning every champion when possible
+        asl_key = str(asl_school_id).strip()
+        champions = ChampionSchool.query.all()
+        for champ in champions:
+            for school in (champ.get_schools() or []):
+                if str(school.get("asl_school_id") or '').strip() == asl_key:
+                    lid = str(school.get("library_school_id") or '').strip()
+                    if lid and lid not in library_ids:
+                        library_ids.append(lid)
 
     if not library_ids:
         return jsonify({
+            "asl_school_id": asl_school_id,
             "message": f"No linked library_school_id for asl_school_id {asl_school_id}",
-            "total_active_users": 0
+            "total_active_users": 0,
+            "schools": []
         }), 200
 
-    # --- Query Library DB ---
-    total_active_users = 0
-    school_profiles = []
-
-    query = """
-        SELECT 
+    placeholders = ','.join(['%s'] * len(library_ids))
+    query = f"""
+        SELECT
             inst.id,
             inst.name AS institution_name,
             COUNT(DISTINCT la.user_id) AS active_users
         FROM logins la
         INNER JOIN institution_user iu ON la.user_id = iu.user_id
         INNER JOIN institutions inst ON iu.institution_id = inst.id
-        WHERE inst.id = %s AND DATE(la.created_at) BETWEEN %s AND %s
+        WHERE inst.id IN ({placeholders})
+          AND la.created_at >= %s AND la.created_at < %s
         GROUP BY inst.id, inst.name
         ORDER BY active_users DESC
     """
 
     conn = get_direct_library_conn()
-    cur = conn.cursor()  # make sure results are dicts
+    cur = conn.cursor()
+    try:
+        cur.execute(query, (*library_ids, start_dt, end_exclusive))
+        school_profiles = cur.fetchall() or []
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
 
-    for lib_id in library_ids:
-        cur.execute(query, (lib_id, start_date, end_date))
-        row = cur.fetchone()
-        if row:
-            total_active_users += row["active_users"]
-            school_profiles.append(row)
-
-    cur.close()
-    conn.close()
+    total_active_users = sum(int(r.get("active_users") or 0) if isinstance(r, dict) else int(r[2] or 0) for r in school_profiles)
 
     return jsonify({
         "asl_school_id": asl_school_id,
@@ -6442,9 +6460,9 @@ def library_school_profile():
 
 
 @app.route('/api/library_custom_date_analytics', methods=['GET'])
+@login_required
 def library_custom_date_analytics():
     try:
-        # Get date range from request, default last 30 days
         end_date = request.args.get("end_date")
         start_date = request.args.get("start_date")
 
@@ -6461,6 +6479,9 @@ def library_custom_date_analytics():
         else:
             start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
 
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_dt_exclusive = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
+
         conn = get_direct_library_conn()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
 
@@ -6473,12 +6494,12 @@ def library_custom_date_analytics():
             FROM logins la
             INNER JOIN institution_user iu ON la.user_id = iu.user_id
             INNER JOIN institutions inst ON iu.institution_id = inst.id
-            WHERE DATE(la.created_at) BETWEEN %s AND %s
+            WHERE la.created_at >= %s AND la.created_at < %s
             GROUP BY inst.id, inst.name, inst.province
             ORDER BY active_users DESC
         """
 
-        cursor.execute(query, (start_date, end_date))
+        cursor.execute(query, (start_dt, end_dt_exclusive))
         results = cursor.fetchall()
 
         total_active_users = sum([row["active_users"] for row in results])
@@ -6990,17 +7011,16 @@ def testingdb1():
 @app.route('/api/smartlearning-school', methods=['POST'])
 @login_required
 def smartlearning_school():
-    conn = None  # Initialize conn to None
+    conn = None
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+        school_id = data.get("school_id")
         school_name = data.get("school_name")
-        if not school_name:
-            return jsonify({"error": "Missing school_name"}), 400
+        if not school_id and not school_name:
+            return jsonify({"error": "Missing school_id or school_name"}), 400
 
-        # Get date range from request or default to MTD
         today = datetime.today().date()
         default_start_date = today.replace(day=1)
-
         start_date_str = data.get("start_date")
         end_date_str = data.get("end_date")
 
@@ -7009,7 +7029,6 @@ def smartlearning_school():
                 start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
             else:
                 start_date = default_start_date
-
             if end_date_str:
                 end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
             else:
@@ -7017,12 +7036,19 @@ def smartlearning_school():
         except ValueError:
             return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
 
-        # Get the connection from the PyMySQL connection pool
-        conn = get_ruzivo_conn()
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_exclusive = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
 
+        conn = get_ruzivo_conn()
         with conn.cursor() as cursor:
-            # Main data query with grade filter
-            query = """
+            if school_id:
+                where_clause = "s.school_id = %s"
+                where_param = int(school_id)
+            else:
+                where_clause = "t.school_name = %s"
+                where_param = school_name
+
+            query = f"""
                 SELECT
                     s.school_id,
                     s.username,
@@ -7031,24 +7057,23 @@ def smartlearning_school():
                     t.school_name
                 FROM vwstudent s
                 JOIN tblschools t ON s.school_id = t.school_id
-                WHERE t.school_name = %s
+                WHERE {where_clause}
                   AND s.grade BETWEEN 4 AND 13
-                  AND s.last_login BETWEEN %s AND %s
-                LIMIT 500;
+                  AND s.last_login >= %s AND s.last_login < %s
+                LIMIT 500
             """
-            cursor.execute(query, (school_name, start_date, end_date))
+            cursor.execute(query, (where_param, start_dt, end_exclusive))
             rows = cursor.fetchall()
             columns = list(rows[0].keys()) if rows else []
 
-            # Count query with grade filter
-            count_query = """
+            count_query = f"""
                 SELECT COUNT(*) AS total FROM vwstudent s
                 JOIN tblschools t ON s.school_id = t.school_id
-                WHERE t.school_name = %s
+                WHERE {where_clause}
                   AND s.grade BETWEEN 4 AND 13
-                  AND s.last_login BETWEEN %s AND %s;
+                  AND s.last_login >= %s AND s.last_login < %s
             """
-            cursor.execute(count_query, (school_name, start_date, end_date))
+            cursor.execute(count_query, (where_param, start_dt, end_exclusive))
             total_count = cursor.fetchone()['total']
 
         return jsonify({
@@ -7067,7 +7092,6 @@ def smartlearning_school():
         return jsonify({"error": str(e)}), 500
 
     finally:
-        # Always return the connection to the pool
         if conn:
             conn.close()
 
@@ -7433,12 +7457,21 @@ def api_branding_inventory():
 @login_required
 def api_branding_requests():
     reqs = BrandingRequest.query.order_by(BrandingRequest.created_at.desc()).all()
-    # include actions history for clarity
+    req_ids = [r.id for r in reqs]
+    actions_by_req = {rid: [] for rid in req_ids}
+    if req_ids:
+        all_acts = (
+            BrandingAction.query
+            .filter(BrandingAction.request_id.in_(req_ids))
+            .order_by(BrandingAction.created_at.asc())
+            .all()
+        )
+        for a in all_acts:
+            actions_by_req.setdefault(a.request_id, []).append(a.to_dict())
     out = []
     for r in reqs:
         row = r.to_dict()
-        acts = BrandingAction.query.filter_by(request_id=r.id).order_by(BrandingAction.created_at.asc()).all()
-        row['actions'] = [a.to_dict() for a in acts]
+        row['actions'] = actions_by_req.get(r.id, [])
         out.append(row)
     return jsonify(out)
 
@@ -7888,8 +7921,8 @@ def api_province_trainers():
 @app.route('/smartlearning-metrics-update',  methods=['GET','POST'])
 @login_required
 def smartlearning_metrics_update():
+    conn = None
     try:
-        # Read form data instead of JSON
         start_date = request.form.get('start_date')
         end_date = request.form.get('end_date')
 
@@ -7898,92 +7931,111 @@ def smartlearning_metrics_update():
         end_date = end_date or today.strftime('%Y-%m-%d')
         active_30_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
 
+        cache_key = f"smartlearning_metrics_{start_date}_{end_date}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return jsonify(cached)
 
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt_exclusive = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+        active_30_dt = datetime.strptime(active_30_date, '%Y-%m-%d')
 
         queries = {
-            "asl_unique_users": f"""
-                SELECT COUNT(DISTINCT student_id) AS value
-                FROM tblstudents_login
-                WHERE login_date BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-            """,
-            "asl_registrations": f"""
-                SELECT COUNT(DISTINCT student_id) AS value
-                FROM tblstudents
-                WHERE date_added BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-            """,
-            "asl_total_primary_content": f"""
-                SELECT COUNT(DISTINCT ca.student_id) AS value
-                FROM tblcontent_access ca
-                JOIN tblstudents ts ON ts.student_id = ca.student_id
-                WHERE ca.start_time BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-                AND ts.student_type != 'STAFF'
-            """,
-            "asl_total_sec_content": f"""
-                SELECT COUNT(DISTINCT ca.student_id) AS value
-                FROM tblcontent_access_hs ca
-                JOIN tblstudents ts ON ts.student_id = ca.student_id
-                WHERE ca.start_time BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-                AND ts.student_type != 'STAFF'
-            """,
-            "asl_total_primary_exercise": f"""
-                SELECT COUNT(DISTINCT tr.student_id) AS value
-                FROM tblresults tr
-                JOIN tblstudents ts ON ts.student_id = tr.student_id
-                WHERE tr.date_added BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-                AND ts.student_type != 'STAFF'
-            """,
-            "asl_total_sec_exercise": f"""
-                SELECT COUNT(DISTINCT tr.student_id) AS value
-                FROM tblresults_hs tr
-                JOIN tblstudents ts ON ts.student_id = tr.student_id
-                WHERE tr.date_added BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-                AND ts.student_type != 'STAFF'
-            """,
-            "asl_total_zimsec_access": f"""
-                SELECT COUNT(DISTINCT zi.student_id) AS value
-                FROM tblcontent_access_zimsec zi
-                JOIN tblstudents ts ON ts.student_id = zi.student_id
-                WHERE zi.start_time BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-                AND ts.student_type != 'STAFF'
-            """,
-            "asl_teacher_set_activities": f"""
-                SELECT COUNT(DISTINCT ta.student_id) AS value
-                FROM tblclass_activity_results ta
-                JOIN tblstudents ts ON ts.student_id = ta.student_id
-                WHERE ta.date_added BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-                AND ts.student_type != 'STAFF'
-            """,
-            "asl_teacher_access": f"""
-                SELECT COUNT(teacher_id) AS value
-                FROM tbl_teacher
-                WHERE active_at BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-            """,
-            "asl_revenue": f"""
-                SELECT currency, SUM(amount) AS value
-                FROM tblecocash_payment_order
-                WHERE date_created BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-                AND transactionOperationStatus = 'COMPLETED'
-                GROUP BY currency
-            """,
-            "asl_unique_subscribers": f"""
-                SELECT COUNT(DISTINCT student_id) AS value
-                FROM tblecocash_payment_order
-                WHERE date_created BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-                AND transactionOperationStatus = 'COMPLETED'
-            """,
-            "asl_active30": f"""
-                SELECT COUNT(DISTINCT student_id) AS value
-                FROM tblstudents_login
-                WHERE login_date BETWEEN DATE('{active_30_date}') AND DATE('{end_date}')
-            """
+            "asl_unique_users": (
+                """SELECT COUNT(DISTINCT student_id) AS value
+                   FROM tblstudents_login
+                   WHERE login_date >= %s AND login_date < %s""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "asl_registrations": (
+                """SELECT COUNT(DISTINCT student_id) AS value
+                   FROM tblstudents
+                   WHERE date_added >= %s AND date_added < %s""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "asl_total_primary_content": (
+                """SELECT COUNT(DISTINCT ca.student_id) AS value
+                   FROM tblcontent_access ca
+                   JOIN tblstudents ts ON ts.student_id = ca.student_id
+                   WHERE ca.start_time >= %s AND ca.start_time < %s
+                   AND ts.student_type != 'STAFF'""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "asl_total_sec_content": (
+                """SELECT COUNT(DISTINCT ca.student_id) AS value
+                   FROM tblcontent_access_hs ca
+                   JOIN tblstudents ts ON ts.student_id = ca.student_id
+                   WHERE ca.start_time >= %s AND ca.start_time < %s
+                   AND ts.student_type != 'STAFF'""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "asl_total_primary_exercise": (
+                """SELECT COUNT(DISTINCT tr.student_id) AS value
+                   FROM tblresults tr
+                   JOIN tblstudents ts ON ts.student_id = tr.student_id
+                   WHERE tr.date_added >= %s AND tr.date_added < %s
+                   AND ts.student_type != 'STAFF'""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "asl_total_sec_exercise": (
+                """SELECT COUNT(DISTINCT tr.student_id) AS value
+                   FROM tblresults_hs tr
+                   JOIN tblstudents ts ON ts.student_id = tr.student_id
+                   WHERE tr.date_added >= %s AND tr.date_added < %s
+                   AND ts.student_type != 'STAFF'""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "asl_total_zimsec_access": (
+                """SELECT COUNT(DISTINCT zi.student_id) AS value
+                   FROM tblcontent_access_zimsec zi
+                   JOIN tblstudents ts ON ts.student_id = zi.student_id
+                   WHERE zi.start_time >= %s AND zi.start_time < %s
+                   AND ts.student_type != 'STAFF'""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "asl_teacher_set_activities": (
+                """SELECT COUNT(DISTINCT ta.student_id) AS value
+                   FROM tblclass_activity_results ta
+                   JOIN tblstudents ts ON ts.student_id = ta.student_id
+                   WHERE ta.date_added >= %s AND ta.date_added < %s
+                   AND ts.student_type != 'STAFF'""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "asl_teacher_access": (
+                """SELECT COUNT(teacher_id) AS value
+                   FROM tbl_teacher
+                   WHERE active_at >= %s AND active_at < %s""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "asl_revenue": (
+                """SELECT currency, SUM(amount) AS value
+                   FROM tblecocash_payment_order
+                   WHERE date_created >= %s AND date_created < %s
+                   AND transactionOperationStatus = 'COMPLETED'
+                   GROUP BY currency""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "asl_unique_subscribers": (
+                """SELECT COUNT(DISTINCT student_id) AS value
+                   FROM tblecocash_payment_order
+                   WHERE date_created >= %s AND date_created < %s
+                   AND transactionOperationStatus = 'COMPLETED'""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "asl_active30": (
+                """SELECT COUNT(DISTINCT student_id) AS value
+                   FROM tblstudents_login
+                   WHERE login_date >= %s AND login_date < %s""",
+                (active_30_dt, end_dt_exclusive),
+            ),
         }
 
         results = {}
         conn = get_ruzivo_conn()
 
         with conn.cursor() as cursor:
-            for label, query in queries.items():
-                cursor.execute(query)
+            for label, (query, params) in queries.items():
+                cursor.execute(query, params)
                 rows = cursor.fetchall()
 
                 if "Revenue" in label:
@@ -7993,7 +8045,7 @@ def smartlearning_metrics_update():
                 else:
                     results[label] = rows[0]['value'] if rows else 0
 
-
+        cache.set(cache_key, results, timeout=600)
         return jsonify(results)
 
     except Exception as e:
@@ -8001,9 +8053,12 @@ def smartlearning_metrics_update():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-    # finally:
-    #     if 'conn' in locals():
-    #         conn.close()
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 # @app.route('/asl_active30', methods=['GET', 'POST'])
@@ -9508,31 +9563,30 @@ def smartlearning_daily_logins():
     conn = None
 
     try:
-        # Set the range for the current month
         today = date.today()
         start_date = today.replace(day=1)
-        # start_date = date(2025, 7, 1)
         end_date = today
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_dt_exclusive = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
 
-        # Database query
         conn = get_ruzivo_conn()
-        
+
         with conn.cursor() as cursor:
+            # Daily unique learners from login events (not last_login snapshot)
             query = """
-                SELECT DATE(last_login) AS login_date, COUNT(*) AS login_count
-                FROM tblstudents_info
-                WHERE last_login BETWEEN %s AND %s
-                GROUP BY DATE(last_login)
+                SELECT DATE(sl.login_date) AS login_date, COUNT(DISTINCT sl.student_id) AS login_count
+                FROM tblstudents_login sl
+                WHERE sl.login_date >= %s AND sl.login_date < %s
+                GROUP BY DATE(sl.login_date)
                 ORDER BY login_date ASC
             """
-            cursor.execute(query, (start_date, end_date))
+            cursor.execute(query, (start_dt, end_dt_exclusive))
             results = cursor.fetchall()
 
-        # Format the results
         usage_data = [
-            {"date": row['login_date'].isoformat(), "count": row['login_count']} for row in results
+            {"date": row['login_date'].isoformat() if hasattr(row['login_date'], 'isoformat') else str(row['login_date']),
+             "count": row['login_count']} for row in results
         ]
-
 
         return jsonify({
             "start_date": start_date.isoformat(),
@@ -9544,9 +9598,12 @@ def smartlearning_daily_logins():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-    # finally:
-    #     if conn:
-    #         conn.close()
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 
@@ -9554,6 +9611,7 @@ def smartlearning_daily_logins():
 
 
 @app.route('/api/asl-daily-unique', methods=['GET'])
+@login_required
 def asl_daily_unique():
     conn = None
     try:
@@ -9561,57 +9619,58 @@ def asl_daily_unique():
         current_year = today.year
         current_month = today.month
         days_in_month = calendar.monthrange(current_year, current_month)[1]
+        month_start = date(current_year, current_month, 1)
+        month_end = min(today, date(current_year, current_month, days_in_month))
+        month_start_dt = datetime.combine(month_start, datetime.min.time())
+        month_end_exclusive = datetime.combine(month_end + timedelta(days=1), datetime.min.time())
 
         conn = get_ruzivo_conn()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
 
+        # Single-pass: first login day in month for non-paying students
+        query = """
+            SELECT DATE(sl.login_date) AS login_day, sl.student_id
+            FROM tblstudents_login sl
+            WHERE sl.login_date >= %s AND sl.login_date < %s
+              AND sl.student_id NOT IN (
+                  SELECT DISTINCT tp.student_id
+                  FROM tblecocash_payment_order tp
+                  WHERE tp.transactionOperationStatus = 'COMPLETED'
+                    AND tp.student_id IS NOT NULL
+              )
+        """
+        cursor.execute(query, (month_start_dt, month_end_exclusive))
+        rows = cursor.fetchall() or []
+
+        first_login = {}
+        for row in rows:
+            sid = row.get("student_id")
+            day = row.get("login_day")
+            if sid is None or day is None:
+                continue
+            if isinstance(day, datetime):
+                day = day.date()
+            elif isinstance(day, str):
+                day = datetime.strptime(day[:10], "%Y-%m-%d").date()
+            prev = first_login.get(sid)
+            if prev is None or day < prev:
+                first_login[sid] = day
+
+        counts = {}
+        for day in first_login.values():
+            key = day.strftime("%Y-%m-%d")
+            counts[key] = counts.get(key, 0) + 1
+
         daily_data = []
-
-        # Loop over each day of the current month
-        for day in range(1, days_in_month - 1):
-            current_day = date(current_year, current_month, day)
-
-            # Yesterday = current day (00:00:00 → 23:59:59)
-            day_start = datetime.combine(current_day, datetime.min.time())
-            day_end = datetime.combine(current_day, datetime.max.time())
-
-            # "Past range" = from 1st of month → 2 days before current_day
-            month_start = date(current_year, current_month, 1)
-            past_end = current_day - timedelta(days=2)
-
-            # If the past range is invalid (e.g., before month start), skip
-            if past_end < month_start:
-                past_end = month_start
-
-            query = """
-                SELECT COUNT(DISTINCT sl.student_id) AS unique_count
-                FROM tblstudents_login sl
-                WHERE sl.student_id NOT IN (
-                    SELECT DISTINCT tp.student_id
-                    FROM tblecocash_payment_order tp
-                    WHERE tp.transactionOperationStatus = 'COMPLETED'
-                )
-                AND sl.student_id NOT IN (
-                    SELECT DISTINCT sl2.student_id
-                    FROM tblstudents_login sl2
-                    WHERE sl2.login_date BETWEEN %s AND %s
-                )
-                AND sl.login_date BETWEEN %s AND %s
-            """
-
-            cursor.execute(query, (
-                month_start, past_end,
-                day_start, day_end
-            ))
-            result = cursor.fetchone()
-
+        for day_num in range(1, days_in_month + 1):
+            current_day = date(current_year, current_month, day_num)
+            if current_day > today:
+                break
+            key = current_day.strftime("%Y-%m-%d")
             daily_data.append({
-                "date": current_day.strftime("%Y-%m-%d"),
-                "unique_count": int(result["unique_count"]) if result and result["unique_count"] else 0
+                "date": key,
+                "unique_count": counts.get(key, 0)
             })
-
-        # cursor.close()
-        # conn.close()
 
         return jsonify({
             "year": current_year,
@@ -9623,9 +9682,14 @@ def asl_daily_unique():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-    # finally:
-    #     if conn:
-    #         conn.close()
+    finally:
+        try:
+            if 'cursor' in locals() and cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+        except Exception:
+            pass
 
 
 
@@ -9707,33 +9771,30 @@ def smartlearning_monthly_logins():
     try:
         today = date.today()
         current_year = today.year
-        current_month = today.month
+        year_start = datetime(current_year, 1, 1)
+        year_end_exclusive = datetime(current_year + 1, 1, 1)
 
-        monthly_data = []
         conn = get_ruzivo_conn()
-
-        # conn = ruzivo_pool.connection()
         with conn.cursor() as cursor:
-            for month in range(1, current_month + 1):
-                # Calculate start and end dates for the month
-                start_date = date(current_year, month, 1)
-                end_day = monthrange(current_year, month)[1]
-                end_date = date(current_year, month, end_day)
+            query = """
+                SELECT MONTH(login_date) AS month_num,
+                       COUNT(DISTINCT student_id) AS student_count
+                FROM tblstudents_login
+                WHERE login_date >= %s AND login_date < %s
+                GROUP BY MONTH(login_date)
+                ORDER BY month_num
+            """
+            cursor.execute(query, (year_start, year_end_exclusive))
+            rows = cursor.fetchall() or []
 
-                # Run the query
-                query = """
-                    SELECT COUNT(DISTINCT student_id) AS asl_active30
-                    FROM tblstudents_login
-                    WHERE DATE(login_date) BETWEEN DATE(%s) AND DATE(%s)
-                """
-                cursor.execute(query, (start_date, end_date))
-                result = cursor.fetchone()
-
-                monthly_data.append({
-                    "month": start_date.strftime("%B"),
-                    "year": current_year,
-                    "student_count": result['asl_active30'] if result['asl_active30'] is not None else 0
-                })
+        by_month = {int(r['month_num']): int(r['student_count'] or 0) for r in rows}
+        monthly_data = []
+        for month in range(1, today.month + 1):
+            monthly_data.append({
+                "month": date(current_year, month, 1).strftime("%B"),
+                "year": current_year,
+                "student_count": by_month.get(month, 0)
+            })
 
         return jsonify({
             "year": current_year,
@@ -9744,9 +9805,12 @@ def smartlearning_monthly_logins():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-    # finally:
-    #     if conn:
-    #         conn.close()
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 
@@ -9754,21 +9818,30 @@ def smartlearning_monthly_logins():
 
 
 @app.route('/api/library-province-institution-logins', methods=['GET'])
+@login_required
 def institution_logins():
     try:
-        # Get province name dynamically from query param
         province = request.args.get("province")
-        start_date = request.args.get("start_date")
-        end_date = request.args.get("end_date")
+        start_date_str = request.args.get("start_date")
+        end_date_str = request.args.get("end_date")
 
-        if not province or not start_date or not end_date:
+        if not province or not start_date_str or not end_date_str:
             return jsonify({"error": "Missing required parameters"}), 400
+
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_exclusive = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
 
         conn = get_direct_library_conn()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
 
         query = """
-            SELECT 
+            SELECT
                 i.province,
                 i.name AS institution_name,
                 COUNT(DISTINCT l.user_id) AS user_count
@@ -9777,17 +9850,17 @@ def institution_logins():
             INNER JOIN institution_user iu ON iu.user_id = u.id
             INNER JOIN institutions i ON i.id = iu.institution_id
             WHERE i.province = %s
-              AND l.created_at BETWEEN %s AND %s
+              AND l.created_at >= %s AND l.created_at < %s
             GROUP BY i.id, i.name, i.province
             ORDER BY user_count DESC
         """
-        cursor.execute(query, (province, start_date, end_date))
+        cursor.execute(query, (province, start_dt, end_exclusive))
         results = cursor.fetchall()
 
         return jsonify({
             "province": province,
-            "start_date": start_date,
-            "end_date": end_date,
+            "start_date": start_date_str,
+            "end_date": end_date_str,
             "institutions": results
         })
 
@@ -9796,15 +9869,24 @@ def institution_logins():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-    # finally:
-    #     if 'conn' in locals() and conn:
-    #         conn.close()
+    finally:
+        try:
+            if 'cursor' in locals() and cursor:
+                cursor.close()
+        except Exception:
+            pass
+        try:
+            if 'conn' in locals() and conn:
+                conn.close()
+        except Exception:
+            pass
 
 
 
 
 
 @app.route('/api/library-province-institution-daily-logins', methods=['GET'])
+@login_required
 def library_province_institution_daily_logins():
     try:
         province = request.args.get("province")
@@ -9864,6 +9946,7 @@ def library_province_institution_daily_logins():
 @app.route('/akello-library-metrics', methods=['GET','POST'])
 @login_required
 def akello_library_metrics():
+    conn = None
     if not request.is_json:
         return jsonify({"error": "Expected JSON body"}), 400
 
@@ -9877,50 +9960,65 @@ def akello_library_metrics():
             datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)
         ).strftime('%Y-%m-%d')
 
+        cache_key = f"library_metrics_{start_date}_{end_date}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return jsonify(cached)
+
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt_exclusive = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+        active_30_dt = datetime.strptime(active_30_date, '%Y-%m-%d')
+
         queries = {
-            "Total Registrations": f"""
-                SELECT COUNT(DISTINCT username) AS value
-                FROM users
-                WHERE created_at BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-                AND deleted_at IS NULL
-            """,
-            "Total Revenue (by currency)": f"""
-                SELECT currency, SUM(total_amount) AS value
-                FROM orders
-                WHERE created_at BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-                AND status='Completed'
-                GROUP BY currency
-            """,
-            "Unique Subscribers": f"""
-                SELECT COUNT(DISTINCT user_id) AS value
-                FROM orders
-                WHERE created_at BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-                AND status='Completed'
-            """,
-            "Unique Readers": f"""
-                SELECT COUNT(DISTINCT user_id) AS value
-                FROM read_trackers
-                WHERE created_at BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-                AND duration_minutes != 0
-            """,
-            "Active Users": f"""
-                SELECT COUNT(DISTINCT user_id) AS value
-                FROM logins
-                WHERE created_at BETWEEN DATE('{start_date}') AND DATE('{end_date}')
-            """,
-            "Active in Last 30 Days": f"""
-                SELECT COUNT(DISTINCT user_id) AS value
-                FROM last_activities
-                WHERE created_at BETWEEN DATE('{active_30_date}') AND DATE('{end_date}')
-            """
+            "Total Registrations": (
+                """SELECT COUNT(DISTINCT username) AS value
+                   FROM users
+                   WHERE created_at >= %s AND created_at < %s
+                   AND deleted_at IS NULL""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "Total Revenue (by currency)": (
+                """SELECT currency, SUM(total_amount) AS value
+                   FROM orders
+                   WHERE created_at >= %s AND created_at < %s
+                   AND status='Completed'
+                   GROUP BY currency""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "Unique Subscribers": (
+                """SELECT COUNT(DISTINCT user_id) AS value
+                   FROM orders
+                   WHERE created_at >= %s AND created_at < %s
+                   AND status='Completed'""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "Unique Readers": (
+                """SELECT COUNT(DISTINCT user_id) AS value
+                   FROM read_trackers
+                   WHERE created_at >= %s AND created_at < %s
+                   AND duration_minutes != 0""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "Active Users": (
+                """SELECT COUNT(DISTINCT user_id) AS value
+                   FROM logins
+                   WHERE created_at >= %s AND created_at < %s""",
+                (start_dt, end_dt_exclusive),
+            ),
+            "Active in Last 30 Days": (
+                """SELECT COUNT(DISTINCT user_id) AS value
+                   FROM last_activities
+                   WHERE created_at >= %s AND created_at < %s""",
+                (active_30_dt, end_dt_exclusive),
+            ),
         }
 
         results = {}
         conn = get_direct_library_conn()
 
         with conn.cursor() as cursor:
-            for label, query in queries.items():
-                cursor.execute(query)
+            for label, (query, params) in queries.items():
+                cursor.execute(query, params)
                 rows = cursor.fetchall()
 
                 if "Revenue" in label:
@@ -9930,7 +10028,7 @@ def akello_library_metrics():
                 else:
                     results[label] = rows[0]['value'] if rows else 0
 
-
+        cache.set(cache_key, results, timeout=600)
         return jsonify(results)
 
     except Exception as e:
@@ -9938,9 +10036,12 @@ def akello_library_metrics():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-    # finally:
-    #     if 'conn' in locals():
-    #         conn.close()
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 
@@ -13308,45 +13409,10 @@ def _get_profile_school_tables_data(username):
                 school_data["asl_mtd"] = asl_mtd_by_school.get(_sid, 0)
                 school_data["al_mtd"] = al_mtd_by_asl_id.get(_sid, 0)
                 school_data["total_mtd"] = school_data["asl_mtd"] + school_data["al_mtd"]
+                school_data["active_subscription_count"] = 0
                 if school_data["active"]:
-                    is_expired = school_data["expiry_date"] and school_data["expiry_date"] < today
-                    if is_expired and school_data["id"]:
-                        try:
-                            first_day_of_month = today.replace(day=1)
-                            first_day_next_month = (today.replace(year=today.year + 1, month=1, day=1) if today.month == 12 else today.replace(month=today.month + 1, day=1))
-                            conn_sub = get_ruzivo_conn()
-                            cursor_sub = conn_sub.cursor()
-                            cursor_sub.execute(
-                                "SELECT COUNT(DISTINCT p.student_id) FROM tblpoints_purchase p JOIN tblstudents s ON p.student_id = s.student_id WHERE s.school_id = %s AND p.expiry_date >= %s AND p.expiry_date < %s",
-                                (school_data["id"], first_day_of_month, first_day_next_month)
-                            )
-                            result = cursor_sub.fetchone()
-                            cursor_sub.close()
-                            conn_sub.close()
-                            school_data["active_subscription_count"] = (result[0] if isinstance(result, (tuple, list)) else result.get("active_count", 0)) or 0 if result else 0
-                        except Exception:
-                            school_data["active_subscription_count"] = 0
-                    else:
-                        school_data["active_subscription_count"] = 0
                     active_scholarship_schools.append(school_data)
                 else:
-                    school_data["active_subscription_count"] = 0
-                    if school_data["id"]:
-                        try:
-                            first_day_of_month = today.replace(day=1)
-                            first_day_next_month = (today.replace(year=today.year + 1, month=1, day=1) if today.month == 12 else today.replace(month=today.month + 1, day=1))
-                            conn_sub = get_ruzivo_conn()
-                            cursor_sub = conn_sub.cursor()
-                            cursor_sub.execute(
-                                "SELECT COUNT(DISTINCT p.student_id) FROM tblpoints_purchase p JOIN tblstudents s ON p.student_id = s.student_id WHERE s.school_id = %s AND p.expiry_date >= %s AND p.expiry_date < %s",
-                                (school_data["id"], first_day_of_month, first_day_next_month)
-                            )
-                            result = cursor_sub.fetchone()
-                            cursor_sub.close()
-                            conn_sub.close()
-                            school_data["active_subscription_count"] = (result[0] if isinstance(result, (tuple, list)) else result.get("active_count", 0)) or 0 if result else 0
-                        except Exception:
-                            school_data["active_subscription_count"] = 0
                     inactive_scholarship_schools.append(school_data)
                 schools_with_scholarship_ids.add(school_data["id"])
 
@@ -13366,6 +13432,76 @@ def _get_profile_school_tables_data(username):
                     })
         except Exception as e:
             print(f"Error fetching scholarship data: {e}")
+
+    # Prefer Active (non-expired) award per school; else latest expiry
+    def _scholarship_rank(s):
+        expiry = s.get("expiry_date")
+        active = bool(s.get("active"))
+        expired = bool(expiry and isinstance(expiry, date) and expiry < today)
+        is_active_status = active and not expired
+        expiry_key = expiry.toordinal() if isinstance(expiry, date) else 0
+        return (1 if is_active_status else 0, expiry_key)
+
+    def _dedupe_by_school(rows):
+        best = {}
+        for s in rows:
+            sid = s.get("id")
+            if sid is None:
+                continue
+            prev = best.get(sid)
+            if prev is None or _scholarship_rank(s) >= _scholarship_rank(prev):
+                best[sid] = s
+        return list(best.values())
+
+    active_scholarship_schools = _dedupe_by_school(active_scholarship_schools)
+    inactive_scholarship_schools = _dedupe_by_school(inactive_scholarship_schools)
+
+    # Batch active subscription counts (one connection) for expired/inactive schools that need them
+    sub_ids = []
+    for s in active_scholarship_schools + inactive_scholarship_schools:
+        expiry = s.get("expiry_date")
+        is_expired = expiry and isinstance(expiry, date) and expiry < today
+        if s.get("id") and (is_expired or not s.get("active")):
+            sub_ids.append(s["id"])
+    sub_ids = sorted(set(sub_ids))
+    sub_map = {}
+    if sub_ids:
+        try:
+            first_day_of_month = today.replace(day=1)
+            first_day_next_month = (
+                today.replace(year=today.year + 1, month=1, day=1)
+                if today.month == 12
+                else today.replace(month=today.month + 1, day=1)
+            )
+            conn_sub = get_ruzivo_conn()
+            cursor_sub = conn_sub.cursor()
+            CHUNK = 500
+            for i in range(0, len(sub_ids), CHUNK):
+                chunk = sub_ids[i:i + CHUNK]
+                ph = ','.join(['%s'] * len(chunk))
+                cursor_sub.execute(
+                    f"""
+                    SELECT s.school_id, COUNT(DISTINCT p.student_id) AS active_count
+                    FROM tblpoints_purchase p
+                    JOIN tblstudents s ON p.student_id = s.student_id
+                    WHERE s.school_id IN ({ph})
+                      AND p.expiry_date >= %s AND p.expiry_date < %s
+                    GROUP BY s.school_id
+                    """,
+                    (*chunk, first_day_of_month, first_day_next_month)
+                )
+                for row in cursor_sub.fetchall() or []:
+                    if isinstance(row, dict):
+                        sub_map[row['school_id']] = row['active_count'] or 0
+                    else:
+                        sub_map[row[0]] = row[1] or 0
+            cursor_sub.close()
+            conn_sub.close()
+        except Exception as e:
+            print(f"Error batching subscription counts: {e}")
+
+    for s in active_scholarship_schools + inactive_scholarship_schools:
+        s["active_subscription_count"] = int(sub_map.get(s.get("id"), 0) or 0)
 
     total_active_sub_students = 0
     schools_with_active_subs_count = 0
@@ -13425,7 +13561,14 @@ def _get_profile_school_tables_data(username):
             "asl_mtd": s.get("asl_mtd", 0),
             "al_mtd": s.get("al_mtd", 0),
             "total_mtd": s.get("total_mtd", 0),
+            "active_subscription_count": s.get("active_subscription_count", 0),
+            "status": (
+                "Active" if (s.get("active") and (s.get("expiry_date") is None or s.get("expiry_date") >= today))
+                else ("Expired" if s.get("active") else "Never Assigned")
+            ),
         }
+
+    al_mtd_total = sum(int(s.get("al_mtd") or 0) for s in truly_active_schools + expired_schools + schools_without_scholarship)
 
     return {
         "truly_active_schools": [_serialize_school(s) for s in truly_active_schools],
@@ -13438,11 +13581,21 @@ def _get_profile_school_tables_data(username):
         "total_active_sub_students": total_active_sub_students,
         "schools_with_active_subs_count": schools_with_active_subs_count,
         "smartlearning_champ_mtd": smartlearning_champ_mtd,
+        "library_student_count": al_mtd_total,
     }
 
 
 @app.route('/api/profile/<username>/school-tables', methods=['GET'])
 @login_required
+@cache.cached(
+    timeout=300,
+    key_prefix=lambda: (
+        f'profile_school_tables_{request.view_args.get("username", "")}_'
+        f'{AppSetting.get_value("asl_mtd_exclude_12_months", "true")}_'
+        f'{AppSetting.get_value("asl_mtd_exclude_1_year_awarded", "true")}'
+    ),
+    response_filter=lambda resp: _json_response_has_rows(resp)
+)
 def api_profile_school_tables(username):
     """Return school tables data for profile page (loaded async with loading indicators)."""
     try:
@@ -13837,7 +13990,7 @@ def api_profile_school_visit_status(username):
     if not target_user:
         return _visit_api_error('NotFound', 'User not found', 404)
 
-    if current_user.username != username and current_user.userRole != 'Admin':
+    if current_user.username != username and not can_view_checkin_reports():
         return _visit_api_error('Unauthorized', 'Unauthorized', 403)
 
     active_visit = SchoolVisitLog.query.filter_by(
@@ -14398,6 +14551,8 @@ def remove_champion_school(username):
 @app.route('/api/schools/<province>')
 @login_required
 def get_schools_by_province(province):
+    conn = None
+    cursor = None
     try:
         conn = get_ruzivo_conn()
         cursor = conn.cursor(pymysql.cursors.DictCursor)  # ensures dict results
@@ -14419,11 +14574,30 @@ def get_schools_by_province(province):
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': f'{type(e).__name__}: {str(e)}'}), 500
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
-    # finally:
-    #     if 'cursor' in locals() and cursor: cursor.close()
-    #     if 'conn' in locals() and conn: conn.close()
+def _json_ok_list_response(resp):
+    """Cache successful JSON list responses (including empty lists); skip errors."""
+    try:
+        if getattr(resp, 'status_code', 200) != 200:
+            return False
+        data = resp.get_json(silent=True)
+        if isinstance(data, dict) and 'error' in data:
+            return False
+        return isinstance(data, list)
+    except Exception:
+        return False
 
 
 
@@ -14956,15 +15130,25 @@ def school_profile_usage(school_id):
     role = current_user.userRole
     asl_school_id = school_id
 
-    conn = get_ruzivo_conn()
-    cursor = conn.cursor()
-
-    query = "SELECT school_name, school_province FROM tblschools WHERE school_id = %s"
-    cursor.execute(query, (school_id,))
-    row = cursor.fetchone()
-
-    # cursor.close()
-    # conn.close()
+    conn = None
+    cursor = None
+    try:
+        conn = get_ruzivo_conn()
+        cursor = conn.cursor()
+        query = "SELECT school_name, school_province FROM tblschools WHERE school_id = %s"
+        cursor.execute(query, (school_id,))
+        row = cursor.fetchone()
+    finally:
+        try:
+            if cursor:
+                cursor.close()
+        except Exception:
+            pass
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
 
     if not row:
         return "School not found", 404
@@ -14973,7 +15157,6 @@ def school_profile_usage(school_id):
         school_name = row['school_name']
         school_province = row['school_province']
     except (TypeError, KeyError):
-        # Fallback if row is a tuple instead of a dict
         school_name = row[0]
         school_province = row[1]
 
@@ -14981,6 +15164,7 @@ def school_profile_usage(school_id):
         'simone_school_usage.html',
         username=username,
         role=role,
+        school_id=school_id,
         school_name=school_name,
         school_province=school_province,
         asl_school_id=asl_school_id,
@@ -17721,17 +17905,27 @@ def generate_and_send_report(template_path, as_of=None):
 def _send_revenue_report_email(*, report_path, filename, total_count, as_of, triggered_by):
     """Send revenue report attachment plus KPI summary, if configured."""
     from app.models import AppSetting
+    from app.revenue_email_utils import resolve_revenue_report_recipients
 
     auto_email_enabled = AppSetting.get_value('revenue_reports_auto_email_enabled', 'false') == 'true'
     if not auto_email_enabled:
         return {"status": "skipped", "reason": "auto_email_disabled"}
 
-    recipient_mode = AppSetting.get_value('revenue_reports_email_recipient_mode', 'custom_group_later')
-    if recipient_mode == 'custom_group_later':
-        return {"status": "skipped", "reason": "recipients_pending_configuration"}
+    recipients, reason = resolve_revenue_report_recipients()
+    if not recipients:
+        return {"status": "skipped", "reason": reason or "no_recipients"}
 
-    # Future recipient strategies can be added here.
-    return {"status": "skipped", "reason": f"unsupported_recipient_mode:{recipient_mode}"}
+    ok, err = _send_revenue_report_email_with_attachment(
+        recipients=recipients,
+        report_path=report_path,
+        filename=filename,
+        total_count=total_count,
+        as_of=as_of,
+        triggered_by=triggered_by,
+    )
+    if ok:
+        return {"status": "success", "reason": f"sent:{len(recipients)}", "recipients": recipients}
+    return {"status": "failed", "reason": err or "send_failed", "recipients": recipients}
 
 
 def _send_revenue_report_email_with_attachment(*, recipients, report_path, filename, total_count, as_of, triggered_by):
@@ -21051,7 +21245,22 @@ def akello_monitoring():
 @app.route('/akello_monitor', methods=['GET'])
 @login_required
 def akello_monitor():
-    return render_template('simone_monitor.html', title='Analytics')
+    try:
+        from app.blueprints.akello_revenue.services import (
+            can_edit_akello_revenue,
+            can_view_akello_revenue,
+        )
+        can_view_rev = can_view_akello_revenue()
+        can_edit_rev = can_edit_akello_revenue()
+    except Exception:
+        can_view_rev = False
+        can_edit_rev = False
+    return render_template(
+        'simone_monitor.html',
+        title='Analytics',
+        can_view_akello_revenue=can_view_rev,
+        can_edit_akello_revenue=can_edit_rev,
+    )
 
 
 @app.route('/help-desk', methods=['GET', 'POST'])
@@ -24672,198 +24881,245 @@ def _get_all_champions_school_tracker_data():
     # Convert to list for SQL IN clause
     school_ids_list = list(unique_school_ids)
 
-    # 3. Query Ruzivo/Scholarship DB
+    # 3. Query Ruzivo/Scholarship DB — one connection for all chunks
     results = []
+    conn = get_ruzivo_conn()
+    if conn is None:
+        raise RuntimeError("Database connection not available")
+    cursor = conn.cursor()
 
-    # Process in chunks if too many schools
-    chunk_size = 1000
-    for i in range(0, len(school_ids_list), chunk_size):
-        chunk = school_ids_list[i:i + chunk_size]
-        placeholders = ','.join(['%s'] * len(chunk))
+    def _parse_expiry(raw):
+        if not raw:
+            return None
+        if isinstance(raw, str):
+            try:
+                return datetime.strptime(raw, "%Y-%m-%d").date()
+            except Exception:
+                try:
+                    return datetime.strptime(raw, "%Y-%m-%d %H:%M:%S").date()
+                except Exception:
+                    return None
+        if hasattr(raw, 'date'):
+            return raw.date()
+        if isinstance(raw, date):
+            return raw
+        return None
 
-        conn = get_ruzivo_conn()
-        cursor = conn.cursor()
-            
-        # Fetch scholarship details
-        query = f"""
-            SELECT ts.school_id, sc.school_name, ts.scholarship_type,
-                   ts.expiry_date, ts.active, ts.duration
-            FROM tblscholarships_schools ts
-            LEFT JOIN tblschools sc ON sc.school_id = ts.school_id
-            WHERE ts.school_id IN ({placeholders})
-        """
-        cursor.execute(query, chunk)
-        scholarship_rows = cursor.fetchall()
+    def _prefer_scholarship_row(existing, candidate):
+        """Prefer Active (non-expired) award; else the one with latest expiry."""
+        if existing is None:
+            return candidate
+        today_cmp = date.today()
 
-        # Fetch durations and first awards since 2025
-        since_2025_query = f"""
-            SELECT x.school_id, SUM(x.duration) AS total_months, MIN(x.awarded_at) AS first_awarded_at
-            FROM tblscholarships_schools x
-            WHERE x.school_id IN ({placeholders})
-            AND x.awarded_at >= %s
-            GROUP BY x.school_id
-        """
-        cursor.execute(since_2025_query, (*chunk, '2025-01-01'))
-        since_2025_rows = cursor.fetchall()
-        since_2025_map = {}
-        for row in since_2025_rows:
-            today_date = date.today()
-            if isinstance(row, dict):
-                q_sid = row['school_id']
-                fa = row['first_awarded_at']
-                total_m = row['total_months'] or 0
-            else:
-                q_sid = row[0]
-                total_m = row[1] or 0
-                fa = row[2]
+        def rank(row):
+            expiry = _parse_expiry(row.get('expiry_date'))
+            active = normalize_active_flag(row.get('active'))
+            expired = bool(expiry and isinstance(expiry, date) and expiry < today_cmp)
+            is_active_status = active and not expired
+            expiry_key = expiry.toordinal() if isinstance(expiry, date) else 0
+            return (1 if is_active_status else 0, expiry_key)
 
-            is_over_12 = False
-            if fa:
-                fa_dt = fa.date() if hasattr(fa, 'date') else fa
-                if isinstance(fa_dt, date) and fa_dt <= today_date - timedelta(days=365):
-                    is_over_12 = True
+        return candidate if rank(candidate) >= rank(existing) else existing
 
-            since_2025_map[q_sid] = {
-                "total_months": total_m,
-                "first_awarded_at": fa,
-                "is_over_12_months": is_over_12
-            }
+    try:
+        chunk_size = 1000
+        for i in range(0, len(school_ids_list), chunk_size):
+            chunk = school_ids_list[i:i + chunk_size]
+            placeholders = ','.join(['%s'] * len(chunk))
 
-        # Fetch active subscriptions for expired checks
-        today_now = datetime.now().date()
-        first_day_of_month = today_now.replace(day=1)
-        if today_now.month == 12:
-            first_day_next_month = today_now.replace(year=today_now.year + 1, month=1, day=1)
-        else:
-            first_day_next_month = today_now.replace(month=today_now.month + 1, day=1)
+            # Fetch scholarship details
+            query = f"""
+                SELECT ts.school_id, sc.school_name, ts.scholarship_type,
+                       ts.expiry_date, ts.active, ts.duration
+                FROM tblscholarships_schools ts
+                LEFT JOIN tblschools sc ON sc.school_id = ts.school_id
+                WHERE ts.school_id IN ({placeholders})
+            """
+            cursor.execute(query, chunk)
+            scholarship_rows = cursor.fetchall()
 
-        sub_query = f"""
-            SELECT s.school_id, COUNT(DISTINCT p.student_id) as active_count
-            FROM tblpoints_purchase p
-            JOIN tblstudents s ON p.student_id = s.student_id
-            WHERE s.school_id IN ({placeholders})
-              AND p.expiry_date >= %s
-              AND p.expiry_date < %s
-            GROUP BY s.school_id
-        """
-        cursor.execute(sub_query, (*chunk, first_day_of_month, first_day_next_month))
-        sub_rows = cursor.fetchall()
-        sub_map = {}
-        for row in sub_rows:
-            if isinstance(row, dict):
-                sub_map[row['school_id']] = row['active_count']
-            else:
-                sub_map[row[0]] = row[1]
+            # Fetch durations and first awards since 2025
+            since_2025_query = f"""
+                SELECT x.school_id, SUM(x.duration) AS total_months, MIN(x.awarded_at) AS first_awarded_at
+                FROM tblscholarships_schools x
+                WHERE x.school_id IN ({placeholders})
+                AND x.awarded_at >= %s
+                GROUP BY x.school_id
+            """
+            cursor.execute(since_2025_query, (*chunk, '2025-01-01'))
+            since_2025_rows = cursor.fetchall()
+            since_2025_map = {}
+            for row in since_2025_rows:
+                today_date = date.today()
+                if isinstance(row, dict):
+                    q_sid = row['school_id']
+                    fa = row['first_awarded_at']
+                    total_m = row['total_months'] or 0
+                else:
+                    q_sid = row[0]
+                    total_m = row[1] or 0
+                    fa = row[2]
 
-        cursor.close()
-        conn.close()
+                is_over_12 = False
+                if fa:
+                    fa_dt = fa.date() if hasattr(fa, 'date') else fa
+                    if isinstance(fa_dt, date) and fa_dt <= today_date - timedelta(days=365):
+                        is_over_12 = True
 
-        # Create map for scholarship rows
-        scholarship_map = {}
-        for row in scholarship_rows:
-            if isinstance(row, dict):
-                q_sid = row['school_id']
-                scholarship_map[q_sid] = row
-            else:
-                q_sid = row[0]
-                scholarship_map[q_sid] = {
-                    'school_name': row[1],
-                    'scholarship_type': row[2],
-                    'expiry_date': row[3],
-                    'active': row[4],
-                    'duration': row[5]
+                since_2025_map[q_sid] = {
+                    "total_months": total_m,
+                    "first_awarded_at": fa,
+                    "is_over_12_months": is_over_12
                 }
 
-        # Process all unique school IDs from ChampionSchool
-        for current_sid in chunk:
-            champ_infos = school_id_map.get(current_sid, [])
-            s_data = scholarship_map.get(current_sid)
-
-            if s_data:
-                current_sname = s_data['school_name']
-                current_stype = s_data['scholarship_type']
-                current_sexpiry = s_data['expiry_date']
-                current_sactive = s_data['active']
-
-                # Normalize Expiry
-                if current_sexpiry:
-                    if isinstance(current_sexpiry, str):
-                        try:
-                            current_sexpiry = datetime.strptime(current_sexpiry, "%Y-%m-%d").date()
-                        except Exception:
-                            try:
-                                current_sexpiry = datetime.strptime(current_sexpiry, "%Y-%m-%d %H:%M:%S").date()
-                            except Exception:
-                                pass
-                    elif hasattr(current_sexpiry, 'date'):
-                        current_sexpiry = current_sexpiry.date()
-
-                current_is_expired = False
-                if current_sexpiry and isinstance(current_sexpiry, date):
-                    if current_sexpiry < today_now:
-                        current_is_expired = True
-
-                normalized_active = normalize_active_flag(current_sactive)
-
-                # Determine Status
-                current_status = "Inactive"
-                if normalized_active:
-                    if current_is_expired:
-                        current_status = "Expired"
-                    else:
-                        current_status = "Active"
-
-                current_active_subs = sub_map.get(current_sid, 0)
-                current_over_12 = since_2025_map.get(current_sid, {}).get("is_over_12_months", False)
-                current_first_awarded = since_2025_map.get(current_sid, {}).get("first_awarded_at", "N/A")
-                current_total_m = since_2025_map.get(current_sid, {}).get("total_months", 0)
+            # Fetch active subscriptions for expired checks
+            today_now = datetime.now().date()
+            first_day_of_month = today_now.replace(day=1)
+            if today_now.month == 12:
+                first_day_next_month = today_now.replace(year=today_now.year + 1, month=1, day=1)
             else:
-                # Not in scholarship table
-                fallback_name_found = "Unknown School"
-                if champ_infos:
-                    fallback_name_found = champ_infos[0].get('fallback_name', "Unknown School")
+                first_day_next_month = today_now.replace(month=today_now.month + 1, day=1)
 
-                current_sname = fallback_name_found
-                current_stype = "N/A"
-                current_sexpiry = None
-                current_status = "Never Assigned"
-                current_active_subs = 0
-                current_over_12 = False
-                current_first_awarded = "N/A"
-                current_total_m = 0
+            sub_query = f"""
+                SELECT s.school_id, COUNT(DISTINCT p.student_id) as active_count
+                FROM tblpoints_purchase p
+                JOIN tblstudents s ON p.student_id = s.student_id
+                WHERE s.school_id IN ({placeholders})
+                  AND p.expiry_date >= %s
+                  AND p.expiry_date < %s
+                GROUP BY s.school_id
+            """
+            cursor.execute(sub_query, (*chunk, first_day_of_month, first_day_next_month))
+            sub_rows = cursor.fetchall()
+            sub_map = {}
+            for row in sub_rows:
+                if isinstance(row, dict):
+                    sub_map[row['school_id']] = row['active_count']
+                else:
+                    sub_map[row[0]] = row[1]
 
-            # Days left to 12 months: from First Awarded date to today in days (365 days = 12 months)
-            days_left_until_12 = None
-            fa_raw = since_2025_map.get(current_sid, {}).get("first_awarded_at")
-            if fa_raw:
-                fa_d = fa_raw.date() if hasattr(fa_raw, 'date') else fa_raw
-                if isinstance(fa_d, date):
-                    if fa_d > today_now:
-                        days_elapsed = 0
-                    else:
-                        days_elapsed = (today_now - fa_d).days
-                    if days_elapsed < 365:
-                        days_left_until_12 = 365 - days_elapsed
-            for info in champ_infos:
-                profile_added_at_dt, system_added_at_dt = resolve_added_timestamps(info)
-                results.append({
-                    "champion": info['champion'],
-                    "province": info['province'],
-                    "school_name": current_sname,
-                    "status": current_status,
-                    "expiry_date": current_sexpiry.isoformat() if current_sexpiry else None,
-                    "first_awarded_at": current_first_awarded,
-                    "profile_added_at": profile_added_at_dt.isoformat() if profile_added_at_dt else None,
-                    "system_added_at": system_added_at_dt.isoformat() if system_added_at_dt else None,
-                    "is_over_12_months": current_over_12,
-                    "scholarship_type": current_stype,
-                    "active_subscriptions": current_active_subs,
-                    "duration": current_total_m,
-                    "days_left_until_12": days_left_until_12,
-                    "asl_school_id": info.get('asl_school_id') or str(current_sid),
-                    "library_school_id": info.get('library_school_id') or ''
-                })
+            # Create map for scholarship rows — prefer Active, else latest expiry
+            scholarship_map = {}
+            for row in scholarship_rows:
+                if isinstance(row, dict):
+                    q_sid = row['school_id']
+                    candidate = row
+                else:
+                    q_sid = row[0]
+                    candidate = {
+                        'school_name': row[1],
+                        'scholarship_type': row[2],
+                        'expiry_date': row[3],
+                        'active': row[4],
+                        'duration': row[5]
+                    }
+                scholarship_map[q_sid] = _prefer_scholarship_row(scholarship_map.get(q_sid), candidate)
 
+            # Process all unique school IDs from ChampionSchool
+            for current_sid in chunk:
+                champ_infos = school_id_map.get(current_sid, [])
+                s_data = scholarship_map.get(current_sid)
+
+                if s_data:
+                    current_sname = s_data['school_name']
+                    current_stype = s_data['scholarship_type']
+                    current_sexpiry = s_data['expiry_date']
+                    current_sactive = s_data['active']
+
+                    # Normalize Expiry
+                    current_sexpiry = _parse_expiry(current_sexpiry)
+
+                    current_is_expired = False
+                    if current_sexpiry and isinstance(current_sexpiry, date):
+                        if current_sexpiry < today_now:
+                            current_is_expired = True
+
+                    normalized_active = normalize_active_flag(current_sactive)
+
+                    # Determine Status
+                    current_status = "Inactive"
+                    if normalized_active:
+                        if current_is_expired:
+                            current_status = "Expired"
+                        else:
+                            current_status = "Active"
+
+                    current_active_subs = sub_map.get(current_sid, 0)
+                    current_over_12 = since_2025_map.get(current_sid, {}).get("is_over_12_months", False)
+                    current_first_awarded = since_2025_map.get(current_sid, {}).get("first_awarded_at", "N/A")
+                    current_total_m = since_2025_map.get(current_sid, {}).get("total_months", 0)
+                else:
+                    # Not in scholarship table
+                    fallback_name_found = "Unknown School"
+                    if champ_infos:
+                        fallback_name_found = champ_infos[0].get('fallback_name', "Unknown School")
+
+                    current_sname = fallback_name_found
+                    current_stype = "N/A"
+                    current_sexpiry = None
+                    current_status = "Never Assigned"
+                    current_active_subs = 0
+                    current_over_12 = False
+                    current_first_awarded = "N/A"
+                    current_total_m = 0
+
+                # Days left to 12 months: from First Awarded date to today in days (365 days = 12 months)
+                days_left_until_12 = None
+                fa_raw = since_2025_map.get(current_sid, {}).get("first_awarded_at")
+                if fa_raw:
+                    fa_d = fa_raw.date() if hasattr(fa_raw, 'date') else fa_raw
+                    if isinstance(fa_d, date):
+                        if fa_d > today_now:
+                            days_elapsed = 0
+                        else:
+                            days_elapsed = (today_now - fa_d).days
+                        if days_elapsed < 365:
+                            days_left_until_12 = 365 - days_elapsed
+                for info in champ_infos:
+                    profile_added_at_dt, system_added_at_dt = resolve_added_timestamps(info)
+                    results.append({
+                        "champion": info['champion'],
+                        "province": info['province'],
+                        "school_name": current_sname,
+                        "status": current_status,
+                        "expiry_date": current_sexpiry.isoformat() if current_sexpiry else None,
+                        "first_awarded_at": current_first_awarded,
+                        "profile_added_at": profile_added_at_dt.isoformat() if profile_added_at_dt else None,
+                        "system_added_at": system_added_at_dt.isoformat() if system_added_at_dt else None,
+                        "is_over_12_months": current_over_12,
+                        "scholarship_type": current_stype,
+                        "active_subscriptions": current_active_subs,
+                        "duration": current_total_m,
+                        "days_left_until_12": days_left_until_12,
+                        "asl_school_id": info.get('asl_school_id') or str(current_sid),
+                        "library_school_id": info.get('library_school_id') or ''
+                    })
+    finally:
+        try:
+            cursor.close()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    return results
+
+
+SCHOOL_TRACKER_CACHE_KEY = 'all_champions_school_tracker_v1'
+SCHOOL_TRACKER_CACHE_TTL = 300
+
+
+def _get_all_champions_school_tracker_data_cached():
+    """Return school tracker rows, reusing Flask-Cache across tracker + compare endpoints."""
+    cached = cache.get(SCHOOL_TRACKER_CACHE_KEY)
+    if cached is not None:
+        return cached
+    results = _get_all_champions_school_tracker_data()
+    # Do not cache empty results — usually means misconfigured app DB
+    if results:
+        cache.set(SCHOOL_TRACKER_CACHE_KEY, results, timeout=SCHOOL_TRACKER_CACHE_TTL)
     return results
 
 
@@ -24872,7 +25128,7 @@ def _get_all_champions_school_tracker_data():
 def all_champions_school_tracker():
     """Fetch all schools for all champions with status"""
     try:
-        results = _get_all_champions_school_tracker_data()
+        results = _get_all_champions_school_tracker_data_cached()
         return jsonify(results), 200
     except Exception as e:
         app.logger.error(f"Error in school tracker: {e}")
@@ -24967,7 +25223,7 @@ def all_champions_compare_upload():
             return jsonify({'error': str(e)}), 400
 
         try:
-            system_rows = _get_all_champions_school_tracker_data()
+            system_rows = _get_all_champions_school_tracker_data_cached()
         except Exception as e:
             app.logger.error(f"Compare upload: failed to get school tracker data: {e}")
             return jsonify({'error': 'Failed to load system data for comparison'}), 500
@@ -25143,6 +25399,11 @@ def sm_interest_redirect():
 
 
 @app.route('/api/public/marketing-events')
+@cache.cached(
+    timeout=300,
+    key_prefix=lambda: f'public_mkt_events_{request.args.get("date", "")}',
+    response_filter=lambda resp: _json_ok_list_response(resp),
+)
 def sm_api_public_marketing_events():
     from app.blueprints.sales_marketing.routes import api_public_marketing_events
     return api_public_marketing_events()
@@ -25152,6 +25413,17 @@ def sm_api_public_marketing_events():
 def sm_api_public_interest_options():
     from app.blueprints.sales_marketing.routes import api_public_interest_options
     return api_public_interest_options()
+
+
+@app.route('/api/public/schools/<province>')
+@cache.cached(
+    timeout=300,
+    key_prefix=lambda: f'public_schools_{request.view_args.get("province", "")}',
+    response_filter=lambda resp: _json_ok_list_response(resp),
+)
+def sm_api_public_schools_by_province(province):
+    from app.blueprints.sales_marketing.routes import api_public_schools_by_province
+    return api_public_schools_by_province(province)
 
 
 @app.route('/api/public/stakeholder-leads', methods=['POST'])

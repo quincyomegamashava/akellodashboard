@@ -224,55 +224,52 @@ def highlight_mentions_html(body):
     )
 
 
-def search_tasks_globally(user, q="", assignee_me=False, status=""):
-    """Search tasks across projects visible to user."""
-    from app.routes import projects_visible_to_user, user_can_access_project_a
+def search_tasks_globally(user, q="", assignee_me=False, status="", limit=40):
+    """Search tasks across projects visible to user (DB filters + hard limit)."""
+    from sqlalchemy import or_
+    from app.routes import projects_visible_to_user
 
-    q = (q or "").strip().lower()
+    q = (q or "").strip()
     visible = projects_visible_to_user()
     visible_ids = [p.id for p in visible]
     if not visible_ids:
         return []
 
     cols = ColumnA.query.filter(ColumnA.project_id.in_(visible_ids)).all()
+    if not cols:
+        return []
     col_by_id = {c.id: c for c in cols}
     project_by_id = {p.id: p for p in visible}
+    col_ids = list(col_by_id.keys())
+
+    query = (
+        TaskA.query.options(joinedload(TaskA.assignees))
+        .filter(TaskA.column_id.in_(col_ids))
+    )
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(TaskA.title.ilike(like), TaskA.description.ilike(like)))
+    me_id = user.id if user else None
+    if assignee_me and me_id:
+        query = query.filter(TaskA.assignees.any(User.id == me_id))
+
+    # Over-fetch slightly so open/done filters still yield enough rows.
+    tasks = query.order_by(TaskA.id.desc()).limit(max(limit * 5, 100)).all()
 
     rows = []
-    tasks = (
-        TaskA.query.filter(TaskA.column_id.in_([c.id for c in cols]))
-        .all()
-    )
-    me_id = user.id if user else None
-
     for task in tasks:
         col = col_by_id.get(task.column_id)
         if not col:
             continue
         project = project_by_id.get(col.project_id)
-        if not project or not user_can_access_project_a(project):
+        if not project:
             continue
-
         prog = task_progress_value(task)
         is_open = prog < 100
         if status == "open" and not is_open:
             continue
         if status == "done" and is_open:
             continue
-
-        if assignee_me and me_id:
-            if me_id not in {u.id for u in (task.assignees or [])}:
-                continue
-
-        if q:
-            hay = " ".join([
-                task.title or "",
-                task.description or "",
-                *(a.username for a in (task.assignees or [])),
-            ]).lower()
-            if q not in hay:
-                continue
-
         rows.append({
             "task_id": task.id,
             "title": task.title,
@@ -282,6 +279,8 @@ def search_tasks_globally(user, q="", assignee_me=False, status=""):
             "progress": prog,
             "end_date": task.end_date.isoformat() if task.end_date else None,
         })
+        if len(rows) >= limit:
+            break
 
     rows.sort(key=lambda r: (r["project_name"], r["title"]))
     return rows
@@ -290,17 +289,64 @@ def search_tasks_globally(user, q="", assignee_me=False, status=""):
 def portfolio_stats_for_projects(projects):
     today = datetime.utcnow().date()
     now = datetime.utcnow()
+    if not projects:
+        return []
+
+    project_ids = [p.id for p in projects]
+    all_cols = ColumnA.query.filter(ColumnA.project_id.in_(project_ids)).all()
+    cols_by_project = {}
+    col_by_id = {}
+    for c in all_cols:
+        cols_by_project.setdefault(c.project_id, []).append(c)
+        col_by_id[c.id] = c
+    all_col_ids = list(col_by_id.keys())
+
+    all_tasks = (
+        TaskA.query.options(joinedload(TaskA.assignees))
+        .filter(TaskA.column_id.in_(all_col_ids))
+        .all()
+        if all_col_ids
+        else []
+    )
+    tasks_by_project = {pid: [] for pid in project_ids}
+    blocker_ids = set()
+    for t in all_tasks:
+        col = col_by_id.get(t.column_id)
+        if not col:
+            continue
+        tasks_by_project.setdefault(col.project_id, []).append(t)
+        if t.blocked_by_task_id:
+            blocker_ids.add(t.blocked_by_task_id)
+
+    blockers = {}
+    if blocker_ids:
+        blockers = {
+            b.id: b
+            for b in TaskA.query.filter(TaskA.id.in_(list(blocker_ids))).all()
+        }
+
+    milestones = (
+        MilestoneA.query.filter(
+            MilestoneA.project_id.in_(project_ids),
+            MilestoneA.due_date.isnot(None),
+            MilestoneA.due_date >= now,
+        )
+        .order_by(MilestoneA.due_date)
+        .all()
+    )
+    next_ms_by_project = {}
+    for m in milestones:
+        if m.project_id not in next_ms_by_project:
+            next_ms_by_project[m.project_id] = m
+
+    owner_ids = {p.owner_id for p in projects if p.owner_id}
+    owners = {}
+    if owner_ids:
+        owners = {u.id: u for u in User.query.filter(User.id.in_(list(owner_ids))).all()}
+
     stats = []
     for p in projects:
-        cols = ColumnA.query.filter_by(project_id=p.id).all()
-        col_by_id = {c.id: c for c in cols}
-        col_ids = list(col_by_id.keys())
-        tasks = (
-            TaskA.query.options(joinedload(TaskA.assignees))
-            .filter(TaskA.column_id.in_(col_ids))
-            .all()
-            if col_ids else []
-        )
+        tasks = tasks_by_project.get(p.id) or []
         total = len(tasks)
         done = sum(1 for t in tasks if task_is_complete(t))
         open_count = total - done
@@ -321,7 +367,7 @@ def portfolio_stats_for_projects(projects):
                         "column_title": col.title if col else "",
                     })
             if t.blocked_by_task_id:
-                blocker = TaskA.query.get(t.blocked_by_task_id)
+                blocker = blockers.get(t.blocked_by_task_id)
                 if blocker and not task_is_complete(blocker):
                     blocked += 1
         top_overdue.sort(key=lambda x: x.get("due_date") or "9999")
@@ -331,24 +377,15 @@ def portfolio_stats_for_projects(projects):
             health = "red"
         elif blocked > 0 or pct < 50:
             health = "yellow"
-        next_ms = (
-            MilestoneA.query.filter_by(project_id=p.id)
-            .filter(MilestoneA.due_date.isnot(None))
-            .filter(MilestoneA.due_date >= now)
-            .order_by(MilestoneA.due_date)
-            .first()
-        )
-        owner_name = None
-        if p.owner_id:
-            owner = User.query.get(p.owner_id)
-            owner_name = owner.username if owner else None
+        next_ms = next_ms_by_project.get(p.id)
+        owner = owners.get(p.owner_id) if p.owner_id else None
         program_names = [pr.name for pr in (p.programs or [])]
         stats.append({
             "project_id": p.id,
             "project_name": p.name,
             "project_type": p.project_type,
             "owner_id": p.owner_id,
-            "owner_name": owner_name,
+            "owner_name": owner.username if owner else None,
             "program_names": program_names,
             "total_tasks": total,
             "completed_tasks": done,

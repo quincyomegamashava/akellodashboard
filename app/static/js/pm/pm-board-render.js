@@ -30,40 +30,38 @@ function pmSyncTaskInBoardData(taskId, patch) {
 
 async function loadBoard(projectId) {
   if (!projectId) return;
+  window._pmLoadBoardSeq = (window._pmLoadBoardSeq || 0) + 1;
+  const seq = window._pmLoadBoardSeq;
+  if (window._pmLoadBoardAbort) {
+    try { window._pmLoadBoardAbort.abort(); } catch (e) { /* ignore */ }
+  }
+  window._pmLoadBoardAbort = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const signal = window._pmLoadBoardAbort ? window._pmLoadBoardAbort.signal : undefined;
   try {
-    if (typeof pmLoadProjectLabels === 'function') await pmLoadProjectLabels(projectId);
-    if (typeof pmLoadProjectDependencies === 'function') await pmLoadProjectDependencies(projectId);
-    if (typeof pmLoadMilestones === 'function') await pmLoadMilestones(projectId);
-    if (typeof pmLoadBaselines === 'function') await pmLoadBaselines(projectId);
+    const metaLoads = [];
+    if (typeof pmLoadProjectLabels === 'function') metaLoads.push(pmLoadProjectLabels(projectId));
+    if (typeof pmLoadProjectDependencies === 'function') metaLoads.push(pmLoadProjectDependencies(projectId));
+    if (typeof pmLoadMilestones === 'function') metaLoads.push(pmLoadMilestones(projectId));
+    if (typeof pmLoadBaselines === 'function') metaLoads.push(pmLoadBaselines(projectId));
+    const boardPromise = apiGET(`${API_BASE}/projects/${projectId}/board`, signal ? { signal } : undefined);
+    const settled = await Promise.all([boardPromise, ...metaLoads]);
+    if (seq !== window._pmLoadBoardSeq) return;
+    const data = settled[0];
     if (typeof pmPopulateBaselineSelect === 'function') pmPopulateBaselineSelect($('pmBaselineSelect'));
-const data = await apiGET(`${API_BASE}/projects/${projectId}/board`);
     lastBoardData = data;
     if (typeof pmApplyProjectCapabilities === 'function') pmApplyProjectCapabilities(data);
+    if (typeof updateProjectManageButtons === 'function') updateProjectManageButtons();
     const canEdit = typeof pmCanEditTasks === 'function' ? pmCanEditTasks() : true;
     const canManage = typeof pmCanManageProject === 'function' ? pmCanManageProject() : true;
     const board = $('board');
     board.innerHTML = '';
 
-    // Resolve members and type robustly
-    const projectInfo = await resolveProjectInfo(projectId, data);
     const timelineSection = document.getElementById('timelineSection');
     const timelineAxisEl = document.getElementById('timelineAxis');
     const milestoneBodyEl = document.getElementById('milestoneBody');
     const timelineItemsBodyEl = document.getElementById('timelineItemsBody');
     const timelineItemsEmptyEl = document.getElementById('timelineItemsEmpty');
     const ganttBtn = document.getElementById('showGanttBtn');
-
-    // Show members list
-    // const membersBox = $('projectMembers'); // This element does not exist
-    // if (projectInfo.members && projectInfo.members.length) {
-    //   // show up to 8 names then "+ N"
-    //   const MAX_SHOW = 8;
-    //   const names = projectInfo.members.slice(0, MAX_SHOW).map(n => escapeHtml(n));
-    //   const rest = projectInfo.members.length - names.length;
-    //   membersBox.innerHTML = `👥 Members: <span class="font-medium">${names.join(', ')}${rest>0? `, +${rest}` : ''}</span>`;
-    // } else {
-    //   membersBox.innerHTML = "👥 Members: <span class='italic text-gray-500'>No members assigned</span>";
-    // }
 
     if (ganttBtn) { ganttBtn.disabled = false; ganttBtn.title = ''; }
 
@@ -72,6 +70,7 @@ const data = await apiGET(`${API_BASE}/projects/${projectId}/board`);
     if (subWrap && subToggle && typeof pmLoadSubscribeState === 'function') {
       subWrap.classList.remove('hidden');
       subToggle.checked = await pmLoadSubscribeState(projectId);
+      if (seq !== window._pmLoadBoardSeq) return;
       subToggle.onchange = async () => {
         if (typeof pmSubscribeProject === 'function') {
           await pmSubscribeProject(projectId, subToggle.checked);

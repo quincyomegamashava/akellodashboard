@@ -321,10 +321,14 @@ def campaign_to_dict(c: EmailCampaign, *, include_body: bool = False) -> dict:
     return data
 
 
-def events_active_on_date(target: date) -> List[MarketingEvent]:
+def events_active_on_date(
+    target: date, *, include_attendees: bool = True
+) -> List[MarketingEvent]:
+    q = MarketingEvent.query
+    if include_attendees:
+        q = q.options(joinedload(MarketingEvent.attendees))
     return (
-        MarketingEvent.query.options(joinedload(MarketingEvent.attendees))
-        .filter(
+        q.filter(
             MarketingEvent.status == "active",
             MarketingEvent.start_date <= target,
             MarketingEvent.end_date >= target,

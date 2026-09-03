@@ -1,8 +1,8 @@
 /** Project management API helpers (shared). */
 window.PM_API_BASE = '/api';
 
-window.pmApiGET = async function(path) {
-  const res = await fetch(path);
+window.pmApiGET = async function(path, opts) {
+  const res = await fetch(path, opts || {});
   if (!res.ok) throw new Error(`GET ${path} failed (${res.status})`);
   return res.json();
 };

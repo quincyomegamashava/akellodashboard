@@ -31,7 +31,7 @@
         <div class="flex items-center justify-between p-3 rounded-md border border-slate-200 bg-slate-50">
           <div>
             <div class="text-sm font-semibold text-slate-700">Auto Email Delivery</div>
-            <div class="text-xs text-slate-500">Send daily generated report by email.</div>
+            <div class="text-xs text-slate-500">Send daily generated Drivers report by email.</div>
           </div>
           <input id="revenue_auto_email_enabled" type="checkbox" class="h-4 w-4">
         </div>
@@ -44,13 +44,41 @@
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1">Email recipients mode</label>
           <select id="revenue_email_recipient_mode" class="w-full border border-slate-300 rounded-md px-3 py-2 bg-white">
-            <option value="custom_group_later">Custom group later (pending)</option>
+            <option value="privilege_holders">Admins + Revenue Reports privilege</option>
+            <option value="custom_list">Custom email list</option>
+            <option value="custom_group_later">Disabled (legacy pending)</option>
           </select>
+        </div>
+        <div id="revenue_email_recipients_wrap">
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Custom recipient emails</label>
+          <textarea id="revenue_email_recipients" rows="2" class="w-full border border-slate-300 rounded-md px-3 py-2"
+            placeholder="name@example.com, other@example.com"></textarea>
+          <div class="text-xs text-slate-500 mt-1">Used when recipient mode is Custom email list. Also used for FY digest.</div>
         </div>
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1">ZiG exchange multiplier</label>
           <input id="revenue_zig_exchange" type="number" step="0.0001" min="0.0001" class="w-full border border-slate-300 rounded-md px-3 py-2" placeholder="37">
-          <div class="text-xs text-slate-500 mt-1">Used for Flash ZiG Smartlearning Daily Actual = zig_exchange x Drivers Smartlearning Daily Actual.</div>
+          <div class="text-xs text-slate-500 mt-1">Used for Flash ZiG Smartlearning Daily Actual and Akello Revenue Summary ZIG-USD.</div>
+        </div>
+        <div class="border-t border-slate-200 pt-4 space-y-3">
+          <div class="text-sm font-semibold text-slate-800">Akello Revenue FY digest</div>
+          <div class="flex items-center justify-between p-3 rounded-md border border-slate-200 bg-slate-50">
+            <div>
+              <div class="text-sm font-semibold text-slate-700">Monthly FY digest email</div>
+              <div class="text-xs text-slate-500">Sends on the 1st of each month using the same recipient mode.</div>
+            </div>
+            <input id="revenue_fy_digest_enabled" type="checkbox" class="h-4 w-4">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Digest time</label>
+              <input id="revenue_fy_digest_time" type="time" class="w-full border border-slate-300 rounded-md px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Period code</label>
+              <input id="revenue_fy_digest_period" type="text" class="w-full border border-slate-300 rounded-md px-3 py-2" placeholder="FY2027">
+            </div>
+          </div>
         </div>
         <div class="text-xs text-slate-500">
           For section 1, unsupported source modes automatically fall back to DB + Template until section 2 is added.
@@ -79,6 +107,12 @@
     alert(message);
   }
 
+  function syncRevenueRecipientFields() {
+    const mode = document.getElementById('revenue_email_recipient_mode').value;
+    const wrap = document.getElementById('revenue_email_recipients_wrap');
+    if (wrap) wrap.style.display = mode === 'custom_list' ? '' : 'none';
+  }
+
   async function loadRevenueSettings() {
     try {
       const response = await fetch('/api/settings/revenue-reports');
@@ -89,8 +123,13 @@
         document.getElementById('revenue_table_source').value = result.settings.table_source || 'latest_generated';
         document.getElementById('revenue_auto_email_enabled').checked = !!result.settings.auto_email_enabled;
         document.getElementById('revenue_email_delivery_mode').value = result.settings.email_delivery_mode || 'attach_plus_summary';
-        document.getElementById('revenue_email_recipient_mode').value = result.settings.email_recipient_mode || 'custom_group_later';
+        document.getElementById('revenue_email_recipient_mode').value = result.settings.email_recipient_mode || 'privilege_holders';
+        document.getElementById('revenue_email_recipients').value = result.settings.email_recipients || '';
         document.getElementById('revenue_zig_exchange').value = result.settings.zig_exchange || 37;
+        document.getElementById('revenue_fy_digest_enabled').checked = !!result.settings.fy_digest_enabled;
+        document.getElementById('revenue_fy_digest_time').value = result.settings.fy_digest_time || '07:00';
+        document.getElementById('revenue_fy_digest_period').value = result.settings.fy_digest_period || 'FY2027';
+        syncRevenueRecipientFields();
       }
 
       const latestRes = await fetch('/api/revenue-reports/section1/latest');
@@ -113,8 +152,12 @@
     const tableSource = document.getElementById('revenue_table_source').value || 'latest_generated';
     const autoEmailEnabled = document.getElementById('revenue_auto_email_enabled').checked;
     const emailDeliveryMode = document.getElementById('revenue_email_delivery_mode').value || 'attach_plus_summary';
-    const emailRecipientMode = document.getElementById('revenue_email_recipient_mode').value || 'custom_group_later';
+    const emailRecipientMode = document.getElementById('revenue_email_recipient_mode').value || 'privilege_holders';
+    const emailRecipients = document.getElementById('revenue_email_recipients').value || '';
     const zigExchange = document.getElementById('revenue_zig_exchange').value || 37;
+    const fyDigestEnabled = document.getElementById('revenue_fy_digest_enabled').checked;
+    const fyDigestTime = document.getElementById('revenue_fy_digest_time').value || '07:00';
+    const fyDigestPeriod = document.getElementById('revenue_fy_digest_period').value || 'FY2027';
 
     try {
       const response = await fetch('/api/settings/revenue-reports', {
@@ -127,7 +170,11 @@
           auto_email_enabled: autoEmailEnabled,
           email_delivery_mode: emailDeliveryMode,
           email_recipient_mode: emailRecipientMode,
-          zig_exchange: zigExchange
+          email_recipients: emailRecipients,
+          zig_exchange: zigExchange,
+          fy_digest_enabled: fyDigestEnabled,
+          fy_digest_time: fyDigestTime,
+          fy_digest_period: fyDigestPeriod
         })
       });
       const result = await response.json();
@@ -157,5 +204,7 @@
     }
     const form = document.getElementById('revenue-settings-form');
     if (form) form.addEventListener('submit', saveRevenueSettings);
+    const modeSel = document.getElementById('revenue_email_recipient_mode');
+    if (modeSel) modeSel.addEventListener('change', syncRevenueRecipientFields);
   });
 </script>

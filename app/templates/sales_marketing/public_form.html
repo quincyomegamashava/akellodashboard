@@ -33,12 +33,12 @@
         <p class="sm-thank-you-links">
           <a href="https://akello.co" target="_blank" rel="noopener">Visit akello.co</a>
           <span aria-hidden="true">&middot;</span>
-          <a href="/connect">Submit another response</a>
+          <a href="{{ connect_again_url|default('/connect') }}">Submit another response</a>
         </p>
       </div>
 
       <form id="sm-public-form" novalidate>
-        <nav class="sm-wizard-progress" aria-label="Form progress">
+        <nav class="sm-wizard-progress" aria-label="Form progress" aria-valuenow="1" aria-valuemin="1" aria-valuemax="3">
           <ol class="sm-wizard-steps" id="sm-wizard-steps">
             <li class="sm-wizard-step is-active" data-step="1">
               <span class="sm-wizard-step-num">1</span>
@@ -56,7 +56,6 @@
           <div class="sm-wizard-bar" aria-hidden="true">
             <div class="sm-wizard-bar-fill" id="sm-wizard-bar-fill"></div>
           </div>
-          <p class="sm-form-steps" id="sm-step-indicator">Step <span id="sm-step-num">1</span> of 3 &mdash; <span id="sm-step-label">Contact details</span></p>
         </nav>
 
         <!-- Step 1: Contact details -->
@@ -105,17 +104,27 @@
               <input type="text" class="form-control sm-field" name="school_name" id="sm-school" list="sm-school-list" maxlength="255" placeholder="Start typing to search" />
               <datalist id="sm-school-list"></datalist>
             </div>
-            <div class="col-md-6">
-              <label class="form-label" for="sm-event-date">Event date</label>
-              <input type="date" class="form-control sm-field" name="event_date" id="sm-event-date" value="{{ today }}" />
-            </div>
-            <div class="col-md-6">
-              <label class="form-label" for="sm-event-id">Event</label>
-              <select class="form-select sm-field" name="event_id" id="sm-event-id">
-                <option value="">Not at an event / General enquiry</option>
-              </select>
+          </div>
+
+          {% if prefill_event_id %}
+          <input type="hidden" name="event_id" id="sm-event-id" value="{{ prefill_event_id }}" />
+          {% else %}
+          <div class="sm-event-block mt-3" id="sm-event-picker">
+            <p class="sm-section-hint mb-2">Were you at an event?</p>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="sm-event-date">Event date</label>
+                <input type="date" class="form-control sm-field" name="event_date" id="sm-event-date" value="{{ today }}" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="sm-event-id">Event</label>
+                <select class="form-select sm-field" name="event_id" id="sm-event-id">
+                  <option value="">Not at an event / General enquiry</option>
+                </select>
+              </div>
             </div>
           </div>
+          {% endif %}
 
           <details class="sm-optional-details mt-3">
             <summary class="sm-optional-summary">Add organization details <span class="sm-optional-badge">Optional</span></summary>
@@ -188,8 +197,8 @@
         </section>
 
         <div class="sm-honeypot" aria-hidden="true">
-          <label>Website</label>
-          <input type="text" name="website" tabindex="-1" autocomplete="off" />
+          <label for="sm-hp-field">Leave blank</label>
+          <input type="text" name="sm_hp_field" id="sm-hp-field" value="" tabindex="-1" autocomplete="off" readonly />
         </div>
 
         <div class="sm-wizard-nav sm-sticky-submit">
@@ -212,6 +221,6 @@
     window.SM_PREFILL_EVENT_ID = {{ prefill_event_id|tojson }};
     window.SM_PREFILL_EVENT = {{ prefill_event|tojson }};
   </script>
-  <script src="{{ url_for('static', filename='js/sales_marketing_public.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/sales_marketing_public.js') }}?v=20260827b"></script>
 </body>
 </html>

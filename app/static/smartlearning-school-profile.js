@@ -1,19 +1,28 @@
 // Global function to load smartlearning data with optional date range
 window.loadSmartlearningData = function(startDate = null, endDate = null) {
-  const schoolId = document.body.dataset.schoolId;
-  const schoolName = document.body.dataset.schoolName;
+  const schoolEl = document.getElementById('school-profile') || document.body;
+  const schoolId = schoolEl.dataset.schoolId || schoolEl.dataset.aslSchoolId;
+  const schoolName = schoolEl.dataset.schoolName;
 
-  const payload = {
-    school_id: schoolId,
-    school_name: schoolName
-  };
-  
+  const payload = {};
+  if (schoolId) payload.school_id = schoolId;
+  if (schoolName) payload.school_name = schoolName;
+
+  if (!payload.school_id && !payload.school_name) {
+    const totalEl = document.getElementById("total-count");
+    if (totalEl) totalEl.textContent = "Missing school";
+    return Promise.resolve();
+  }
+
   if (startDate && endDate) {
     payload.start_date = startDate;
     payload.end_date = endDate;
   }
 
-  fetch('/api/smartlearning-school', {
+  const totalEl = document.getElementById("total-count");
+  if (totalEl) totalEl.textContent = "…";
+
+  return fetch('/api/smartlearning-school', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -24,33 +33,31 @@ window.loadSmartlearningData = function(startDate = null, endDate = null) {
   .then(data => {
     if (data.error) {
       console.error("API Error:", data.error);
-      document.getElementById("total-count").textContent = "Error loading data";
+      if (totalEl) totalEl.textContent = "Error";
       return;
     }
 
-    // Set total count
-    document.getElementById("total-count").textContent = data.total_count;
+    if (totalEl) totalEl.textContent = data.total_count;
 
-    // Build header
     const headerRow = document.getElementById("student-table-header");
-    headerRow.innerHTML = '';
-    data.columns.forEach(col => {
-      const th = document.createElement("th");
-      th.textContent = col.replace(/_/g, ' ').toUpperCase();
-      headerRow.appendChild(th);
-    });
+    if (headerRow) {
+      headerRow.innerHTML = '';
+      (data.columns || []).forEach(col => {
+        const th = document.createElement("th");
+        th.textContent = col.replace(/_/g, ' ').toUpperCase();
+        headerRow.appendChild(th);
+      });
+    }
 
-    // Create tbody reference
     const tbody = document.querySelector("#student-table tbody");
+    if (!tbody) return;
 
-    // Function to render table rows
     function renderTableRows(filteredRows) {
       tbody.innerHTML = '';
       filteredRows.forEach(row => {
         const tr = document.createElement("tr");
-        data.columns.forEach(col => {
+        (data.columns || []).forEach(col => {
           const td = document.createElement("td");
-          // Make username clickable
           if (col === 'username' && row[col]) {
             const link = document.createElement("a");
             link.href = `/learner-profile/${encodeURIComponent(row[col])}`;
@@ -59,15 +66,9 @@ window.loadSmartlearningData = function(startDate = null, endDate = null) {
             link.style.textDecoration = 'none';
             link.style.fontWeight = '600';
             link.style.cursor = 'pointer';
-            link.addEventListener('mouseenter', function() {
-              this.style.textDecoration = 'underline';
-            });
-            link.addEventListener('mouseleave', function() {
-              this.style.textDecoration = 'none';
-            });
             td.appendChild(link);
           } else {
-            td.textContent = row[col];
+            td.textContent = row[col] != null ? String(row[col]) : '';
           }
           tr.appendChild(td);
         });
@@ -75,20 +76,23 @@ window.loadSmartlearningData = function(startDate = null, endDate = null) {
       });
     }
 
-    // Populate full table initially
-    renderTableRows(data.rows);
+    renderTableRows(data.rows || []);
 
-    // Calculate and display grade-wise counts
     const gradeCounts = {};
-    data.rows.forEach(row => {
+    (data.rows || []).forEach(row => {
       const grade = row.grade || 'Unknown';
       gradeCounts[grade] = (gradeCounts[grade] || 0) + 1;
     });
 
-    // Build grade filter dropdown
-    const filterContainer = document.getElementById("grade-filter") || document.createElement("div");
-    filterContainer.id = "grade-filter";
-    filterContainer.style.margin = "10px 0";
+    let filterContainer = document.getElementById("grade-filter");
+    if (!filterContainer) {
+      filterContainer = document.createElement("div");
+      filterContainer.id = "grade-filter";
+      filterContainer.style.margin = "10px 0";
+      const table = document.getElementById("student-table");
+      if (table) table.before(filterContainer);
+    }
+    filterContainer.innerHTML = '';
 
     const gradeSelect = document.createElement("select");
     gradeSelect.style.padding = "5px";
@@ -107,26 +111,21 @@ window.loadSmartlearningData = function(startDate = null, endDate = null) {
     });
 
     filterContainer.appendChild(gradeSelect);
-    document.getElementById("student-table").before(filterContainer);
 
-    // Handle dropdown change
     gradeSelect.addEventListener("change", function () {
       const selectedGrade = this.value;
       if (selectedGrade === "all") {
-        renderTableRows(data.rows);
+        renderTableRows(data.rows || []);
       } else {
-        const filtered = data.rows.filter(row => String(row.grade) === selectedGrade);
+        const filtered = (data.rows || []).filter(row => String(row.grade) === selectedGrade);
         renderTableRows(filtered);
       }
     });
 
-    // ===============================
-    // Grade count cards (Modern style)
-    // ===============================
     const gradeCountsDiv = document.getElementById("grade-counts");
+    if (!gradeCountsDiv) return;
     gradeCountsDiv.innerHTML = '<h4 class="w3-hide">Students by Grade</h4>';
 
-    // Inject lightweight styles for grade cards once
     (function injectGradeCardStyles(){
       const STYLE_ID = 'grade-cards-styles';
       if (document.getElementById(STYLE_ID)) return;
@@ -145,16 +144,14 @@ window.loadSmartlearningData = function(startDate = null, endDate = null) {
       document.head.appendChild(style);
     })();
 
-    // nice color gradients to rotate through
     const gradients = [
       'linear-gradient(135deg,#6366f1,#22c55e)',
       'linear-gradient(135deg,#3b82f6,#06b6d4)',
       'linear-gradient(135deg,#f59e0b,#ef4444)',
       'linear-gradient(135deg,#8b5cf6,#ec4899)',
-      'linear-gradient(135deg,#10b981,#14b8a6)' 
+      'linear-gradient(135deg,#10b981,#14b8a6)'
     ];
 
-    // Sort grades: numeric ascending first, then others alphabetically
     const gradeKeys = Object.keys(gradeCounts).sort((a,b)=>{
       const na = parseInt(a,10); const nb = parseInt(b,10);
       const ia = Number.isFinite(na); const ib = Number.isFinite(nb);
@@ -191,7 +188,6 @@ window.loadSmartlearningData = function(startDate = null, endDate = null) {
       card.appendChild(title);
       card.appendChild(value);
       card.appendChild(sub);
-
       gradeContainer.appendChild(card);
     });
 
@@ -199,11 +195,8 @@ window.loadSmartlearningData = function(startDate = null, endDate = null) {
   })
   .catch(error => {
     console.error("Fetch error:", error);
-    document.getElementById("total-count").textContent = "Error loading data";
+    if (totalEl) totalEl.textContent = "Error";
   });
 };
 
-// Load data on page load with default date range
-document.addEventListener("DOMContentLoaded", function () {
-  window.loadSmartlearningData();
-});
+// Do not auto-fetch on DOMContentLoaded — page script drives loadAllData with dates.

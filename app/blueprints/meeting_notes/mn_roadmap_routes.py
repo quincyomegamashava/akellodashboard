@@ -19,6 +19,7 @@ from app.blueprints.meeting_notes.models import (
     MeetingFocusRow,
     MeetingNote,
 )
+from app.blueprints.meeting_notes.routes import _can_edit_meeting, _forbid_edit
 from app.blueprints.meeting_notes.services import (
     action_items_query,
     carry_forward_preview,
@@ -65,6 +66,8 @@ def api_meeting_decisions(meeting_id: int):
             .all()
         )
         return jsonify([decision_to_dict(d) for d in rows])
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     body = (payload.get("body") or "").strip()
     if not body:
@@ -89,6 +92,9 @@ def api_decision_detail(decision_id: int):
     d = db.session.get(MeetingDecision, decision_id)
     if not d:
         return jsonify({"error": "Not found"}), 404
+    mn = d.meeting_note or db.session.get(MeetingNote, d.meeting_note_id)
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     if request.method == "DELETE":
         meeting_id = d.meeting_note_id
         db.session.delete(d)
@@ -219,6 +225,13 @@ def api_hub_command():
 @bp.route("/api/hub/analytics/extended")
 @login_required
 def api_hub_analytics_extended():
+    from app.routes import cache
+
+    cache_key = f"mn_hub_analytics_ext_{current_user.id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+
     base = hub_analytics_summary()
     today = date.today()
     users = User.query.limit(200).all()
@@ -266,4 +279,8 @@ def api_hub_analytics_extended():
             "open_items": total - done,
         })
     base["meeting_health"] = meeting_health
+    try:
+        cache.set(cache_key, base, timeout=60)
+    except Exception:
+        pass
     return jsonify(base)

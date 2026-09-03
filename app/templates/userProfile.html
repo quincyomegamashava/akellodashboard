@@ -789,34 +789,10 @@
 
     <div class="profile-content">
       <main class="profile-main card">
-        <header class="card-header"><strong>General Information</strong></header>
+        <header class="card-header"><strong>{{ user.firstname }} {{ user.lastname }}</strong>
+          <span class="stat-subtle"> · {{ user.userRole }} · {{ user.province }}</span>
+        </header>
         <div class="card-body">
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">First Name</span>
-              <span class="info-value">{{ user.firstname }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Last Name</span>
-              <span class="info-value">{{ user.lastname }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Username</span>
-              <span class="info-value">{{ user.username }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Department</span>
-              <span class="info-value">{{ user.department }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Role</span>
-              <span class="info-value">{{ user.userRole }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Province</span>
-              <span class="info-value">{{ user.province }}</span>
-            </div>
-          </div>
         </div>
         {# School tables loaded async via /api/profile/<username>/school-tables; loading state shown until data arrives #}
         <div class="visit-status-card" id="visit-status-card">
@@ -825,25 +801,37 @@
           <div class="visit-status-sub" id="visit-status-sub">Last visit summary will appear here after checkout.</div>
           <div class="visit-status-actions" id="visit-status-actions" hidden></div>
         </div>
-        {% if current_user.userRole == 'Brand Ambassador' or current_user.userRole == 'Admin' %}
-        <div class="visit-status-card" id="weekly-checkin-report-card">
-          <div class="visit-status-title">Weekly Check-in Report</div>
-          <div class="d-flex flex-wrap gap-2 align-items-center">
+        {% if current_user.userRole == 'Brand Ambassador' or current_user.userRole == 'Admin' or current_user.userRole == 'Super Admin' or current_user.userRole == 'Manager' %}
+        <details class="visit-status-card" id="weekly-checkin-report-card">
+          <summary class="visit-status-title" style="cursor:pointer;">Weekly Check-in Report</summary>
+          <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
             <input type="date" id="weekly-checkin-week-ending" class="form-control form-control-sm" style="max-width: 220px;" />
             <button type="button" class="visit-action-btn checkin" id="download-weekly-checkin-csv">Download CSV</button>
             <button type="button" class="visit-action-btn checkout" id="download-weekly-checkin-pdf">Download PDF</button>
           </div>
           <div class="visit-status-sub" id="weekly-checkin-report-status">Select a Friday week ending date to download your weekly report.</div>
-        </div>
+        </details>
         {% endif %}
 
         <section class="section-group">
-          <div class="section-header">Schools with Active Scholarship</div>
+          <div class="section-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span>Schools</span>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <select id="profile-school-status-filter" class="form-control form-control-sm" style="max-width:160px;">
+                <option value="all">All statuses</option>
+                <option value="Active">Active</option>
+                <option value="Expired">Expired</option>
+                <option value="Never Assigned">Never Assigned</option>
+              </select>
+              <input type="text" id="profile-school-search" class="form-control form-control-sm" placeholder="Search schools…" style="max-width:220px;">
+            </div>
+          </div>
           <div class="table-responsive">
-            <table class="profile-school-table">
+            <table class="profile-school-table" id="profile-schools-table">
               <thead>
                 <tr>
                   <th>School name</th>
+                  <th>Status</th>
                   <th>First Awarded (2025+)</th>
                   <th>Days left until 12 months</th>
                   <th>ASL MTD</th>
@@ -852,9 +840,9 @@
                   <th>Action</th>
                 </tr>
               </thead>
-              <tbody id="profile-schools-active-tbody">
+              <tbody id="profile-schools-tbody">
                 <tr>
-                  <td colspan="7" class="profile-table-loading">
+                  <td colspan="8" class="profile-table-loading">
                     <i class="fa fa-spinner fa-spin"></i> Loading school data...
                   </td>
                 </tr>
@@ -863,90 +851,9 @@
           </div>
         </section>
 
-        <section class="section-group">
-          <div class="section-header">Schools with Expired Scholarship</div>
-          <div class="table-responsive">
-            <table class="profile-school-table profile-school-table-expired">
-              <thead>
-                <tr>
-                  <th>School name</th>
-                  <th>First Awarded (2025+)</th>
-                  <th>Days left until 12 months</th>
-                  <th>ASL MTD</th>
-                  <th>AL MTD</th>
-                  <th>Total MTD</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="profile-schools-expired-tbody">
-                <tr>
-                  <td colspan="7" class="profile-table-loading">
-                    <i class="fa fa-spinner fa-spin"></i> Loading school data...
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-          {% if inactive_scholarship_schools %}
-          <section class="section-group inactive-schools">
-            <div class="section-header">Schools with Inactive Scholarship</div>
-            <div class="chips-grid">
-              {% for school in inactive_scholarship_schools %}
-              {% set school_url = url_for('school_profile_usage', school_id=school.id) %}
-              {% set is_long_term = school.is_over_12_months %}
-              <a class="chip neutral chip-detail inactive-schol {{ 'long-term' if is_long_term }}"
-                href="{{ school_url }}"
-                title="Type: {{ school.scholarship_type or 'N/A' }} | Grades: {{ school.scholarship_grades or 'N/A' }} | Expired: {{ school.expiry_date or 'N/A' }} | Awarded by: {{ school.awarded_by or 'N/A' }}"
-                data-school-name="{{ school.name }}" data-school-expiry="{{ school.expiry_date or 'N/A' }}"
-                data-school-grades="{{ school.scholarship_grades or 'N/A' }}"
-                data-school-type="{{ school.scholarship_type or 'N/A' }}"
-                data-school-duration="{{ school.total_months or 0 }}"
-                data-school-awarded-at="{{ school.first_awarded_at or 'N/A' }}"
-                data-school-long-term="{{ 'true' if is_long_term else 'false' }}" data-school-url="{{ school_url }}" data-school-months-left="{{ school.months_left_until_12 or '' }}">
-                <i class="fa fa-university"></i> {{ school.name }}
-                <span class="stat-subtle">( {{ school.scholarship_type or 'N/A' }} )</span>
-                {% if school.months_left_until_12 is defined and school.months_left_until_12 and school.months_left_until_12 > 0 %}
-                <span class="months-left-highlight">{{ school.months_left_until_12 }} mo left to 12 mo</span>
-                {% endif %}
-                {% if school.active_subscription_count %}
-                <span class="status-badge">{{ school.active_subscription_count }} active</span>
-                {% endif %}
-              </a>
-              {% endfor %}
-            </div>
-          </section>
-          {% endif %}
-
-          <section class="section-group">
-            <div class="section-header">Schools Without Scholarship</div>
-            <div class="table-responsive">
-              <table class="profile-school-table profile-school-table-no-schol">
-                <thead>
-                  <tr>
-                    <th>School name</th>
-                    <th>First Awarded (2025+)</th>
-                    <th>Days left until 12 months</th>
-                    <th>ASL MTD</th>
-                    <th>AL MTD</th>
-                    <th>Total MTD</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="profile-schools-without-tbody">
-                  <tr>
-                    <td colspan="7" class="profile-table-loading">
-                      <i class="fa fa-spinner fa-spin"></i> Loading school data...
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
       </main>
 
-      {% if user.userRole == 'Brand Ambassador' %}
+      {% if user.userRole == 'Brand Ambassador' or current_user.userRole in ['Admin', 'Super Admin', 'Manager'] %}
       <aside class="profile-aside">
         <div class="card">
           <header class="card-header"><strong>Export</strong></header>
@@ -1004,7 +911,7 @@
               </div>
               <div>
                 <div class="stat-label">Total Active Subs</div>
-                <div class="stat-value">{{ total_active_sub_students }}</div>
+                <div class="stat-value" id="paid-subs-total">{{ total_active_sub_students }}</div>
               </div>
             </div>
             <div class="stat-card">
@@ -1013,7 +920,7 @@
               </div>
               <div>
                 <div class="stat-label">Schools with Active Subs</div>
-                <div class="stat-value">{{ schools_with_active_subs_count }}</div>
+                <div class="stat-value" id="paid-subs-schools">{{ schools_with_active_subs_count }}</div>
               </div>
             </div>
           </div>
@@ -1094,28 +1001,17 @@
     };
   }
 
-  // Fetch Quick Stats (ASL MTD, AL MTD). Backend always uses current month with per-school period; no date params sent.
-  async function fetchStats() {
-    try {
-      const profileEl = document.querySelector("#profile");
-      if (!profileEl) return;
-      const firstname = profileEl.dataset.firstname;
-      const lastname = profileEl.dataset.lastname;
-      if (!firstname || !lastname) return;
+  // AL MTD / paid subs come from school-tables API (no second fetch)
+  async function fetchStats() { /* deprecated — kept no-op for old listeners */ }
 
-      // AL (Library) - no date params; backend uses current month and per-institution period
-      const alQueryParams = `firstname=${encodeURIComponent(firstname)}&lastname=${encodeURIComponent(lastname)}`;
-      const alResponse = await fetch(`/api/champ-library-usage?${alQueryParams}`);
-      const alData = await alResponse.json();
-      if (alResponse.ok) {
-        const alTargetEl = document.querySelector("#libstudent-count");
-        if (alTargetEl) alTargetEl.textContent = alData.library_student_count ?? 0;
-      }
-
-      // ASL MTD is not updated from API so it stays equal to the "Schools with Active Scholarship" table total
-    } catch (err) {
-      console.error(err);
-    }
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   const DEVICE_INSTALL_STORAGE_KEY = "akello_checkin_device_install_id";
@@ -1189,10 +1085,8 @@
 
   // Load school tables and hero stats from API (replaces loading indicators)
   async function loadProfileSchoolTables() {
-    const tbodyActive = document.getElementById("profile-schools-active-tbody");
-    const tbodyExpired = document.getElementById("profile-schools-expired-tbody");
-    const tbodyWithout = document.getElementById("profile-schools-without-tbody");
-    if (!tbodyActive) return;
+    const tbody = document.getElementById("profile-schools-tbody");
+    if (!tbody) return;
 
     const profileEl = document.getElementById("profile");
     const username = (profileEl && profileEl.dataset.username) || (window.location.pathname.split("/").filter(Boolean).pop());
@@ -1205,10 +1099,8 @@
       const data = await res.json();
 
       if (!res.ok) {
-        const errMsg = data.error || "Failed to load school data.";
-        [tbodyActive, tbodyExpired, tbodyWithout].forEach((tb) => {
-          if (tb) tb.innerHTML = '<tr><td colspan="7" class="profile-table-loading">' + errMsg + ' Try refreshing.</td></tr>';
-        });
+        const errMsg = escapeHtml(data.error || "Failed to load school data.");
+        tbody.innerHTML = '<tr><td colspan="8" class="profile-table-loading">' + errMsg + ' Try refreshing.</td></tr>';
         return;
       }
 
@@ -1235,66 +1127,105 @@
         }
 
         if (activeOtherSchool) {
-          const activeName = activeVisit.school_name || "another school";
-          return `<span class="stat-subtle" title="Checked in at ${activeName.replace(/"/g, '&quot;')}">—</span>`;
+          const activeName = escapeHtml(activeVisit.school_name || "another school");
+          return `<span class="stat-subtle" title="Checked in at ${activeName}">—</span>`;
         }
 
         if (!schoolLibId) {
           return '<span class="stat-subtle">N/A</span>';
         }
 
-        /* Check-in from school rows is hidden; use visit status card / other flows if needed. */
-        return '<span class="stat-subtle">—</span>';
+        return `<button type="button" class="visit-action-btn checkin js-school-checkin-btn"
+          data-asl-school-id="${escapeHtml(schoolAslId)}"
+          data-library-id="${escapeHtml(schoolLibId)}"
+          data-school-name="${escapeHtml(schoolName)}">Check in</button>`;
+      }
+
+      function statusBadge(status) {
+        const s = status || 'Never Assigned';
+        if (s === 'Active') return '<span class="status-badge" style="background:#dcfce7;color:#166534;">Active</span>';
+        if (s === 'Expired') return '<span class="status-badge" style="background:#fef3c7;color:#92400e;">Expired</span>';
+        return '<span class="status-badge" style="background:#e0f2fe;color:#075985;">Never Assigned</span>';
       }
 
       function renderRow(school) {
-        const url = "/school_profile_usage/" + (school.id || "");
+        const url = "/school_profile_usage/" + encodeURIComponent(school.id || "");
         const isCurrentSchoolActive = schoolMatchesActiveVisit(school, activeVisit);
-        const name = (school.name || "—").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const name = escapeHtml(school.name || "—");
         const activeBadge = isCurrentSchoolActive ? '<span class="profile-school-active-badge">Checked in here</span>' : "";
-        const fa = school.first_awarded_2025 != null ? school.first_awarded_2025 : "—";
-        const days = school.days_left_until_12 != null ? school.days_left_until_12 : "—";
-        const asl = school.asl_mtd != null ? school.asl_mtd : 0;
-        const al = school.al_mtd != null ? school.al_mtd : 0;
-        const total = school.total_mtd != null ? school.total_mtd : 0;
+        const fa = escapeHtml(school.first_awarded_2025 != null ? school.first_awarded_2025 : "—");
+        const days = escapeHtml(school.days_left_until_12 != null ? school.days_left_until_12 : "—");
+        const asl = escapeHtml(school.asl_mtd != null ? school.asl_mtd : 0);
+        const al = escapeHtml(school.al_mtd != null ? school.al_mtd : 0);
+        const total = escapeHtml(school.total_mtd != null ? school.total_mtd : 0);
         const action = buildActionCell(school);
         const rowClass = isCurrentSchoolActive ? ' class="profile-school-row--active" data-active-visit-row="1"' : "";
-        return "<tr" + rowClass + "><td><a href=\"" + url + "\"><i class=\"fa fa-university\"></i> " + name + activeBadge + "</a></td><td>" + fa + "</td><td>" + days + "</td><td>" + asl + "</td><td>" + al + "</td><td>" + total + "</td><td>" + action + "</td></tr>";
+        const status = school.status || 'Never Assigned';
+        return `<tr${rowClass} data-school-status="${escapeHtml(status)}" data-school-name="${name.toLowerCase()}">
+          <td><a href="${url}"><i class="fa fa-university"></i> ${name}${activeBadge}</a></td>
+          <td>${statusBadge(status)}</td>
+          <td>${fa}</td><td>${days}</td><td>${asl}</td><td>${al}</td><td>${total}</td><td>${action}</td>
+        </tr>`;
       }
 
-      function fillBody(tbody, schools) {
-        if (!tbody) return;
-        if (!schools || schools.length === 0) {
-          tbody.innerHTML = "<tr><td colspan=\"7\">No schools</td></tr>";
-          return;
+      const allSchools = []
+        .concat((data.truly_active_schools || []).map(s => ({ ...s, status: s.status || 'Active' })))
+        .concat((data.expired_schools || []).map(s => ({ ...s, status: s.status || 'Expired' })))
+        .concat((data.schools_without_scholarship || []).map(s => ({ ...s, status: s.status || 'Never Assigned' })));
+
+      window.__profileAllSchools = allSchools;
+      window.__profileSchoolTablesData = data;
+
+      function applySchoolFilters() {
+        const statusFilter = (document.getElementById('profile-school-status-filter') || {}).value || 'all';
+        const term = ((document.getElementById('profile-school-search') || {}).value || '').toLowerCase().trim();
+        const filtered = allSchools.filter(s => {
+          if (statusFilter !== 'all' && (s.status || '') !== statusFilter) return false;
+          if (term && !(s.name || '').toLowerCase().includes(term)) return false;
+          return true;
+        });
+        if (!filtered.length) {
+          tbody.innerHTML = '<tr><td colspan="8">No schools match</td></tr>';
+        } else {
+          tbody.innerHTML = filtered.map(renderRow).join('');
         }
-        tbody.innerHTML = schools.map(renderRow).join("");
+        scrollActiveVisitRowIntoView();
       }
 
-      fillBody(tbodyActive, data.truly_active_schools);
-      fillBody(tbodyExpired, data.expired_schools);
-      fillBody(tbodyWithout, data.schools_without_scholarship);
-      scrollActiveVisitRowIntoView();
+      applySchoolFilters();
+      const statusEl = document.getElementById('profile-school-status-filter');
+      const searchEl = document.getElementById('profile-school-search');
+      if (statusEl && !statusEl._bound) {
+        statusEl.addEventListener('change', applySchoolFilters);
+        statusEl._bound = true;
+      }
+      if (searchEl && !searchEl._bound) {
+        searchEl.addEventListener('input', applySchoolFilters);
+        searchEl._bound = true;
+      }
 
       const heroValid = document.getElementById("hero-count-valid-schol");
       const heroElapsed = document.getElementById("hero-count-elapsed-schol");
       const heroNo = document.getElementById("hero-count-no-schol");
       const aslCount = document.getElementById("asl-count");
+      const libCount = document.getElementById("libstudent-count");
+      const paidTotal = document.getElementById("paid-subs-total");
+      const paidSchools = document.getElementById("paid-subs-schools");
       if (heroValid) heroValid.textContent = data.count_valid_scholarship != null ? data.count_valid_scholarship : 0;
       if (heroElapsed) heroElapsed.textContent = data.count_elapsed_scholarship != null ? data.count_elapsed_scholarship : 0;
       if (heroNo) heroNo.textContent = data.count_no_scholarship_schools != null ? data.count_no_scholarship_schools : 0;
       if (aslCount) aslCount.textContent = data.active_schools_asl_mtd_total != null ? data.active_schools_asl_mtd_total : 0;
+      if (libCount) libCount.textContent = data.library_student_count != null ? data.library_student_count : 0;
+      if (paidTotal) paidTotal.textContent = data.total_active_sub_students != null ? data.total_active_sub_students : 0;
+      if (paidSchools) paidSchools.textContent = data.schools_with_active_subs_count != null ? data.schools_with_active_subs_count : 0;
 
-      window.__profileSchoolTablesData = data;
       const exportPdfBtn = document.getElementById("export-pdf-btn");
       const exportExcelBtn = document.getElementById("export-excel-btn");
       if (exportPdfBtn) { exportPdfBtn.disabled = false; exportPdfBtn.removeAttribute("title"); }
       if (exportExcelBtn) { exportExcelBtn.disabled = false; exportExcelBtn.removeAttribute("title"); }
     } catch (err) {
       console.error("loadProfileSchoolTables:", err);
-      [tbodyActive, tbodyExpired, tbodyWithout].forEach((tb) => {
-        if (tb) tb.innerHTML = '<tr><td colspan="7" class="profile-table-loading">Failed to load school data. Try refreshing.</td></tr>';
-      });
+      tbody.innerHTML = '<tr><td colspan="8" class="profile-table-loading">Failed to load school data. Try refreshing.</td></tr>';
     }
   }
 
@@ -1499,9 +1430,11 @@
   function latestFridayDateString() {
     const now = new Date();
     const diff = (now.getDay() + 2) % 7;
-    const friday = new Date(now);
-    friday.setDate(now.getDate() - diff);
-    return friday.toISOString().slice(0, 10);
+    const friday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+    const y = friday.getFullYear();
+    const m = String(friday.getMonth() + 1).padStart(2, '0');
+    const d = String(friday.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 
   async function refreshWeeklyReportStatus() {
@@ -1626,30 +1559,7 @@
     loadVisitStatus().then(() => loadProfileSchoolTables());
     refreshWeeklyReportStatus();
 
-    // Date Range Filter section removed; only run Flatpickr/filter JS if elements exist
-    const startDateEl = document.querySelector("#start-date");
-    if (startDateEl && typeof flatpickr !== 'undefined') {
-      const { startDate, endDate } = getDefaultDates();
-      const flatpickrConfig = {
-        dateFormat: "Y-m-d",
-        allowInput: false,
-        disable: [{ from: "2025-12-04", to: "2026-01-12" }]
-      };
-      const startPicker = flatpickr("#start-date", { ...flatpickrConfig, defaultDate: startDate });
-      const endPicker = flatpickr("#end-date", { ...flatpickrConfig, defaultDate: endDate });
-      fetchStats();
-      const filterForm = document.querySelector("#date-filter-form");
-      if (filterForm) filterForm.addEventListener("submit", (e) => { e.preventDefault(); fetchStats(); });
-      const resetBtn = document.querySelector("#reset-filter");
-      if (resetBtn) resetBtn.addEventListener("click", () => {
-        const d = getDefaultDates();
-        if (startPicker) startPicker.setDate(d.startDate);
-        if (endPicker) endPicker.setDate(d.endDate);
-        fetchStats();
-      });
-    } else {
-      fetchStats();
-    }
+    // Date Range Filter removed — AL/ASL come from school-tables
 
     const exportPdfBtn = document.getElementById("export-pdf-btn");
     const exportExcelBtn = document.getElementById("export-excel-btn");

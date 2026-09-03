@@ -3,10 +3,6 @@
 {% block head_extra %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/shared_hub.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/meeting_notes.css') }}">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 {% endblock %}
 {% block content %}
 <datalist id="mn-platform-datalist">
@@ -363,7 +359,6 @@
 
     {% include "meeting_notes/_activity_log.html" %}
 
-    <div id="mn-detail-pane-filters" class="d-none" aria-hidden="true"></div>
   </div>
 
   <div class="mn-detail-tab-pane d-none mn-card p-3 mb-0" id="mn-tab-decisions">
@@ -652,8 +647,6 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css">
 <script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
 <script src="{{ url_for('static', filename='js/vendor/pptxgen.bundle.js') }}"></script>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
 <script>
   window.MN_MEETING_NOTE_ID = {{ meeting.id }};
   window.MN_MEETING_TITLE = {{ meeting.title|tojson }};

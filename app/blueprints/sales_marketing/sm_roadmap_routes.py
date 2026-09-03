@@ -301,9 +301,14 @@ def api_email_template_detail(template_id: int):
 
 
 def connect_page_by_slug(slug: str):
-    from app.blueprints.sales_marketing.routes import connect_page
-    from app.blueprints.sales_marketing.services import seed_interest_options_if_empty
+    from datetime import date
+
     from app.blueprints.sales_marketing.models import InterestOption
+    from app.blueprints.sales_marketing.services import (
+        HEARD_ABOUT_OPTIONS,
+        ROLE_CATEGORIES,
+        seed_interest_options_if_empty,
+    )
 
     seed_interest_options_if_empty()
     event = MarketingEvent.query.filter_by(slug=slug, status="active").first()
@@ -314,8 +319,6 @@ def connect_page_by_slug(slug: str):
         .order_by(InterestOption.sort_order, InterestOption.id)
         .all()
     )
-    from datetime import date
-    from app.blueprints.sales_marketing.services import HEARD_ABOUT_OPTIONS, ROLE_CATEGORIES
 
     return render_template(
         "sales_marketing/public_form.html",
@@ -332,5 +335,5 @@ def connect_page_by_slug(slug: str):
             "location": event.location or "",
             "banner_text": getattr(event, "banner_text", None) or "",
         },
-        form_step_mode=True,
+        connect_again_url=f"/connect/e/{slug}",
     )

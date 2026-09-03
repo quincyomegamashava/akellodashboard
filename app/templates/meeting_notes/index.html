@@ -180,7 +180,7 @@
 
   <div class="mn-hub-tab-pane d-none" id="mn-hub-tab-new" role="tabpanel" aria-labelledby="mn-hub-tab-btn-new">
 
-  <div class="mn-card mb-0 mn-new-meeting-desktop">
+  <div class="mn-card mb-0 mn-new-meeting-desktop d-none d-md-block">
 
     <div class="mn-card-header">New meeting</div>
 
@@ -242,64 +242,6 @@
 
 
 
-  <div class="mn-card mb-0 d-lg-none" id="mn-new-meeting-mobile-tab">
-
-    <div class="mn-card-header">New meeting</div>
-
-    <div class="mn-card-body">
-
-      <form id="formNewMeetingMobileTab" class="row g-3">
-
-        <div class="col-12">
-
-          <label class="mn-filter-label">Title</label>
-
-          <input type="text" class="form-control form-control-sm" name="title" placeholder="Meeting title" />
-
-        </div>
-
-        <div class="col-6">
-
-          <label class="mn-filter-label">Date</label>
-
-          <input type="date" class="form-control form-control-sm" name="meeting_date" required />
-
-        </div>
-
-        <div class="col-6">
-
-          <label class="mn-filter-label">Template</label>
-
-          <select class="form-select form-select-sm" id="mn-template-select-mobile-tab">
-
-            <option value="">Blank</option>
-
-          </select>
-
-        </div>
-
-        <div class="col-12">
-
-          <label class="mn-filter-label">Summary (optional)</label>
-
-          <textarea class="form-control form-control-sm" name="summary" rows="2"></textarea>
-
-        </div>
-
-        <div class="col-12">
-
-          <button type="submit" class="btn btn-sm mn-btn-primary w-100">Create &amp; open</button>
-
-        </div>
-
-      </form>
-
-      <div id="newMeetingErrMobileTab" class="text-danger small mt-2 d-none"></div>
-
-    </div>
-
-  </div>
-
   </div>
 
 </div>
@@ -308,7 +250,7 @@
 
 
 
-<div class="offcanvas offcanvas-bottom mn-new-meeting-sheet d-lg-none" tabindex="-1" id="mn-new-meeting-sheet" aria-labelledby="mn-new-meeting-sheet-label">
+<div class="offcanvas offcanvas-bottom mn-new-meeting-sheet d-md-none" tabindex="-1" id="mn-new-meeting-sheet" aria-labelledby="mn-new-meeting-sheet-label">
 
   <div class="offcanvas-header">
 
@@ -497,26 +439,6 @@
       e.preventDefault();
 
       submitNewMeeting(formM, errM);
-
-    });
-
-  }
-
-  const formMTab = document.getElementById('formNewMeetingMobileTab');
-
-  const errMTab = document.getElementById('newMeetingErrMobileTab');
-
-  if (formMTab) {
-
-    const d = formMTab.querySelector('[name="meeting_date"]');
-
-    if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);
-
-    formMTab.addEventListener('submit', function(e) {
-
-      e.preventDefault();
-
-      submitNewMeeting(formMTab, errMTab);
 
     });
 

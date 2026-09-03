@@ -113,9 +113,17 @@ def connect_page():
             ev = db.session.get(MarketingEvent, eid)
             if ev and ev.status == "active":
                 prefill_event_id = ev.id
-                prefill_event = {"id": ev.id, "name": ev.name, "location": ev.location or "", "banner_text": getattr(ev, "banner_text", None) or ""}
+                prefill_event = {
+                    "id": ev.id,
+                    "name": ev.name,
+                    "location": ev.location or "",
+                    "banner_text": getattr(ev, "banner_text", None) or "",
+                }
         except (TypeError, ValueError):
             pass
+    connect_again_url = (
+        f"/connect?event={prefill_event_id}" if prefill_event_id else "/connect"
+    )
     return render_template(
         "sales_marketing/public_form.html",
         title="Connect with Akello",
@@ -126,12 +134,13 @@ def connect_page():
         today=today,
         prefill_event_id=prefill_event_id,
         prefill_event=prefill_event,
+        connect_again_url=connect_again_url,
     )
 
 
 def api_public_marketing_events():
     d = _parse_date(request.args.get("date")) or date.today()
-    events = events_active_on_date(d)
+    events = events_active_on_date(d, include_attendees=False)
     return jsonify([{"id": e.id, "name": e.name, "location": e.location or ""} for e in events])
 
 
@@ -145,10 +154,70 @@ def api_public_interest_options():
     return jsonify([interest_option_to_dict(o) for o in opts])
 
 
+def api_public_schools_by_province(province: str):
+    """Public school-name list for connect form autocomplete (names only)."""
+    province = (province or "").strip()
+    if province not in ZIMBABWE_PROVINCES:
+        return jsonify({"error": "Invalid province."}), 400
+
+    conn = None
+    cursor = None
+    try:
+        import pymysql
+        from app.routes import get_ruzivo_conn
+
+        conn = get_ruzivo_conn()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor.execute(
+            """
+            SELECT school_name
+            FROM tblschools
+            WHERE school_province = %s
+              AND (flag IS NULL OR flag <> 'd')
+            ORDER BY school_name ASC
+            LIMIT 500
+            """,
+            (province,),
+        )
+        rows = cursor.fetchall() or []
+        names = []
+        seen = set()
+        for row in rows:
+            name = (row.get("school_name") or "").strip()
+            if name and name not in seen:
+                seen.add(name)
+                names.append(name)
+        return jsonify(names)
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {str(e)}"}), 500
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
 def api_public_submit_lead():
+    try:
+        return _api_public_submit_lead_impl()
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"error": f"Could not save your details ({type(exc).__name__}). Please try again."}), 500
+
+
+def _api_public_submit_lead_impl():
     payload = request.get_json(silent=True) or request.form.to_dict()
 
-    if (payload.get("website") or "").strip():
+    # Honeypot: accept both legacy "website" and renamed field. Return 200 without
+    # a real save so bots are not tipped off.
+    honeypot = (payload.get("sm_hp_field") or payload.get("website") or "").strip()
+    if honeypot:
         return jsonify({"ok": True})
 
     if not check_rate_limit():
@@ -170,7 +239,8 @@ def api_public_submit_lead():
         interest_id = int(payload.get("interest_option_id") or 0)
     except (TypeError, ValueError):
         interest_id = 0
-    if not interest_id or not db.session.get(InterestOption, interest_id):
+    interest = db.session.get(InterestOption, interest_id) if interest_id else None
+    if not interest or not interest.is_active:
         return jsonify({"error": "Please select an interest option."}), 400
 
     event_id = None
@@ -212,12 +282,18 @@ def api_public_submit_lead():
 
     log_lead_activity(lead.id, "form_submit", f"Submitted via public form: {full_name}")
     update_lead_score(lead)
+    # Persist the lead first so notification failures never roll it back.
     db.session.commit()
-    notify_new_lead(lead)
-    io = db.session.get(InterestOption, interest_id)
-    if (lead.role_category or "").lower() == "principal" and io and "demo" in (io.label or "").lower():
-        notify_hot_lead(lead)
-    return jsonify({"ok": True, "duplicate_warning": is_dup}), 201
+
+    try:
+        notify_new_lead(lead)
+        if (lead.role_category or "").lower() == "principal" and "demo" in (interest.label or "").lower():
+            notify_hot_lead(lead)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    return jsonify({"ok": True, "lead_id": lead.id, "duplicate_warning": is_dup}), 201
 
 
 # --- Staff HTML pages ---

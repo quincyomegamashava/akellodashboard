@@ -29,7 +29,7 @@
           </div>
           <nav class="mt-4 space-y-2 text-sm">
             <div class="text-slate-500 uppercase tracking-wider text-xs px-2">Main Menu</div>
-            <a class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 {{ 'bg-amber-50 text-amber-700' if request.endpoint=='welcome' else '' }}" href="{{ url_for('welcome') }}">
+            <a class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 {{ 'bg-amber-50 text-amber-700' if request.endpoint=='overview' else '' }}" href="{{ url_for('overview') }}">
               <span>Overview</span>
             </a>
             {% if current_user.userRole != 'Brand Ambassador' %}

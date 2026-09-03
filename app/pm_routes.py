@@ -58,14 +58,30 @@ def _import_pm_helpers():
         comment_to_dict,
         label_to_dict,
         project_access_denied,
+        project_manage_denied,
         projects_visible_to_user,
         task_to_dict,
         user_can_access_project_a,
+        user_can_manage_project_a,
         _log_task_activity,
         _project_for_task,
         _task_a_with_access,
     )
     return locals()
+
+
+def _pm_is_app_admin() -> bool:
+    if getattr(current_user, "userRole", None) == "Admin":
+        return True
+    return bool(hasattr(current_user, "has_privilege") and current_user.has_privilege("Super-admin"))
+
+
+def _project_task_ids(project_id: int):
+    col_ids = [c.id for c in ColumnA.query.filter_by(project_id=project_id).all()]
+    if not col_ids:
+        return set()
+    rows = db.session.query(TaskA.id).filter(TaskA.column_id.in_(col_ids)).all()
+    return {row[0] for row in rows}
 
 
 @app.route("/api/projects/<int:project_id>/labels/<int:label_id>", methods=["PATCH", "DELETE"])
@@ -296,6 +312,8 @@ def project_milestones(project_id):
     if request.method == "GET":
         ms = MilestoneA.query.filter_by(project_id=p.id).order_by(MilestoneA.position).all()
         return jsonify([milestone_to_dict(m) for m in ms])
+    if not h["user_can_manage_project_a"](p):
+        return h["project_manage_denied"]()
     data = request.get_json() or {}
     title = (data.get("title") or "").strip()
     if not title:
@@ -314,7 +332,9 @@ def project_milestones(project_id):
     db.session.flush()
     task_ids = data.get("task_ids") or []
     if task_ids:
-        m.tasks = TaskA.query.filter(TaskA.id.in_(task_ids)).all()
+        allowed = _project_task_ids(p.id)
+        safe_ids = [int(tid) for tid in task_ids if int(tid) in allowed]
+        m.tasks = TaskA.query.filter(TaskA.id.in_(safe_ids)).all() if safe_ids else []
     db.session.commit()
     return jsonify(milestone_to_dict(m)), 201
 
@@ -327,6 +347,8 @@ def project_milestone_detail(project_id, ms_id):
     m = MilestoneA.query.filter_by(id=ms_id, project_id=p.id).first_or_404()
     if not h["user_can_access_project_a"](p):
         return h["project_access_denied"]()
+    if not h["user_can_manage_project_a"](p):
+        return h["project_manage_denied"]()
     if request.method == "DELETE":
         db.session.delete(m)
         db.session.commit()
@@ -339,7 +361,9 @@ def project_milestone_detail(project_id, ms_id):
     if "color" in data:
         m.color = data["color"]
     if "task_ids" in data:
-        m.tasks = TaskA.query.filter(TaskA.id.in_(data["task_ids"] or [])).all()
+        allowed = _project_task_ids(p.id)
+        safe_ids = [int(tid) for tid in (data["task_ids"] or []) if int(tid) in allowed]
+        m.tasks = TaskA.query.filter(TaskA.id.in_(safe_ids)).all() if safe_ids else []
     db.session.commit()
     return jsonify(milestone_to_dict(m))
 
@@ -364,6 +388,8 @@ def project_baselines(project_id):
             }
             for b in rows
         ])
+    if not h["user_can_manage_project_a"](p):
+        return h["project_manage_denied"]()
     data = request.get_json() or {}
     name = (data.get("name") or f"Baseline {datetime.utcnow().strftime('%Y-%m-%d')}").strip()
     snap = baseline_snapshot(p)
@@ -376,6 +402,16 @@ def project_baselines(project_id):
 @app.route("/api/pm/portfolio", methods=["GET"])
 @login_required
 def pm_portfolio():
+    from app.routes import cache
+
+    cache_key = (
+        f"pm_portfolio_{current_user.id}_"
+        f"{request.args.get('program_id', '')}_{request.args.get('health', '')}"
+    )
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+
     projects = _import_pm_helpers()["projects_visible_to_user"]()
     program_id = request.args.get("program_id")
     if program_id:
@@ -387,6 +423,11 @@ def pm_portfolio():
     health = request.args.get("health")
     if health in ("red", "yellow", "green"):
         stats = [s for s in stats if s.get("health") == health]
+    if stats:
+        try:
+            cache.set(cache_key, stats, timeout=60)
+        except Exception:
+            pass
     return jsonify(stats)
 
 
@@ -427,6 +468,8 @@ def pm_programs():
             }
             for pr in progs
         ])
+    if not _pm_is_app_admin():
+        return jsonify({"error": "Only admins can create programs."}), 403
     data = request.get_json() or {}
     name = (data.get("name") or "").strip()
     if not name:
@@ -443,6 +486,8 @@ def pm_programs():
 @app.route("/api/pm/programs/<int:prog_id>", methods=["PATCH"])
 @login_required
 def pm_program_patch(prog_id):
+    if not _pm_is_app_admin():
+        return jsonify({"error": "Only admins can update programs."}), 403
     pr = ProgramA.query.get_or_404(prog_id)
     data = request.get_json() or {}
     if "name" in data and data["name"]:
@@ -655,8 +700,20 @@ def project_webhook_test(project_id, wh_id):
 @app.route("/api/pm/workload", methods=["GET"])
 @login_required
 def pm_workload():
+    from app.routes import cache
+
+    cache_key = f"pm_workload_{current_user.id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
     projects = _import_pm_helpers()["projects_visible_to_user"]()
-    return jsonify(workload_summary_for_projects(projects))
+    data = workload_summary_for_projects(projects)
+    if data:
+        try:
+            cache.set(cache_key, data, timeout=60)
+        except Exception:
+            pass
+    return jsonify(data)
 
 
 @app.route("/pm/workload")

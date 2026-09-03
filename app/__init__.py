@@ -91,6 +91,15 @@ try:
 except Exception:
     logger.exception("Sales & Marketing blueprint failed to register")
 
+try:
+    from app.blueprints.akello_revenue import bp as akello_revenue_bp
+    from app.blueprints.akello_revenue import models as akello_revenue_models  # noqa: F401
+
+    app.register_blueprint(akello_revenue_bp)
+    logger.info("Akello Revenue blueprint registered (/akello-revenue/)")
+except Exception:
+    logger.exception("Akello Revenue blueprint failed to register")
+
 from app.blueprints.learn_admin import bp as learn_admin_bp
 from app.blueprints.learn_api import bp as learn_api_bp
 from app.blueprints.learn_guardian import bp as learn_guardian_bp

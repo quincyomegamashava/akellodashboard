@@ -4,7 +4,6 @@ import base64
 from datetime import date, datetime
 from typing import Any, List, Optional, Sequence
 
-import requests
 from flask import abort, jsonify, render_template, request
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
@@ -96,6 +95,45 @@ def _can_view_activity(meeting_id: int) -> bool:
         return True
     mn = db.session.get(MeetingNote, meeting_id)
     return bool(mn and mn.created_by == current_user.id)
+
+
+def _can_edit_meeting(mn: Optional[MeetingNote]) -> bool:
+    """Creator, attendee, or Admin may mutate meeting content."""
+    if not mn or not current_user.is_authenticated:
+        return False
+    if _is_admin():
+        return True
+    if mn.created_by == current_user.id:
+        return True
+    return any(u.id == current_user.id for u in (mn.attendees or []))
+
+
+def _can_delete_meeting(mn: Optional[MeetingNote]) -> bool:
+    """Only creator or Admin may delete a meeting."""
+    if not mn or not current_user.is_authenticated:
+        return False
+    if _is_admin():
+        return True
+    return mn.created_by == current_user.id
+
+
+def _forbid_edit():
+    return jsonify({"error": "You do not have permission to edit this meeting."}), 403
+
+
+def _forbid_delete():
+    return jsonify({"error": "You do not have permission to delete this meeting."}), 403
+
+
+def _meeting_for_item(item: Optional[MeetingActionItem]) -> Optional[MeetingNote]:
+    if not item:
+        return None
+    fr = item.focus_row
+    if fr is None and item.focus_row_id:
+        fr = db.session.get(MeetingFocusRow, item.focus_row_id)
+    if not fr:
+        return None
+    return fr.meeting_note or db.session.get(MeetingNote, fr.meeting_note_id)
 
 
 def _payload_silent(payload: dict) -> bool:
@@ -425,7 +463,21 @@ def api_action_items():
         stakeholder_lead_id=stakeholder_lead_id,
         marketing_event_id=marketing_event_id,
     )
-    items = q.order_by(MeetingNote.meeting_date.desc(), MeetingFocusRow.sort_order, MeetingActionItem.sort_order).all()
+    ordered = q.order_by(
+        MeetingNote.meeting_date.desc(),
+        MeetingFocusRow.sort_order,
+        MeetingActionItem.sort_order,
+    )
+    # Cap unscoped / cross-meeting lists to keep hub & all-items responsive.
+    if not meeting_note_id:
+        try:
+            limit = int(request.args.get("limit") or 500)
+        except (TypeError, ValueError):
+            limit = 500
+        limit = max(50, min(limit, 1000))
+        items = ordered.limit(limit).all()
+    else:
+        items = ordered.all()
     collapse = request.args.get("collapse_lineage", "1") != "0"
     # Collapse only on cross-meeting "All items" views (no meeting filter).
     if collapse and not meeting_note_id:
@@ -549,6 +601,8 @@ def api_duplicate_meeting(meeting_id: int):
     src = db.session.get(MeetingNote, meeting_id)
     if not src:
         return jsonify({"error": "Not found"}), 404
+    if not _can_edit_meeting(src):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     title = (payload.get("title") or "").strip() or f"{src.title} (copy)"
     meeting_date = _parse_date_json(payload, "meeting_date") or date.today()
@@ -645,6 +699,8 @@ def api_carry_forward(meeting_id: int):
     target = db.session.get(MeetingNote, meeting_id)
     if not target:
         return jsonify({"error": "Not found"}), 404
+    if not _can_edit_meeting(target):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     source_id = payload.get("from_meeting_id")
     if not source_id:
@@ -765,6 +821,25 @@ def api_bulk_action_items():
     ids = payload.get("item_ids") or []
     if not ids:
         return jsonify({"error": "No items selected"}), 400
+    meetings_to_edit: dict[int, MeetingNote] = {}
+    for raw_id in ids:
+        try:
+            item_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        item = (
+            MeetingActionItem.query.options(joinedload(MeetingActionItem.focus_row))
+            .filter_by(id=item_id)
+            .first()
+        )
+        if not item:
+            continue
+        mn = _meeting_for_item(item)
+        if mn and mn.id not in meetings_to_edit:
+            meetings_to_edit[mn.id] = mn
+    for mn in meetings_to_edit.values():
+        if not _can_edit_meeting(mn):
+            return _forbid_edit()
     updated = 0
     mid = None
     for raw_id in ids:
@@ -833,11 +908,15 @@ def api_meeting(meeting_id: int):
     if not mn:
         return jsonify({"error": "Not found"}), 404
     if request.method == "DELETE":
+        if not _can_delete_meeting(mn):
+            return _forbid_delete()
         title = mn.title
         _log_activity(mn.id, "delete", "meeting_note", mn.id, f"Deleted meeting: {title}")
         db.session.delete(mn)
         db.session.commit()
         return jsonify({"ok": True})
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     if "title" in payload:
         mn.title = (payload.get("title") or "").strip() or mn.title
@@ -906,6 +985,8 @@ def api_agenda_from_focus_rows(meeting_id: int):
     mn = db.session.get(MeetingNote, meeting_id)
     if not mn:
         return jsonify({"error": "Not found"}), 404
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     rows = (
         MeetingFocusRow.query.filter_by(meeting_note_id=meeting_id)
         .order_by(MeetingFocusRow.sort_order, MeetingFocusRow.id)
@@ -953,6 +1034,8 @@ def api_meeting_focus_rows(meeting_id: int):
                 for r in rows
             ]
         )
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     fr = MeetingFocusRow(
         meeting_note_id=meeting_id,
@@ -979,6 +1062,9 @@ def api_focus_row(row_id: int):
     fr = db.session.get(MeetingFocusRow, row_id)
     if not fr:
         return jsonify({"error": "Not found"}), 404
+    mn = fr.meeting_note or db.session.get(MeetingNote, fr.meeting_note_id)
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     mid = fr.meeting_note_id
     if request.method == "DELETE":
         _log_activity(mid, "delete", "focus_row", fr.id, f"Removed focus row: {fr.platform} / {fr.focus_area}")
@@ -1056,6 +1142,9 @@ def api_create_action_item(row_id: int):
     fr = db.session.get(MeetingFocusRow, row_id)
     if not fr:
         return jsonify({"error": "Not found"}), 404
+    mn = fr.meeting_note or db.session.get(MeetingNote, fr.meeting_note_id)
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     item = MeetingActionItem(
         focus_row_id=row_id,
@@ -1131,6 +1220,9 @@ def api_action_item(item_id: int):
     mid = fr.meeting_note_id if fr else None
     if request.method == "GET":
         return jsonify(item_to_dict(item))
+    mn = _meeting_for_item(item)
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     if request.method == "DELETE":
         preview = (item.call_to_action or "")[:120]
         _log_activity(mid, "delete", "action_item", item.id, f"Deleted action item: {preview}")
@@ -1229,6 +1321,9 @@ def api_action_item_subtasks(item_id: int):
     if request.method == "GET":
         subtasks = sorted(item.subtasks or [], key=lambda s: (s.sort_order, s.id))
         return jsonify([subtask_to_dict(s) for s in subtasks])
+    mn = _meeting_for_item(item)
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     title = (payload.get("title") or "").strip()
     if not title:
@@ -1290,6 +1385,9 @@ def api_subtask(subtask_id: int):
     item = _action_item_with_subtasks(st.action_item_id)
     if not item:
         return jsonify({"error": "Not found"}), 404
+    mn = _meeting_for_item(item)
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     mid = _meeting_id_for_action_item(item)
     silent = _payload_silent(request.get_json(silent=True) or {})
     if request.method == "DELETE":
@@ -1372,6 +1470,9 @@ def api_reorder_subtasks(item_id: int):
     item = _action_item_with_subtasks(item_id)
     if not item:
         return jsonify({"error": "Not found"}), 404
+    mn = _meeting_for_item(item)
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     ordered_ids = payload.get("ordered_ids") or []
     if not isinstance(ordered_ids, list):
@@ -1400,6 +1501,21 @@ def api_reorder_action_items():
     ordered_ids = payload.get("ordered_ids") or []
     if not isinstance(ordered_ids, list):
         return jsonify({"error": "ordered_ids must be a list"}), 400
+    meetings_to_edit: dict[int, MeetingNote] = {}
+    for raw_id in ordered_ids:
+        try:
+            item_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        item = db.session.get(MeetingActionItem, item_id)
+        if not item:
+            continue
+        mn = _meeting_for_item(item)
+        if mn and mn.id not in meetings_to_edit:
+            meetings_to_edit[mn.id] = mn
+    for mn in meetings_to_edit.values():
+        if not _can_edit_meeting(mn):
+            return _forbid_edit()
     for idx, raw_id in enumerate(ordered_ids):
         try:
             item_id = int(raw_id)
@@ -1421,6 +1537,28 @@ def api_reorder_focus_rows():
     meeting_id = payload.get("meeting_note_id")
     if not isinstance(ordered_ids, list):
         return jsonify({"error": "ordered_ids must be a list"}), 400
+    if meeting_id is not None:
+        mn = db.session.get(MeetingNote, int(meeting_id))
+        if not mn:
+            return jsonify({"error": "Not found"}), 404
+        if not _can_edit_meeting(mn):
+            return _forbid_edit()
+    else:
+        meetings_to_edit: dict[int, MeetingNote] = {}
+        for raw_id in ordered_ids:
+            try:
+                row_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            fr = db.session.get(MeetingFocusRow, row_id)
+            if not fr:
+                continue
+            mn = fr.meeting_note or db.session.get(MeetingNote, fr.meeting_note_id)
+            if mn and mn.id not in meetings_to_edit:
+                meetings_to_edit[mn.id] = mn
+        for mn in meetings_to_edit.values():
+            if not _can_edit_meeting(mn):
+                return _forbid_edit()
     for idx, raw_id in enumerate(ordered_ids):
         try:
             row_id = int(raw_id)
@@ -1555,7 +1693,19 @@ def api_meetings_search():
 @bp.route("/api/hub/analytics")
 @login_required
 def api_hub_analytics():
-    return jsonify(hub_analytics_summary())
+    from app.routes import cache
+
+    cache_key = f"mn_hub_analytics_{current_user.id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+    data = hub_analytics_summary()
+    if data:
+        try:
+            cache.set(cache_key, data, timeout=60)
+        except Exception:
+            pass
+    return jsonify(data)
 
 
 @bp.route("/api/hub/my-tasks")
@@ -1567,6 +1717,11 @@ def api_hub_my_tasks():
 @bp.route("/api/meetings/<int:meeting_id>/ai/extract-tasks", methods=["POST"])
 @login_required
 def api_ai_extract_tasks(meeting_id: int):
+    mn = db.session.get(MeetingNote, meeting_id)
+    if not mn:
+        return jsonify({"error": "Not found"}), 404
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     data, err = extract_tasks_from_notes(meeting_id, payload.get("notes_text"))
     if err:
@@ -1591,6 +1746,8 @@ def api_ai_apply_tasks(meeting_id: int):
     mn = db.session.get(MeetingNote, meeting_id)
     if not mn:
         return jsonify({"error": "Not found"}), 404
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     focus_row_id = payload.get("focus_row_id")
     items = payload.get("items") or []
@@ -1683,6 +1840,11 @@ def api_ai_apply_tasks(meeting_id: int):
 @bp.route("/api/meetings/<int:meeting_id>/ai/summarize", methods=["POST"])
 @login_required
 def api_ai_summarize(meeting_id: int):
+    mn = db.session.get(MeetingNote, meeting_id)
+    if not mn:
+        return jsonify({"error": "Not found"}), 404
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     text, err = summarize_notes(meeting_id, payload.get("notes_text"))
     if err:
@@ -1696,6 +1858,8 @@ def api_meeting_transcript(meeting_id: int):
     mn = db.session.get(MeetingNote, meeting_id)
     if not mn:
         return jsonify({"error": "Not found"}), 404
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     transcript = (payload.get("transcript") or "").strip()
     if not transcript:
@@ -1721,6 +1885,8 @@ def api_email_meeting_report(meeting_id: int):
     )
     if not meeting:
         return jsonify({"error": "Not found"}), 404
+    if not _can_edit_meeting(meeting):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     email_attendees = bool(payload.get("email_attendees"))
     include_assignees = bool(payload.get("include_assignees"))
@@ -1823,6 +1989,8 @@ def api_share_meeting_slack(meeting_id: int):
     )
     if not meeting:
         return jsonify({"error": "Not found"}), 404
+    if not _can_edit_meeting(meeting):
+        return _forbid_edit()
     if not get_mn_slack_webhook_url():
         return jsonify({
             "error": "Slack webhook not configured. Set MN_SLACK_WEBHOOK_URL or AppSetting mn_slack_webhook_url.",
@@ -1852,20 +2020,63 @@ def api_share_meeting_slack(meeting_id: int):
 @bp.route("/api/pdf-logo")
 @login_required
 def api_pdf_logo():
+    """Serve a logo as data URL. Only same-origin static paths or built-in asset — no open URL fetch."""
+    from flask import current_app, url_for
+    import os
+
     url = (request.args.get("url") or "").strip()
+    static_root = os.path.join(current_app.root_path, "static")
+    allowed_rel = ("smartlearning.webp", "logo.png", "img/logo.png", "css/logo.png")
+
+    rel_path = None
     if not url:
-        return jsonify({"error": "url required"}), 400
-    if not (url.startswith("http://") or url.startswith("https://")):
-        return jsonify({"error": "Only http(s) urls allowed"}), 400
+        for candidate in allowed_rel:
+            full = os.path.join(static_root, candidate.replace("/", os.sep))
+            if os.path.isfile(full):
+                rel_path = candidate
+                break
+    else:
+        # Accept /static/... or url_for-style paths only (block external SSRF).
+        path = url
+        if path.startswith("http://") or path.startswith("https://"):
+            from urllib.parse import urlparse
+
+            parsed = urlparse(path)
+            path = parsed.path or ""
+        if path.startswith("/static/"):
+            path = path[len("/static/") :]
+        path = path.lstrip("/").replace("\\", "/")
+        if ".." in path.split("/"):
+            return jsonify({"error": "Invalid logo path"}), 400
+        full = os.path.normpath(os.path.join(static_root, path.replace("/", os.sep)))
+        if not full.startswith(os.path.normpath(static_root)):
+            return jsonify({"error": "Invalid logo path"}), 400
+        if not os.path.isfile(full):
+            return jsonify({"error": "Logo not found"}), 404
+        # Restrict to image extensions under static
+        lower = full.lower()
+        if not lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")):
+            return jsonify({"error": "Not an image"}), 400
+        rel_path = path
+
+    if not rel_path:
+        return jsonify({"error": "No logo available"}), 404
+
+    full = os.path.join(static_root, rel_path.replace("/", os.sep))
     try:
-        resp = requests.get(url, timeout=12)
-        if not resp.ok:
-            return jsonify({"error": f"logo fetch failed ({resp.status_code})"}), 400
-        content_type = (resp.headers.get("Content-Type") or "image/png").split(";")[0].strip().lower()
-        if not content_type.startswith("image/"):
-            return jsonify({"error": "url did not return an image"}), 400
-        data_b64 = base64.b64encode(resp.content).decode("ascii")
-        return jsonify({"data_url": f"data:{content_type};base64,{data_b64}"})
+        with open(full, "rb") as f:
+            raw = f.read()
+        ext = os.path.splitext(full)[1].lower().lstrip(".")
+        mime = {
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "webp": "image/webp",
+            "gif": "image/gif",
+            "svg": "image/svg+xml",
+        }.get(ext, "image/png")
+        data_b64 = base64.b64encode(raw).decode("ascii")
+        return jsonify({"data_url": f"data:{mime};base64,{data_b64}"})
     except Exception as exc:
         return jsonify({"error": str(exc)[:200]}), 500
 
@@ -1961,6 +2172,9 @@ def api_item_comments(item_id: int):
             .all()
         )
         return jsonify([comment_to_dict(c) for c in rows])
+    mn = _meeting_for_item(item)
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     body = (payload.get("body") or "").strip()
     if not body:
@@ -1998,6 +2212,9 @@ def api_mobile_update_item(item_id: int):
     )
     if not item:
         return jsonify({"error": "Not found"}), 404
+    mn = _meeting_for_item(item)
+    if not _can_edit_meeting(mn):
+        return _forbid_edit()
     payload = request.get_json(silent=True) or {}
     _apply_action_item_fields(item, payload)
     db.session.commit()

@@ -1,856 +1,103 @@
 {% extends 'base.html' %}
-<head>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-</head>
 {% block title %}Overview • Akello{% endblock %}
 {% block head_extra %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/sales_marketing.css') }}">
-{% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-    body {
-      font-family: "Inter", sans-serif;
-      background-color: #f8f9fb;
-      color: #333;
-      margin: 0;
-      padding: 40px 20px;
-    }
-
-    h1 {
-      text-align: center;
-      color: #3b28cc;
-      font-size: 2rem;
-      margin-bottom: 10px;
-    }
-
-    p.subtitle {
-      text-align: center;
-      color: #555;
-      margin-bottom: 40px;
-    }
-
-    .accordion {
-      max-width: 800px;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
-
-    details {
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      border-radius: 10px;
-      padding: 20px;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
-    }
-
-    details[open] {
-      border-color: #3b28cc;
-      box-shadow: 0 4px 10px rgba(59, 40, 204, 0.08);
-    }
-
-    summary {
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 1.05rem;
-      list-style: none;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    summary::after {
-      content: "➕";
-      font-size: 1.2rem;
-      color: #3b28cc;
-      transition: transform 0.3s ease;
-    }
-
-    details[open] summary::after {
-      content: "➖";
-    }
-
-    details p {
-      margin-top: 15px;
-      color: #555;
-      line-height: 1.6;
-    }
-
-    /* How-to modern styles */
-    .howto-hero { background: linear-gradient(135deg,#e8f0ff,#ffffff); border:1px solid #e6ecf7; border-radius:16px; padding:18px 18px; box-shadow:0 6px 18px rgba(13,38,76,.06); display:flex; align-items:center; gap:14px; }
-    .howto-hero .icon { width:44px; height:44px; border-radius:12px; background: linear-gradient(135deg,#6366f1,#22c55e); color:#fff; display:grid; place-items:center; font-size:18px; }
-    .howto-hero .title { font-weight:700; color:#0b213f; margin:0; font-size:1.05rem; }
-    .howto-hero .desc { margin:2px 0 0; color:#55657d; font-size:.9rem; }
-
-    .step-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap:14px; }
-    .step-card { background:#fff; border:1px solid #e9eef5; border-radius:14px; padding:14px 16px; box-shadow:0 6px 16px rgba(13,38,76,.06); transition:transform .05s ease, box-shadow .2s ease; }
-    .step-card:hover { transform: translateY(-1px); box-shadow:0 10px 24px rgba(13,38,76,.10); }
-    .step-card .icon { width:36px; height:36px; border-radius:10px; display:grid; place-items:center; color:#fff; font-size:16px; margin-bottom:8px; background: linear-gradient(135deg,#3b82f6,#06b6d4); }
-    .step-card h4 { margin:0 0 6px; font-size:1rem; color:#0b213f; }
-    .step-card ul { margin: 0; padding-left: 18px; color:#56627a; font-size:.92rem; }
-    .step-card li { margin: 4px 0; }
-
-    .contact-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap:12px; }
-    .contact-card { background:#fff; border:1px solid #e9eef5; border-radius:14px; padding:12px 14px; box-shadow:0 6px 16px rgba(13,38,76,.06); display:flex; align-items:center; gap:10px; }
-    .contact-card .avatar { width:40px; height:40px; border-radius:10px; display:grid; place-items:center; color:#fff; font-size:16px; background: linear-gradient(135deg,#10b981,#14b8a6); }
-    .contact-card .name { font-weight:600; color:#0b213f; margin:0; }
-    .contact-card .email { font-size:.9rem; color:#55657d; margin:0; word-break: break-all; }
-
-    .badge-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; font-size:.75rem; border:1px solid #dfe7f5; background:#f7faff; color:#1f3161; }
-
-    @media (max-width: 640px){ .howto-hero { flex-direction: column; align-items: flex-start; } }
-    
-    /* Chart loading animations */
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    
-    @keyframes progress {
-        0% { width: 0%; }
-        100% { width: 100%; }
-    }
-    
-    /* 60-second progress bar */
-    .progress-60s {
-        animation: progress 60s linear;
-    }
-    
-    /* Chart container improvements */
-    .chart-container {
-        position: relative;
-        min-height: 300px;
-    }
-    
-    /* Loading state improvements */
-    .chart-loading-overlay {
-        backdrop-filter: blur(2px);
-    }
-    
-    .chart-error {
-        backdrop-filter: blur(1px);
-    }
-  </style>
+  .overview-page { max-width: 1280px; margin: 0 auto; padding: 16px 20px 40px; width: 100%; box-sizing: border-box; }
+  .overview-page h1.ov-title {
+    text-align: center; color: #4338ca; font-size: 1.35rem;
+    font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; margin: 8px 0 16px;
+  }
+  .ov-tabs { display: flex; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+  .ov-tabs .tablink {
+    flex: 1; text-align: center; padding: 12px 8px; cursor: pointer;
+    background: #fff; border: none; font-size: 13px; color: #374151;
+  }
+  .ov-tabs .tablink:hover { background: #eef2ff; }
+  .ov-tabs .tablink.w3-indigo { background: #4338ca; color: #fff; }
+  .ov-kpi-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+  }
+  .ov-kpi {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; text-align: center;
+  }
+  .ov-kpi .label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+  .ov-kpi .value { font-size: 1.4rem; font-weight: 700; color: #374151; }
+  .ov-charts { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  @media (min-width: 1100px) { .ov-charts { grid-template-columns: 1fr 1fr; } }
+  .ov-chart-card {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 16px 20px;
+    position: relative;
+  }
+  .ov-chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 420px;
+  }
+  @media (max-width: 768px) {
+    .overview-page { padding: 12px 12px 32px; }
+    .ov-chart-wrap { height: 360px; }
+  }
+  @media (max-width: 480px) {
+    .ov-chart-wrap { height: 300px; }
+  }
+  .ov-chart-wrap canvas { width: 100% !important; height: 100% !important; }
+  #sample-data-banner {
+    display: none; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 12px; color: #92400e; font-size: 13px;
+  }
+  #chart-load-status { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+  .menu { display: none; }
+</style>
+{% endblock %}
 {% block content %}
-<div class=" w3-display-container  w3-small rounded-2xl  p-6 " style="height: 65vh; width: 75vw; overflow: auto;">
-  <div class="w3-display-middle bg-white " style="height: 63vh; width: 73vw; overflow: auto;">
-    
+<div class="overview-page">
+  <h1 class="ov-title">Akello Internal Dashboard</h1>
 
-    <!-- Menu Container -->
-<div class="w3-padding  " id="menu">
-  <div class="w3-card rounded-2xl soft-shadow p-6 w3-small" style="width: 69vw;">
-  
-    <div  class="text-slate-500 w3-center uppercase w3-text-indigo font-bold tracking-wider text-2xl px-2 mt-6" style="">AKELLO iNTERNAL dASHBOARD</div>
-    <div class="w3-row w3-center w3-border w3-border-light-gray">
-      <a href="javascript:void(0)" onclick="openMenu(event, 'how-to');" id="myLink">
-        <div class="w3-col s4 tablink w3-padding w3-hover-indigo w3-small rounded-2xl  p-6">Overview</div>
-      </a>
-      <a href="javascript:void(0)" class="{% if current_user.userRole =='Brand Ambassador' %} w3-hide {% endif %}" onclick="openMenu(event, 'branding');">
-        <div class="w3-col s4 tablink w3-padding w3-hover-indigo w3-small rounded-2xl  p-6">Branding Tracker</div>
-      </a>
-      <a href="javascript:void(0)" onclick="openMenu(event, 'brandmanager');" class="{% if current_user.userRole =='Admin' or current_user.userRole == 'Brand Manager' %}{% else %} w3-hide {% endif %}">
-        <div class="w3-col s4 tablink w3-padding w3-hover-indigo w3-small rounded-2xl  p-6">Brand Manager</div>
-      </a>
-    </div>
+  <div class="ov-tabs" id="menu">
+    <a href="javascript:void(0)" onclick="openMenu(event, 'how-to');" id="myLink">
+      <div class="tablink w3-indigo">Overview</div>
+    </a>
+    <a href="javascript:void(0)" class="{% if current_user.userRole =='Brand Ambassador' %} w3-hide {% endif %}" onclick="openMenu(event, 'branding');">
+      <div class="tablink">Branding Tracker</div>
+    </a>
+    <a href="javascript:void(0)" onclick="openMenu(event, 'brandmanager');" class="{% if current_user.userRole =='Admin' or current_user.userRole == 'Brand Manager' %}{% else %} w3-hide {% endif %}">
+      <div class="tablink">Brand Manager</div>
+    </a>
+  </div>
 
-    <div id="how-to" class="w3-container menu w3-padding-32 w3-white">
-      
-      <div class="max-w-7xl mx-auto space-y-8">
-
-    {% if sm_overview %}
-    <div class="sm-overview-widget">
-      <h3><i class="fas fa-bullhorn"></i> Sales &amp; Marketing</h3>
-      <div class="sm-overview-stats">
-        <span><strong>{{ sm_overview.leads_this_week }}</strong> leads this week</span>
-        <span><strong>{{ sm_overview.total_leads }}</strong> total</span>
-        <span><strong>{{ sm_overview.with_consent }}</strong> with consent</span>
-        <span><strong>{{ sm_overview.active_events }}</strong> active events</span>
-        {% if sm_overview.next_event %}
-        <span>Next: <strong>{{ sm_overview.next_event.name }}</strong> ({{ sm_overview.next_event.start_date }})</span>
-        {% endif %}
-      </div>
-      <a href="/sales-marketing/" class="btn btn-sm btn-primary mt-2" style="background:#00407d;">Open hub</a>
-      <a href="/sales-marketing/map" class="btn btn-sm btn-outline-primary mt-2 ms-1">Lead map</a>
-    </div>
-    {% endif %}
-
-    {% if mn_overview %}
-    <div class="sm-overview-widget" style="border-left:4px solid #0ea5e9;">
-      <h3><i class="fas fa-clipboard-list"></i> Meeting Notes</h3>
-      <div class="sm-overview-stats">
-        <span><strong>{{ mn_overview.completion_rate }}%</strong> tasks complete</span>
-        <span><strong>{{ mn_overview.overdue_items }}</strong> overdue</span>
-        <span><strong>{{ mn_overview.total_items }}</strong> total action items</span>
-      </div>
-      <a href="/meeting-notes/" class="btn btn-sm btn-primary mt-2" style="background:#0ea5e9;border-color:#0ea5e9;">My work</a>
-    </div>
-    {% endif %}
-
-    <!-- Yearly Totals -->
-    <div id="totals" class="bg-white w3-hide p-4 rounded-2xl shadow mb-6 text-center">
-      <h2 class="text-xl font-semibold text-gray-700 mb-2">
-        Yearly Totals (<span id="year"></span>)
-      </h2>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div><span class="font-bold text-blue-600">ASL:</span> <span id="asl_total">0</span></div>
-        <div><span class="font-bold text-green-600">Library:</span> <span id="library_total">0</span></div>
-        <div><span class="font-bold text-yellow-600">Ask Akello:</span> <span id="ask_total">0</span></div>
-        <div><span class="font-bold text-purple-600">Overall:</span> <span id="overall_total">0</span></div>
+  <div id="how-to" class="menu w3-padding w3-white" style="display:block;">
+    <div id="totals" class="w3-margin-top w3-margin-bottom">
+      <div class="w3-small w3-text-gray w3-margin-bottom"><b>Yearly Totals (<span id="year">—</span>)</b></div>
+      <div class="ov-kpi-grid">
+        <div class="ov-kpi"><div class="label">Overall</div><div class="value" id="overall_total">—</div></div>
+        <div class="ov-kpi"><div class="label">Smartlearning</div><div class="value" id="asl_total">—</div></div>
+        <div class="ov-kpi"><div class="label">Library</div><div class="value" id="library_total">—</div></div>
+        <div class="ov-kpi"><div class="label">Ask Akello</div><div class="value" id="ask_total">—</div></div>
       </div>
     </div>
 
-    <!-- Charts - Buttons to open modals -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <div class="bg-white shadow-lg rounded-2xl p-6 text-center">
-        <h2 class="text-lg font-semibold mb-3 text-blue-700">Overall Monthly Usage</h2>
-        <p class="text-gray-600 mb-4">View detailed monthly usage statistics</p>
-        <button onclick="openChartModal('monthlyUsageModal')" class="w3-button w3-blue w3-round">View Chart</button>
-      </div>
+    <div id="sample-data-banner"></div>
+    <div id="chart-load-status">
+      <button type="button" id="loadChartsBtn" class="w3-button w3-blue w3-round w3-small" onclick="loadYearlyCharts()">
+        Load yearly charts
+      </button>
+    </div>
 
-      <div class="bg-white shadow-lg rounded-2xl p-6 text-center">
-        <h2 class="text-lg font-semibold mb-3 text-green-700">Platform Comparison</h2>
-        <p class="text-gray-600 mb-4">Compare platform usage across months</p>
-        <button onclick="openChartModal('platformComparisonModal')" class="w3-button w3-green w3-round">View Chart</button>
+    <div class="ov-charts">
+      <div class="ov-chart-card chart-container">
+        <h2 class="text-lg font-semibold mb-3 text-blue-700" style="font-size:1rem;margin:0 0 12px;">Overall Monthly Usage</h2>
+        <div class="ov-chart-wrap"><canvas id="lineChart"></canvas></div>
+      </div>
+      <div class="ov-chart-card chart-container">
+        <h2 class="text-lg font-semibold mb-3 text-green-700" style="font-size:1rem;margin:0 0 12px;">Platform Comparison</h2>
+        <div class="ov-chart-wrap"><canvas id="barChart"></canvas></div>
       </div>
     </div>
   </div>
 
-  <!-- Include the script here -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Paste the JS script block here -->
-        
-    </div>
-
-    <script>
-// Chart loading with timeout and error handling
-document.addEventListener('DOMContentLoaded', async () => {
-    // Add loading indicators
-    showChartLoading(true);
-    
-    try {
-        // Create a timeout promise (60 seconds for slow queries)
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Chart data loading timeout after 60 seconds')), 60000);
-        });
-        
-        // Create fetch promise with timeout
-        const fetchPromise = fetch('/api/platforms_overall_yearly', {
-            method: 'GET',
-            headers: {
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-            }
-        });
-        
-        // Race between fetch and timeout
-        const res = await Promise.race([fetchPromise, timeoutPromise]);
-        
-        // Handle specific HTTP status codes
-        if (!res.ok) {
-            if (res.status === 408) {
-                // Server timeout - show timeout UI instead of error
-                const timeoutData = await res.json().catch(() => ({}));
-                console.log('Server timeout detected (408)');
-                showChartTimeout(
-                    timeoutData.error || 'Charts are taking longer than expected to load. This might be due to heavy server load.',
-                    timeoutData.retry_recommended
-                );
-                return;
-            } else {
-                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-            }
-        }
-        
-        const data = await res.json();
-
-        if (data.error) {
-            console.error("API Error:", data.error);
-            showChartError(`Error fetching data: ${data.error}`);
-            return;
-        }
-        const { monthly_usage, yearly_totals, year } = data;
-
-        // Update yearly totals section
-        document.getElementById("year").textContent = year;
-        document.getElementById("asl_total").textContent = yearly_totals.asl.toLocaleString();
-        document.getElementById("library_total").textContent = yearly_totals.library.toLocaleString();
-        document.getElementById("ask_total").textContent = yearly_totals.ask_akello.toLocaleString();
-        document.getElementById("overall_total").textContent = yearly_totals.overall.toLocaleString();
-
-        // Prepare data for charts
-        const labels = monthly_usage.map(d => d.month);
-        const overall = monthly_usage.map(d => d.overall);
-        const asl = monthly_usage.map(d => d.asl);
-        const library = monthly_usage.map(d => d.library);
-        const ask = monthly_usage.map(d => d.ask_akello);
-
-        // Destroy existing charts if reloading
-        if (window.lineChartInstance) window.lineChartInstance.destroy();
-        if (window.barChartInstance) window.barChartInstance.destroy();
-
-        // --- LINE CHART: Overall Monthly Usage ---
-        const lineCtx = document.getElementById('lineChart').getContext('2d');
-        window.lineChartInstance = new Chart(lineCtx, {
-            type: 'line',
-            data: {
-                labels,
-                datasets: [{
-                    label: `Overall Usage (${year})`,
-                    data: overall,
-                    borderColor: '#2563eb',
-                    backgroundColor: 'rgba(37,99,235,0.15)',
-                    borderWidth: 3,
-                    tension: 0.3,
-                    fill: true,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { display: true, position: 'top' },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff'
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: { display: true, text: 'Total Users' }
-                    }
-                }
-            }
-        });
-
-        // --- BAR CHART: Platform Comparison ---
-        const barCtx = document.getElementById('barChart').getContext('2d');
-        window.barChartInstance = new Chart(barCtx, {
-            type: 'bar',
-            data: {
-                labels,
-                datasets: [
-                    {
-                        label: 'ASL',
-                        data: asl,
-                        backgroundColor: '#f59e0b',
-                        stack: 'combined'
-                    },
-                    {
-                        label: 'Library',
-                        data: library,
-                        backgroundColor: '#10b981',
-                        stack: 'combined'
-                    },
-                    {
-                        label: 'Ask Akello',
-                        data: ask,
-                        backgroundColor: '#3b82f6',
-                        stack: 'combined'
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { position: 'top' },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff'
-                    }
-                },
-                scales: {
-                    x: {
-                        stacked: true,
-                        title: { display: true, text: 'Month' }
-                    },
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        title: { display: true, text: 'Active Users' }
-                    }
-                }
-            }
-        });
-        
-        // Hide loading indicators and show charts
-        showChartLoading(false);
-        
-        // Check if this is sample data and show notification
-        if (data._sample_data) {
-            showSampleDataNotification(data._note || 'Sample data is being used due to database performance issues.');
-        }
-        
-        // Show success message with load time
-        console.log('Charts loaded successfully', data._debug || {});
-
-    } catch (err) {
-        console.error("Error loading chart data:", err);
-        showChartLoading(false);
-        
-        // Show user-friendly error message based on error type
-        if (err.message.includes('timeout')) {
-            showChartTimeout('Charts are taking longer than expected to load. The server might be processing a large amount of data.');
-        } else if (err.message.includes('Failed to fetch')) {
-            showChartError('Unable to connect to the server. Please check your internet connection and try again.');
-        } else {
-            showChartError(`An error occurred while loading chart data: ${err.message}`);
-        }
-        
-        // Show fallback message with retry button
-        showRetryOption();
-    }
-});
-
-// Helper functions for loading states and error handling
-function showChartLoading(show) {
-    const lineChartContainer = document.getElementById('lineChart').parentElement;
-    const barChartContainer = document.getElementById('barChart').parentElement;
-    
-    if (show) {
-        // Add loading overlay to chart containers
-        addLoadingOverlay(lineChartContainer, 'Loading Overall Monthly Usage...');
-        addLoadingOverlay(barChartContainer, 'Loading Platform Comparison...');
-    } else {
-        // Remove loading overlays
-        removeLoadingOverlay(lineChartContainer);
-        removeLoadingOverlay(barChartContainer);
-    }
-}
-
-function addLoadingOverlay(container, message) {
-    const overlay = document.createElement('div');
-    overlay.className = 'chart-loading-overlay';
-    overlay.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(255, 255, 255, 0.9);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 100;
-        border-radius: 1rem;
-    `;
-    
-    overlay.innerHTML = `
-        <div class="spinner" style="
-            border: 4px solid #f3f4f6;
-            border-top: 4px solid #3b82f6;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin-bottom: 16px;
-        "></div>
-        <p id="loading-message-${Date.now()}" style="color: #6b7280; font-size: 14px; margin: 0; text-align: center;">${message}</p>
-        <div style="width: 200px; height: 4px; background: #e5e7eb; border-radius: 2px; margin-top: 12px; overflow: hidden;">
-            <div class="progress-bar" style="
-                height: 100%;
-                background: linear-gradient(90deg, #3b82f6, #1d4ed8);
-                border-radius: 2px;
-                width: 0;
-                animation: progress 60s linear;
-            "></div>
-        </div>
-        <p style="color: #9ca3af; font-size: 12px; margin: 8px 0 0 0;">Maximum wait time: 60 seconds</p>
-        <div id="progress-messages" style="margin-top: 12px; text-align: center;">
-            <p id="msg-15s" style="color: #10b981; font-size: 11px; margin: 2px 0; display: none;">📊 Processing data...</p>
-            <p id="msg-30s" style="color: #f59e0b; font-size: 11px; margin: 2px 0; display: none;">⏳ Still loading (this may take a moment)...</p>
-            <p id="msg-45s" style="color: #ef4444; font-size: 11px; margin: 2px 0; display: none;">🔄 Almost there, please wait...</p>
-        </div>
-    `;
-    
-    container.style.position = 'relative';
-    container.appendChild(overlay);
-    
-    // Start progressive message updates
-    startProgressiveMessages();
-}
-
-function startProgressiveMessages() {
-    // Show different messages at different time intervals
-    setTimeout(() => {
-        const msg15s = document.getElementById('msg-15s');
-        if (msg15s) msg15s.style.display = 'block';
-    }, 15000); // 15 seconds
-    
-    setTimeout(() => {
-        const msg30s = document.getElementById('msg-30s');
-        if (msg30s) msg30s.style.display = 'block';
-    }, 30000); // 30 seconds
-    
-    setTimeout(() => {
-        const msg45s = document.getElementById('msg-45s');
-        if (msg45s) msg45s.style.display = 'block';
-    }, 45000); // 45 seconds
-}
-
-function removeLoadingOverlay(container) {
-    const overlay = container.querySelector('.chart-loading-overlay');
-    if (overlay) {
-        overlay.remove();
-    }
-}
-
-function showChartError(message) {
-    const lineChartContainer = document.getElementById('lineChart').parentElement;
-    const barChartContainer = document.getElementById('barChart').parentElement;
-    
-    [lineChartContainer, barChartContainer].forEach(container => {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'chart-error';
-        errorDiv.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: #fef2f2;
-            border: 1px solid #fca5a5;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            border-radius: 1rem;
-            padding: 20px;
-            text-align: center;
-        `;
-        
-        errorDiv.innerHTML = `
-            <div style="
-                width: 48px;
-                height: 48px;
-                border-radius: 50%;
-                background: #fee2e2;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin-bottom: 16px;
-            ">
-                <svg style="width: 24px; height: 24px; color: #dc2626;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.732 19.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                </svg>
-            </div>
-            <h4 style="color: #dc2626; margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">Chart Loading Failed</h4>
-            <p style="color: #7f1d1d; margin: 0; font-size: 14px; line-height: 1.5;">${message}</p>
-        `;
-        
-        container.style.position = 'relative';
-        container.appendChild(errorDiv);
-    });
-}
-
-function showChartTimeout(message, showRetry = true) {
-    const lineChartContainer = document.getElementById('lineChart').parentElement;
-    const barChartContainer = document.getElementById('barChart').parentElement;
-    
-    [lineChartContainer, barChartContainer].forEach(container => {
-        const timeoutDiv = document.createElement('div');
-        timeoutDiv.className = 'chart-timeout';
-        timeoutDiv.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: #fffbeb;
-            border: 1px solid #fed7aa;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            border-radius: 1rem;
-            padding: 20px;
-            text-align: center;
-        `;
-        
-        timeoutDiv.innerHTML = `
-            <div style="
-                width: 48px;
-                height: 48px;
-                border-radius: 50%;
-                background: #fef3c7;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin-bottom: 16px;
-            ">
-                <svg style="width: 24px; height: 24px; color: #d97706;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-            </div>
-            <h4 style="color: #d97706; margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">Charts Taking Longer</h4>
-            <p style="color: #92400e; margin: 0 0 16px 0; font-size: 14px; line-height: 1.5;">${message}</p>
-            ${showRetry ? `
-                <div style="margin-top: 12px;">
-                    <button onclick="retryChartLoad()" style="
-                        background: #3b82f6;
-                        color: white;
-                        border: none;
-                        padding: 8px 16px;
-                        border-radius: 6px;
-                        font-size: 14px;
-                        cursor: pointer;
-                        margin-right: 8px;
-                    ">Try Again</button>
-                    <button onclick="location.reload()" style="
-                        background: transparent;
-                        color: #3b82f6;
-                        border: 1px solid #3b82f6;
-                        padding: 8px 16px;
-                        border-radius: 6px;
-                        font-size: 14px;
-                        cursor: pointer;
-                    ">Refresh Page</button>
-                </div>
-            ` : ''}
-        `;
-        
-        container.style.position = 'relative';
-        container.appendChild(timeoutDiv);
-    });
-}
-
-function showRetryOption() {
-    const chartsContainer = document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2');
-    const retryDiv = document.createElement('div');
-    retryDiv.className = 'retry-section';
-    retryDiv.style.cssText = `
-        grid-column: 1 / -1;
-        background: #fffbeb;
-        border: 1px solid #fed7aa;
-        border-radius: 1rem;
-        padding: 20px;
-        text-align: center;
-        margin-top: 16px;
-    `;
-    
-    retryDiv.innerHTML = `
-        <h4 style="color: #d97706; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">Unable to Load Charts</h4>
-        <p style="color: #92400e; margin: 0 0 16px 0; font-size: 14px;">You can try refreshing the page or contact support if the problem persists.</p>
-        <button onclick="location.reload()" style="
-            background: #3b82f6;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 14px;
-            cursor: pointer;
-            margin-right: 8px;
-        ">Refresh Page</button>
-        <button onclick="window.open('/help_desk', '_blank')" style="
-            background: transparent;
-            color: #3b82f6;
-            border: 1px solid #3b82f6;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 14px;
-            cursor: pointer;
-        ">Contact Support</button>
-    `;
-    
-    chartsContainer.appendChild(retryDiv);
-}
-
-// Retry chart loading function
-function retryChartLoad() {
-    console.log('Retrying chart load...');
-    
-    // Clear existing overlays
-    clearChartOverlays();
-    
-    // Restart the chart loading process
-    location.reload();
-}
-
-// Clear all chart overlays
-function clearChartOverlays() {
-    const lineChartContainer = document.getElementById('lineChart').parentElement;
-    const barChartContainer = document.getElementById('barChart').parentElement;
-    
-    [lineChartContainer, barChartContainer].forEach(container => {
-        const overlays = container.querySelectorAll('.chart-loading-overlay, .chart-error, .chart-timeout');
-        overlays.forEach(overlay => overlay.remove());
-    });
-}
-
-// Show sample data notification
-function showSampleDataNotification(message) {
-    const chartsContainer = document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2');
-    
-    // Remove existing notification if present
-    const existingNotification = document.getElementById('sample-data-notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
-    
-    const notificationDiv = document.createElement('div');
-    notificationDiv.id = 'sample-data-notification';
-    notificationDiv.style.cssText = `
-        grid-column: 1 / -1;
-        background: #fef3c7;
-        border: 1px solid #f59e0b;
-        border-radius: 1rem;
-        padding: 12px 16px;
-        margin-bottom: 16px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    `;
-    
-    notificationDiv.innerHTML = `
-        <div style="
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: #fbbf24;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        ">
-            <svg style="width: 14px; height: 14px; color: white;" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-        </div>
-        <div style="flex-grow: 1;">
-            <h4 style="color: #d97706; margin: 0 0 4px 0; font-size: 14px; font-weight: 600;">Sample Data Notice</h4>
-            <p style="color: #92400e; margin: 0; font-size: 13px; line-height: 1.4;">${message}</p>
-        </div>
-        <button onclick="this.parentElement.style.display='none'" style="
-            background: none;
-            border: none;
-            color: #d97706;
-            cursor: pointer;
-            font-size: 18px;
-            padding: 0;
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        ">&times;</button>
-    `;
-    
-    chartsContainer.insertBefore(notificationDiv, chartsContainer.firstChild);
-    
-    // Auto-hide after 10 seconds
-    setTimeout(() => {
-        if (notificationDiv && notificationDiv.parentElement) {
-            notificationDiv.style.display = 'none';
-        }
-    }, 10000);
-}
-</script>
-
-      <!-- <div class="howto-hero w3-margin-bottom">
-        <div class="icon"><i class="fa fa-rocket"></i></div>
-        <div>
-          <p class="title">Welcome to Akello Internal Dashboard</p>
-          <p class="desc">Follow the steps below to request branding collateral and track your requests smoothly.</p>
-          <span class="badge-chip" title="Tip">
-            <i class="fa fa-lightbulb-o"></i>
-            You can edit or filter your requests anytime in the Branding tab.
-          </span>
-        </div>
-      </div>
-
-      <div class="step-grid w3-margin-bottom">
-        <div class="step-card">
-          <div class="icon"><i class="fa fa-list-ul"></i></div>
-          <h4>1. Request Branding Collateral</h4>
-          <ul>
-            <li>Open the <strong>Branding Tracker</strong> tab.</li>
-            <li>Review available branding items and quantities.</li>
-            <li>In the Requests panel, choose the branding <em>platform</em> and click <strong>Next</strong>.</li>
-            <li>Select the branding <em>type</em> and <em>quantity</em>, then click <strong>Add to request</strong>.</li>
-            <li>Click <strong>Next</strong> and add your <em>Event</em>, <em>Check Out</em>, and <em>Return</em> dates.</li>
-            <li>Click <strong>Submit request</strong> to finalize.</li>
-          </ul>
-          <details class="w3-margin-top">
-            <summary class="w3-small"><i class="fa fa-lightbulb-o"></i> Advanced tips</summary>
-            <ul class="w3-small" style="margin-top:6px">
-              <li>Use clear, descriptive <em>Event</em> names to make tracking easier.</li>
-              <li>If you’re requesting for multiple platforms, add items per platform in separate steps to keep quantities accurate.</li>
-              <li>Double-check stock availability hints under the <strong>Branding Type</strong> field.</li>
-            </ul>
-          </details>
-        </div>
-
-        <div class="step-card">
-          <div class="icon" style="background:linear-gradient(135deg,#f59e0b,#ef4444)"><i class="fa fa-shield"></i></div>
-          <h4>2. Rules for Requesting</h4>
-          <ul>
-            <li>Submit requests within the timeframe specified by the Brand Manager.</li>
-            <li>Ensure you’ve selected accurate dates for collection and return.</li>
-            <li>Keep track of the <strong>Status</strong> in the Branding Trackers table.</li>
-          </ul>
-          <details class="w3-margin-top">
-            <summary class="w3-small"><i class="fa fa-info-circle"></i> Advanced tips</summary>
-            <ul class="w3-small" style="margin-top:6px">
-              <li>Group similar items in one request to simplify approvals.</li>
-              <li>Plan returns a day after the event to allow for logistics.</li>
-              <li>Use the filters above the table to quickly find your requests by status or platform.</li>
-            </ul>
-          </details>
-        </div>
-
-        <div class="step-card">
-          <div class="icon" style="background:linear-gradient(135deg,#10b981,#14b8a6)"><i class="fa fa-undo"></i></div>
-          <h4>3. After Your Event</h4>
-          <ul>
-            <li>When your event is done, your request status will update automatically.</li>
-            <li>Click <strong>Mark returned</strong> in the Actions column after returning collateral.</li>
-            <li>The Brand Manager will acknowledge or provide feedback on the return.</li>
-          </ul>
-          <details class="w3-margin-top">
-            <summary class="w3-small"><i class="fa fa-check-circle"></i> Advanced tips</summary>
-            <ul class="w3-small" style="margin-top:6px">
-              <li>Attach notes on the request if items were lost or damaged to speed up resolution.</li>
-              <li>Check your email notifications for approval/return confirmations.</li>
-              <li>Need a repeat? Duplicate the request by reusing the same items list and updating the dates.</li>
-            </ul>
-          </details>
-        </div>
-      </div>
-
-      <div class="w3-margin-top">
-        <p class="desc" style="margin-bottom:10px">Need help? Reach out to the right contact below.</p>
-        <div class="contact-grid">
-          <div class="contact-card">
-            <div class="avatar" style="background:linear-gradient(135deg,#6366f1,#22c55e)"><i class="fa fa-user"></i></div>
-            <div>
-              <p class="name">Branding Requests</p>
-              <p class="email">Christina.Arufandika@akello.co</p>
-            </div>
-          </div>
-          <div class="contact-card">
-            <div class="avatar" style="background:linear-gradient(135deg,#3b82f6,#06b6d4)"><i class="fa fa-cogs"></i></div>
-            <div>
-              <p class="name">Platform Processes</p>
-              <p class="email">Quincy.Mashava@akello.co</p>
-            </div>
-          </div>
-        </div>
-      </div> -->
-    </div>
-
-    <div id="branding" class="w3-container menu w3-padding w3-white {% if current_user.userRole =='Brand Ambassador' %} w3-hide {% endif %}">
+<div id="branding" class="w3-container menu w3-padding w3-white {% if current_user.userRole =='Brand Ambassador' %} w3-hide {% endif %}">
       
 
 
@@ -940,33 +187,6 @@ function showSampleDataNotification(message) {
 
 
 
-
-<!-- Chart Modals -->
-<!-- Monthly Usage Modal -->
-<div id="monthlyUsageModal" class="w3-modal">
-  <div class="w3-modal-content w3-animate-zoom" style="width: 80vw; max-width: 80vw; height: 75vh; max-height: 75vh;">
-    <div class="w3-container">
-      <span onclick="closeChartModal('monthlyUsageModal')" class="w3-button w3-display-topright w3-large">&times;</span>
-      <div class="bg-white shadow-lg rounded-2xl p-4 chart-container" style="margin-top: 40px; height: 65vh;">
-        <h2 class="text-lg font-semibold mb-3 text-blue-700">Overall Monthly Usage</h2>
-        <canvas id="lineChart" height="100"></canvas>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Platform Comparison Modal -->
-<div id="platformComparisonModal" class="w3-modal">
-  <div class="w3-modal-content w3-animate-zoom" style="width: 80vw; max-width: 80vw; height: 75vh; max-height: 75vh;">
-    <div class="w3-container">
-      <span onclick="closeChartModal('platformComparisonModal')" class="w3-button w3-display-topright w3-large">&times;</span>
-      <div class="bg-white shadow-lg rounded-2xl p-4 chart-container" style="margin-top: 40px; height: 65vh;">
-        <h2 class="text-lg font-semibold mb-3 text-green-700">Platform Comparison</h2>
-        <canvas id="barChart" style="width: auto;" height="100"></canvas>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- Inventory Management Modal -->
 <div id="inventoryModal" class="w3-modal">
@@ -1313,9 +533,14 @@ function showSampleDataNotification(message) {
 {% include '_branding_tracker_scripts.html' %}
 <script>
   document.addEventListener('DOMContentLoaded', function(){
-    try { loadBrandingData(); } catch(e) { console.error(e); }
     try { showBrStep(1); } catch(e) {}
   });
+  window.__brandingLoaded = false;
+  window.ensureBrandingLoaded = async function(){
+    if (window.__brandingLoaded) return;
+    window.__brandingLoaded = true;
+    try { await loadBrandingData(); } catch(e) { console.error(e); window.__brandingLoaded = false; }
+  };
 </script>
 <script>
   async function submitBrandingRequest(ev){
@@ -1349,6 +574,7 @@ function closeChartModal(modalId) {
 }
 
 function openInventoryModal() {
+  if (typeof ensureBrandingLoaded === 'function') ensureBrandingLoaded();
   document.getElementById('inventoryModal').style.display = 'block';
 }
 
@@ -1357,6 +583,7 @@ function closeInventoryModal() {
 }
 
 function openBrandingModal(modalId) {
+  if (typeof ensureBrandingLoaded === 'function') ensureBrandingLoaded();
   document.getElementById(modalId).style.display = 'block';
   // Load collateral data when opening view modal
   if (modalId === 'collateralViewModal') {
@@ -1390,6 +617,20 @@ window.onclick = function(event) {
   });
 }
 
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/`/g, '&#96;');
+}
+
 // Collateral Management Functions
 async function loadCollateralData() {
   try {
@@ -1402,7 +643,7 @@ async function loadCollateralData() {
     }
     tbody.innerHTML = data.items.map(item => `
       <tr>
-        <td>${item.collateral_name}</td>
+        <td>${escapeHtml(item.collateral_name)}</td>
         <td>
           <span class="w3-tag ${item.status === 'available' ? 'w3-green' : 'w3-red'} w3-small">
             ${item.status}
@@ -1436,7 +677,7 @@ async function loadCollateralViewData() {
     }
     tbody.innerHTML = data.items.map(item => `
       <tr>
-        <td>${item.collateral_name}</td>
+        <td>${escapeHtml(item.collateral_name)}</td>
         <td>
           <span class="w3-tag ${item.status === 'available' ? 'w3-green' : 'w3-red'} w3-small">
             ${item.status}
@@ -1446,7 +687,7 @@ async function loadCollateralViewData() {
         <td>${new Date(item.created_at).toLocaleString()}</td>
         <td>
           ${item.status === 'available' ? 
-            `<button class="w3-button w3-small w3-blue" onclick="openRequestForm(${item.id}, '${item.collateral_name}')">Request</button>` : 
+            `<button class="w3-button w3-small w3-blue" onclick="openRequestForm(${item.id}, '${escapeAttr(item.collateral_name)}')">Request</button>` : 
             '<span class="w3-text-gray">Unavailable</span>'
           }
         </td>
@@ -1613,7 +854,7 @@ async function loadMyCollateralRequests() {
     
     tbody.innerHTML = data.requests.map(req => `
       <tr>
-        <td>${req.collateral_name || 'N/A'}</td>
+        <td>${escapeHtml(req.collateral_name || 'N/A')}</td>
         <td>${req.event_details}</td>
         <td>${new Date(req.needed_by_date).toLocaleDateString()}</td>
         <td>
@@ -1657,7 +898,7 @@ async function loadAllCollateralRequests() {
     tbody.innerHTML = data.requests.map(req => `
       <tr>
         <td>${req.requester_username}</td>
-        <td>${req.collateral_name || 'N/A'}</td>
+        <td>${escapeHtml(req.collateral_name || 'N/A')}</td>
         <td>${req.event_details}</td>
         <td>${new Date(req.needed_by_date).toLocaleDateString()}</td>
         <td>
@@ -1747,13 +988,154 @@ function openMenu(evt, menuName) {
      tablinks[i].className = tablinks[i].className.replace(" w3-indigo", "");
   }
   document.getElementById(menuName).style.display = "block";
-  evt.currentTarget.firstElementChild.className += " w3-indigo";
+  var tabEl = evt.currentTarget.firstElementChild || evt.currentTarget;
+  tabEl.className += " w3-indigo";
+  if (menuName === 'branding' || menuName === 'brandmanager') {
+    if (typeof ensureBrandingLoaded === 'function') ensureBrandingLoaded();
+  }
 }
 document.getElementById("myLink").click();
 </script>
 
+<script>
+let yearlyChartPromise = null;
 
+function showSampleDataBanner(message) {
+  const el = document.getElementById('sample-data-banner');
+  if (!el) return;
+  el.style.display = 'block';
+  el.textContent = message || 'Showing sample data because live queries were slow or unavailable.';
+}
 
-  </div>
+function setChartStatus(html) {
+  const el = document.getElementById('chart-load-status');
+  if (el) el.innerHTML = html;
+}
+
+async function loadYearlyCharts(force) {
+  if (yearlyChartPromise && !force) return yearlyChartPromise;
+  if (force) yearlyChartPromise = null;
+
+  setChartStatus('<i class="fas fa-spinner fa-spin"></i> Loading yearly charts…');
+
+  yearlyChartPromise = (async () => {
+    try {
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Chart data loading timeout after 60 seconds')), 60000);
+      });
+      const fetchPromise = fetch('/api/platforms_overall_yearly', { method: 'GET' });
+      const res = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (!res.ok) {
+        if (res.status === 408) {
+          const timeoutData = await res.json().catch(() => ({}));
+          setChartStatus((timeoutData.error || 'Charts timed out.') +
+            ' <button type="button" class="w3-button w3-blue w3-round w3-small" onclick="loadYearlyCharts(true)">Retry</button>' +
+            ' <a class="w3-button w3-border w3-round w3-small" href="/help-desk" target="_blank">Help Desk</a>');
+          yearlyChartPromise = null;
+          return;
+        }
+        throw new Error('HTTP ' + res.status + ': ' + res.statusText);
+      }
+
+      const data = await res.json();
+      if (data.error) {
+        setChartStatus('<span class="w3-text-red">' + data.error + '</span> ' +
+          '<button type="button" class="w3-button w3-blue w3-round w3-small" onclick="loadYearlyCharts(true)">Retry</button>');
+        yearlyChartPromise = null;
+        return;
+      }
+
+      if (data._sample_data || (data._debug && data._debug.cache_status === 'fallback_sample_data')) {
+        showSampleDataBanner(data._note || 'Sample data is shown because live database queries timed out or failed.');
+      }
+
+      const monthly_usage = data.monthly_usage;
+      const yearly_totals = data.yearly_totals;
+      const year = data.year;
+      document.getElementById('year').textContent = year;
+      document.getElementById('asl_total').textContent = (yearly_totals.asl || 0).toLocaleString();
+      document.getElementById('library_total').textContent = (yearly_totals.library || 0).toLocaleString();
+      document.getElementById('ask_total').textContent = (yearly_totals.ask_akello || 0).toLocaleString();
+      document.getElementById('overall_total').textContent = (yearly_totals.overall || 0).toLocaleString();
+
+      const labels = monthly_usage.map(function(d) { return d.month; });
+      const overall = monthly_usage.map(function(d) { return d.overall; });
+      const asl = monthly_usage.map(function(d) { return d.asl; });
+      const library = monthly_usage.map(function(d) { return d.library; });
+      const ask = monthly_usage.map(function(d) { return d.ask_akello; });
+
+      if (window.lineChartInstance) window.lineChartInstance.destroy();
+      if (window.barChartInstance) window.barChartInstance.destroy();
+
+      window.lineChartInstance = new Chart(document.getElementById('lineChart').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Overall Usage (' + year + ')',
+            data: overall,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37,99,235,0.15)',
+            borderWidth: 3,
+            tension: 0.3,
+            fill: true,
+            pointRadius: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: true, position: 'top' } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      window.barChartInstance = new Chart(document.getElementById('barChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: 'ASL', data: asl, backgroundColor: '#f59e0b', stack: 'combined' },
+            { label: 'Library', data: library, backgroundColor: '#10b981', stack: 'combined' },
+            { label: 'Ask Akello', data: ask, backgroundColor: '#3b82f6', stack: 'combined' }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'top' } },
+          scales: {
+            x: { stacked: true },
+            y: { stacked: true, beginAtZero: true }
+          }
+        }
+      });
+
+      setChartStatus('<span class="w3-text-green">Charts loaded</span>');
+    } catch (err) {
+      console.error(err);
+      yearlyChartPromise = null;
+      setChartStatus('<span class="w3-text-red">Failed to load charts: ' + err.message + '</span> ' +
+        '<button type="button" class="w3-button w3-blue w3-round w3-small" onclick="loadYearlyCharts(true)">Retry</button> ' +
+        '<a class="w3-button w3-border w3-round w3-small" href="/help-desk" target="_blank">Help Desk</a>');
+    }
+  })();
+
+  return yearlyChartPromise;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(function() { loadYearlyCharts(); }, { timeout: 2500 });
+  } else {
+    setTimeout(function() { loadYearlyCharts(); }, 400);
+  }
+});
+
+function openChartModal() {}
+function closeChartModal() {}
+</script>
+
 </div>
 {% endblock %}

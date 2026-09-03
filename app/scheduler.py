@@ -279,6 +279,69 @@ def refresh_meeting_report_email_schedule(app):
     logger.info("Meeting report email scheduler set to %02d:%02d", hour, minute)
 
 
+def _read_akello_revenue_digest_schedule():
+    from sqlalchemy.exc import OperationalError
+
+    from app.models import AppSetting
+
+    try:
+        enabled = (AppSetting.get_value("akello_revenue_digest_enabled", "false") or "false").strip().lower() in (
+            "true",
+            "1",
+            "yes",
+            "y",
+            "t",
+        )
+        raw = (AppSetting.get_value("akello_revenue_digest_schedule", "07:00") or "07:00").strip()
+    except OperationalError:
+        return False, 7, 0
+    try:
+        hour_s, minute_s = raw.split(":", 1)
+        hour, minute = int(hour_s), int(minute_s)
+        if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+            raise ValueError("out of range")
+    except Exception:
+        logger.warning("Invalid FY digest schedule '%s'. Falling back to 07:00.", raw)
+        hour, minute = 7, 0
+    return enabled, hour, minute
+
+
+def _scheduled_akello_revenue_digest(app):
+    with app.app_context():
+        try:
+            from app.blueprints.akello_revenue.services import run_akello_revenue_digest
+
+            result = run_akello_revenue_digest(triggered_by="scheduler")
+            logger.info("Akello Revenue FY digest result: %s", result.get("status"))
+        except Exception as e:
+            logger.exception("Akello Revenue FY digest job failed: %s", e)
+
+
+def refresh_akello_revenue_digest_schedule(app):
+    """Create/update monthly (day 1) Akello Revenue FY digest job."""
+    global _scheduler
+    if _scheduler is None:
+        return
+    enabled, hour, minute = _read_akello_revenue_digest_schedule()
+    if not enabled:
+        try:
+            _scheduler.remove_job("akello_revenue_fy_digest_job")
+        except Exception:
+            pass
+        return
+    _scheduler.add_job(
+        func=_scheduled_akello_revenue_digest,
+        args=[app],
+        trigger="cron",
+        day=1,
+        hour=hour,
+        minute=minute,
+        id="akello_revenue_fy_digest_job",
+        replace_existing=True,
+    )
+    logger.info("Akello Revenue FY digest scheduler set to day 1 at %02d:%02d", hour, minute)
+
+
 def _scheduled_pm_due_soon(app):
     with app.app_context():
         try:
@@ -376,5 +439,6 @@ def start_scheduler(app):
         refresh_revenue_report_schedule(app)
         refresh_weekly_checkin_schedule(app)
         refresh_meeting_report_email_schedule(app)
+        refresh_akello_revenue_digest_schedule(app)
     _scheduler.start()
     logger.info("Helpdesk email scheduler started (interval 60s)")
