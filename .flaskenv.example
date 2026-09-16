@@ -1,0 +1,4 @@
+# Copy to `.flaskenv` for local Flask CLI only. Do not put secrets here.
+# Flask auto-loads this file; `.env` is the place for credentials.
+FLASK_APP=app.py
+FLASK_DEBUG=0

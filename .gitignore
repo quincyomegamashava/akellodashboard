@@ -40,9 +40,11 @@ env/
 *~
 .DS_Store
 
-# Environment variables
-# .env
-# .env.local
+# Environment variables — never commit real secrets
+.env
+.env.local
+.env.*.local
+.flaskenv
 
 # Flask
 instance/
@@ -59,3 +61,4 @@ logs/*
 
 # OS
 Thumbs.db
+*.stackdump
