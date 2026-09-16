@@ -375,6 +375,16 @@ def _scheduled_helpdesk_sla(app):
             logger.exception("Helpdesk SLA scheduler job failed: %s", e)
 
 
+def _scheduled_province_stats_prewarm(app):
+    with app.app_context():
+        try:
+            from app.province_stats_service import run_province_stats_prewarm_job
+            n = run_province_stats_prewarm_job()
+            logger.info("Province stats prewarm job: processed %d province(s)", n)
+        except Exception as e:
+            logger.exception("Province stats prewarm scheduler job failed: %s", e)
+
+
 def start_scheduler(app):
     """
     Start the background scheduler with a 60-second email fetch job.
@@ -397,6 +407,14 @@ def start_scheduler(app):
         trigger="interval",
         minutes=5,
         id="helpdesk_sla_check",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        func=_scheduled_province_stats_prewarm,
+        args=[app],
+        trigger="interval",
+        minutes=15,
+        id="province_stats_prewarm",
         replace_existing=True,
     )
     _scheduler.add_job(

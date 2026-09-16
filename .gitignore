@@ -47,6 +47,7 @@ env/
 # Flask
 instance/
 .webassets-cache
+flask_cache/
 
 # Task attachments (legacy disk location, kept for back-compat)
 app/static/uploads/task_attachments/

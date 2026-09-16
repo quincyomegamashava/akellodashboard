@@ -603,7 +603,7 @@ class ChampionSchool(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     firstname = db.Column(db.String(100), nullable=False)
     lastname = db.Column(db.String(100), nullable=False)
-    province = db.Column(db.String(100), nullable=False)
+    province = db.Column(db.String(100), nullable=False, index=True)
     schools = db.Column(db.Text, nullable=True, default='[]')  # JSON field
 
     def set_schools(self, school_list):

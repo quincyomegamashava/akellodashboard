@@ -3107,6 +3107,12 @@ def champion_school_requests_admin():
 @app.route('/provincestats/<provincename>', methods=['GET', 'POST'])
 @login_required
 def provincestats(provincename):
+        from app.province_stats_service import is_valid_province
+
+        if not is_valid_province(provincename):
+            flash('Invalid province name.', 'danger')
+            return redirect(url_for('index'))
+
         today = datetime.today().date()
         nhasi = today.strftime('%y- %m- %d')
         month_name = today.strftime('%B')
@@ -3527,18 +3533,18 @@ def ask_akello_chosen_school(school_id):
 
 @app.route('/api/champion-schools-data/<province_name>', methods=['GET'])
 @login_required
-@cache.cached(
-    timeout=300,
-    key_prefix=lambda: f'ask_akello_{request.view_args["province_name"]}_{request.args.get("start_date", "")}_{request.args.get("end_date", "")}',
-    response_filter=lambda resp: _json_response_has_rows(resp)
-)
 def champion_schools_data(province_name):
     """
     Returns total Ask Akello chat log counts per Champion within a province.
-    Bulk query once for all ASL school IDs (no per-champion reconnect).
+    Cached via province_stats_service (shared FileSystemCache / Redis).
     """
-    today = datetime.now()
-    default_start_date = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    from app.province_stats_service import get_or_fetch_ask_akello, is_valid_province
+
+    if not is_valid_province(province_name):
+        return jsonify({"error": "Invalid province"}), 400
+
+    today = datetime.today().date()
+    default_start_date = today.replace(day=1)
 
     start_date_str = request.args.get("start_date")
     end_date_str = request.args.get("end_date")
@@ -3546,17 +3552,17 @@ def champion_schools_data(province_name):
     try:
         if start_date_str:
             try:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S").date()
             except ValueError:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+                start_date = datetime.strptime(start_date_str[:10], "%Y-%m-%d").date()
         else:
             start_date = default_start_date
 
         if end_date_str:
             try:
-                end_date = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S").date()
             except ValueError:
-                end_date = datetime.strptime(end_date_str, "%Y-%m-%d") + timedelta(days=1)
+                end_date = datetime.strptime(end_date_str[:10], "%Y-%m-%d").date()
         else:
             end_date = today
     except ValueError:
@@ -3565,87 +3571,10 @@ def champion_schools_data(province_name):
         }), 400
 
     try:
-        champions = ChampionSchool.query.filter_by(province=province_name).all()
-        local_champions = User.query.filter(
-            User.province == province_name,
-            User.userRole == 'Brand Ambassador'
-        ).all()
-        user_index = {(
-            (u.firstname or '').strip().lower(),
-            (u.lastname or '').strip().lower()
-        ): u.username for u in local_champions}
-
-        champ_to_asl = {}
-        all_asl_ids = []
-        for champ in champions:
-            schools = champ.get_schools() or []
-            ids = []
-            for s in schools:
-                raw = str(s.get('asl_school_id') or '').strip()
-                if raw.isdigit():
-                    sid = int(raw)
-                    ids.append(sid)
-                    all_asl_ids.append(sid)
-            if ids:
-                champ_to_asl[champ.id] = ids
-
-        counts_by_school = {}
-        if all_asl_ids:
-            all_asl_ids = sorted(set(all_asl_ids))
-            conn = get_ruzivo_conn()
-            if conn is None:
-                return jsonify({"error": "Database connection not available"}), 500
-            try:
-                import pymysql.cursors
-                cursor = conn.cursor(pymysql.cursors.DictCursor)
-                CHUNK = 1000
-                for i in range(0, len(all_asl_ids), CHUNK):
-                    chunk = all_asl_ids[i:i + CHUNK]
-                    placeholders = ','.join(['%s'] * len(chunk))
-                    chatlog_query = f"""
-                        SELECT
-                            sc.school_id,
-                            COUNT(DISTINCT tl.student_id) AS chatlog_count
-                        FROM tblask_akello_chat_logs tl
-                        LEFT JOIN tblstudents ts ON ts.student_id = tl.student_id
-                        LEFT JOIN tblschools sc ON sc.school_id = ts.school_id
-                        WHERE sc.school_id IN ({placeholders})
-                          AND tl.created_at >= %s AND tl.created_at < %s
-                        GROUP BY sc.school_id
-                    """
-                    cursor.execute(chatlog_query, (*chunk, start_date, end_date))
-                    for row in cursor.fetchall() or []:
-                        sid = int(row['school_id'])
-                        counts_by_school[sid] = counts_by_school.get(sid, 0) + int(row['chatlog_count'] or 0)
-            finally:
-                try:
-                    cursor.close()
-                except Exception:
-                    pass
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-
-        results = []
-        for champ in champions:
-            asl_ids = champ_to_asl.get(champ.id, [])
-            if not asl_ids:
-                continue
-            chatlog_count = sum(counts_by_school.get(sid, 0) for sid in asl_ids)
-            username = user_index.get((
-                (champ.firstname or '').strip().lower(),
-                (champ.lastname or '').strip().lower()
-            ))
-            results.append({
-                "champion": f"{champ.firstname} {champ.lastname}",
-                "username": username,
-                "school_count": len(asl_ids),
-                "chatlog_count": chatlog_count
-            })
-
-        return jsonify(results)
-
+        result = get_or_fetch_ask_akello(province_name, start_date, end_date)
+        if not result.get("ok"):
+            return jsonify({"error": result.get("error", "Unknown error")}), 500
+        return jsonify(result.get("data") or [])
     except Exception as e:
         logging.error(f"Error in champion_schools_data: {e}")
         return jsonify({"error": str(e)}), 500
@@ -4144,10 +4073,13 @@ def champ_library_usage():
 
 @app.route('/api/champion-schools-smartlearning-usage/<province_name>', methods=['GET'])
 @login_required
-@cache.cached(timeout=300, key_prefix=lambda: f'champion_usage_{request.view_args["province_name"]}_{request.args.get("start_date", "")}_{request.args.get("end_date", "")}', response_filter=lambda resp: _json_response_has_rows(resp))
 def champion_schools_smartlearning_usage(province_name):
-    """OPTIMIZED: Bulk queries instead of N+1 - fetches all data in 2 queries total."""
-    # Get date range from query parameters or default to MTD
+    """Champion Overview: bulk ASL + Library metrics (cached via province_stats_service)."""
+    from app.province_stats_service import get_or_fetch_overview, is_valid_province
+
+    if not is_valid_province(province_name):
+        return jsonify({"error": "Invalid province"}), 400
+
     today = datetime.today().date()
     default_start_date = today.replace(day=1)
 
@@ -4167,157 +4099,10 @@ def champion_schools_smartlearning_usage(province_name):
     except ValueError:
         return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
 
-    # Get champions for this province
-    champions = ChampionSchool.query.filter_by(province=province_name).all()
-    local_champions = User.query.filter(
-        User.province == province_name,
-        User.userRole == 'Brand Ambassador'
-    ).all()
-
-    # Build username lookup index
-    user_index = {(
-        (u.firstname or '').strip().lower(),
-        (u.lastname or '').strip().lower(),
-        (u.province or '').strip().lower()
-    ): u.username for u in local_champions}
-
-    # Build mappings and collect all IDs
-    champ_asl = {}
-    champ_lib = {}
-    all_asl_ids, all_lib_ids = [], []
-    
-    for champ in champions:
-        schools = champ.get_schools() or []
-        asl_ids = [int(s.get('asl_school_id')) for s in schools if str(s.get('asl_school_id') or '').strip().isdigit()]
-        lib_ids = [int(s.get('library_school_id')) for s in schools if str(s.get('library_school_id') or '').strip().isdigit()]
-        
-        if asl_ids:
-            champ_asl[champ.id] = asl_ids
-            all_asl_ids.extend(asl_ids)
-        if lib_ids:
-            champ_lib[champ.id] = lib_ids
-            all_lib_ids.extend(lib_ids)
-
-    all_asl_ids = sorted(set(all_asl_ids))
-    all_lib_ids = sorted(set(all_lib_ids))
-
-    # Early return if nothing to process
-    if not all_asl_ids and not all_lib_ids:
-        return jsonify([])
-
-    # Time bounds
-    start_dt = datetime.combine(start_date, datetime.min.time())
-    end_dt = datetime.combine(end_date, datetime.max.time())
-
-    # BULK QUERY 1: ASL - fetch all school counts in one query
-    asl_counts_by_school = {}
-    if all_asl_ids:
-        conn = None
-        cursor = None
-        try:
-            pool = get_ruzivo_pool()
-            if pool is None:
-                logging.error("Ruzivo pool not available")
-            else:
-                conn = pool.connection()
-                import pymysql.cursors
-                cursor = conn.cursor(pymysql.cursors.DictCursor)
-                
-                # Process in chunks if needed
-                CHUNK = 1000
-                for i in range(0, len(all_asl_ids), CHUNK):
-                    chunk = all_asl_ids[i:i+CHUNK]
-                    placeholders = ','.join(['%s'] * len(chunk))
-                    query = f"""
-                        SELECT school_id, COUNT(DISTINCT student_id) AS student_count
-                        FROM vwstudent
-                        WHERE school_id IN ({placeholders})
-                          AND last_login BETWEEN %s AND %s
-                        GROUP BY school_id
-                    """
-                    params = chunk + [start_dt, end_dt]
-                    cursor.execute(query, params)
-                    
-                    for row in cursor.fetchall():
-                        sid = int(row['school_id'])
-                        asl_counts_by_school[sid] = int(row['student_count'] or 0)
-        except Exception as e:
-            logging.error("ASL bulk query error: %s", e)
-        finally:
-            if cursor:
-                cursor.close()
-            if conn:
-                conn.close()
-
-    # BULK QUERY 2: Library - fetch all institution counts in one query
-    lib_counts_by_inst = {}
-    if all_lib_ids:
-        conn = None
-        cursor = None
-        try:
-            conn = get_direct_library_conn()
-            if conn:
-                import pymysql.cursors
-                cursor = conn.cursor(pymysql.cursors.DictCursor)
-                
-                # Process in chunks if needed
-                CHUNK = 1000
-                for i in range(0, len(all_lib_ids), CHUNK):
-                    chunk = all_lib_ids[i:i+CHUNK]
-                    placeholders = ','.join(['%s'] * len(chunk))
-                    query = f"""
-                        SELECT iu.institution_id AS inst_id, COUNT(DISTINCT la.user_id) AS active_users
-                        FROM logins la
-                        JOIN institution_user iu ON la.user_id = iu.user_id
-                        WHERE iu.institution_id IN ({placeholders})
-                          AND la.created_at BETWEEN %s AND %s
-                        GROUP BY iu.institution_id
-                    """
-                    params = chunk + [start_dt, end_dt]
-                    cursor.execute(query, params)
-                    
-                    for row in cursor.fetchall():
-                        iid = int(row['inst_id'])
-                        lib_counts_by_inst[iid] = int(row['active_users'] or 0)
-        except Exception as e:
-            logging.error("Library bulk query error: %s", e)
-        finally:
-            if cursor:
-                cursor.close()
-            if conn:
-                conn.close()
-
-    # Build results by aggregating precomputed counts
-    results = []
-    for champ in champions:
-        asl_ids = champ_asl.get(champ.id, [])
-        lib_ids = champ_lib.get(champ.id, [])
-        
-        if not asl_ids and not lib_ids:
-            continue
-
-        # Sum up counts from bulk query results
-        asl_student_count = sum(asl_counts_by_school.get(int(sid), 0) for sid in asl_ids)
-        library_student_count = sum(lib_counts_by_inst.get(int(iid), 0) for iid in lib_ids)
-        overall_student_count = asl_student_count + library_student_count
-
-        # Lookup username
-        username = user_index.get((
-            (champ.firstname or '').strip().lower(),
-            (champ.lastname or '').strip().lower(),
-            (champ.province or '').strip().lower()
-        ))
-
-        results.append({
-            "champion": f"{champ.firstname} {champ.lastname}",
-            "username": username,
-            "school_count": len(asl_ids),
-            "asl_student_count": asl_student_count,
-            "library_student_count": library_student_count,
-            "overall_student_count": overall_student_count
-        })
-
-    return jsonify(results)
+    result = get_or_fetch_overview(province_name, start_date, end_date)
+    if not result.get("ok"):
+        return jsonify({"error": result.get("error", "Unknown error")}), 500
+    return jsonify(result.get("data") or [])
 
 
 
@@ -5530,6 +5315,8 @@ def get_province_details(provincename):
 @login_required
 def province_school_active_logins():
     try:
+        from app.province_stats_service import get_or_fetch_asl_active, is_valid_province
+
         province = request.args.get("province")
         start_date_str = request.args.get("start_date")
         end_date_str = request.args.get("end_date")
@@ -5537,56 +5324,24 @@ def province_school_active_logins():
         if not province or not start_date_str or not end_date_str:
             return jsonify({"error": "Missing required parameters (province, start_date, end_date)"}), 400
 
+        if not is_valid_province(province):
+            return jsonify({"error": "Invalid province"}), 400
+
         try:
             start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
             end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
         except ValueError:
             return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
 
-        start_dt = datetime.combine(start_date, datetime.min.time())
-        end_dt_exclusive = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
-
-        conn = get_ruzivo_conn()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
-
-        query = """
-            SELECT
-                sch.school_id,
-                sch.school_name,
-                sch.school_province,
-                COUNT(DISTINCT sl.student_id) AS active_learners
-            FROM tblstudents_login sl
-            INNER JOIN tblstudents st ON sl.student_id = st.student_id
-            INNER JOIN tblschools sch ON st.school_id = sch.school_id
-            WHERE sl.login_date >= %s AND sl.login_date < %s
-              AND sch.school_province = %s
-            GROUP BY sch.school_id, sch.school_name, sch.school_province
-            ORDER BY active_learners DESC
-        """
-
-        cursor.execute(query, (start_dt, end_dt_exclusive, province))
-        results = cursor.fetchall()
-
-        province_total = sum([row["active_learners"] for row in results])
-
-        return jsonify({
-            "province": province,
-            "date_range": {
-                "start": start_date_str,
-                "end": end_date_str
-            },
-            "province_total": province_total,
-            "schools": results
-        })
+        result = get_or_fetch_asl_active(province, start_date, end_date)
+        if not result.get("ok"):
+            return jsonify({"error": result.get("error", "Unknown error")}), 500
+        return jsonify(result.get("data") or {})
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
-    finally:
-        if 'conn' in locals() and conn:
-            conn.close()
 
 
 
@@ -5756,11 +5511,8 @@ def get_province_details1(provincename):
 @login_required
 def get_active_students_by_province():
     try:
-        valid_provinces = [
-            'Harare', 'Bulawayo', 'Manicaland', 'Mashonaland Central',
-            'Mashonaland East', 'Mashonaland West', 'Masvingo',
-            'Matabeleland North', 'Matabeleland South', 'Midlands'
-        ]
+        from app.province_stats_service import VALID_PROVINCES
+        valid_provinces = list(VALID_PROVINCES)
 
         today = datetime.today().date()
         start_date = today.replace(day=1)
@@ -9821,6 +9573,8 @@ def smartlearning_monthly_logins():
 @login_required
 def institution_logins():
     try:
+        from app.province_stats_service import get_or_fetch_library, is_valid_province
+
         province = request.args.get("province")
         start_date_str = request.args.get("start_date")
         end_date_str = request.args.get("end_date")
@@ -9828,58 +9582,24 @@ def institution_logins():
         if not province or not start_date_str or not end_date_str:
             return jsonify({"error": "Missing required parameters"}), 400
 
+        if not is_valid_province(province):
+            return jsonify({"error": "Invalid province"}), 400
+
         try:
             start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
             end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
         except ValueError:
             return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
 
-        start_dt = datetime.combine(start_date, datetime.min.time())
-        end_exclusive = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
-
-        conn = get_direct_library_conn()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
-
-        query = """
-            SELECT
-                i.province,
-                i.name AS institution_name,
-                COUNT(DISTINCT l.user_id) AS user_count
-            FROM users u
-            INNER JOIN logins l ON l.user_id = u.id
-            INNER JOIN institution_user iu ON iu.user_id = u.id
-            INNER JOIN institutions i ON i.id = iu.institution_id
-            WHERE i.province = %s
-              AND l.created_at >= %s AND l.created_at < %s
-            GROUP BY i.id, i.name, i.province
-            ORDER BY user_count DESC
-        """
-        cursor.execute(query, (province, start_dt, end_exclusive))
-        results = cursor.fetchall()
-
-        return jsonify({
-            "province": province,
-            "start_date": start_date_str,
-            "end_date": end_date_str,
-            "institutions": results
-        })
+        result = get_or_fetch_library(province, start_date, end_date)
+        if not result.get("ok"):
+            return jsonify({"error": result.get("error", "Unknown error")}), 500
+        return jsonify(result.get("data") or {})
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
-    finally:
-        try:
-            if 'cursor' in locals() and cursor:
-                cursor.close()
-        except Exception:
-            pass
-        try:
-            if 'conn' in locals() and conn:
-                conn.close()
-        except Exception:
-            pass
 
 
 

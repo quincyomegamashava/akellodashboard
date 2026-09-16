@@ -59,9 +59,11 @@ class Config:
     HELPDESK_EMAIL = os.environ.get('HELPDESK_EMAIL') or os.environ.get('HELP_DESK_EMAIL')
     HELPDESK_APP_PASSWORD = os.environ.get('HELPDESK_APP_PASSWORD') or os.environ.get('HELP_DESK_EMAIL_APP_PASSWORD')
 
-    # Cache configuration
-    CACHE_TYPE = os.environ.get('CACHE_TYPE', 'SimpleCache')  # or 'redis' for production
-    CACHE_DEFAULT_TIMEOUT = 300  # 5 minutes default
+    # Cache configuration (FileSystemCache is shared across workers on one host;
+    # set CACHE_TYPE=RedisCache in production when Redis is available)
+    CACHE_TYPE = os.environ.get('CACHE_TYPE', 'FileSystemCache')
+    CACHE_DIR = os.environ.get('CACHE_DIR', os.path.join(basedir, 'flask_cache'))
+    CACHE_DEFAULT_TIMEOUT = 900  # 15 minutes (aligned with province-stats prewarm)
 
     # AI generation (do not hardcode secrets in source code)
     # Default provider: ollama | gemini | openai (UI may override per request)

@@ -1,18 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Overview • Akello{% endblock %}
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.anychart.com/releases/8.10.0/js/anychart-bundle.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> -->
-
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
-
-  <style>
+{% block content %}
+<style>
     :root {
       --ak-primary: #00407d;
       --ak-accent: #0ea5e9;
@@ -26,21 +15,15 @@
     .ak-badge { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.4); color: #fff; border-radius: 999px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 8px; }
     .ak-card { background: #fff; border-radius: 12px; box-shadow: 0 6px 16px rgba(0,0,0,.06); border: 1px solid #e5e7eb; }
     .section-title { color: #374151; font-weight: 700; }
-    /* Modern tables */
     .table-modern { width: 100%; border-collapse: separate; border-spacing: 0; }
     .table-modern thead th { position: sticky; top: 0; background: #f3f4f6; color: #111827; z-index: 1; box-shadow: inset 0 -1px 0 #e5e7eb; }
     .table-modern tbody tr:nth-child(odd) { background: #fafafa; }
     .table-modern tbody tr:hover { background: #eef2ff; transition: background .2s ease; }
     .table-modern th, .table-modern td { border-bottom: 1px solid #e5e7eb; padding: 10px; vertical-align: middle; }
     .table-modern td .w3-tag { vertical-align: middle; }
-    /* KPI cards */
     .ak-kpi .kpi-body { display: grid; place-items: center; padding: 18px 12px; }
     .ak-kpi .kpi-value { font-size: 1.6rem; color: #111827; font-weight: 800; }
-  </style>
-<link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
-
-</head>
-{% block content %}
+</style>
 <div class="w3-container w3-small rounded-2xl p-4" style="max-width: 100%; overflow: auto;">
   <div class="bg-white rounded-2xl soft-shadow" style="max-height: 85vh; overflow: auto;">
     
@@ -195,7 +178,7 @@
   <tbody id="table-body">
     <!-- Rows will be dynamically inserted here -->
     <tr>
-      <td colspan="7" class="w3-center w3-text-gray">Loading champion data...</td>
+      <td colspan="7" class="w3-center w3-text-gray">Open Overview to load champion data...</td>
     </tr>
   </tbody>
 </table>
@@ -247,16 +230,21 @@ window.filterChampions = function() {
 };
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     // Province name from server-rendered context (safe for quotes)
     const provinceName = {{ provincename|tojson }};
+    const isBrandAmbassador = {{ 'true' if current_user.userRole == 'Brand Ambassador' else 'false' }};
+    window.provinceStatsTabLoaded = window.provinceStatsTabLoaded || {
+        Overview: false,
+        smartlearning: false,
+        askakello: false,
+        library: false
+    };
 
-    // Initial UI state
-    document.getElementById('loading').style.display = 'block';
+    // Initial UI state — do not show spinner until tab is actually loaded
+    document.getElementById('loading').style.display = 'none';
     const errorMsg = document.getElementById('error-message');
     if (errorMsg) {
-        // Keep W3 class if present, but ensure Bootstrap 'd-none' isn't an issue
         errorMsg.classList.add('w3-hide');
         errorMsg.classList.remove('d-none');
     }
@@ -285,7 +273,12 @@ window.filterChampions = function() {
             const response = await fetch(url);
             
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                let detail = `HTTP error! status: ${response.status}`;
+                try {
+                    const errBody = await response.json();
+                    if (errBody && errBody.error) detail = errBody.error;
+                } catch (_) {}
+                throw new Error(detail);
             }
             
             const data = await response.json();
@@ -420,24 +413,31 @@ window.filterChampions = function() {
         fetchChampionData(startDate, endDate);
     }
 
-    // Handle filter form submission
+    // Handle filter form submission — Overview loads lazily via openMenu
     document.addEventListener('DOMContentLoaded', () => {
         setDefaultDates();
-        
-        // Load data with default dates
-        const startDate = document.getElementById('overview-start-date').value;
-        const endDate = document.getElementById('overview-end-date').value;
-        fetchChampionData(startDate, endDate);
-        
-        // Handle form submission
+
         document.getElementById('overview-filter-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const startDate = document.getElementById('overview-start-date').value;
             const endDate = document.getElementById('overview-end-date').value;
             document.getElementById('loading').style.display = 'block';
             fetchChampionData(startDate, endDate);
+            window.provinceStatsTabLoaded.Overview = true;
         });
     });
+
+    window.ensureOverviewLoaded = function(force) {
+        if (window.provinceStatsTabLoaded.Overview && !force) return;
+        setDefaultDates();
+        const startDate = document.getElementById('overview-start-date').value;
+        const endDate = document.getElementById('overview-end-date').value;
+        document.getElementById('loading').style.display = 'block';
+        const err = document.getElementById('error-message');
+        if (err) err.classList.add('w3-hide');
+        fetchChampionData(startDate, endDate);
+        window.provinceStatsTabLoaded.Overview = true;
+    };
 
     // Optional: Add refresh button functionality
     function refreshData() {
@@ -575,16 +575,34 @@ function filterASLTable() {
     <script>
         document.getElementById("asl_active_filterForm").addEventListener("submit", function(e) {
             e.preventDefault();
+            loadAslActiveLogins();
+        });
 
+        function loadAslActiveLogins() {
             let province = document.getElementById("province").value;
             let startDate = document.getElementById("start_date").value;
             let endDate = document.getElementById("end_date").value;
+            let tableBody = document.querySelector("#asl_active_dataTable tbody");
+            tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4"><i class="fas fa-spinner fa-spin text-primary mb-2"></i><div>Loading data...</div></td></tr>`;
 
             fetch(`/api/province-school-active-logins?province=${encodeURIComponent(province)}&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`)
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) {
+                        return res.json().then(body => {
+                            throw new Error((body && body.error) || (`HTTP ${res.status}`));
+                        }).catch(err => {
+                            if (err.message) throw err;
+                            throw new Error(`HTTP ${res.status}`);
+                        });
+                    }
+                    return res.json();
+                })
                 .then(data => {
-                    let tableBody = document.querySelector("#asl_active_dataTable tbody");
                     tableBody.innerHTML = "";
+                    if (data.error) {
+                        tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">${escapeHtml(data.error)}</td></tr>`;
+                        return;
+                    }
 
                     document.getElementById("summary").innerText =
                         `Province Total: ${data.province_total ?? 0}`;
@@ -601,11 +619,16 @@ function filterASLTable() {
                     if (!(data.schools || []).length) {
                         tableBody.innerHTML = '<tr><td colspan="4" class="text-center">No data available</td></tr>';
                     }
+                })
+                .catch(err => {
+                    console.error('Smartlearning load error:', err);
+                    tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Failed to load: ${escapeHtml(err.message || err)}</td></tr>`;
                 });
-        });
+        }
+        window.loadAslActiveLogins = loadAslActiveLogins;
 
-        // Auto-load Smartlearning with MTD on first paint
-        (function autoLoadAslMtd() {
+        window.ensureSmartlearningLoaded = function(force) {
+            if (window.provinceStatsTabLoaded.smartlearning && !force) return;
             const today = new Date();
             const first = new Date(today.getFullYear(), today.getMonth(), 1);
             const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -614,9 +637,10 @@ function filterASLTable() {
             if (startEl && !startEl.value) startEl.value = ymd(first);
             if (endEl && !endEl.value) endEl.value = ymd(today);
             if (startEl && endEl && startEl.value && endEl.value) {
-                document.getElementById("asl_active_filterForm").dispatchEvent(new Event('submit', { cancelable: true }));
+                loadAslActiveLogins();
+                window.provinceStatsTabLoaded.smartlearning = true;
             }
-        })();
+        };
     </script>
 
     </div>
@@ -669,9 +693,8 @@ function filterASLTable() {
       </thead>
       <tbody id="championTableBody" class="w3-white">
         <tr>
-          <td colspan="3" class="w3-center w3-text-orange w3-padding-16">
-            <i class="fas fa-spinner fa-spin fa-lg"></i>
-            <p class="w3-small w3-margin-top">Loading champions...</p>
+          <td colspan="3" class="w3-center w3-text-gray w3-padding-16">
+            Open Ask Akello to load champions...
           </td>
         </tr>
       </tbody>
@@ -680,28 +703,23 @@ function filterASLTable() {
 
   <!-- Search filter -->
             <script>
-$(document).ready(function () {
-    const provinceName = "{{ provincename }}";
+(function () {
+    // provinceName comes from Overview script (|tojson)
 
     function renderChampionTable(data) {
         const tbody = $("#championTableBody");
         tbody.empty();
 
-        if (!data.length) {
+        if (!data || !data.length) {
             tbody.append('<tr><td colspan="3">No data available</td></tr>');
             return;
         }
 
-        // Sort by chat engagement descending
         data.sort((a, b) => b.chatlog_count - a.chatlog_count);
 
         data.forEach((row, index) => {
             const tr = $("<tr>");
-
-            // Highlight top champion
-            if (index === 0) {
-                tr.addClass("top-champion");
-            }
+            if (index === 0) tr.addClass("top-champion");
 
             const nameCell = $("<td>");
             if (row.username) {
@@ -730,25 +748,20 @@ $(document).ready(function () {
         });
     }
 
-    function filterChampionTable() {
-        const searchTerm = $("#championSearch").val().toLowerCase();
+    function filterChampionTableAsk() {
+        const searchTerm = ($("#championSearch").val() || "").toLowerCase();
         $("#championTableBody tr").each(function () {
             const championName = $(this).find("td:first").text().toLowerCase();
             $(this).toggle(championName.includes(searchTerm));
         });
     }
 
-    // Load champion data with optional date range
     function loadChampionData(startDate = null, endDate = null) {
         let url = `/api/champion-schools-data/${encodeURIComponent(provinceName)}`;
         const params = new URLSearchParams();
-        
         if (startDate) params.append('start_date', startDate);
         if (endDate) params.append('end_date', endDate);
-        
-        if (params.toString()) {
-            url += '?' + params.toString();
-        }
+        if (params.toString()) url += '?' + params.toString();
 
         $("#championTableBody").html(`<tr><td colspan="3" class="w3-center w3-text-orange w3-padding-16"><i class="fas fa-spinner fa-spin fa-lg"></i><p class="w3-small w3-margin-top">Loading champions...</p></td></tr>`);
 
@@ -759,46 +772,54 @@ $(document).ready(function () {
                 renderChampionTable(data);
             },
             error: function (xhr, status, err) {
-                $("#championTableBody").html(`<tr><td colspan="3">Error loading data</td></tr>`);
+                let msg = "Error loading data";
+                try {
+                    const body = JSON.parse(xhr.responseText);
+                    if (body && body.error) msg = body.error;
+                } catch (_) {}
+                $("#championTableBody").html(`<tr><td colspan="3"></td></tr>`);
+                $("#championTableBody td").text(msg);
                 console.error("Champion data fetch error:", err, xhr.responseText);
             }
         });
     }
 
-    // Set default dates
     function setAskAkelloDates() {
         const today = new Date();
         const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        
         document.getElementById('askakello-start-date').valueAsDate = firstOfMonth;
         document.getElementById('askakello-end-date').valueAsDate = today;
     }
 
-    // Initialize dates and load data
-    setAskAkelloDates();
-    const startDate = document.getElementById('askakello-start-date').value;
-    const endDate = document.getElementById('askakello-end-date').value;
-    loadChampionData(startDate, endDate);
+    window.ensureAskAkelloLoaded = function(force) {
+        if (window.provinceStatsTabLoaded.askakello && !force) return;
+        setAskAkelloDates();
+        const startDate = document.getElementById('askakello-start-date').value;
+        const endDate = document.getElementById('askakello-end-date').value;
+        loadChampionData(startDate, endDate);
+        window.provinceStatsTabLoaded.askakello = true;
+    };
 
-    // Handle form submission
+    setAskAkelloDates();
+
     $('#askakello-filter-form').on('submit', function(e) {
         e.preventDefault();
         const startDate = document.getElementById('askakello-start-date').value;
         const endDate = document.getElementById('askakello-end-date').value;
         loadChampionData(startDate, endDate);
+        window.provinceStatsTabLoaded.askakello = true;
     });
 
-    // Reset filter
     window.resetAskAkelloFilter = function() {
         setAskAkelloDates();
         const startDate = document.getElementById('askakello-start-date').value;
         const endDate = document.getElementById('askakello-end-date').value;
         loadChampionData(startDate, endDate);
+        window.provinceStatsTabLoaded.askakello = true;
     };
 
-    // Filter search
-    $("#championSearch").on("input", filterChampionTable);
-});
+    $("#championSearch").on("input", filterChampionTableAsk);
+})();
 </script>
 <!-- ask akello ends here -->
 
@@ -934,40 +955,60 @@ $(document).ready(function() {
         document.getElementById("filterForm").addEventListener("submit", function(event) {
             event.preventDefault();
             loadInstitutionLogins();
+            window.provinceStatsTabLoaded.library = true;
         });
 
         async function loadInstitutionLogins() {
             const province = provinceName;
             const startDate = document.getElementById("startDate").value;
             const endDate = document.getElementById("endDate").value;
+            const tbody = document.querySelector("#libraryloginsTable tbody");
 
             if (!startDate || !endDate) {
                 alert("Please select both start and end dates.");
                 return;
             }
 
-            const response = await fetch(`/api/library-province-institution-logins?province=${encodeURIComponent(province)}&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`);
-            const data = await response.json();
+            tbody.innerHTML = `<tr><td colspan="3" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>`;
 
-            const tbody = document.querySelector("#libraryloginsTable tbody");
-            tbody.innerHTML = "";
+            try {
+                const response = await fetch(`/api/library-province-institution-logins?province=${encodeURIComponent(province)}&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`);
+                const data = await response.json();
+                tbody.innerHTML = "";
 
-            if (data.institutions && data.institutions.length > 0) {
-                data.institutions.forEach(row => {
+                if (!response.ok || data.error) {
                     const tr = document.createElement("tr");
-                    tr.innerHTML = `
-                        <td>${escapeHtml(row.province)}</td>
-                        <td>${escapeHtml(row.institution_name)}</td>
-                        <td>${escapeHtml(row.user_count)}</td>
-                    `;
+                    tr.innerHTML = `<td colspan="3" class="text-danger"></td>`;
+                    tr.querySelector("td").textContent = data.error || (`HTTP ${response.status}`);
                     tbody.appendChild(tr);
-                });
-            } else {
+                    return;
+                }
+
+                if (data.institutions && data.institutions.length > 0) {
+                    data.institutions.forEach(row => {
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td>${escapeHtml(row.province)}</td>
+                            <td>${escapeHtml(row.institution_name)}</td>
+                            <td>${escapeHtml(row.user_count)}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `<td colspan="3">No data available</td>`;
+                    tbody.appendChild(tr);
+                }
+            } catch (err) {
+                console.error("Library load error:", err);
+                tbody.innerHTML = "";
                 const tr = document.createElement("tr");
-                tr.innerHTML = `<td colspan="3">No data available</td>`;
+                tr.innerHTML = `<td colspan="3" class="text-danger"></td>`;
+                tr.querySelector("td").textContent = `Failed to load: ${err.message || err}`;
                 tbody.appendChild(tr);
             }
         }
+        window.loadInstitutionLogins = loadInstitutionLogins;
 
         window.exportLibraryToExcel = function() {
             if (typeof XLSX === 'undefined') {
@@ -995,8 +1036,8 @@ $(document).ready(function() {
             XLSX.writeFile(wb, `library_${provinceName}_${new Date().toISOString().slice(0,10)}.xlsx`);
         };
 
-        // Auto-load Library with MTD
-        (function autoLoadLibraryMtd() {
+        window.ensureLibraryLoaded = function(force) {
+            if (window.provinceStatsTabLoaded.library && !force) return;
             const today = new Date();
             const first = new Date(today.getFullYear(), today.getMonth(), 1);
             const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -1004,8 +1045,11 @@ $(document).ready(function() {
             const e = document.getElementById("endDate");
             if (s && !s.value) s.value = ymd(first);
             if (e && !e.value) e.value = ymd(today);
-            if (s && e && s.value && e.value) loadInstitutionLogins();
-        })();
+            if (s && e && s.value && e.value) {
+                loadInstitutionLogins();
+                window.provinceStatsTabLoaded.library = true;
+            }
+        };
     </script>
 
     </div><br>
@@ -1018,7 +1062,7 @@ $(document).ready(function() {
 
 
 <script>
-// Tabbed Menu
+// Tabbed Menu — lazy-loads each tab's data on first visit
 function openMenu(evt, menuName) {
   var i, x, tablinks;
   x = document.getElementsByClassName("menu");
@@ -1037,12 +1081,34 @@ function openMenu(evt, menuName) {
   if (evt && evt.currentTarget && evt.currentTarget.firstElementChild) {
     evt.currentTarget.firstElementChild.className += " w3-indigo";
   }
+
+  try {
+    if (menuName === 'Overview' && typeof window.ensureOverviewLoaded === 'function') {
+      window.ensureOverviewLoaded();
+    } else if (menuName === 'smartlearning' && typeof window.ensureSmartlearningLoaded === 'function') {
+      window.ensureSmartlearningLoaded();
+    } else if (menuName === 'askakello' && typeof window.ensureAskAkelloLoaded === 'function') {
+      window.ensureAskAkelloLoaded();
+    } else if (menuName === 'library' && typeof window.ensureLibraryLoaded === 'function') {
+      window.ensureLibraryLoaded();
+    }
+  } catch (e) {
+    console.error('Tab lazy-load error:', e);
+  }
 }
 (function initDefaultTab() {
-  var isBA = {{ 'true' if current_user.userRole == 'Brand Ambassador' else 'false' }};
-  var defaultLink = isBA ? document.getElementById("askAkelloLink") : document.getElementById("myLink");
-  if (defaultLink) defaultLink.click();
-  else if (document.getElementById("askAkelloLink")) document.getElementById("askAkelloLink").click();
+  function activate() {
+    var isBA = {{ 'true' if current_user.userRole == 'Brand Ambassador' else 'false' }};
+    var defaultLink = isBA ? document.getElementById("askAkelloLink") : document.getElementById("myLink");
+    if (defaultLink) defaultLink.click();
+    else if (document.getElementById("askAkelloLink")) document.getElementById("askAkelloLink").click();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', activate);
+  } else {
+    // Defer so tab ensure* helpers registered in earlier scripts / jQuery ready can bind
+    setTimeout(activate, 0);
+  }
 })();
 </script>
 
