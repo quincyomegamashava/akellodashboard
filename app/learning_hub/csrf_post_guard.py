@@ -6,8 +6,14 @@ Flask-WTF 1.2.x ``validate_csrf`` requires the signed token as the first argumen
 
 from __future__ import annotations
 
+from functools import wraps
+
 from flask import abort, current_app, request
 from wtforms import ValidationError
+
+# CHECK_DEFAULT is false so legacy dashboard POSTs keep working. Unsafe methods
+# on opted-in views (Learning Hub + staff admin mutations) are checked here.
+UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 def _csrf_token_from_request() -> str | None:
@@ -31,7 +37,7 @@ def _csrf_token_from_request() -> str | None:
 
 
 def require_csrf_on_post() -> None:
-    if request.method != "POST":
+    if request.method not in UNSAFE_METHODS:
         return
     if not current_app.config.get("WTF_CSRF_ENABLED", True):
         return
@@ -42,3 +48,14 @@ def require_csrf_on_post() -> None:
         validate_csrf(_csrf_token_from_request())
     except ValidationError:
         abort(400)
+
+
+def csrf_protect_unsafe(view):
+    """Decorator: validate CSRF on POST/PUT/PATCH/DELETE. No-op on GET."""
+
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        require_csrf_on_post()
+        return view(*args, **kwargs)
+
+    return wrapped

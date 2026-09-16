@@ -1048,6 +1048,8 @@ async function loadYearlyCharts(force) {
 
       if (data._sample_data || (data._debug && data._debug.cache_status === 'fallback_sample_data')) {
         showSampleDataBanner(data._note || 'Sample data is shown because live database queries timed out or failed.');
+      } else if (data._debug && data._debug.cache_status === 'stale_after_timeout') {
+        showSampleDataBanner(data._note || 'Showing last successful result because a live query timed out.');
       }
 
       const monthly_usage = data.monthly_usage;

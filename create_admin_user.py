@@ -5,19 +5,22 @@ Run this script to create an admin user with the specified credentials.
 
 from app import app, db
 from app.models import User
+import os
 import sqlalchemy as sa
 
 def create_admin_user():
-    """Create an admin user with the specified credentials"""
+    """Create an admin user. Password must come from ADMIN_BOOTSTRAP_PASSWORD."""
     with app.app_context():
         try:
-            # User details
-            username = "QuincyOMashava"
-            email = "quincyomashava@akello.local"
-            firstname = "Quincy"
-            lastname = "Mashava"
+            username = os.environ.get("ADMIN_BOOTSTRAP_USERNAME", "QuincyOMashava")
+            email = os.environ.get("ADMIN_BOOTSTRAP_EMAIL", "quincyomashava@akello.local")
+            firstname = os.environ.get("ADMIN_BOOTSTRAP_FIRSTNAME", "Quincy")
+            lastname = os.environ.get("ADMIN_BOOTSTRAP_LASTNAME", "Mashava")
             userRole = "Admin"
-            password = "def4ult123"
+            password = os.environ.get("ADMIN_BOOTSTRAP_PASSWORD")
+            if not password:
+                print("Set ADMIN_BOOTSTRAP_PASSWORD in the environment. Refusing to use a hardcoded password.")
+                return False
             
             # Check if user with this username already exists
             existing_user = db.session.scalar(sa.select(User).where(User.username == username))

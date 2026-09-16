@@ -64,12 +64,10 @@ class RegistrationForm(FlaskForm):
     # A dropdown/select field is good for predefined roles
     userRole = SelectField('Role', choices=[
         ('Brand Ambassador', 'Brand Ambassador'), 
-        ('Manager', 'Manager'), 
         ('Software Engineer', 'Software Engineer'), 
         ('DevOps Engineer', 'DevOps Engineer'),
         ('Content Acquisition', 'Content Acquisition'),
         ('Brand Manager', 'Brand Manager'),
-        ('Admin', 'Admin')
     ], validators=[DataRequired()])
     
     department = SelectField('Department', choices=[

@@ -3,9 +3,32 @@
 **Date:** 2026-09-16  
 **Scope:** Full repository review of `akellodashboard` (Flask dashboard + Learning Hub + mobile_app).  
 **Method:** Static review of config, bootstrap, routes, database layer, analytics, auth, env files, tests, and requirements. Syntax check of `app/routes.py` (`python3 -m py_compile`). Runtime test suite was **not** executed in this agent environment (system Python has no Flask/pandas).  
-**This PR:** Documentation + secret-handling hygiene only. No large refactors.
 
 **Secrets policy for this document:** live credentials were found in tracked files. Values are **not** repeated here. Rotate them; treat git history as compromised.
+
+---
+
+## Phase 1 implemented (this PR)
+
+Code fixes on `cursor/audit-efficiency-plan-8ba0` after Quincy approved Phase 1. No `routes.py` split.
+
+| Item | Status | What changed |
+| --- | --- | --- |
+| S1 Secrets untracked | Done earlier | `.env` / `.flaskenv` untracked; `.gitignore` ignores them. **Rotate anyway — history still has values.** |
+| S2 Hardcoded MySQL in `routes.py` | Done | Pools and `get_direct_library_conn` / ruzivo fallback read `ASL_DB_*` / `AL_DB_*` only. Hardcoded `DB_CONFIG` removed. Root query scripts use the same env vars. |
+| S3 Help-desk IMAP password fallback | Done | `_helpdesk_imap_settings()` — no literal app password. Missing config skips IMAP. |
+| S4 PII export unauthenticated | Done | `/api/users-with-contact` and `/api/students-with-contact` require login + Admin. Excel engine is `openpyxl`. |
+| S5 Debug leftovers | Done | Live `/check-columns` and `/api/testingdb1` routes removed. |
+| S6 Public register → Admin | Done | Form no longer lists Admin/Manager. Server coerces those roles to `Brand Ambassador`. |
+| S7 Weak SECRET_KEY | Done | `config.py` raises if `SECRET_KEY` is unset when `FLASK_ENV`/`ENV` is `production`/`prod`. Local fallback is `dev-only-insecure-secret-key` only. |
+| S8 CSRF on staff mutations | Partial (intentional) | `WTF_CSRF_CHECK_DEFAULT` still false (legacy forms). `/admin/users/*` grant/revoke/patch/delete/reset/toggle now use `csrf_protect_unsafe`. `base.html` sends `X-CSRFToken` on mutating `fetch()`. Learning Hub unchanged. Exempt: public lead POST, `learn_api`. Full CHECK_DEFAULT=true remains Phase 2. |
+| B1/B2 Fake chart data | Done | Random sample generators removed. Timeout returns last-good real cache or HTTP 408. |
+| B3 HLF cache ignores dates | Done | Cache key is `hlf_weekly_stats_{start}_{end}`. |
+| B8 pandas in requirements | Done | `pandas==2.3.2` uncommented. |
+| B7 tests import `create_app` | Done (skip) | `tests/test_pm_service.py` skips unless `create_app` exists so collect does not explode. |
+| `create_admin_user.py` default password | Done | Requires `ADMIN_BOOTSTRAP_PASSWORD`. |
+
+**Not in this Phase 1 pass (follow-ups):** S9 Socket.IO CORS; S10 DDL defaults; S11 query-UI SQL; B4 `add_privilege` crash; B5 `/generate_lesson` dead return; B11 logout redirect; B12 stack traces in JSON; B13 `/upload_users` Admin gate; routes.py split.
 
 ---
 
