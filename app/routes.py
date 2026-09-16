@@ -14,6 +14,8 @@ import sqlalchemy as sa
 from docx import Document
 import re
 from app import app, db, csrf
+from app.auth_decorators import admin_required
+from app.learning_hub.csrf_post_guard import csrf_protect_unsafe
 from app.forms import EventForm, LoginForm, PerfomanceTargetsForm, RegistrationForm, BookAllocationForm, ReportForm, WorkspaceForm, ProjectForm, TaskForm, CSVUploadForm, ChampionCSVUploadForm, ChampionSchoolForm, AkelloSimEventForm
 from app.models import PerfomanceTargets, Scorecard, User, BookAllocations, BookAllocationRequest, Report, Workspace, Project, Task, ChampionSchool, ChampionSchoolRequest, SchoolVisitLog, Event, WeeklyReport, TaskA, TaskASubtask, ColumnA, ProjectA, TaskAttachment, TaskAComment, TaskAActivity, TaskALabel, TaskACustomFieldValue, ProjectACustomField, TaskADependency, AkelloSimEvent, UserActivity, ActiveSession, PageAnalytics, WorkspaceFile, Lesson, ActivityQuestion, CollateralItems, CollateralRequest, GameUser, Game, GameScore, Notification, Ticket, Ticket, AuditLog, AppSetting, taska_comment_mentions
 from datetime import datetime, timezone, timedelta, date
@@ -88,44 +90,109 @@ load_dotenv()
 ruzivo_pool = None
 direct_library_pool = None
 
+_MYSQL_CONNECT_ARGS = {
+    'cursorclass': pymysql.cursors.DictCursor,
+    'autocommit': True,
+    'connect_timeout': 30,
+    'read_timeout': 60,
+    'write_timeout': 60,
+    'charset': 'utf8mb4',
+}
+
+
+def _env_int(name, default):
+    raw = os.getenv(name)
+    if raw is None or str(raw).strip() == '':
+        return default
+    return int(raw)
+
+
+def _mysql_kwargs_from_env(host_var, port_var, name_var, user_var, pass_var, default_db, label):
+    """Build pymysql kwargs from env. Password must be set (empty string is explicit)."""
+    host = (os.getenv(host_var) or '').strip()
+    user = (os.getenv(user_var) or '').strip()
+    password = os.getenv(pass_var)
+    database = (os.getenv(name_var) or default_db).strip()
+    port = _env_int(port_var, 3306)
+    if not host or not user or password is None:
+        raise RuntimeError(
+            f'{label} MySQL is not configured. Set {host_var}, {user_var}, and {pass_var}.'
+        )
+    return {
+        'host': host,
+        'port': port,
+        'user': user,
+        'password': password,
+        'database': database,
+        **_MYSQL_CONNECT_ARGS,
+    }
+
+
+def _ruzivo_mysql_kwargs():
+    return _mysql_kwargs_from_env(
+        'ASL_DB_HOST', 'ASL_DB_PORT', 'ASL_DB_NAME', 'ASL_DB_USER', 'ASL_DB_PASS',
+        'ruzivo_2017', 'Ruzivo',
+    )
+
+
+def _library_mysql_kwargs():
+    return _mysql_kwargs_from_env(
+        'AL_DB_HOST', 'AL_DB_PORT', 'AL_DB_NAME', 'AL_DB_USER', 'AL_DB_PASS',
+        'akello_library', 'Library',
+    )
+
+
+def _helpdesk_imap_settings():
+    email_addr = os.getenv('HELP_DESK_EMAIL') or os.getenv('HELPDESK_EMAIL')
+    password = os.getenv('HELP_DESK_EMAIL_APP_PASSWORD') or os.getenv('HELPDESK_APP_PASSWORD')
+    server = os.getenv('HELP_DESK_IMAP_SERVER') or os.getenv('HELPDESK_IMAP_SERVER') or 'outlook.office365.com'
+    port = int(os.getenv('HELP_DESK_IMAP_PORT') or os.getenv('HELPDESK_IMAP_PORT') or '993')
+    return email_addr, password, server, port
+
+
 def get_ruzivo_pool():
-    """Get or create Ruzivo connection pool"""
+    """Get or create Ruzivo connection pool from ASL_DB_* env vars."""
     global ruzivo_pool
     if ruzivo_pool is None:
         try:
+            kw = _ruzivo_mysql_kwargs()
             ruzivo_pool = PooledDB(
                 creator=pymysql,
-                maxconnections=5,     # Reduced for stability
-                mincached=0,          # No minimum cached connections
+                maxconnections=5,
+                mincached=0,
                 maxcached=3,
                 maxshared=2,
                 maxusage=1000,
                 blocking=False,
                 setsession=[],
-                ping=1,               # Only ping on checkout
-                host='40.90.237.225',
-                port=33000,
-                user='qmashava',
-                password='#Qhava@@!Fu11',
-                database='ruzivo_2017',
-                cursorclass=pymysql.cursors.DictCursor,
-                autocommit=True,
-                connect_timeout=30,
-                read_timeout=60,
-                write_timeout=60,
-                charset='utf8mb4',
+                ping=1,
+                host=kw['host'],
+                port=kw['port'],
+                user=kw['user'],
+                password=kw['password'],
+                database=kw['database'],
+                cursorclass=kw['cursorclass'],
+                autocommit=kw['autocommit'],
+                connect_timeout=kw['connect_timeout'],
+                read_timeout=kw['read_timeout'],
+                write_timeout=kw['write_timeout'],
+                charset=kw['charset'],
             )
-            app.logger.info("Ruzivo connection pool initialized successfully")
+            app.logger.info(
+                "Ruzivo connection pool initialized for %s:%s/%s as %s",
+                kw['host'], kw['port'], kw['database'], kw['user'],
+            )
         except Exception as e:
             app.logger.error(f"Failed to initialize Ruzivo pool: {e}")
             ruzivo_pool = None
     return ruzivo_pool
 
 def get_library_pool():
-    """Get or create Library connection pool"""
+    """Get or create Library connection pool from AL_DB_* env vars."""
     global direct_library_pool
     if direct_library_pool is None:
         try:
+            kw = _library_mysql_kwargs()
             direct_library_pool = PooledDB(
                 creator=pymysql,
                 maxconnections=5,
@@ -136,19 +203,22 @@ def get_library_pool():
                 blocking=False,
                 setsession=[],
                 ping=1,
-                host='40.88.149.15',
-                port=33000,
-                user='kmudzimuirema',
-                password='Ak3110$2022',
-                database='akello_library',
-                cursorclass=pymysql.cursors.DictCursor,
-                autocommit=True,
-                connect_timeout=30,
-                read_timeout=60,
-                write_timeout=60,
-                charset='utf8mb4',
+                host=kw['host'],
+                port=kw['port'],
+                user=kw['user'],
+                password=kw['password'],
+                database=kw['database'],
+                cursorclass=kw['cursorclass'],
+                autocommit=kw['autocommit'],
+                connect_timeout=kw['connect_timeout'],
+                read_timeout=kw['read_timeout'],
+                write_timeout=kw['write_timeout'],
+                charset=kw['charset'],
             )
-            app.logger.info("Library connection pool initialized successfully")
+            app.logger.info(
+                "Library connection pool initialized for %s:%s/%s as %s",
+                kw['host'], kw['port'], kw['database'], kw['user'],
+            )
         except Exception as e:
             app.logger.error(f"Failed to initialize Library pool: {e}")
             direct_library_pool = None
@@ -159,33 +229,14 @@ def get_library_pool():
 # ---------- Helper functions ----------
 # ---------- Improved Helper functions with error handling ----------
 def get_direct_library_conn():
-    """Get a library database connection - direct connection for help desk"""
+    """Get a library database connection from AL_DB_* env vars."""
     try:
-        import pymysql
-        
-        # Use credentials that have access from this IP
-        # Note: User qmashava doesn't have access from your current IP (77.246.50.217)
-        host = '40.88.149.15'
-        port = 33000
-        user = 'kmudzimuirema'
-        password = 'Ak3110$2022'
-        database = 'akello_library'
-        
-        app.logger.info(f"Connecting to library database at {host}:{port}/{database} as {user}")
-        
-        return pymysql.connect(
-            host=host,
-            port=port,
-            user=user,
-            password=password,
-            database=database,
-            cursorclass=pymysql.cursors.DictCursor,
-            autocommit=True,
-            connect_timeout=30,
-            read_timeout=60,
-            write_timeout=60,
-            charset='utf8mb4'
+        kw = _library_mysql_kwargs()
+        app.logger.info(
+            "Connecting to library database at %s:%s/%s as %s",
+            kw['host'], kw['port'], kw['database'], kw['user'],
         )
+        return pymysql.connect(**kw)
     except Exception as e:
         app.logger.error(f"Failed to get library connection: {e}")
         raise
@@ -203,22 +254,8 @@ def get_ruzivo_conn():
         return conn
     except Exception as e:
         app.logger.error(f"Error getting ruzivo database connection: {e}")
-        # Try to create a direct connection as fallback
         try:
-            import pymysql
-            return pymysql.connect(
-                host='40.90.237.225',
-                port=33000,
-                user='qmashava',
-                password='#Qhava@@!Fu11',
-                database='ruzivo_2017',
-                cursorclass=pymysql.cursors.DictCursor,
-                autocommit=True,
-                connect_timeout=30,
-                read_timeout=60,
-                write_timeout=60,
-                charset='utf8mb4'
-            )
+            return pymysql.connect(**_ruzivo_mysql_kwargs())
         except Exception as fallback_error:
             app.logger.error(f"Fallback connection also failed: {fallback_error}")
             raise Exception("Unable to establish ruzivo database connection")
@@ -803,6 +840,7 @@ def edit_event(event_id):
 
 @app.route("/admin/users/<int:user_id>/grant", methods=["POST"])
 @login_required
+@csrf_protect_unsafe
 def grant_privilege(user_id):
     if not current_user.userRole == "Admin":
         return jsonify({"error": "Unauthorized"}), 403
@@ -818,6 +856,7 @@ def grant_privilege(user_id):
 
 @app.route("/admin/users/<int:user_id>/revoke", methods=["POST"])
 @login_required
+@csrf_protect_unsafe
 def revoke_privilege(user_id):
     if not current_user.userRole == "Admin":
         return jsonify({"error": "Unauthorized"}), 403
@@ -932,6 +971,7 @@ def _ensure_helpdesk_resolved_at_column():
 
 @app.route('/admin/users/<int:user_id>', methods=['DELETE'])
 @login_required
+@csrf_protect_unsafe
 def admin_delete_user(user_id):
     if current_user.userRole != 'Admin':
         return jsonify({"error": "Unauthorized"}), 403
@@ -958,6 +998,7 @@ def admin_delete_user(user_id):
 
 @app.route('/admin/users/<int:user_id>/reset_password', methods=['POST'])
 @login_required
+@csrf_protect_unsafe
 def admin_reset_password(user_id):
     if current_user.userRole != 'Admin':
         return jsonify({"error": "Unauthorized"}), 403
@@ -978,6 +1019,7 @@ def admin_reset_password(user_id):
 
 @app.route('/admin/users/<int:user_id>', methods=['PATCH'])
 @login_required
+@csrf_protect_unsafe
 def admin_update_user(user_id):
     if current_user.userRole != 'Admin':
         return jsonify({"error": "Unauthorized"}), 403
@@ -999,6 +1041,7 @@ def admin_update_user(user_id):
 
 @app.route("/admin/users/<int:user_id>/toggle_privilege", methods=["POST"])
 @login_required
+@csrf_protect_unsafe
 def toggle_privilege(user_id):
     if current_user.userRole != "Admin":
         return jsonify({"error": "Unauthorized"}), 403
@@ -1456,15 +1499,7 @@ def api_mobile_champion_request_reject(request_id):
 
 
 
-# Database configuration
-DB_CONFIG = {
-    'host': '40.90.237.225',
-    'port': 33000,
-    'user': 'qmashava',
-    'password': '#Qhava@@!Fu11',
-    'database': 'ruzivo_2017',
-    'cursorclass': pymysql.cursors.DictCursor
-}
+# Database configuration is env-only (ASL_DB_*). See _ruzivo_mysql_kwargs().
 
 
 
@@ -4321,6 +4356,34 @@ def platforms_quick_custom_date():
 
 # Cache already initialized at the top of the file after imports
 
+def _cached_real_chart_payload(cache_key):
+    """Return a copy of last-good chart cache, or None. Never returns sample data."""
+    cached = cache.get(cache_key)
+    if cached is not None and isinstance(cached, dict) and not cached.get('_sample_data') and 'error' not in cached:
+        return dict(cached)
+    return None
+
+
+def _chart_timeout_response(cache_key, execution_time=20.0):
+    """Prefer last-good real cache after a timeout; otherwise 408 with no invented metrics."""
+    stale = _cached_real_chart_payload(cache_key)
+    if stale is not None:
+        stale['_debug'] = {
+            "execution_time_seconds": execution_time,
+            "query_count": 0,
+            "cache_status": "stale_after_timeout",
+            "timeout_occurred": True,
+        }
+        stale['_note'] = 'Showing last successful result because a live query timed out.'
+        return jsonify(stale)
+    return jsonify({
+        "error": "Database queries are taking too long. Please try again later.",
+        "timeout": True,
+        "suggestion": "Please try refreshing the page later when server load is lower.",
+        "retry_recommended": True,
+    }), 408
+
+
 @app.route('/api/platforms_overall_yearly', methods=['GET'])
 @login_required
 def platforms_overall_yearly():
@@ -4329,15 +4392,14 @@ def platforms_overall_yearly():
     import concurrent.futures
 
     cache_key = f"platforms_overall_yearly_{datetime.today().year}"
-    cached = cache.get(cache_key)
-    if cached is not None and isinstance(cached, dict) and not cached.get('_sample_data'):
-        payload = dict(cached)
-        payload['_debug'] = {
+    cached = _cached_real_chart_payload(cache_key)
+    if cached is not None:
+        cached['_debug'] = {
             "execution_time_seconds": 0,
             "query_count": 3,
             "cache_status": "cached"
         }
-        return jsonify(payload)
+        return jsonify(cached)
 
     start_time = time.time()
 
@@ -4349,13 +4411,7 @@ def platforms_overall_yearly():
                 execution_time = round(time.time() - start_time, 2)
 
                 if isinstance(result, dict) and result.get('_sample_data'):
-                    result['_debug'] = {
-                        "execution_time_seconds": execution_time,
-                        "query_count": 0,
-                        "cache_status": "fallback_sample_data",
-                        "timeout_occurred": False
-                    }
-                    return jsonify(result)
+                    return _chart_timeout_response(cache_key, execution_time)
 
                 if isinstance(result, dict) and 'year' in result:
                     cache.set(cache_key, result, timeout=60 * 60 * 6)
@@ -4369,24 +4425,8 @@ def platforms_overall_yearly():
 
             except concurrent.futures.TimeoutError:
                 future.cancel()
-                print("Query timeout after 20 seconds - providing sample data (not cached)")
-                try:
-                    sample_data = _get_sample_chart_data(datetime.today().year)
-                    sample_data['_debug'] = {
-                        "execution_time_seconds": 20.0,
-                        "query_count": 0,
-                        "cache_status": "fallback_sample_data",
-                        "timeout_occurred": True
-                    }
-                    return jsonify(sample_data)
-                except Exception as e:
-                    print(f"Sample data generation failed: {e}")
-                    return jsonify({
-                        "error": "Database queries are taking too long. Please try again later.",
-                        "timeout": True,
-                        "suggestion": "Please try refreshing the page later when server load is lower.",
-                        "retry_recommended": True
-                    }), 408
+                app.logger.warning("Yearly platforms query timeout after 20 seconds")
+                return _chart_timeout_response(cache_key, 20.0)
 
     except Exception as e:
         import traceback
@@ -4470,8 +4510,8 @@ def _platforms_overall_yearly_impl():
             asl_results, ask_results = asl_future.result()
             lib_results = lib_future.result()
     except Exception as e:
-        print(f"Yearly platforms query error: {e}")
-        return _get_sample_chart_data(current_year)
+        app.logger.error("Yearly platforms query error: %s", e)
+        raise
 
     asl_by_month = {int(row['month_num']): int(row['active_learners'] or 0) for row in asl_results}
     lib_by_month = {int(row['month_num']): int(row['active_users'] or 0) for row in lib_results}
@@ -4512,63 +4552,6 @@ def _platforms_overall_yearly_impl():
     }
 
 
-def _get_sample_chart_data(current_year):
-    """Fallback function that returns sample data when database queries are too slow"""
-    import random
-    
-    print("Using sample data fallback due to database performance issues")
-    
-    # Generate realistic sample data
-    months_names = ['January', 'February', 'March', 'April', 'May', 'June',
-                   'July', 'August', 'September', 'October', 'November', 'December']
-    
-    monthly_data = []
-    total_asl_year = 0
-    total_lib_year = 0
-    total_ask_year = 0
-    
-    for i, month_name in enumerate(months_names):
-        # Generate realistic numbers with some variation
-        base_asl = random.randint(800, 1200)
-        base_lib = random.randint(300, 500)
-        base_ask = random.randint(150, 250)
-        
-        # Add seasonal variation (higher in school months)
-        if i in [0, 1, 2, 7, 8, 9]:  # Jan-Mar, Aug-Oct (school months)
-            multiplier = random.uniform(1.1, 1.3)
-        else:
-            multiplier = random.uniform(0.7, 0.9)
-        
-        asl_count = int(base_asl * multiplier)
-        lib_count = int(base_lib * multiplier)
-        ask_count = int(base_ask * multiplier)
-        
-        total_asl_year += asl_count
-        total_lib_year += lib_count
-        total_ask_year += ask_count
-        
-        total = asl_count + lib_count + ask_count
-        
-        monthly_data.append({
-            "month": month_name,
-            "asl": asl_count,
-            "library": lib_count,
-            "ask_akello": ask_count,
-            "overall": total
-        })
-    
-    return {
-        "year": current_year,
-        "monthly_usage": monthly_data,
-        "yearly_totals": {
-            "asl": total_asl_year,
-            "library": total_lib_year,
-            "ask_akello": total_ask_year,
-            "overall": total_asl_year + total_lib_year + total_ask_year
-        },
-        "_sample_data": True,
-        "_note": "Sample data used due to database performance issues"
-    }
 
 
 
@@ -4583,7 +4566,6 @@ def hlf_stats():
 
 @app.route('/api/hlf-weekly-stats/', methods=['GET'])
 @login_required
-@cache.cached(timeout=60 * 60 * 6, key_prefix='hlf_weekly_stats')  # Cache for 6 hours
 def hlf_weekly_stats():
     import time
     import concurrent.futures
@@ -4606,6 +4588,16 @@ def hlf_weekly_stats():
     except ValueError:
         return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
 
+    cache_key = f"hlf_weekly_stats_{start_date.isoformat()}_{end_date.isoformat()}"
+    cached = _cached_real_chart_payload(cache_key)
+    if cached is not None:
+        cached['_debug'] = {
+            "execution_time_seconds": 0,
+            "query_count": 3,
+            "cache_status": "cached",
+        }
+        return jsonify(cached)
+
     def execute_query():
         return _hlf_weekly_stats_impl(start_date, end_date)
 
@@ -4616,7 +4608,12 @@ def hlf_weekly_stats():
                 result = future.result(timeout=20)
                 execution_time = round(time.time() - start_time, 2)
 
+                if isinstance(result, dict) and result.get('_sample_data'):
+                    return _chart_timeout_response(cache_key, execution_time)
+
                 if isinstance(result, dict) and 'weeks' in result:
+                    to_store = {k: v for k, v in result.items() if k != '_debug'}
+                    cache.set(cache_key, to_store, timeout=60 * 60 * 6)
                     result['_debug'] = {
                         "execution_time_seconds": execution_time,
                         "query_count": 3,
@@ -4626,25 +4623,8 @@ def hlf_weekly_stats():
 
             except concurrent.futures.TimeoutError:
                 future.cancel()
-                print("Query timeout after 20 seconds - providing sample weekly data")
-
-                try:
-                    sample_data = _get_sample_weekly_data(start_date.year)
-                    sample_data['_debug'] = {
-                        "execution_time_seconds": 20.0,
-                        "query_count": 0,
-                        "cache_status": "fallback_sample_data",
-                        "timeout_occurred": True
-                    }
-                    return jsonify(sample_data)
-                except Exception as e:
-                    print(f"Sample data generation failed: {e}")
-                    return jsonify({
-                        "error": "Database queries are taking too long. Showing sample data to ensure charts display.",
-                        "timeout": True,
-                        "suggestion": "Please try refreshing the page later when server load is lower.",
-                        "retry_recommended": True
-                    }), 408
+                app.logger.warning("HLF weekly query timeout after 20 seconds")
+                return _chart_timeout_response(cache_key, 20.0)
 
     except Exception as e:
         import traceback
@@ -4780,51 +4760,6 @@ def _hlf_weekly_stats_impl(start_date, end_date):
 
 
 
-def _get_sample_weekly_data(current_year):
-    """Fallback weekly data"""
-    import random
-    print("Using sample weekly data fallback")
-
-    weekly_data = []
-    total_asl = total_lib = total_ask = 0
-
-    for week in range(1, 53):
-        asl = random.randint(600, 1200)
-        lib = random.randint(200, 500)
-        ask = random.randint(100, 300)
-        total = asl + lib + ask
-
-        total_asl += asl
-        total_lib += lib
-        total_ask += ask
-
-        weekly_data.append({
-            "week": week,
-            "asl": asl,
-            "library": lib,
-            "ask_akello": ask,
-            "overall": total
-        })
-
-    avg_weekly = {
-        "asl": round(total_asl / 52, 2),
-        "library": round(total_lib / 52, 2),
-        "ask_akello": round(total_ask / 52, 2),
-        "overall": round((total_asl + total_lib + total_ask) / 52, 2)
-    }
-
-    return {
-        "year": current_year,
-        "weeks": weekly_data,
-        "average_weekly_usage": avg_weekly,
-        "totals": {
-            "asl": total_asl,
-            "library": total_lib,
-            "ask_akello": total_ask,
-            "overall": total_asl + total_lib + total_ask
-        },
-        "_sample_data": True
-    }
 
 
 
@@ -6443,6 +6378,8 @@ import io
 import pymysql
 
 @app.route('/api/users-with-contact', methods=['GET'])
+@login_required
+@admin_required
 def users_with_contact():
     conn = None
     try:
@@ -6467,7 +6404,7 @@ def users_with_contact():
 
         # Write Excel to memory (not disk)
         output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df.to_excel(writer, index=False, sheet_name="Users")
         output.seek(0)
 
@@ -6498,6 +6435,8 @@ import io
 import pymysql
 
 @app.route('/api/students-with-contact', methods=['GET'])
+@login_required
+@admin_required
 def students_with_contact():
     conn = None
     try:
@@ -6529,7 +6468,7 @@ def students_with_contact():
 
         # Write Excel in memory
         output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df.to_excel(writer, index=False, sheet_name="Students")
         output.seek(0)
 
@@ -6633,36 +6572,7 @@ def library_daily_currency():
 
 
 
-@app.route('/api/testingdb1', methods=['GET'])
-def testingdb1():
-    try:
-        # conn = get_ruzivo_conn()
-        conn = get_direct_library_conn()
-        with conn.cursor() as cursor:
-            query = """
-               SELECT 
-                    i.province,
-                    COUNT(DISTINCT i.id) AS number_of_institutions,
-                    COUNT(DISTINCT l.user_id) AS total_users
-                FROM institution_user iu
-                JOIN institutions i ON iu.institution_id = i.id
-                JOIN logins l ON iu.user_id = l.user_id
-                WHERE l.created_at BETWEEN %s AND %s
-                GROUP BY i.province
-                ORDER BY total_users DESC;
-"""
-            cursor.execute(query)
-            data = cursor.fetchall()
-        return jsonify(data)
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-    # finally:
-    #     if 'conn' in locals():
-    #         conn.close()
+# Debug leftover /api/testingdb1 removed (unauthenticated live query). Use Database Studio.
 
 
 
@@ -10039,45 +9949,7 @@ def library_active90():
 import traceback
 
 
-# library tables 
-@app.route('/check-columns')
-def check_columns():
-    try:
-        # Get connection from SSH-tunneled pool
-        connection = get_direct_library_conn()
-        cursor = connection.cursor()
-
-        # Fetch all table names
-        cursor.execute("SHOW TABLES;")
-        tables = cursor.fetchall()
-
-        html_output = "<h2>Database: akello_library_2</h2>"
-
-        for table in tables:
-            table_name = list(table.values())[0]  # pymysql.DictCursor gives a dict per row
-            try:
-                html_output += f"<h3>Table: <code>{table_name}</code></h3><ul>"
-
-                cursor.execute(f"DESCRIBE `{table_name}`;")
-                columns = cursor.fetchall()
-
-                for col in columns:
-                    html_output += f"<li>{col['Field']} ({col['Type']})</li>"
-
-                html_output += "</ul><hr>"
-            except Exception as e:
-                html_output += f"<p style='color:red;'>Error fetching columns for table <code>{table_name}</code>: {str(e)}</p><hr>"
-
-        return html_output
-
-    except Exception as e:
-        return f"<h3>Error:</h3><p>{str(e)}</p>"
-
-    # finally:
-    #     if 'cursor' in locals():
-    #         cursor.close()
-    #     if 'connection' in locals():
-    #         connection.close()
+# Debug leftover /check-columns removed (unauthenticated schema dump). Use Database Studio.
 
 
 
@@ -17401,9 +17273,8 @@ def logout():
 def register():
     """
     Handles user registration.
-    If the user is already logged in, they are redirected to the index page.
-    On form submission, it validates the data and creates a new user
-    with all the required fields from the updated User model.
+    Privileged roles (Admin, Manager) cannot be chosen here; those are assigned
+    only from /administration.
     """
     if current_user.is_authenticated:
         return redirect(url_for('index'))
@@ -17411,24 +17282,21 @@ def register():
     form = RegistrationForm()
     
     if form.validate_on_submit():
-        # Create a new User instance with the data from the registration form
+        privileged = {'Admin', 'Manager'}
+        requested_role = (form.userRole.data or '').strip()
+        user_role = requested_role if requested_role and requested_role not in privileged else 'Brand Ambassador'
         user = User(
             username=form.username.data,
             email=form.email.data,
             firstname=form.firstname.data,
             lastname=form.lastname.data,
-            userRole=form.userRole.data,
+            userRole=user_role,
             department=form.department.data,
             province=form.province.data,
-            # Privileges are usually not set at registration.
-            # This can be handled by an admin later.
-            # We can set a default value if needed, e.g., privileges={}
         )
         
-        # Set the user's password
         user.set_password(form.password.data)
         
-        # Add the new user to the database
         db.session.add(user)
         db.session.commit()
         
@@ -19049,9 +18917,7 @@ def ensure_json_response(data, status_code=200):
 @login_required
 def get_help_desk_outlook_config():
     """Return whether Outlook uses IMAP (shared mailbox) or OAuth. When IMAP is configured, UI should not show Connect to Outlook."""
-    # TODO: remove hardcoded fallback after testing; use .env only in production
-    help_desk_email = os.getenv('HELP_DESK_EMAIL') or 'library@akello.co'
-    help_desk_password = os.getenv('HELP_DESK_EMAIL_APP_PASSWORD') or 'wdmqpbqtpdkqsmbr'
+    help_desk_email, help_desk_password, _, _ = _helpdesk_imap_settings()
     use_imap = bool(help_desk_email and help_desk_password)
     out = {'use_imap': use_imap}
     if use_imap:
@@ -19106,7 +18972,7 @@ def get_email_queries():
             
             if email_source == 'gmail':
                 result = fetch_gmail_emails()
-            elif email_source == 'outlook' and (os.getenv('HELP_DESK_EMAIL') or 'library@akello.co') and (os.getenv('HELP_DESK_EMAIL_APP_PASSWORD') or 'wdmqpbqtpdkqsmbr'):
+            elif email_source == 'outlook' and (os.getenv('HELP_DESK_EMAIL') or os.getenv('HELPDESK_EMAIL')) and (os.getenv('HELP_DESK_EMAIL_APP_PASSWORD') or os.getenv('HELPDESK_APP_PASSWORD')):
                 result = fetch_outlook_emails_imap()
             else:
                 result = fetch_outlook_emails()
@@ -19343,11 +19209,7 @@ def fetch_outlook_emails_imap():
     """Fetch emails from Outlook using IMAP (HELP_DESK_EMAIL + HELP_DESK_EMAIL_APP_PASSWORD)"""
     mail = None
     try:
-        # TODO: remove hardcoded fallback after testing
-        help_desk_email = os.getenv('HELP_DESK_EMAIL') or 'library@akello.co'
-        help_desk_password = os.getenv('HELP_DESK_EMAIL_APP_PASSWORD') or 'wdmqpbqtpdkqsmbr'
-        imap_server = os.getenv('HELP_DESK_IMAP_SERVER', 'outlook.office365.com')
-        imap_port = int(os.getenv('HELP_DESK_IMAP_PORT', '993'))
+        help_desk_email, help_desk_password, imap_server, imap_port = _helpdesk_imap_settings()
 
         if not help_desk_email or not help_desk_password:
             return jsonify({
@@ -19921,11 +19783,7 @@ def get_email_query_details(email_id):
 def get_outlook_imap_email_details(email_id):
     """Get details of a specific email from Outlook using IMAP (by UID)"""
     try:
-        # TODO: remove hardcoded fallback after testing
-        help_desk_email = os.getenv('HELP_DESK_EMAIL') or 'library@akello.co'
-        help_desk_password = os.getenv('HELP_DESK_EMAIL_APP_PASSWORD') or 'wdmqpbqtpdkqsmbr'
-        imap_server = os.getenv('HELP_DESK_IMAP_SERVER', 'outlook.office365.com')
-        imap_port = int(os.getenv('HELP_DESK_IMAP_PORT', '993'))
+        help_desk_email, help_desk_password, imap_server, imap_port = _helpdesk_imap_settings()
 
         if not help_desk_email or not help_desk_password:
             return jsonify({
@@ -20350,11 +20208,7 @@ def convert_email_to_query(email_id):
 def convert_outlook_imap_email_to_query(email_id):
     """Convert an Outlook IMAP email (outlook_imap_* id) to a help desk query; uses HELP_DESK_EMAIL app password."""
     try:
-        # TODO: remove hardcoded fallback after testing
-        help_desk_email = os.getenv('HELP_DESK_EMAIL') or 'library@akello.co'
-        help_desk_password = os.getenv('HELP_DESK_EMAIL_APP_PASSWORD') or 'wdmqpbqtpdkqsmbr'
-        imap_server = os.getenv('HELP_DESK_IMAP_SERVER', 'outlook.office365.com')
-        imap_port = int(os.getenv('HELP_DESK_IMAP_PORT', '993'))
+        help_desk_email, help_desk_password, imap_server, imap_port = _helpdesk_imap_settings()
         if not help_desk_email or not help_desk_password:
             return jsonify({'error': 'Help desk Outlook IMAP not configured.', 'requires_config': True}), 500
 

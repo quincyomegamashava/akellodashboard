@@ -4,6 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>{% block title %}Akello Dashboard{% endblock %}</title>
 
   <!-- Fonts -->
@@ -389,6 +390,27 @@
         setSidebarState(true);
       }
     });
+  </script>
+
+  <script>
+    (function () {
+      var originalFetch = window.fetch;
+      window.fetch = function (input, init) {
+        init = init || {};
+        var method = String((init.method || 'GET')).toUpperCase();
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(method) !== -1) {
+          var headers = new Headers(init.headers || {});
+          if (!headers.has('X-CSRFToken') && !headers.has('X-CSRF-Token')) {
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta && meta.content) {
+              headers.set('X-CSRFToken', meta.content);
+            }
+          }
+          init.headers = headers;
+        }
+        return originalFetch.call(this, input, init);
+      };
+    })();
   </script>
 
   {% block scripts %}{% endblock %}

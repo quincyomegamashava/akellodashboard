@@ -6,6 +6,20 @@ from flask import jsonify
 from flask_login import current_user
 
 
+def admin_required(f):
+    """Require an authenticated Admin role (JSON 401/403)."""
+
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return jsonify({'error': 'Authentication required'}), 401
+        if current_user.userRole != 'Admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        return f(*args, **kwargs)
+
+    return decorated
+
+
 def super_admin_required(f):
     """Require Admin role and Super-admin privilege."""
 

@@ -13,12 +13,34 @@ except ImportError:
     pass
 
 
+def _is_production() -> bool:
+    """True when FLASK_ENV or ENV is production/prod. Unset env is treated as local."""
+    flask_env = (os.environ.get('FLASK_ENV') or os.environ.get('ENV') or '').strip().lower()
+    return flask_env in ('production', 'prod')
+
+
+# Local-only fallback. Production must set SECRET_KEY (fail closed).
+_DEV_SECRET_FALLBACK = 'dev-only-insecure-secret-key'
+_secret_key = (os.environ.get('SECRET_KEY') or '').strip()
+if not _secret_key:
+    if _is_production():
+        raise RuntimeError(
+            'SECRET_KEY must be set when FLASK_ENV or ENV is production. '
+            'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'
+        )
+    _secret_key = _DEV_SECRET_FALLBACK
+
+
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
+    SECRET_KEY = _secret_key
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(basedir, 'app.db')
 
-    # Flask-WTF CSRF — Learning Hub blueprints validate explicitly (legacy dashboard POSTs unchanged).
+    # Flask-WTF CSRF — CHECK_DEFAULT stays false so legacy dashboard POSTs without
+    # tokens keep working. Learning Hub and staff admin mutations call
+    # csrf_protect_unsafe / require_csrf_on_post explicitly. Exempt: public
+    # stakeholder lead POST, learn_api blueprint, Socket.IO. Enable CHECK_DEFAULT
+    # only after remaining dashboard fetch() POSTs send X-CSRFToken.
     WTF_CSRF_ENABLED = os.environ.get('WTF_CSRF_ENABLED', 'true').lower() in ('true', '1', 't', 'yes', 'y')
     WTF_CSRF_TIME_LIMIT = int(os.environ.get('WTF_CSRF_TIME_LIMIT', '86400'))
     WTF_CSRF_CHECK_DEFAULT = os.environ.get('WTF_CSRF_CHECK_DEFAULT', 'false').lower() in ('true', '1', 't', 'yes', 'y')
