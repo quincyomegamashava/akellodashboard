@@ -98,10 +98,17 @@
                         </button>
                     </div>
                     <div class="toolbar-group">
+                        {% if query_writes_enabled %}
                         <label class="checkbox-label">
                             <input type="checkbox" id="allowModifications">
-                            Allow Modifications
+                            Allow DML (Super-admin; DDL is always blocked)
                         </label>
+                        {% else %}
+                        <span class="checkbox-label" title="Read-only. Set ALLOW_QUERY_UI_WRITES and use Super-admin to enable DML.">
+                            Read-only (SELECT / SHOW / EXPLAIN)
+                        </span>
+                        <input type="hidden" id="allowModifications" value="">
+                        {% endif %}
                         <label class="input-label">
                             Limit: <input type="number" id="queryLimit" value="1000" min="1" max="10000" class="limit-input">
                         </label>

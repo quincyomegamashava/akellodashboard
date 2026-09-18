@@ -128,6 +128,12 @@ class User(UserMixin, db.Model):
     def has_privilege(self, privilege):
         return self.get_privileges().get(privilege, False)
 
+    def add_privilege(self, privilege: str):
+        """Grant a privilege (Phase 2). ``grant_privilege`` calls this helper."""
+        if not privilege or not str(privilege).strip():
+            raise ValueError('privilege name is required')
+        self.set_privilege(str(privilege).strip(), True)
+
     def set_privilege(self, privilege, value: bool):
         from sqlalchemy.orm.attributes import flag_modified
         privs = self.get_privileges()

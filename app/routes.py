@@ -346,400 +346,8 @@ def _json_response_has_rows(resp):
     except Exception:
         return False
 
-@app.route("/generate_lesson", methods=["POST"])
-def generate_lesson():
-    """Legacy endpoint for lesson plan generation - now uses Ollama instead of OpenAI"""
-    data = request.get_json()
-    topic = data.get("topic")
-    objectives = data.get("objectives", [])
-    age = data.get("age")
-    subject = data.get("subject", "")
-    duration = data.get("duration", 45)
-    class_size = data.get("class_size", 25)
-    notes = data.get("notes", "")
-
-    if not topic or not age:
-        return jsonify({"error": "Please provide topic and age"}), 400
-
-    objectives_text = ", ".join(objectives) if isinstance(objectives, list) else objectives
-    
-    # Build subject context
-    subject_context = f" for {subject}" if subject else ""
-    
-    # Build duration context
-    duration_context = f"The lesson should be designed for {duration} minutes."
-    
-    # Build class size context
-    class_context = f"Consider a class size of approximately {class_size} students."
-    
-    # Build notes context
-    notes_context = f"\n\nAdditional requirements: {notes}" if notes else ""
-
-    # Enhanced prompt construction
-    prompt = f"""
-    You are an experienced British teacher. Create a detailed, age-appropriate lesson plan{subject_context}.
-
-    Topic: {topic}
-    Learner age: {age} years old
-    Subject: {subject if subject else "General"}
-    Duration: {duration} minutes
-    Class size: {class_size} students
-    Learning objectives: {objectives_text if objectives_text else "To understand and explain the key concepts of the topic"}{notes_context}
-
-    {duration_context} {class_context}
-
-    The lesson plan should include:
-    - A clear, engaging title
-    - Learning objectives (specific, measurable, and age-appropriate)
-    - An engaging introduction/warm-up activity (5-10% of lesson time)
-    - Main content broken into logical sections with timing
-    - At least 3 varied exercises or activities suitable for the class size
-    - Assessment opportunities
-    - A brief summary/plenary at the end
-    - Required materials/resources
-    - Differentiation strategies for different ability levels
-
-    Use British spelling and educational terminology. Make it practical and actionable for teachers.
-
-    Please return the result in structured JSON format like this:
-    {{
-      "title": "",
-      "objectives": [],
-      "introduction": "",
-      "content": [],
-      "exercises": [],
-      "assessment": "",
-      "summary": "",
-      "materials": [],
-      "differentiation": ""
-    }}
-    """
-
-    # Ollama config
-    base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')
-    model = os.getenv('OLLAMA_MODEL') or 'llama3.1'
-
-    # Try HTTP API first
-    content = ''
-    http_error = None
-    headers = {}
-    authz = os.getenv('OLLAMA_AUTHORIZATION')
-    api_key = os.getenv('OLLAMA_API_KEY')
-    if authz:
-        headers['Authorization'] = authz
-    elif api_key:
-        headers['Authorization'] = f'Bearer {api_key}'
-
-    try:
-        resp = requests.post(f"{base_url}/api/generate", json={
-            'model': model,
-            'prompt': prompt,
-            'stream': False
-        }, timeout=120, headers=headers)
-        resp.raise_for_status()
-        payload = resp.json()
-        content = payload.get('response') or payload.get('message') or ''
-        if not content:
-            content = payload.get('data') or ''
-    except Exception as e:
-        http_error = e
-    # If HTTP failed or returned empty, try HTTP chat endpoint
-    if not content:
-        try:
-            resp2 = requests.post(f"{base_url}/api/chat", json={
-                'model': model,
-                'messages': [
-                    {'role': 'system', 'content': 'You are a professional British lesson plan designer with expertise in creating engaging, age-appropriate educational content.'},
-                    {'role': 'user', 'content': prompt}
-            ],
-                'stream': False
-            }, timeout=120, headers=headers)
-            resp2.raise_for_status()
-            payload2 = resp2.json()
-            content = payload2.get('message', {}).get('content') or ''
-        except Exception:
-            pass
-    # If HTTP failed or returned empty, try Python library fallback
-    if not content:
-        try:
-            from ollama import Client
-            client = Client(host=base_url)
-            res = client.generate(model=model, prompt=prompt, stream=False)
-            content = res.get('response') or res.get('message', {}).get('content') or ''
-            if not content:
-                res2 = client.chat(model=model, messages=[
-                    {'role': 'system', 'content': 'You are a professional British lesson plan designer with expertise in creating engaging, age-appropriate educational content.'},
-                    {'role': 'user', 'content': prompt}
-                ])
-                content = res2.get('message', {}).get('content') or ''
-        except Exception as e:
-            if http_error:
-                return jsonify({'error': f'Failed to generate from Ollama HTTP ({http_error}); and Python client also failed: {e}'}), 502
-            return jsonify({'error': f'Failed to generate from Ollama Python client: {e}'}), 502
-
-    if not content:
-        return jsonify({'error': 'Failed to generate lesson plan from Ollama'}), 502
-
-        return jsonify({"lesson": content})
-
-
-
-@app.route('/analyze_users_csv', methods=['POST'])
-@login_required
-def analyze_users_csv():
-    """Analyze user CSV for duplicates and validate columns before uploading"""
-    if current_user.userRole != 'Admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
-
-    file = request.files['file']
-    if not file or not file.filename:
-        return jsonify({'error': 'No file selected'}), 400
-
-    if not file.filename.lower().endswith('.csv'):
-        return jsonify({'error': 'Please upload a .csv file'}), 400
-
-    try:
-        # Parse CSV
-        stream = io.TextIOWrapper(file.stream, encoding='utf-8')
-        reader = csv.DictReader(stream)
-        
-        # Required columns for user upload
-        required_columns = ['firstname', 'lastname', 'email', 'userRole', 'department', 'province']
-        csv_columns = reader.fieldnames or []
-        
-        # Check for missing columns
-        missing_columns = [col for col in required_columns if col not in csv_columns]
-        if missing_columns:
-            return jsonify({
-                'error': 'Missing required columns',
-                'missing_columns': missing_columns,
-                'required_columns': required_columns,
-                'found_columns': csv_columns
-            }), 400
-        
-        # Track duplicates
-        email_duplicates = []  # Emails that exist in DB
-        csv_email_duplicates = []  # Duplicate emails within CSV
-        seen_emails = {}
-        
-        users_to_create = []
-        row_num = 1  # Start at 1 (header is row 0)
-        
-        for row in reader:
-            row_num += 1
-            email = (row.get('email') or '').strip().lower()
-            firstname = (row.get('firstname') or '').strip()
-            lastname = (row.get('lastname') or '').strip()
-            
-            if not email:
-                continue
-            
-            # Check for duplicates within CSV
-            if email in seen_emails:
-                csv_email_duplicates.append({
-                    'email': email,
-                    'firstname': firstname,
-                    'lastname': lastname,
-                    'rows': [seen_emails[email], row_num]
-                })
-            else:
-                seen_emails[email] = row_num
-            
-            # Check if email exists in database
-            existing_user = User.query.filter_by(email=email).first()
-            if existing_user:
-                email_duplicates.append({
-                    'email': email,
-                    'firstname': firstname,
-                    'lastname': lastname,
-                    'existing_user': f"{existing_user.firstname} {existing_user.lastname}",
-                    'existing_username': existing_user.username,
-                    'row': row_num
-                })
-            else:
-                users_to_create.append({
-                    'email': email,
-                    'firstname': firstname,
-                    'lastname': lastname,
-                    'userRole': row.get('userRole', '').strip(),
-                    'department': row.get('department', '').strip(),
-                    'province': row.get('province', '').strip()
-                })
-        
-        has_duplicates = len(email_duplicates) > 0 or len(csv_email_duplicates) > 0
-        
-        return jsonify({
-            'success': True,
-            'has_duplicates': has_duplicates,
-            'csv_email_duplicates': csv_email_duplicates,
-            'existing_email_duplicates': email_duplicates,
-            'total_new_users': len(users_to_create),
-            'total_duplicates': len(email_duplicates)
-        }), 200
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/upload_users_confirmed', methods=['POST'])
-@login_required
-def upload_users_confirmed():
-    """Upload users CSV with skip options"""
-    if current_user.userRole != 'Admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
-
-    file = request.files['file']
-    skip_emails = request.form.get('skip_emails', '[]')
-    
-    try:
-        skip_emails = json.loads(skip_emails)
-    except:
-        skip_emails = []
-
-    try:
-        stream = io.TextIOWrapper(file.stream, encoding='utf-8')
-        reader = csv.DictReader(stream)
-        
-        created = 0
-        skipped = 0
-        errors = []
-        
-        for row in reader:
-            try:
-                firstname = row.get('firstname', '').strip()
-                lastname = row.get('lastname', '').strip()
-                email = row.get('email', '').strip().lower()
-                role = row.get('userRole', '').strip()
-                department = row.get('department', '').strip()
-                province = row.get('province', '').strip()
-
-                if not (firstname and lastname and email and role and department and province):
-                    continue
-                
-                # Check if email should be skipped
-                if email in skip_emails:
-                    skipped += 1
-                    continue
-
-                # Generate unique username
-                base_username = f"{firstname.lower()}{lastname.lower()}"
-                username = base_username
-                count = 1
-                while User.query.filter_by(username=username).first():
-                    username = f"{base_username}{count}"
-                    count += 1
-
-                # Create user
-                password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(10))
-                user = User(
-                    username=username,
-                    firstname=firstname,
-                    lastname=lastname,
-                    email=email,
-                    userRole=role,
-                    department=department,
-                    province=province
-                )
-                user.set_password(password)
-                db.session.add(user)
-                created += 1
-                
-            except Exception as e:
-                errors.append(str(e))
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': f'Upload complete! Created: {created}, Skipped: {skipped}',
-            'created': created,
-            'skipped': skipped,
-            'errors': errors
-        }), 200
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/upload_users', methods=['GET', 'POST'])
-@login_required
-def upload_users():
-    form = CSVUploadForm()
-    if form.validate_on_submit():
-        file = form.csv_file.data
-        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
-        reader = csv.DictReader(stream)
-
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(['First Name', 'Last Name', 'Email', 'Username', 'Password', 'Status'])
-
-        for row in reader:
-            try:
-                firstname = row.get('firstname', '').strip()
-                lastname = row.get('lastname', '').strip()
-                email = row.get('email', '').strip()
-                role = row.get('userRole', '').strip()
-                department = row.get('department', '').strip()
-                province = row.get('province', '').strip()
-
-                if not (firstname and lastname and email and role and department and province):
-                    writer.writerow([firstname, lastname, email, '', '', 'Missing Fields'])
-                    continue
-
-                base_username = f"{firstname.lower()}{lastname.lower()}"
-                username = base_username
-                count = 1
-                while User.query.filter_by(username=username).first():
-                    username = f"{base_username}{count}"
-                    count += 1
-
-                if User.query.filter_by(email=email).first():
-                    writer.writerow([firstname, lastname, email, username, '', 'Email Exists'])
-                    continue
-
-                password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(10))
-                user = User(
-                    username=username,
-                    firstname=firstname,
-                    lastname=lastname,
-                    email=email,
-                    userRole=role,
-                    department=department,
-                    province=province
-                )
-                user.set_password(password)
-                print(user)
-                db.session.add(user)
-                db.session.commit()
-
-                writer.writerow([firstname, lastname, email, username, password, 'Created'])
-                print(f"[INFO] Created user: {username} ({email})")
-
-            except Exception as e:
-                db.session.rollback()
-                print("Error while creating user:", e)
-                traceback.print_exc()
-                writer.writerow([firstname, lastname, email, '', '', f'Error: {str(e)}'])
-
-        output.seek(0)
-        return send_file(
-            io.BytesIO(output.getvalue().encode()),
-            mimetype='text/csv',
-            as_attachment=True,
-            download_name='registered_users_report.csv'
-        )
-    return redirect(url_for('settings'))
-
-
-
+# /generate_lesson, /analyze_users_csv, /upload_users, /upload_users_confirmed,
+# and /logout live in app/blueprints/staff_security (Phase 2 extract).
 
 @app.route('/welcome', methods=['GET'])
 @login_required
@@ -845,12 +453,18 @@ def grant_privilege(user_id):
     if not current_user.userRole == "Admin":
         return jsonify({"error": "Unauthorized"}), 403
 
-    privilege = request.json.get("privilege")
+    payload = request.get_json(silent=True) or {}
+    privilege = payload.get("privilege")
+    if not privilege:
+        return jsonify({"error": "privilege is required"}), 400
     user = db.session.get(User, user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    user.add_privilege(privilege)
+    try:
+        user.add_privilege(privilege)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     return jsonify({"message": f"Privilege '{privilege}' granted to {user.username}."})
 
 
@@ -9210,7 +8824,9 @@ def asl_total_sec_content():
 
     except Exception as e:
         import traceback
-        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+        from app.http_errors import client_error_payload
+        app.logger.exception("asl_total_sec_content failed")
+        return jsonify(client_error_payload(status=500, exc=e)), 500
 
 
 
@@ -17200,9 +16816,10 @@ def login():
             return redirect(url_for('login'))
         login_user(user, remember=form.remember_me.data)
         next_page = request.args.get('next')
+        from app.redirect_util import is_safe_internal_redirect
         # Ensure non-Brand Ambassador users land on /overview (not /welcome) after login.
-        # Keep Brand Ambassador users redirected to their /profile.
-        if not next_page or urlsplit(next_page).netloc != '' or next_page == url_for('overview'):
+        # Keep Brand Ambassador users redirected to their /profile. Reject open redirects.
+        if not is_safe_internal_redirect(next_page) or next_page == url_for('overview'):
             if (user.userRole == 'Brand Ambassador') or (getattr(current_user, 'userRole', None) == 'Brand Ambassador'):
                 next_page = url_for('profile', username=user.username)
             else:
@@ -17263,10 +16880,7 @@ def api_tickets():
     } for t in tickets])
 
 
-@app.route('/logout')
-def logout():
-    logout_user()
-    return redirect(url_for('welcome'))
+# /logout moved to app/blueprints/staff_security
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -22059,6 +21673,7 @@ def mobile_logout():
     """
     try:
         logout_user()
+        session.clear()
         return jsonify({'success': True, 'message': 'Logout successful'}), 200
     except Exception as e:
         print(f"Mobile logout error: {e}")

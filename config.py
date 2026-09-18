@@ -113,11 +113,20 @@ class Config:
     OLLAMA_NUM_PREDICT = int(os.environ.get('OLLAMA_NUM_PREDICT', '900'))
     GENERATION_PROGRESS_TARGET_CHARS = int(os.environ.get('GENERATION_PROGRESS_TARGET_CHARS', '2600'))
 
-    # Allow applying Alembic upgrades from /administration (disable via .env in Docker if needed)
-    ALLOW_WEB_MIGRATIONS = os.environ.get('ALLOW_WEB_MIGRATIONS', 'true').lower() in ('true', '1', 't', 'yes', 'y')
+    # Socket.IO CORS allowlist (never default to *). Comma-separated origins.
+    # SOCKETIO_CORS_ORIGINS takes precedence over CORS_ORIGINS.
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '')
+    SOCKETIO_CORS_ORIGINS = os.environ.get('SOCKETIO_CORS_ORIGINS', '') or CORS_ORIGINS
 
-    # Allow DDL (create/alter/drop tables & columns) from Database Schema Studio
-    ALLOW_WEB_SCHEMA_CHANGES = os.environ.get('ALLOW_WEB_SCHEMA_CHANGES', 'true').lower() in ('true', '1', 't', 'yes', 'y')
+    # Allow applying Alembic upgrades from /administration. Default OFF (fail closed).
+    ALLOW_WEB_MIGRATIONS = os.environ.get('ALLOW_WEB_MIGRATIONS', 'false').lower() in ('true', '1', 't', 'yes', 'y')
+
+    # Allow DDL (create/alter/drop tables & columns) from Database Schema Studio. Default OFF.
+    ALLOW_WEB_SCHEMA_CHANGES = os.environ.get('ALLOW_WEB_SCHEMA_CHANGES', 'false').lower() in ('true', '1', 't', 'yes', 'y')
+
+    # Query UI DML (INSERT/UPDATE/DELETE). DDL is never allowed. Default OFF.
+    # Even when true, only Super-admin may run DML.
+    ALLOW_QUERY_UI_WRITES = os.environ.get('ALLOW_QUERY_UI_WRITES', 'false').lower() in ('true', '1', 't', 'yes', 'y')
 
     # Allow DDL on external MySQL databases (Ruzivo/Library) — keep false in production unless needed
     ALLOW_EXTERNAL_SCHEMA_CHANGES = os.environ.get(

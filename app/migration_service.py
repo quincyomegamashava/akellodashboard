@@ -497,7 +497,7 @@ def get_diagnostics() -> dict[str, Any]:
             'recommended_stamp_targets': recommended,
             'available_revisions': available_revisions,
             'database': _safe_database_label(),
-            'web_migrations_enabled': current_app.config.get('ALLOW_WEB_MIGRATIONS', True),
+            'web_migrations_enabled': current_app.config.get('ALLOW_WEB_MIGRATIONS', False),
             'multiple_heads': multiple_heads,
             'has_orphan_files': has_orphan_files,
             'suggested_actions': suggested_actions,
@@ -589,7 +589,7 @@ def _read_migration_status() -> dict[str, Any]:
             'pending_count': len(pending),
             'is_up_to_date': is_up_to_date and len(pending) == 0,
             'database': _safe_database_label(),
-            'web_migrations_enabled': current_app.config.get('ALLOW_WEB_MIGRATIONS', True),
+            'web_migrations_enabled': current_app.config.get('ALLOW_WEB_MIGRATIONS', False),
             'chain_broken': False,
             'needs_repair': False,
         }
@@ -605,7 +605,7 @@ def _read_migration_status() -> dict[str, Any]:
             'pending_count': 0,
             'pending_revisions': [],
             'database': _safe_database_label(),
-            'web_migrations_enabled': current_app.config.get('ALLOW_WEB_MIGRATIONS', True),
+            'web_migrations_enabled': current_app.config.get('ALLOW_WEB_MIGRATIONS', False),
             'chain_broken': True,
             'needs_repair': True,
         }
@@ -723,7 +723,7 @@ def backup_app_database() -> dict[str, Any]:
 
 
 def _check_web_migrations_enabled() -> dict[str, Any] | None:
-    if not current_app.config.get('ALLOW_WEB_MIGRATIONS', True):
+    if not current_app.config.get('ALLOW_WEB_MIGRATIONS', False):
         return {
             'success': False,
             'error': 'Web migrations are disabled (ALLOW_WEB_MIGRATIONS=false).',
@@ -1845,7 +1845,7 @@ def run_upgrade(
     mode: str = 'all',
 ) -> dict[str, Any]:
     """Apply pending migrations up to the given revision (or only the next one)."""
-    if not current_app.config.get('ALLOW_WEB_MIGRATIONS', True):
+    if not current_app.config.get('ALLOW_WEB_MIGRATIONS', False):
         return {
             'success': False,
             'error': 'Web migrations are disabled (ALLOW_WEB_MIGRATIONS=false).',

@@ -475,7 +475,7 @@ def studio_migration_sync():
 @super_admin_required
 def studio_migration_generate():
     """Autogenerate an Alembic revision from model/schema diff (does not apply)."""
-    if not current_app.config.get('ALLOW_WEB_MIGRATIONS', True):
+    if not current_app.config.get('ALLOW_WEB_MIGRATIONS', False):
         return _json_error('Web migrations are disabled (ALLOW_WEB_MIGRATIONS=false).')
 
     data = request.get_json(silent=True) or {}

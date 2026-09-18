@@ -21,14 +21,34 @@ Code fixes on `cursor/audit-efficiency-plan-8ba0` after Quincy approved Phase 1.
 | S5 Debug leftovers | Done | Live `/check-columns` and `/api/testingdb1` routes removed. |
 | S6 Public register → Admin | Done | Form no longer lists Admin/Manager. Server coerces those roles to `Brand Ambassador`. |
 | S7 Weak SECRET_KEY | Done | `config.py` raises if `SECRET_KEY` is unset when `FLASK_ENV`/`ENV` is `production`/`prod`. Local fallback is `dev-only-insecure-secret-key` only. |
-| S8 CSRF on staff mutations | Partial (intentional) | `WTF_CSRF_CHECK_DEFAULT` still false (legacy forms). `/admin/users/*` grant/revoke/patch/delete/reset/toggle now use `csrf_protect_unsafe`. `base.html` sends `X-CSRFToken` on mutating `fetch()`. Learning Hub unchanged. Exempt: public lead POST, `learn_api`. Full CHECK_DEFAULT=true remains Phase 2. |
+| S8 CSRF on staff mutations | Partial (intentional) | `WTF_CSRF_CHECK_DEFAULT` still false (legacy forms). `/admin/users/*` grant/revoke/patch/delete/reset/toggle now use `csrf_protect_unsafe`. `base.html` sends `X-CSRFToken` on mutating `fetch()`. Learning Hub unchanged. Exempt: public lead POST, `learn_api`. Phase 2 also CSRF-wraps user CSV uploads. Full CHECK_DEFAULT=true remains deferred. |
 | B1/B2 Fake chart data | Done | Random sample generators removed. Timeout returns last-good real cache or HTTP 408. |
 | B3 HLF cache ignores dates | Done | Cache key is `hlf_weekly_stats_{start}_{end}`. |
 | B8 pandas in requirements | Done | `pandas==2.3.2` uncommented. |
 | B7 tests import `create_app` | Done (skip) | `tests/test_pm_service.py` skips unless `create_app` exists so collect does not explode. |
 | `create_admin_user.py` default password | Done | Requires `ADMIN_BOOTSTRAP_PASSWORD`. |
 
-**Not in this Phase 1 pass (follow-ups):** S9 Socket.IO CORS; S10 DDL defaults; S11 query-UI SQL; B4 `add_privilege` crash; B5 `/generate_lesson` dead return; B11 logout redirect; B12 stack traces in JSON; B13 `/upload_users` Admin gate; routes.py split.
+**Not in this Phase 1 pass (follow-ups):** see Phase 2 below (implemented on `cursor/phase-2-security-hygiene-501a`).
+
+---
+
+## Phase 2 implemented (stacked PR)
+
+Hygiene follow-ups on `cursor/phase-2-security-hygiene-501a`, branched from Phase 1. Details: `PHASE_2_NOTES.md`.
+
+| Item | Status | What changed |
+| --- | --- | --- |
+| B13 `/upload_users` Admin gate | Done | `/upload_users`, `/upload_users_confirmed`, `/analyze_users_csv` require Admin (403 otherwise) + CSRF on POST. |
+| B11 Logout redirect | Done | Session cleared; redirect to `/login` (ignores `next=`). Login `next` uses `is_safe_internal_redirect`. |
+| B12 Stack traces in JSON | Done | Global sanitizer strips `trace`; production 5xx JSON is generic; server logs the exception. |
+| S9 Socket.IO CORS | Done | Allowlist from `SOCKETIO_CORS_ORIGINS` / `CORS_ORIGINS`; localhost default; `*` refused in production. |
+| S11 Query UI SQL | Done | Word-boundary DDL/DCL/OUTFILE/stacked-statement block. Client `allow_modifications` ignored. DML only for Super-admin + `ALLOW_QUERY_UI_WRITES`. Residual: ad-hoc SELECT is still a string (`text()`), not bound parameters. |
+| B4 `User.add_privilege` | Done | Helper calls `set_privilege(privilege, True)`. |
+| B5 `/generate_lesson` | Done | Login + Admin/Content Development; JSON null-check; success return no longer dead; errors logged, not leaked in production. |
+| S10 DDL defaults | Done | `ALLOW_WEB_MIGRATIONS` / `ALLOW_WEB_SCHEMA_CHANGES` default false. |
+| Incremental `routes.py` split | Done | `app/blueprints/staff_security/` (logout, uploads, generate_lesson) with stable endpoint names. |
+
+**Still deferred:** global CSRF CHECK_DEFAULT; analytics extract from `routes.py`; `create_app` factory; secret rotation (Quincy).
 
 ---
 
@@ -181,7 +201,9 @@ Impact × effort. Do not start these until Section C items 1–7 are in motion.
 
 ### Phase 2 — Structure (after Phase 1)
 
-**Work**
+Hygiene items originally listed as Phase 1 leftovers (S9–S11, B4, B5, B11–B13, incremental routes extract) are implemented on `cursor/phase-2-security-hygiene-501a`. See `PHASE_2_NOTES.md`.
+
+**Still open structure work**
 
 - Extract analytics/chart routes from `app/routes.py` into `app/blueprints/analytics/` (start with platforms yearly, HLF weekly, province stats — `province_stats_service.py` is the template).
 - Extract connection helpers to `app/db_external.py`.
@@ -204,7 +226,7 @@ Impact × effort. Do not start these until Section C items 1–7 are in motion.
 - Prewarm MTD province stats (helpers already exist in `province_stats_service.py`).
 - Redis cache for multi-worker deploys.
 - Judge0 for Learning Hub sandbox in production.
-- Restrict Socket.IO CORS; consider splitting realtime from the gunicorn/werkzeug web process.
+- Socket.IO CORS allowlist is done in Phase 2; consider splitting realtime from the gunicorn/werkzeug web process.
 
 **Success criteria**
 
