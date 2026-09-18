@@ -18,8 +18,12 @@ csrf = CSRFProtect(app)
 login = LoginManager(app)
 login.login_view = 'login'
 
-# Initialize SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+# Initialize SocketIO with an origin allowlist (never '*' by default).
+from app.cors_util import socketio_cors_origins
+from app.http_errors import register_error_sanitizers
+
+socketio = SocketIO(app, cors_allowed_origins=socketio_cors_origins(), async_mode='threading')
+register_error_sanitizers(app)
 
 # Initialize activity tracking
 from app.activity_tracker import ActivityTracker
@@ -48,6 +52,9 @@ from app import routes_asl_settings
 # Import and register database routes
 from app.database_routes import database_bp
 app.register_blueprint(database_bp)
+
+from app.blueprints.staff_security import init_app as init_staff_security
+init_staff_security(app)
 
 from app.migration_routes import migration_bp
 app.register_blueprint(migration_bp)

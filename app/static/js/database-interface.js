@@ -816,7 +816,8 @@ SELECT * FROM users LIMIT 10;`, -1);
                 return;
             }
             
-            const allowModifications = document.getElementById('allowModifications').checked;
+            const allowEl = document.getElementById('allowModifications');
+            const allowModifications = !!(allowEl && allowEl.checked);
             const limit = parseInt(document.getElementById('queryLimit').value) || 1000;
             
             const response = await fetch(`/api/databases/${this.currentDatabase}/query`, {

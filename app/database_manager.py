@@ -293,12 +293,26 @@ class DatabaseManager:
         except:
             return 0
     
-    def execute_query(self, db_key: str, query: str, limit: int = 1000) -> Dict[str, Any]:
-        """Execute SQL query and return results"""
+    def execute_query(self, db_key: str, query: str, limit: int = 1000, allow_dml: bool = False) -> Dict[str, Any]:
+        """Execute SQL query and return results.
+
+        Always re-validates SQL (defense in depth). DDL is never executed.
+        """
+        from app.sql_guard import validate_query_ui_sql
+
         if db_key not in self.engines:
             raise ValueError(f"Database {db_key} not connected")
-        
+
+        ok, err = validate_query_ui_sql(query, allow_dml=allow_dml)
+        if not ok:
+            return {'success': False, 'error': err, 'message': err}
+
         try:
+            try:
+                limit = max(1, min(int(limit), 10000))
+            except (TypeError, ValueError):
+                limit = 1000
+
             engine = self.engines[db_key]
             start_time = datetime.now()
             
@@ -378,6 +392,8 @@ class DatabaseManager:
     def _build_select_query(self, config: Dict[str, Any]) -> str:
         """Build SELECT query from configuration"""
         # Extract configuration
+        from app.sql_guard import assert_safe_identifiers, is_safe_identifier, is_safe_operator, sql_literal
+
         tables = config.get('tables', [])
         columns = config.get('columns', ['*'])
         joins = config.get('joins', [])
@@ -386,9 +402,11 @@ class DatabaseManager:
         having = config.get('having', [])
         order_by = config.get('order_by', [])
         limit = config.get('limit')
-        
+
         if not tables:
             raise ValueError("At least one table must be selected")
+
+        assert_safe_identifiers(tables, kind='table')
         
         # Build SELECT clause
         if columns == ['*'] or not columns:
@@ -400,17 +418,26 @@ class DatabaseManager:
                     table = col.get('table', '')
                     column = col.get('column', '')
                     alias = col.get('alias', '')
-                    
+
+                    if table and not is_safe_identifier(table):
+                        raise ValueError(f'Invalid table identifier: {table!r}')
+                    if column != '*' and not is_safe_identifier(column):
+                        raise ValueError(f'Invalid column identifier: {column!r}')
+                    if alias and not is_safe_identifier(alias):
+                        raise ValueError(f'Invalid alias: {alias!r}')
+
                     if table and column:
                         col_str = f"`{table}`.`{column}`"
                     else:
                         col_str = f"`{column}`"
-                    
+
                     if alias:
                         col_str += f" AS `{alias}`"
-                    
+
                     formatted_columns.append(col_str)
                 else:
+                    if col != '*' and not is_safe_identifier(col):
+                        raise ValueError(f'Invalid column identifier: {col!r}')
                     formatted_columns.append(f"`{col}`")
             
             select_clause = f"SELECT {', '.join(formatted_columns)}"
@@ -427,6 +454,11 @@ class DatabaseManager:
             condition = join.get('condition', '')
             
             if table and condition:
+                if not is_safe_identifier(table):
+                    raise ValueError(f'Invalid join table: {table!r}')
+                if ';' in condition or '--' in condition:
+                    raise ValueError('Invalid join condition')
+                join_type = join_type if join_type in ('INNER', 'LEFT', 'RIGHT', 'FULL') else 'INNER'
                 join_clauses.append(f"{join_type} JOIN `{table}` ON {condition}")
         
         # Build WHERE clause
@@ -440,10 +472,13 @@ class DatabaseManager:
                     value = condition.get('value', '')
                     
                     if column and value is not None:
-                        if isinstance(value, str) and not value.isdigit():
-                            formatted_conditions.append(f"`{column}` {operator} '{value}'")
-                        else:
-                            formatted_conditions.append(f"`{column}` {operator} {value}")
+                        if not is_safe_identifier(column.split('.')[-1].replace('`', '')):
+                            raise ValueError(f'Invalid condition column: {column!r}')
+                        if not is_safe_operator(operator):
+                            raise ValueError(f'Invalid operator: {operator!r}')
+                        formatted_conditions.append(
+                            f"`{column}` {operator} {sql_literal(value)}"
+                        )
                 else:
                     formatted_conditions.append(str(condition))
             
@@ -644,7 +679,7 @@ def get_db_manager():
                     return []
                 def get_sample_data(self, db_key, table_name, limit=10):
                     return {'success': False, 'error': 'Not available during migrations'}
-                def execute_query(self, db_key, query, limit=1000):
+                def execute_query(self, db_key, query, limit=1000, allow_dml=False):
                     return {'success': False, 'error': 'Not available during migrations'}
                 def build_query(self, db_key, data):
                     return ""

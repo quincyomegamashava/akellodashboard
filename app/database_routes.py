@@ -7,6 +7,9 @@ from flask import Blueprint, render_template, request, jsonify, current_app, sen
 from flask_login import login_required, current_user
 from functools import wraps
 from app.database_manager import get_db_manager
+from app.auth_decorators import is_super_admin
+from app.sql_guard import validate_query_ui_sql
+from app.http_errors import client_error_payload
 import json
 import os
 from datetime import datetime
@@ -26,12 +29,21 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def _query_ui_allow_dml() -> bool:
+    """DML only when env flag is on and the caller is Super-admin. DDL is never allowed."""
+    return bool(current_app.config.get('ALLOW_QUERY_UI_WRITES')) and is_super_admin()
+
+
 @database_bp.route('/databases')
 @login_required
 @admin_required
 def databases_interface():
     """Main database query interface page"""
-    return render_template('database_interface.html', title='Database Query Tool')
+    return render_template(
+        'database_interface.html',
+        title='Database Query Tool',
+        query_writes_enabled=_query_ui_allow_dml(),
+    )
 
 @database_bp.route('/api/databases/list')
 @login_required
@@ -120,23 +132,19 @@ def execute_database_query(db_key):
                 'success': False,
                 'error': 'Query cannot be empty'
             }), 400
-        
-        # Security check - prevent dangerous operations
-        dangerous_keywords = ['DROP', 'DELETE', 'TRUNCATE', 'ALTER', 'CREATE', 'INSERT', 'UPDATE']
-        query_upper = query.upper()
-        
-        # Allow only if explicitly permitted or if it's a SELECT query
-        allow_modifications = data.get('allow_modifications', False)
-        if not allow_modifications:
-            for keyword in dangerous_keywords:
-                if keyword in query_upper:
-                    return jsonify({
-                        'success': False,
-                        'error': f'Operation {keyword} not allowed. Use "Allow Modifications" option if needed.'
-                    }), 400
-        
+
+        # Client allow_modifications is ignored for authorization. DDL is always
+        # blocked. DML requires ALLOW_QUERY_UI_WRITES + Super-admin.
+        allow_dml = _query_ui_allow_dml()
+        ok, err = validate_query_ui_sql(query, allow_dml=allow_dml)
+        if not ok:
+            return jsonify({
+                'success': False,
+                'error': err
+            }), 400
+
         limit = data.get('limit', 1000)
-        result = get_db_manager().execute_query(db_key, query, limit)
+        result = get_db_manager().execute_query(db_key, query, limit, allow_dml=allow_dml)
         
         # Log query execution for audit
         current_app.logger.info(f"Query executed by {current_user.username} on {db_key}: {query[:100]}...")
@@ -147,7 +155,7 @@ def execute_database_query(db_key):
         current_app.logger.error(f"Error executing query on {db_key}: {e}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            **client_error_payload(status=500, exc=e)
         }), 500
 
 @database_bp.route('/api/databases/<db_key>/build-query', methods=['POST'])
@@ -191,12 +199,19 @@ def execute_built_query(db_key):
                 'error': 'Query configuration is required'
             }), 400
         
-        # Build the query
+        # Build the query (SELECT only; identifiers validated in DatabaseManager)
         query = get_db_manager().build_query(db_key, data)
-        
+
+        ok, err = validate_query_ui_sql(query, allow_dml=False)
+        if not ok:
+            return jsonify({
+                'success': False,
+                'error': err
+            }), 400
+
         # Execute the query
         limit = data.get('limit', 1000)
-        result = get_db_manager().execute_query(db_key, query, limit)
+        result = get_db_manager().execute_query(db_key, query, limit, allow_dml=False)
         
         # Add the generated query to the result
         if result.get('success'):

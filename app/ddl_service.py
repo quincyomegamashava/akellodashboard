@@ -53,7 +53,7 @@ def validate_identifier(name: str, label: str = 'Identifier') -> str:
 
 
 def _check_schema_changes_enabled(db_key: str | None = None) -> dict[str, Any] | None:
-    if not current_app.config.get('ALLOW_WEB_SCHEMA_CHANGES', True):
+    if not current_app.config.get('ALLOW_WEB_SCHEMA_CHANGES', False):
         return {
             'success': False,
             'error': 'Web schema changes are disabled (ALLOW_WEB_SCHEMA_CHANGES=false).',
