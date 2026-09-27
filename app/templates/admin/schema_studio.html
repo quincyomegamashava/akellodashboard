@@ -186,9 +186,22 @@
 
       <!-- Files (GitHub-style allowlisted config editor) -->
       <section id="panel-files" class="studio-panel">
+        <div id="filesStatusBar" class="studio-files-status">
+          <div class="studio-files-status-text">
+            <i class="fas fa-shield-alt" id="filesStatusIcon"></i>
+            <span id="filesStatusLabel">Checking file-edit permission…</span>
+          </div>
+          <div class="studio-files-status-actions">
+            <label class="studio-files-toggle" title="Stored in app_settings (super-admin)">
+              <input type="checkbox" id="filesDbToggle">
+              <span>Enable file edits (DB)</span>
+            </label>
+          </div>
+        </div>
         <div id="filesDisabledBanner" class="studio-warning-banner" style="display:none;background:#fef3c7;border-color:#fde68a;color:#92400e;">
           <i class="fas fa-lock"></i>
-          File editing is <strong>disabled</strong>. Set <code>ALLOW_WEB_FILE_EDITS=true</code> in <code>.env</code>, then restart the app.
+          File editing is <strong>disabled</strong>. Turn on <strong>Enable file edits (DB)</strong> above — no .env or restart needed.
+          Optional: set <code>ALLOW_WEB_FILE_EDITS=true</code> in <code>.env</code> for a permanent env override.
         </div>
         <div class="studio-files-layout">
           <aside class="studio-files-tree studio-card">

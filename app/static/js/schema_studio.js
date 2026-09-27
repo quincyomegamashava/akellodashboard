@@ -1244,9 +1244,7 @@
       toast(data.error || 'Failed to list files', 'error');
       return;
     }
-    filesEnabled = !!data.enabled;
-    const banner = $('#filesDisabledBanner');
-    if (banner) banner.style.display = filesEnabled ? 'none' : 'block';
+    applyFilesStatus(data);
     const tree = $('#filesTree');
     if (!tree) return;
     tree.innerHTML = (data.files || []).map((f) => `
@@ -1261,9 +1259,66 @@
       btn.addEventListener('click', () => openConfigFile(btn.dataset.path));
     });
     if (filesCurrentPath) {
-      // refresh open file
       openConfigFile(filesCurrentPath);
     }
+  }
+
+  function applyFilesStatus(data) {
+    filesEnabled = !!data.enabled;
+    const banner = $('#filesDisabledBanner');
+    if (banner) banner.style.display = filesEnabled ? 'none' : 'block';
+    const bar = $('#filesStatusBar');
+    const label = $('#filesStatusLabel');
+    const icon = $('#filesStatusIcon');
+    const toggle = $('#filesDbToggle');
+    if (bar) {
+      bar.classList.toggle('is-on', filesEnabled);
+      bar.classList.toggle('is-off', !filesEnabled);
+    }
+    if (toggle) {
+      toggle.checked = !!data.db_enabled;
+      // Env can keep edits on even if DB is off
+      toggle.disabled = false;
+    }
+    if (label) {
+      if (filesEnabled) {
+        const src = data.source === 'env' ? 'environment (.env)'
+          : data.source === 'db' ? 'database toggle'
+          : data.source === 'env+db' ? 'environment + database'
+          : 'enabled';
+        label.textContent = 'File editing is ON (' + src + ').';
+      } else {
+        label.textContent = 'File editing is OFF — enable the DB toggle to edit .env without SSH.';
+      }
+    }
+    if (icon) {
+      icon.className = filesEnabled ? 'fas fa-unlock' : 'fas fa-lock';
+    }
+    if (filesAce) filesAce.setReadOnly(!filesEnabled);
+    setFilesDirty(filesDirty); // refresh save button state
+  }
+
+  async function setFilesDbToggle(enabled) {
+    if (enabled && !confirm(
+      'Enable web file edits for super-admins?\n\nThis is stored in the database (app_settings). You can turn it off anytime.'
+    )) {
+      const toggle = $('#filesDbToggle');
+      if (toggle) toggle.checked = false;
+      return;
+    }
+    const res = await api('/files/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled: !!enabled, confirm: true }),
+    });
+    if (!res.success) {
+      toast(res.error || 'Failed to update setting', 'error');
+      const toggle = $('#filesDbToggle');
+      if (toggle) toggle.checked = !enabled;
+      return;
+    }
+    toast(res.message || (enabled ? 'File edits enabled' : 'File edits disabled'), 'success');
+    applyFilesStatus(res);
+    if (filesCurrentPath) openConfigFile(filesCurrentPath);
   }
 
   async function openConfigFile(relPath) {
@@ -1272,7 +1327,7 @@
       toast(data.error || 'Failed to open file', 'error');
       return;
     }
-    filesEnabled = !!data.enabled;
+    applyFilesStatus(data);
     filesCurrentPath = data.path;
     filesKind = data.kind || 'text';
     filesOriginalContent = data.content || '';
@@ -1307,7 +1362,7 @@
   async function saveConfigFile() {
     if (!filesCurrentPath) return;
     if (!filesEnabled) {
-      toast('Set ALLOW_WEB_FILE_EDITS=true to save', 'error');
+      toast('Enable file edits (DB toggle) first', 'error');
       return;
     }
     if (!confirm('Save changes to ' + filesCurrentPath + '?\n\nA backup will be created under .studio_backups/')) return;
@@ -1355,6 +1410,7 @@
   $('#filesRefreshBtn')?.addEventListener('click', () => loadFilesPanel());
   $('#filesSaveBtn')?.addEventListener('click', () => saveConfigFile());
   $('#filesDiscardBtn')?.addEventListener('click', () => discardConfigFile());
+  $('#filesDbToggle')?.addEventListener('change', (e) => setFilesDbToggle(!!e.target.checked));
   $('#filesAddEntryBtn')?.addEventListener('click', () => {
     const wrap = $('#filesEnvRows');
     if (!wrap) return;

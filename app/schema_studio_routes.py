@@ -6,7 +6,7 @@ import io
 import sys
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.auth_decorators import is_super_admin, super_admin_required
 from app.ddl_service import (
@@ -536,14 +536,46 @@ def studio_migration_generate():
 
 # --- Allowlisted project config files (GitHub-style editor) ---
 
+@schema_studio_bp.route('/api/admin/schema-studio/files/settings', methods=['GET'])
+@login_required
+@super_admin_required
+def studio_files_settings_get():
+    from app.config_files_service import file_edits_status
+    return jsonify({'success': True, **file_edits_status()})
+
+
+@schema_studio_bp.route('/api/admin/schema-studio/files/settings', methods=['PUT'])
+@login_required
+@super_admin_required
+def studio_files_settings_put():
+    from app.config_files_service import set_db_file_edits_enabled
+    data = request.get_json(silent=True) or {}
+    if 'enabled' not in data:
+        return _json_error('Send {"enabled": true|false}.')
+    enabled = bool(data.get('enabled'))
+    if enabled and not data.get('confirm'):
+        return _json_error('Confirmation required to enable file edits. Send {"enabled": true, "confirm": true}.')
+    try:
+        status = set_db_file_edits_enabled(enabled, user_id=getattr(current_user, 'id', None))
+        return jsonify({
+            'success': True,
+            'message': 'File editing enabled via database toggle.' if enabled else 'Database file-edit toggle turned off.',
+            **status,
+        })
+    except Exception as exc:
+        current_app.logger.exception('schema-studio files settings')
+        return _json_error(str(exc), 500)
+
+
 @schema_studio_bp.route('/api/admin/schema-studio/files', methods=['GET'])
 @login_required
 @super_admin_required
 def studio_list_files():
-    from app.config_files_service import files_enabled, list_config_files
+    from app.config_files_service import file_edits_status, list_config_files
+    status = file_edits_status()
     return jsonify({
         'success': True,
-        'enabled': files_enabled(),
+        **status,
         'files': list_config_files(),
     })
 
@@ -552,10 +584,10 @@ def studio_list_files():
 @login_required
 @super_admin_required
 def studio_read_file(rel_path):
-    from app.config_files_service import files_enabled, read_config_file
+    from app.config_files_service import file_edits_status, read_config_file
     try:
         data = read_config_file(rel_path)
-        data['enabled'] = files_enabled()
+        data.update(file_edits_status())
         return jsonify({'success': True, **data})
     except ValueError as exc:
         return _json_error(str(exc), 404)

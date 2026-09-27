@@ -10,6 +10,8 @@ from typing import Any
 
 from flask import current_app
 
+SETTING_KEY_FILE_EDITS = "allow_web_file_edits"
+
 # Relative to project root (parent of app/)
 ALLOWED_FILES: dict[str, dict[str, str]] = {
     ".env": {
@@ -69,8 +71,56 @@ def _resolve_allowed(rel_path: str) -> Path | None:
     return target
 
 
-def files_enabled() -> bool:
+def _truthy(val: str | None) -> bool:
+    return str(val or "").strip().lower() in ("true", "1", "t", "yes", "y", "on")
+
+
+def env_file_edits_enabled() -> bool:
     return bool(current_app.config.get("ALLOW_WEB_FILE_EDITS", False))
+
+
+def db_file_edits_enabled() -> bool:
+    try:
+        from app.models import AppSetting
+        return _truthy(AppSetting.get_value(SETTING_KEY_FILE_EDITS, "false"))
+    except Exception:
+        return False
+
+
+def files_enabled() -> bool:
+    """True if env flag OR super-admin DB toggle is on."""
+    return env_file_edits_enabled() or db_file_edits_enabled()
+
+
+def file_edits_status() -> dict[str, Any]:
+    env_on = env_file_edits_enabled()
+    db_on = db_file_edits_enabled()
+    enabled = env_on or db_on
+    if env_on and db_on:
+        source = "env+db"
+    elif env_on:
+        source = "env"
+    elif db_on:
+        source = "db"
+    else:
+        source = "off"
+    return {
+        "enabled": enabled,
+        "env_enabled": env_on,
+        "db_enabled": db_on,
+        "source": source,
+    }
+
+
+def set_db_file_edits_enabled(enabled: bool, user_id: int | None = None) -> dict[str, Any]:
+    from app.models import AppSetting
+    AppSetting.set_value(
+        SETTING_KEY_FILE_EDITS,
+        "true" if enabled else "false",
+        user_id=user_id,
+        description="Allow Schema Studio Files panel to edit allowlisted project files (.env, etc.)",
+    )
+    return file_edits_status()
 
 
 def list_config_files() -> list[dict[str, Any]]:
@@ -198,7 +248,10 @@ def write_config_file(
     reload_env: bool = True,
 ) -> dict[str, Any]:
     if not files_enabled():
-        raise PermissionError("Web file edits are disabled (ALLOW_WEB_FILE_EDITS=false).")
+        raise PermissionError(
+            "Web file edits are disabled. Enable the Files toggle in Schema Studio "
+            "or set ALLOW_WEB_FILE_EDITS=true."
+        )
     key = _normalize_rel(rel_path)
     path = _resolve_allowed(key)
     if path is None:
