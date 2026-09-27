@@ -61,6 +61,7 @@
     if (name === 'activity') loadActivity();
     if (name === 'er') loadERDiagram();
     if (name === 'overview') loadOverview();
+    if (name === 'files') loadFilesPanel();
   }
 
   function initAceEditor() {
@@ -1077,6 +1078,312 @@
     migGenerate,
     migPreflight,
   };
+
+  // --- Files panel (GitHub-style allowlisted editor) ---
+  let filesEnabled = false;
+  let filesCurrentPath = null;
+  let filesKind = 'text';
+  let filesOriginalContent = '';
+  let filesEntries = [];
+  let filesDirty = false;
+  let filesView = 'raw';
+  let filesAce = null;
+  let filesAceIgnoreChange = false;
+  let filesShowSecrets = false;
+
+  function setFilesDirty(v) {
+    filesDirty = !!v;
+    const bar = $('#filesDirtyBar');
+    if (bar) bar.style.display = filesDirty ? 'block' : 'none';
+    const save = $('#filesSaveBtn');
+    const discard = $('#filesDiscardBtn');
+    if (save) save.disabled = !filesDirty || !filesEnabled;
+    if (discard) discard.disabled = !filesDirty;
+  }
+
+  function setFilesAceValue(text) {
+    if (!filesAce) return;
+    filesAceIgnoreChange = true;
+    try {
+      filesAce.setValue(text || '', -1);
+    } finally {
+      filesAceIgnoreChange = false;
+    }
+  }
+
+  function initFilesAce() {
+    if (filesAce || typeof ace === 'undefined') return;
+    const el = $('#filesEditorAce');
+    if (!el) return;
+    filesAce = ace.edit('filesEditorAce');
+    filesAce.setTheme('ace/theme/github');
+    filesAce.session.setMode('ace/mode/text');
+    filesAce.setOptions({ fontSize: '13px', showPrintMargin: false, wrap: true });
+    filesAce.session.on('change', () => {
+      if (filesAceIgnoreChange) return;
+      if (filesView === 'raw') setFilesDirty(true);
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+
+  function collectEnvEntriesFromDom() {
+    return $$('#filesEnvRows .studio-env-row').map((row) => {
+      const key = row.querySelector('.env-key')?.value || '';
+      const value = row.querySelector('.env-value')?.value || '';
+      return { type: 'entry', key, value };
+    }).filter((e) => e.key.trim());
+  }
+
+  function renderEnvRows(entries) {
+    const wrap = $('#filesEnvRows');
+    if (!wrap) return;
+    const list = (entries || []).filter((e) => e.type === 'entry');
+    if (!list.length) {
+      wrap.innerHTML = '<div class="studio-empty">No variables yet — click Add variable.</div>';
+      return;
+    }
+    wrap.innerHTML = list.map((e, idx) => {
+      const sens = e.sensitive || /PASSWORD|SECRET|API_KEY|TOKEN|PASS\b/i.test(e.key || '');
+      const shown = (!filesShowSecrets && sens) ? '••••••••' : (e.value || '');
+      const ro = (!filesShowSecrets && sens) ? 'readonly' : '';
+      return `
+        <div class="studio-env-row" data-idx="${idx}">
+          <input class="env-key" value="${escapeHtml(e.key || '')}" placeholder="KEY_NAME" ${filesEnabled ? '' : 'readonly'}>
+          <input class="env-value" value="${escapeHtml(shown)}" data-real="${escapeHtml(e.value || '')}" data-sensitive="${sens ? '1' : '0'}" placeholder="value" ${ro} ${filesEnabled ? '' : 'readonly'}>
+          <button type="button" class="studio-btn studio-btn-sm env-del" title="Remove" ${filesEnabled ? '' : 'disabled'}><i class="fas fa-trash"></i></button>
+        </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('.env-key, .env-value').forEach((inp) => {
+      inp.addEventListener('input', () => {
+        if (inp.classList.contains('env-value') && inp.dataset.sensitive === '1' && !filesShowSecrets) {
+          // when hidden, don't treat bullets as real edits until revealed
+          return;
+        }
+        if (inp.classList.contains('env-value')) inp.dataset.real = inp.value;
+        setFilesDirty(true);
+      });
+      inp.addEventListener('focus', () => {
+        if (inp.classList.contains('env-value') && inp.dataset.sensitive === '1' && !filesShowSecrets) {
+          // reveal on focus if user wants to edit — require Show secrets
+        }
+      });
+    });
+    wrap.querySelectorAll('.env-del').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        btn.closest('.studio-env-row')?.remove();
+        setFilesDirty(true);
+      });
+    });
+  }
+
+  function syncSecretVisibility() {
+    $$('#filesEnvRows .env-value').forEach((inp) => {
+      const sens = inp.dataset.sensitive === '1';
+      const real = inp.dataset.real != null ? inp.dataset.real : inp.value;
+      if (sens && !filesShowSecrets) {
+        inp.value = '••••••••';
+        inp.readOnly = true;
+      } else {
+        inp.value = real;
+        inp.readOnly = !filesEnabled;
+      }
+    });
+  }
+
+  function setFilesView(view) {
+    filesView = view === 'form' ? 'form' : 'raw';
+    $('#filesTabForm')?.classList.toggle('active', filesView === 'form');
+    $('#filesTabRaw')?.classList.toggle('active', filesView === 'raw');
+    const form = $('#filesFormView');
+    const raw = $('#filesRawView');
+    if (form) form.style.display = filesView === 'form' ? 'block' : 'none';
+    if (raw) raw.style.display = filesView === 'raw' ? 'block' : 'none';
+    if (filesView === 'raw') {
+      initFilesAce();
+      // Push form → raw when switching
+      if (filesKind === 'env') {
+        const entries = collectEnvEntriesFromDom();
+        // Keep comments from original by using serialize via API? Client-side simple:
+        const lines = entries.map((e) => {
+          const v = e.value;
+          if (/[\s#"']/.test(v) || v === '') return `${e.key}="${String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+          return `${e.key}=${v}`;
+        });
+        if (filesAce) setFilesAceValue(lines.join('\n') + (lines.length ? '\n' : ''));
+      }
+      if (filesAce) filesAce.resize();
+    } else if (filesKind === 'env' && filesAce) {
+      // raw → form: re-parse local content roughly
+      const content = filesAce.getValue();
+      const entries = [];
+      content.split(/\r?\n/).forEach((line) => {
+        const s = line.trim();
+        if (!s || s.startsWith('#') || !s.includes('=')) return;
+        const i = s.indexOf('=');
+        let key = s.slice(0, i).trim();
+        let val = s.slice(i + 1).trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        entries.push({ type: 'entry', key, value: val, sensitive: /PASSWORD|SECRET|API_KEY|TOKEN|PASS\b/i.test(key) });
+      });
+      filesEntries = entries;
+      renderEnvRows(entries);
+    }
+  }
+
+  async function loadFilesPanel() {
+    const data = await api('/files');
+    if (!data.success) {
+      toast(data.error || 'Failed to list files', 'error');
+      return;
+    }
+    filesEnabled = !!data.enabled;
+    const banner = $('#filesDisabledBanner');
+    if (banner) banner.style.display = filesEnabled ? 'none' : 'block';
+    const tree = $('#filesTree');
+    if (!tree) return;
+    tree.innerHTML = (data.files || []).map((f) => `
+      <li>
+        <button type="button" data-path="${escapeHtml(f.path)}" class="${filesCurrentPath === f.path ? 'active' : ''}">
+          <i class="fas fa-file-code"></i>
+          <span>${escapeHtml(f.path)}</span>
+          <span class="file-meta">${f.exists ? formatBytes(f.size) : 'missing'}</span>
+        </button>
+      </li>`).join('');
+    tree.querySelectorAll('button[data-path]').forEach((btn) => {
+      btn.addEventListener('click', () => openConfigFile(btn.dataset.path));
+    });
+    if (filesCurrentPath) {
+      // refresh open file
+      openConfigFile(filesCurrentPath);
+    }
+  }
+
+  async function openConfigFile(relPath) {
+    const data = await api('/files/' + encodeURIComponent(relPath).replace(/%2F/g, '/'));
+    if (!data.success) {
+      toast(data.error || 'Failed to open file', 'error');
+      return;
+    }
+    filesEnabled = !!data.enabled;
+    filesCurrentPath = data.path;
+    filesKind = data.kind || 'text';
+    filesOriginalContent = data.content || '';
+    filesEntries = data.entries || [];
+    $('#filesCurrentPath').textContent = data.path;
+    $('#filesCurrentDesc').textContent = data.description || '';
+    $('#filesEmpty').style.display = 'none';
+    $('#filesBreadcrumb').innerHTML = `<span class="studio-files-crumb">akellodashboard</span> / <strong>${escapeHtml(data.path)}</strong>`;
+    $$('#filesTree button').forEach((b) => b.classList.toggle('active', b.dataset.path === data.path));
+
+    const tabs = $('#filesViewTabs');
+    if (tabs) tabs.style.display = filesKind === 'env' ? 'inline-flex' : 'none';
+
+    initFilesAce();
+    if (filesAce) {
+      setFilesAceValue(filesOriginalContent);
+      filesAce.setReadOnly(!filesEnabled);
+    }
+
+    if (filesKind === 'env') {
+      renderEnvRows(filesEntries);
+      setFilesView('form');
+    } else {
+      setFilesView('raw');
+      $('#filesFormView').style.display = 'none';
+      $('#filesRawView').style.display = 'block';
+    }
+    setFilesDirty(false);
+    $('#filesSaveBtn').disabled = !filesEnabled;
+  }
+
+  async function saveConfigFile() {
+    if (!filesCurrentPath) return;
+    if (!filesEnabled) {
+      toast('Set ALLOW_WEB_FILE_EDITS=true to save', 'error');
+      return;
+    }
+    if (!confirm('Save changes to ' + filesCurrentPath + '?\n\nA backup will be created under .studio_backups/')) return;
+
+    let body = { confirm: true };
+    if (filesKind === 'env' && filesView === 'form') {
+      // capture real values for masked fields
+      $$('#filesEnvRows .env-value').forEach((inp) => {
+        if (inp.dataset.sensitive === '1' && !filesShowSecrets) {
+          // keep previous real
+        } else {
+          inp.dataset.real = inp.value;
+        }
+      });
+      const entries = $$('#filesEnvRows .studio-env-row').map((row) => {
+        const key = row.querySelector('.env-key')?.value || '';
+        const valInp = row.querySelector('.env-value');
+        const value = valInp?.dataset.real != null ? valInp.dataset.real : (valInp?.value || '');
+        return { type: 'entry', key, value };
+      });
+      body.entries = entries;
+    } else {
+      body.content = filesAce ? filesAce.getValue() : filesOriginalContent;
+    }
+
+    const res = await api('/files/' + encodeURIComponent(filesCurrentPath).replace(/%2F/g, '/'), {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+    if (!res.success) {
+      toast(res.error || 'Save failed', 'error');
+      return;
+    }
+    toast('Saved ' + filesCurrentPath + (res.backup ? ' (backup: ' + res.backup + ')' : ''), 'success');
+    if (res.hint) toast(res.hint, 'success');
+    setFilesDirty(false);
+    openConfigFile(filesCurrentPath);
+  }
+
+  function discardConfigFile() {
+    if (!filesCurrentPath) return;
+    openConfigFile(filesCurrentPath);
+  }
+
+  $('#filesRefreshBtn')?.addEventListener('click', () => loadFilesPanel());
+  $('#filesSaveBtn')?.addEventListener('click', () => saveConfigFile());
+  $('#filesDiscardBtn')?.addEventListener('click', () => discardConfigFile());
+  $('#filesAddEntryBtn')?.addEventListener('click', () => {
+    const wrap = $('#filesEnvRows');
+    if (!wrap) return;
+    if (wrap.querySelector('.studio-empty')) wrap.innerHTML = '';
+    const row = document.createElement('div');
+    row.className = 'studio-env-row';
+    row.innerHTML = `
+      <input class="env-key" placeholder="NEW_KEY" value="">
+      <input class="env-value" data-real="" placeholder="value" value="">
+      <button type="button" class="studio-btn studio-btn-sm env-del"><i class="fas fa-trash"></i></button>`;
+    wrap.appendChild(row);
+    row.querySelector('.env-del').addEventListener('click', () => { row.remove(); setFilesDirty(true); });
+    row.querySelectorAll('input').forEach((inp) => inp.addEventListener('input', () => {
+      if (inp.classList.contains('env-value')) inp.dataset.real = inp.value;
+      setFilesDirty(true);
+    }));
+    setFilesDirty(true);
+    row.querySelector('.env-key').focus();
+  });
+  $('#filesShowSecrets')?.addEventListener('change', (e) => {
+    filesShowSecrets = !!e.target.checked;
+    // flush visible edits to data-real before toggling
+    $$('#filesEnvRows .env-value').forEach((inp) => {
+      if (!inp.readOnly) inp.dataset.real = inp.value;
+    });
+    syncSecretVisibility();
+  });
+  $('#filesTabForm')?.addEventListener('click', () => setFilesView('form'));
+  $('#filesTabRaw')?.addEventListener('click', () => setFilesView('raw'));
 
   // Init
   loadDatabases().then(() => {

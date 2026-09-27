@@ -532,3 +532,58 @@ def studio_migration_generate():
     except Exception as exc:
         current_app.logger.exception('Autogenerate migration failed')
         return _json_error(str(exc), 500)
+
+
+# --- Allowlisted project config files (GitHub-style editor) ---
+
+@schema_studio_bp.route('/api/admin/schema-studio/files', methods=['GET'])
+@login_required
+@super_admin_required
+def studio_list_files():
+    from app.config_files_service import files_enabled, list_config_files
+    return jsonify({
+        'success': True,
+        'enabled': files_enabled(),
+        'files': list_config_files(),
+    })
+
+
+@schema_studio_bp.route('/api/admin/schema-studio/files/<path:rel_path>', methods=['GET'])
+@login_required
+@super_admin_required
+def studio_read_file(rel_path):
+    from app.config_files_service import files_enabled, read_config_file
+    try:
+        data = read_config_file(rel_path)
+        data['enabled'] = files_enabled()
+        return jsonify({'success': True, **data})
+    except ValueError as exc:
+        return _json_error(str(exc), 404)
+    except Exception as exc:
+        current_app.logger.exception('schema-studio read file')
+        return _json_error(str(exc), 500)
+
+
+@schema_studio_bp.route('/api/admin/schema-studio/files/<path:rel_path>', methods=['PUT'])
+@login_required
+@super_admin_required
+def studio_write_file(rel_path):
+    from app.config_files_service import write_config_file
+    data = request.get_json(silent=True) or {}
+    if not data.get('confirm'):
+        return _json_error('Confirmation required. Send {"confirm": true}.')
+    try:
+        result = write_config_file(
+            rel_path,
+            content=data.get('content'),
+            entries=data.get('entries'),
+            reload_env=bool(data.get('reload_env', True)),
+        )
+        return jsonify({'success': True, **result})
+    except PermissionError as exc:
+        return _json_error(str(exc), 403)
+    except ValueError as exc:
+        return _json_error(str(exc), 400)
+    except Exception as exc:
+        current_app.logger.exception('schema-studio write file')
+        return _json_error(str(exc), 500)

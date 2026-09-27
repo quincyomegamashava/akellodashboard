@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Atlas Quest · Quiz Galaxy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet"/>
+<style>
+
+:root {
+  --ink:#123044; --bg:#c5e4f5; --panel:#fffdf8; --border:#5eb8e888;
+  --accent:#2b6cb0; --play-bg:linear-gradient(180deg,#9fd4f5,#7ec8e8 40%,#6bb85a 40%,#5a9a4a);
+}
+.map-wrap { position:relative; width:100%; height:100%; min-height:300px; padding:12px; }
+.map-svg { width:100%; height:100%; min-height:280px; }
+.region {
+  fill:#d4e8c8; stroke:#2b6cb0; stroke-width:2; cursor:pointer; transition:fill .15s, transform .15s;
+  filter:drop-shadow(0 2px 0 rgba(0,0,0,.12));
+}
+.region:hover, .region:focus { fill:#ffe08a; }
+.region.hot { fill:#f6ad55; animation:pulse 1s ease infinite; }
+.region.correct { fill:#68d391; }
+.region.wrong { fill:#fc8181; }
+@keyframes pulse { 50% { fill:#ffd27a; } }
+.pin-label {
+  position:absolute; left:50%; bottom:10px; transform:translateX(-50%);
+  background:rgba(255,253,248,.94); border:2px solid #2b6cb0; border-radius:12px;
+  padding:8px 12px; font-weight:800; font-size:.85rem; max-width:92%; text-align:center;
+  pointer-events:none;
+}
+
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; min-height:100%; font-family:Nunito,sans-serif; color:var(--ink); overflow-x:hidden; }
+body { min-height:100vh; display:flex; flex-direction:column; background:var(--bg); }
+.app { position:relative; z-index:1; width:min(920px,100%); margin:0 auto; padding:14px 14px 28px; display:flex; flex-direction:column; gap:12px; flex:1; }
+.brand { text-align:center; }
+.back-link { display:inline-block; margin-bottom:4px; font-weight:800; font-size:.85rem; color:var(--accent); text-decoration:none; }
+.brand h1 { font-family:'Baloo 2',cursive; font-size:clamp(1.6rem,5vw,2.3rem); font-weight:800; line-height:1.1; }
+.brand p { font-weight:700; opacity:.8; font-size:.92rem; }
+.hud { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; background:var(--panel); border-radius:16px; padding:10px 14px; border:2px solid var(--border); }
+.score-chip .label { font-size:.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; opacity:.7; }
+.score-chip .value { font-family:'Baloo 2',cursive; font-size:1.7rem; line-height:1; color:var(--accent); }
+.timer-wrap { text-align:center; }
+.timer-wrap .time { font-family:'Baloo 2',cursive; font-size:1.8rem; }
+.meta { display:flex; justify-content:space-between; font-weight:800; font-size:.85rem; opacity:.85; }
+.quiz-panel { background:var(--panel); border-radius:18px; padding:14px; border:2px solid var(--border); }
+#question { font-family:'Baloo 2',cursive; font-size:clamp(1.05rem,3.5vw,1.35rem); font-weight:800; line-height:1.3; margin-bottom:10px; text-align:center; }
+.feedback { min-height:1.3em; text-align:center; font-weight:800; font-size:.95rem; }
+.feedback.good { color:#276749; }
+.feedback.bad { color:#c53030; }
+.play { position:relative; min-height:280px; border-radius:18px; border:2px solid var(--border); background:var(--play-bg); overflow:hidden; }
+.overlay { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(10,20,40,.72); backdrop-filter:blur(4px); }
+.overlay.hidden { opacity:0; visibility:hidden; pointer-events:none; }
+.card { width:min(440px,100%); background:#fffdf8; border-radius:22px; padding:26px; text-align:center; border:3px solid rgba(0,0,0,.08); box-shadow:0 18px 40px rgba(0,0,0,.25); color:#1a2744; }
+.card h2 { font-family:'Baloo 2',cursive; font-size:1.9rem; margin-bottom:8px; }
+.card .lead { font-weight:700; margin-bottom:14px; line-height:1.4; }
+.rules { text-align:left; background:#fef3c7; border-radius:14px; padding:12px 14px; margin-bottom:18px; font-size:.9rem; font-weight:700; color:#744210; }
+.rules li { margin:6px 0 6px 1.1em; }
+.btn-primary { font-family:'Baloo 2',cursive; font-size:1.2rem; font-weight:800; border:none; border-radius:999px; padding:12px 28px; background:linear-gradient(180deg,#f6d063,#f6a623); color:#5c3a08; cursor:pointer; }
+.btn-primary:disabled { opacity:.45; cursor:not-allowed; }
+.muted { margin-top:10px; font-size:.8rem; font-weight:700; color:#5a6b5a; }
+#galaxyLoadStatus { position:fixed; left:12px; bottom:12px; z-index:40; background:rgba(255,252,245,.92); color:#1a2744; padding:8px 12px; border-radius:10px; font:700 12px Nunito,sans-serif; max-width:280px; }
+
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="brand">
+    <a class="back-link" href="/quiz-galaxy">← Quiz Galaxy</a>
+    <h1>Atlas Quest</h1>
+    <p>Tap the correct region on the map</p>
+  </div>
+  <div class="hud" id="hud">
+    <div class="score-chip"><div class="label">Correct</div><div class="value" id="player-score">0</div></div>
+    <div class="timer-wrap"><div class="time" id="timer">1:00</div></div>
+    <div class="score-chip" style="text-align:right"><div class="label">Focus</div><div class="value" style="font-size:1rem" id="streak">Streak 0</div></div>
+  </div>
+  <div class="meta"><span id="q-badge">Q 0</span><span>60s round</span></div>
+  <div class="quiz-panel" id="quiz-panel">
+    <div id="question">Loading quizzes…</div>
+    <div id="feedback" class="feedback"></div>
+  </div>
+  <div class="play" id="play">
+<div class="map-wrap">
+  <svg class="map-svg" viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" aria-label="Answer map">
+    <ellipse cx="200" cy="130" rx="170" ry="100" fill="#7eb8e0" opacity=".35"/>
+    <path class="region" data-slot="0" d="M40 90 L120 50 L160 110 L90 150 Z"/>
+    <path class="region" data-slot="1" d="M170 45 L280 40 L300 120 L190 115 Z"/>
+    <path class="region" data-slot="2" d="M60 160 L150 130 L180 210 L70 220 Z"/>
+    <path class="region" data-slot="3" d="M200 140 L310 130 L330 210 L210 220 Z"/>
+  </svg>
+  <div class="pin-label" id="map-hint">Tap a region</div>
+</div>
+</div>
+</div>
+
+<div class="overlay" id="start-overlay">
+  <div class="card">
+    <h2>Atlas Quest</h2>
+    <p class="lead">Tap the correct region on the map</p>
+    <ul class="rules"><li>Each region on the map is an answer choice.</li><li>Read the labels, then tap the correct region.</li><li>Built for Geography exploration vibes.</li></ul>
+    <button class="btn-primary" id="start-btn" type="button" disabled>Start</button>
+    <p class="muted">Start unlocks when questions are ready.</p>
+  </div>
+</div>
+<div class="overlay hidden" id="end-overlay">
+  <div class="card">
+    <h2 id="end-title">Round complete</h2>
+    <p class="lead">Correct answers</p>
+    <div style="font-family:'Baloo 2',cursive;font-size:2.6rem;color:#2b6cb0" id="end-score">0</div>
+    <p class="muted" id="end-detail"></p>
+    <button class="btn-primary" id="replay-btn" type="button">Play again</button>
+    <p class="muted"><a href="/quiz-galaxy">Back to Quiz Galaxy</a></p>
+  </div>
+</div>
+<div id="galaxyLoadStatus">Loading your quizzes…</div>
+<script>
+
+const ROUND_SECONDS = 60;
+function quizBank() {
+  if (window.GalaxyShell && typeof window.GalaxyShell.quizBank === 'function') {
+    const bank = window.GalaxyShell.quizBank();
+    if (bank && bank.length) return bank;
+  }
+  return window.GALAXY_QUESTIONS || [];
+}
+function shellQ(raw) {
+  if (!raw) return null;
+  const choices = raw.choices || raw.options || [];
+  const q = raw.q || raw.prompt || '';
+  if (!q || !Array.isArray(choices) || choices.length < 2) return null;
+  return {
+    q, choices: choices.slice(0, 4),
+    answer: typeof raw.answer === 'number' ? raw.answer : (typeof raw.correctIndex === 'number' ? raw.correctIndex : 0),
+    explain: raw.explain || '', id: raw.id, source: raw.source || '',
+  };
+}
+function shuffle(a) {
+  const arr = a.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+function formatTime(s) {
+  return Math.floor(s / 60) + ':' + String(Math.max(0, s) % 60).padStart(2, '0');
+}
+const state = {
+  playing: false, playerCorrect: 0, streak: 0, asked: 0,
+  secondsLeft: ROUND_SECONDS, deck: [], current: null, locked: false, timerId: null,
+};
+if (window.GalaxyShell && GalaxyShell.resetDealState) GalaxyShell.resetDealState(state);
+      window.__galaxyPlayState = state;
+
+async function ensureBank() {
+  if (quizBank().length) return quizBank();
+  if (window.GalaxyShell && GalaxyShell.ensureQuestions) await GalaxyShell.ensureQuestions();
+  return quizBank();
+}
+function updateHud() {
+  const sc = document.getElementById('player-score');
+  const tm = document.getElementById('timer');
+  const qb = document.getElementById('q-badge');
+  const st = document.getElementById('streak');
+  if (sc) sc.textContent = String(state.playerCorrect);
+  if (tm) tm.textContent = formatTime(state.secondsLeft);
+  if (qb) qb.textContent = 'Q ' + state.asked;
+  if (st) st.textContent = 'Streak ' + state.streak;
+}
+function setFeedback(text, cls) {
+  const fb = document.getElementById('feedback');
+  if (!fb) return;
+  fb.textContent = text || '';
+  fb.className = 'feedback' + (cls ? ' ' + cls : '');
+}
+function afterAnswer(correct) {
+  if (window.GalaxyUX) {
+    GalaxyUX.afterAnswer({
+      correct,
+      explain: (state.current && state.current.explain) || '',
+      prompt: state.current && state.current.q,
+      choices: state.current && state.current.choices,
+      answerIndex: state.current && state.current.answer,
+    });
+  }
+  if (window.GalaxyShell && GalaxyShell.checkpoint) GalaxyShell.checkpoint(state);
+}
+function startTimer() {
+  clearInterval(state.timerId);
+  state.timerId = setInterval(() => {
+    if (!state.playing) return;
+    if (window.GalaxyUX && !GalaxyUX.timerMayTick()) return;
+    state.secondsLeft -= 1;
+    updateHud();
+    if (state.secondsLeft <= 10 && state.secondsLeft > 0 && window.GalaxyUX) GalaxyUX.sfx.tick();
+    if (state.secondsLeft <= 0) endRound();
+  }, 1000);
+}
+async function endRound() {
+  if (!state.playing && !state.endedByQuestions) return;
+  if (state._ending) return;
+  state._ending = true;
+  state.playing = false;
+  clearInterval(state.timerId);
+  if (typeof onRoundEnd === 'function') onRoundEnd();
+  try {
+    if (window.GalaxyShell) {
+      const sc = state.playerCorrect || 0;
+      const res = await window.GalaxyShell.submitRound(sc, Math.max(sc, 10));
+      if (res && res.progress) window.__galaxyLastProgress = res.progress;
+    }
+  } catch (e) { console.warn(e); }
+  document.getElementById('end-score').textContent = String(state.playerCorrect);
+  document.getElementById('end-detail').textContent = state.endedByQuestions
+    ? ('Round complete — you finished all questions with ' + state.playerCorrect + ' correct.')
+    : ('You got ' + state.playerCorrect + ' correct across ' + state.asked + ' questions.');
+  document.getElementById('end-overlay').classList.remove('hidden');
+  if (window.GalaxyUX) {
+    const coach = (window.__galaxyLastProgress && window.__galaxyLastProgress.coaching_blurb) || null;
+    if (coach) GalaxyUX.setCoaching(coach);
+    setTimeout(() => GalaxyUX.enhanceEndScreen({ coaching: coach, missed: GalaxyUX.getMissed(), progress: window.__galaxyLastProgress }), 50);
+  }
+}
+
+    function dealNextRaw(playState) {
+      if (window.GalaxyShell && typeof window.GalaxyShell.takeNextQuestion === 'function') {
+        return window.GalaxyShell.takeNextQuestion(playState);
+      }
+      if (!playState.deck || !playState.deck.length) {
+        const bank = (typeof quizBank === 'function' ? quizBank() : (window.GALAXY_QUESTIONS || [])).slice();
+        for (let i = bank.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const t = bank[i]; bank[i] = bank[j]; bank[j] = t;
+        }
+        playState.deck = bank;
+      }
+      return playState.deck.pop() || null;
+    }
+
+    function nextQuestion() {
+  if (!state.playing) return;
+  state.current = shellQ(dealNextRaw(state));
+  if (!state.current) {
+    document.getElementById('question').textContent = 'You cleared this question set — great work!';
+    if (typeof setFeedback === 'function') setFeedback('No repeats left in this round', 'good');
+    state.endedByQuestions = true;
+    state.locked = true;
+    if (state.timerId) { clearInterval(state.timerId); state.timerId = null; }
+    if (state.rivalId) { clearInterval(state.rivalId); state.rivalId = null; }
+    setTimeout(function () { if (typeof endRound === 'function') endRound(); }, 450);
+    return;
+  }
+  state.asked += 1;
+  state.locked = false;
+  document.getElementById('question').textContent = state.current.q;
+  setFeedback('');
+  updateHud();
+  if (typeof renderQuestion === 'function') renderQuestion(state.current);
+  if (window.GalaxyUX) GalaxyUX.onQuestionShown(state.current);
+}
+function resolveAnswer(choiceIndex) {
+  if (!state.playing || state.locked || !state.current) return;
+  if (window.GalaxyUX && GalaxyUX.isPaused && GalaxyUX.isPaused()) return;
+  state.locked = true;
+  const correct = choiceIndex === state.current.answer;
+  if (correct) {
+    state.playerCorrect += 1;
+    state.streak += 1;
+    setFeedback('Correct!', 'good');
+    if (window.GalaxyUX) GalaxyUX.sfx.correct();
+  } else {
+    state.streak = 0;
+    setFeedback('Not quite', 'bad');
+    if (window.GalaxyUX) GalaxyUX.sfx.wrong();
+  }
+  afterAnswer(correct);
+  updateHud();
+  if (typeof onAnswerResolved === 'function') onAnswerResolved(correct, choiceIndex);
+  setTimeout(() => { if (state.playing) nextQuestion(); }, correct ? 450 : 800);
+}
+async function startGame() {
+  const bank = await ensureBank();
+  if (!bank.length) {
+    document.getElementById('question').textContent = 'Still loading… try again.';
+    return;
+  }
+  state.playing = true;
+  state._ending = false;
+  state.endedByQuestions = false;
+  state.playerCorrect = 0;
+  state.streak = 0;
+  state.asked = 0;
+  state.secondsLeft = ROUND_SECONDS;
+  state.deck = shuffle(bank).map(shellQ).filter(Boolean);
+  state.current = null;
+  state.locked = false;
+  window.__galaxyPlayState = state;
+  const resume = window.GALAXY_RESUME;
+  if (resume && resume.status === 'in_progress') {
+    state.playerCorrect = resume.playerCorrect || 0;
+    state.streak = resume.streak || 0;
+    state.asked = resume.asked || 0;
+    if (typeof resume.secondsLeft === 'number' && resume.secondsLeft > 0) state.secondsLeft = resume.secondsLeft;
+    window.GALAXY_RESUME = null;
+  }
+  document.getElementById('start-overlay').classList.add('hidden');
+  document.getElementById('end-overlay').classList.add('hidden');
+  if (window.GalaxyUX) GalaxyUX.onRoundStart(state);
+  updateHud();
+  startTimer();
+  if (typeof onRoundStart === 'function') onRoundStart();
+  nextQuestion();
+}
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('replay-btn').addEventListener('click', startGame);
+
+
+const regions = [...document.querySelectorAll('.region')];
+const hint = document.getElementById('map-hint');
+regions.forEach((r) => {
+  r.addEventListener('click', () => {
+    const idx = Number(r.dataset.choice);
+    if (Number.isNaN(idx)) return;
+    resolveAnswer(idx);
+  });
+});
+function renderQuestion(q) {
+  regions.forEach((r) => {
+    r.classList.remove('hot', 'correct', 'wrong');
+    delete r.dataset.choice;
+  });
+  const n = Math.min(4, q.choices.length);
+  for (let i = 0; i < n; i++) {
+    const r = regions[i];
+    r.dataset.choice = String(i);
+    r.classList.add('hot');
+    r.setAttribute('aria-label', q.choices[i]);
+  }
+  hint.textContent = q.choices.map((c, i) => String.fromCharCode(65 + i) + ': ' + c).join('  ·  ');
+}
+function onAnswerResolved(correct, choiceIndex) {
+  regions.forEach((r) => {
+    if (Number(r.dataset.choice) === choiceIndex) r.classList.add(correct ? 'correct' : 'wrong');
+  });
+}
+function onRoundStart() { hint.textContent = 'Tap the region with the correct answer'; }
+function onRoundEnd() {}
+
+</script>
+<script src="/static/js/galaxy_shell_bridge.js?v=8"></script>
+<script src="/static/js/galaxy_game_ux.js?v=5"></script>
+</body>
+</html>

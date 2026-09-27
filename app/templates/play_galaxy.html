@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>{{ title }} · Quiz Galaxy</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0b1a3a; }
+    #shellFrame { border: 0; width: 100%; height: 100%; display: block; }
+    #gate {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: #071428; color: #ffe08a; font-family: system-ui, sans-serif; z-index: 5;
+    }
+    #gate a { color: #fff; }
+  </style>
+</head>
+<body>
+  <div id="gate">Checking login…</div>
+  <iframe id="shellFrame" title="{{ world.name }}" style="display:none;"></iframe>
+  <script>
+    const shell = {{ shell|tojson }};
+    const subject = {{ subject|tojson }};
+    const shellGameId = {{ shell_game_id|tojson }};
+    const shellUrl = {{ shell_static_url|tojson }};
+    const userId = sessionStorage.getItem('gameUserId');
+    const gate = document.getElementById('gate');
+    if (!userId) {
+      const next = encodeURIComponent(shell);
+      const sub = encodeURIComponent(subject || '');
+      window.location.href = '/quiz-galaxy?login=1&next=' + next + '&subject=' + sub;
+    } else {
+      window.GALAXY = {
+        shell,
+        subject,
+        userId: Number(userId),
+        shellGameId,
+        catalogSubjects: {{ catalog_subjects|tojson }},
+      };
+      const frame = document.getElementById('shellFrame');
+      const qs = new URLSearchParams({
+        user_id: String(userId),
+        shell: shell,
+        subject: subject || '',
+      });
+      if (shellGameId) qs.set('shell_game_id', String(shellGameId));
+      const join = shellUrl.includes('?') ? '&' : '?';
+      frame.onload = function () {
+        try {
+          if (frame.contentWindow) frame.contentWindow.GALAXY = window.GALAXY;
+        } catch (e) { /* ignore */ }
+      };
+      frame.src = shellUrl + join + qs.toString();
+      frame.style.display = 'block';
+      gate.style.display = 'none';
+    }
+  </script>
+</body>
+</html>

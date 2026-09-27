@@ -23,7 +23,27 @@ VALID_AGE_RANGES = [
     "Youths & older",
 ]
 ITEM_TYPES = ("puzzle", "quiz", "question")
+VALID_VISUAL_THEMES = ("car", "tug_of_war")
 RECENT_FINISHED_HOURS = 2
+
+
+def _normalize_visual_theme(value, default="car"):
+    theme = (value or default or "car").strip().lower()
+    if theme not in VALID_VISUAL_THEMES:
+        return default
+    return theme
+
+
+def _player_team(players_sorted, player):
+    """Assign Team 1 / Team 2 by join order (1-based)."""
+    for index, row in enumerate(players_sorted):
+        if row.id == player.id:
+            return 1 if (index % 2) == 0 else 2
+    return 1
+
+
+def _sorted_players_by_join(race):
+    return sorted(race.players, key=lambda p: (p.joined_at or datetime.max, p.id or 0))
 
 
 def _catalog_ages_for_race(age_range):
@@ -192,6 +212,7 @@ def _item_payload(item, include_answers=False):
 
 
 def _leaderboard(race, hide_scores=False):
+    join_order = _sorted_players_by_join(race)
     players = sorted(
         race.players,
         key=lambda p: (
@@ -222,6 +243,7 @@ def _leaderboard(race, hide_scores=False):
             "progress": progress,
             "total_items": total_items,
             "show_progress": hide_scores and not player.finished,
+            "team": _player_team(join_order, player),
             "joined_at": player.joined_at.isoformat() if player.joined_at else None,
             "submitted_at": player.submitted_at.isoformat() if player.submitted_at else None,
         })
@@ -300,6 +322,7 @@ def _serialize_race(race, include_items=False, include_answers=False, player=Non
         "starts_at": race.starts_at.isoformat() if race.starts_at else None,
         "ends_at": race.ends_at.isoformat() if race.ends_at else None,
         "duration_minutes": race.duration_minutes,
+        "visual_theme": _normalize_visual_theme(getattr(race, "visual_theme", None)),
         "status": race.status(now),
         "is_cancelled": bool(race.is_cancelled),
         "remaining_seconds": race.remaining_seconds(now),
@@ -324,12 +347,14 @@ def _serialize_race(race, include_items=False, include_answers=False, player=Non
                 draft_ids.append(int(key))
             elif entry.get("score") is not None:
                 finalized_ids.append(int(key))
+        join_order = _sorted_players_by_join(race)
         data["me"] = {
             "user_id": player.game_user_id,
             "score": player.score or 0,
             "max_score": player.max_score or race.total_points(),
             "finished": bool(player.finished),
             "place": player.place,
+            "team": _player_team(join_order, player),
             "draft_item_ids": draft_ids,
             "answered_item_ids": finalized_ids,
             "progress": _draft_progress(race, player),
@@ -558,12 +583,15 @@ def create_game_race():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
+    visual_theme = _normalize_visual_theme(data.get("visual_theme"))
+
     race = GameRace(
         title=title,
         age_range=age_range,
         starts_at=starts_at,
         duration_minutes=duration_minutes,
         ends_at=starts_at + timedelta(minutes=duration_minutes),
+        visual_theme=visual_theme,
         created_by=current_user.id,
         is_cancelled=False,
     )
@@ -613,6 +641,12 @@ def update_game_race(race_id):
             return jsonify({"error": "Start time is invalid"}), 400
         race.starts_at = starts_at
     race.ends_at = race.starts_at + timedelta(minutes=race.duration_minutes)
+
+    if "visual_theme" in data:
+        theme = (data.get("visual_theme") or "").strip().lower()
+        if theme not in VALID_VISUAL_THEMES:
+            return jsonify({"error": f"visual_theme must be one of: {', '.join(VALID_VISUAL_THEMES)}"}), 400
+        race.visual_theme = theme
 
     if "items" in data:
         try:

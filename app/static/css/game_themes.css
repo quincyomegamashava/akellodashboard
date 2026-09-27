@@ -1,0 +1,570 @@
+/* Shared game portal themes: race track, tug of war, solo survival */
+
+.theme-stage {
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+  margin-bottom: 1rem;
+  background: #f8fafc;
+}
+
+.theme-stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.theme-chip-you {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ---- Car race ---- */
+.car-track {
+  position: relative;
+  height: 160px;
+  background: linear-gradient(180deg, #87ceeb 0%, #b8e0f0 42%, #4a7c59 42%, #3d6b4f 48%, #5a5a5a 48%, #6b6b6b 100%);
+  overflow: hidden;
+}
+
+.car-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 72%;
+  height: 3px;
+  background: repeating-linear-gradient(
+    90deg,
+    #fff 0 18px,
+    transparent 18px 36px
+  );
+  opacity: 0.85;
+}
+
+.car-finish {
+  position: absolute;
+  right: 12px;
+  top: 48%;
+  bottom: 8%;
+  width: 10px;
+  background: repeating-linear-gradient(
+    0deg,
+    #0f172a 0 8px,
+    #fff 8px 16px
+  );
+  border-radius: 2px;
+  z-index: 1;
+}
+
+.car-lane {
+  position: absolute;
+  left: 8px;
+  right: 28px;
+  height: 28px;
+  transition: top 0.3s ease;
+}
+
+.car-sprite {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+  z-index: 2;
+}
+
+.car-sprite .car-body {
+  width: 42px;
+  height: 22px;
+  border-radius: 8px 14px 8px 8px;
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+.car-sprite .car-body::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 3px;
+  width: 16px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 4px 8px 2px 2px;
+}
+
+.car-sprite .car-body::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 6px;
+  right: 6px;
+  height: 6px;
+  background: radial-gradient(circle, #1e293b 40%, transparent 42%);
+  background-size: 10px 6px;
+  background-repeat: repeat-x;
+}
+
+.car-sprite .car-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 1px 6px;
+  border-radius: 999px;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.car-sprite.is-me .car-label {
+  outline: 2px solid #0284c7;
+}
+
+/* ---- Tug of war ---- */
+.tug-banners-overlay {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 1rem 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: #fff;
+}
+.tug-banners-overlay .team1 { color: #1d4ed8; }
+.tug-banners-overlay .team2 { color: #c2410c; }
+
+.tug-arena {
+  position: relative;
+  height: 170px;
+  background: linear-gradient(180deg, #c7e8f5 0%, #e8f4e8 55%, #d4e8c2 100%);
+  overflow: hidden;
+}
+
+.tug-arena-3d {
+  height: 210px;
+  background: #0f172a;
+  padding: 0;
+}
+
+.theme-3d-mount,
+.theme-3d-host {
+  width: 100%;
+  height: 100%;
+}
+
+.theme-3d-canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.survival-stage.swim-3d {
+  height: 220px;
+  padding: 0;
+  background: #0369a1;
+}
+
+.tug-midline {
+  position: absolute;
+  left: 50%;
+  top: 20%;
+  bottom: 18%;
+  width: 0;
+  border-left: 2px dashed rgba(15, 23, 42, 0.35);
+  transform: translateX(-50%);
+}
+
+.tug-banners {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 1rem 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.tug-banners .team1 { color: #1d4ed8; }
+.tug-banners .team2 { color: #c2410c; }
+
+.tug-rope-wrap {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 52%;
+  height: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tug-rope {
+  width: 100%;
+  height: 8px;
+  background: linear-gradient(90deg, #92400e, #d97706, #92400e);
+  border-radius: 999px;
+  position: relative;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 2px 0 #78350f;
+}
+
+.tug-knot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  background: #78350f;
+  border-radius: 50%;
+  border: 3px solid #fbbf24;
+  z-index: 2;
+}
+
+.tug-team {
+  position: absolute;
+  top: 38%;
+  display: flex;
+  gap: 4px;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tug-team.left { left: 6%; }
+.tug-team.right { right: 6%; flex-direction: row-reverse; }
+
+.tug-kid {
+  width: 28px;
+  height: 40px;
+  position: relative;
+}
+
+.tug-kid .head {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin: 0 auto;
+  background: #fcd9b0;
+}
+
+.tug-kid .body {
+  width: 18px;
+  height: 18px;
+  margin: 1px auto 0;
+  border-radius: 4px;
+}
+
+.tug-team.left .body { background: #2563eb; }
+.tug-team.right .body { background: #ea580c; }
+
+.tug-kid .legs {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+}
+
+.tug-kid .legs span {
+  width: 5px;
+  height: 10px;
+  background: #1e293b;
+  border-radius: 2px;
+}
+
+/* ---- Solo survival ---- */
+.solo-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  max-width: 1400px;
+  margin: 20px auto;
+  padding: 0 24px;
+}
+
+@media (min-width: 960px) {
+  .solo-layout {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    align-items: start;
+  }
+}
+
+.survival-panel {
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px rgba(15, 23, 42, 0.05);
+  position: sticky;
+  top: 72px;
+}
+
+.survival-timer {
+  text-align: center;
+  padding: 0.75rem 1rem 0.35rem;
+}
+
+.survival-timer .label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.survival-timer .clock {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.survival-timer .clock.warn { color: #c2410c; }
+.survival-timer .clock.danger { color: #be123c; animation: pulseDanger 0.8s ease-in-out infinite; }
+
+@keyframes pulseDanger {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.survival-stage {
+  position: relative;
+  height: 220px;
+  overflow: hidden;
+}
+
+.survival-stage.swim {
+  background: linear-gradient(180deg, #7dd3fc 0%, #0ea5e9 45%, #0369a1 100%);
+}
+
+.survival-stage.balloon {
+  background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 40%, #86efac 100%);
+}
+
+.survival-stage.rocket {
+  background: linear-gradient(180deg, #0f172a 0%, #1e3a5f 50%, #334155 100%);
+}
+
+.survival-actor {
+  position: absolute;
+  transition: left 0.4s ease, bottom 0.4s ease, top 0.4s ease, opacity 0.4s ease, transform 0.4s ease;
+  z-index: 2;
+}
+
+.swimmer {
+  width: 48px;
+  height: 36px;
+  left: 8%;
+  top: 42%;
+}
+
+.swimmer .s-head {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fcd9b0;
+  position: absolute;
+  left: 4px;
+  top: 4px;
+}
+
+.swimmer .s-body {
+  width: 28px;
+  height: 14px;
+  background: #2563eb;
+  border-radius: 8px;
+  position: absolute;
+  left: 16px;
+  top: 12px;
+}
+
+.swimmer.swimming .s-body {
+  animation: swimKick 0.6s ease-in-out infinite;
+}
+
+@keyframes swimKick {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(6deg); }
+}
+
+.swimmer.drowning {
+  top: 70% !important;
+  opacity: 0.7;
+  animation: drownBob 0.5s ease-in-out infinite;
+}
+
+@keyframes drownBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+}
+
+.swimmer.safe {
+  left: 78% !important;
+  top: 28% !important;
+}
+
+.shore {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 22%;
+  background: linear-gradient(90deg, transparent, #fde68a 30%, #fbbf24);
+}
+
+.balloon-actor {
+  width: 40px;
+  left: 50%;
+  margin-left: -20px;
+  bottom: 12%;
+}
+
+.balloon-actor .balloon-ball {
+  width: 36px;
+  height: 44px;
+  background: #f43f5e;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  margin: 0 auto;
+  position: relative;
+}
+
+.balloon-actor .balloon-ball::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  margin-left: -4px;
+  border: 4px solid transparent;
+  border-top-color: #e11d48;
+}
+
+.balloon-actor .string {
+  width: 2px;
+  height: 28px;
+  background: #64748b;
+  margin: 0 auto;
+}
+
+.balloon-actor.popped .balloon-ball {
+  animation: popBurst 0.45s forwards;
+}
+
+@keyframes popBurst {
+  to { transform: scale(1.6); opacity: 0; }
+}
+
+.rocket-actor {
+  width: 28px;
+  left: 50%;
+  margin-left: -14px;
+  bottom: 10%;
+}
+
+.rocket-actor .r-body {
+  width: 20px;
+  height: 36px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, #f8fafc, #94a3b8);
+  border-radius: 10px 10px 4px 4px;
+  position: relative;
+}
+
+.rocket-actor .r-body::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 2px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 12px solid #ef4444;
+}
+
+.rocket-actor .flame {
+  width: 10px;
+  height: 14px;
+  margin: 2px auto 0;
+  background: #f97316;
+  border-radius: 0 0 50% 50%;
+  animation: flameFlicker 0.25s infinite alternate;
+}
+
+@keyframes flameFlicker {
+  from { transform: scaleY(0.8); opacity: 0.8; }
+  to { transform: scaleY(1.2); opacity: 1; }
+}
+
+.rocket-actor.crashed {
+  bottom: 4% !important;
+  transform: rotate(55deg);
+}
+
+.rocket-actor.crashed .flame { display: none; }
+
+.rocket-actor.orbit {
+  bottom: 72% !important;
+}
+
+.survival-status {
+  padding: 0.5rem 1rem 0.85rem;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.survival-status.fail { color: #be123c; }
+.survival-status.win { color: #047857; }
+
+.game-locked #gameContainer {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.game-locked #gameContainer::after {
+  content: "Time's up";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.35);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.25rem;
+  border-radius: 16px;
+  z-index: 5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .car-sprite,
+  .tug-rope,
+  .tug-team,
+  .survival-actor,
+  .swimmer.swimming .s-body,
+  .swimmer.drowning,
+  .rocket-actor .flame,
+  .survival-timer .clock.danger {
+    animation: none !important;
+    transition: none !important;
+  }
+}

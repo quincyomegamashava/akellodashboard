@@ -23738,6 +23738,8 @@ def list_games():
                 'grade': getattr(g, 'grade', None),
                 'ruzivo_ex_id': getattr(g, 'ruzivo_ex_id', None),
                 'difficulty_level': g.difficulty_level,
+                'solo_theme': getattr(g, 'solo_theme', None) or 'swim',
+                'solo_time_limit_seconds': g.resolved_solo_time_limit_seconds() if hasattr(g, 'resolved_solo_time_limit_seconds') else 240,
                 'is_active': g.is_active,
                 'bank_item_count': len(g.bank_items) if g.bank_items is not None else 0,
                 'created_at': g.created_at.isoformat() if g.created_at else None
@@ -23879,6 +23881,21 @@ def create_game():
         valid_difficulty_levels = ['easy', 'medium', 'hard']
         if difficulty_level and difficulty_level not in valid_difficulty_levels:
             return jsonify({'error': f'Difficulty level must be one of: {", ".join(valid_difficulty_levels)}'}), 400
+
+        valid_solo_themes = ['swim', 'balloon', 'rocket']
+        solo_theme = (data.get('solo_theme') or 'swim').strip().lower()
+        if solo_theme not in valid_solo_themes:
+            return jsonify({'error': f'solo_theme must be one of: {", ".join(valid_solo_themes)}'}), 400
+        solo_time_limit_seconds = data.get('solo_time_limit_seconds')
+        if solo_time_limit_seconds is not None and solo_time_limit_seconds != '':
+            try:
+                solo_time_limit_seconds = int(solo_time_limit_seconds)
+            except (TypeError, ValueError):
+                return jsonify({'error': 'solo_time_limit_seconds must be a number'}), 400
+            if solo_time_limit_seconds < 30 or solo_time_limit_seconds > 3600:
+                return jsonify({'error': 'solo_time_limit_seconds must be between 30 and 3600'}), 400
+        else:
+            solo_time_limit_seconds = None
         
         game = Game(
             title=title,
@@ -23889,6 +23906,8 @@ def create_game():
             subject=subject or None,
             content_source=(data.get('content_source') or 'general_knowledge').strip() or 'general_knowledge',
             difficulty_level=difficulty_level if difficulty_level else None,
+            solo_theme=solo_theme,
+            solo_time_limit_seconds=solo_time_limit_seconds,
             is_active=bool(is_active),
             created_by=current_user.id
         )
@@ -23905,6 +23924,8 @@ def create_game():
                 'age_range': game.age_range,
                 'subject': game.subject,
                 'difficulty_level': game.difficulty_level,
+                'solo_theme': game.solo_theme,
+                'solo_time_limit_seconds': game.resolved_solo_time_limit_seconds(),
                 'is_active': game.is_active
             }
         }), 201
@@ -23935,6 +23956,9 @@ def get_game(game_id):
                 'content_source': getattr(game, 'content_source', None) or 'general_knowledge',
                 'grade': getattr(game, 'grade', None),
                 'difficulty_level': game.difficulty_level,
+                'solo_theme': getattr(game, 'solo_theme', None) or 'swim',
+                'solo_time_limit_seconds': game.resolved_solo_time_limit_seconds() if hasattr(game, 'resolved_solo_time_limit_seconds') else 240,
+                'solo_time_limit_override': getattr(game, 'solo_time_limit_seconds', None),
                 'is_active': game.is_active,
                 'created_at': game.created_at.isoformat() if game.created_at else None
             }
@@ -23980,6 +24004,23 @@ def update_game(game_id):
             if difficulty_level and difficulty_level not in valid_difficulty_levels:
                 return jsonify({'error': f'Difficulty level must be one of: {", ".join(valid_difficulty_levels)}'}), 400
             game.difficulty_level = difficulty_level if difficulty_level else None
+        if 'solo_theme' in data:
+            solo_theme = (data.get('solo_theme') or 'swim').strip().lower()
+            if solo_theme not in ('swim', 'balloon', 'rocket'):
+                return jsonify({'error': 'solo_theme must be one of: swim, balloon, rocket'}), 400
+            game.solo_theme = solo_theme
+        if 'solo_time_limit_seconds' in data:
+            raw = data.get('solo_time_limit_seconds')
+            if raw is None or raw == '':
+                game.solo_time_limit_seconds = None
+            else:
+                try:
+                    solo_time_limit_seconds = int(raw)
+                except (TypeError, ValueError):
+                    return jsonify({'error': 'solo_time_limit_seconds must be a number'}), 400
+                if solo_time_limit_seconds < 30 or solo_time_limit_seconds > 3600:
+                    return jsonify({'error': 'solo_time_limit_seconds must be between 30 and 3600'}), 400
+                game.solo_time_limit_seconds = solo_time_limit_seconds
         if 'is_active' in data:
             game.is_active = bool(data['is_active'])
         
@@ -23996,6 +24037,8 @@ def update_game(game_id):
                 'age_range': game.age_range,
                 'subject': game.subject,
                 'difficulty_level': game.difficulty_level,
+                'solo_theme': game.solo_theme,
+                'solo_time_limit_seconds': game.resolved_solo_time_limit_seconds(),
                 'is_active': game.is_active
             }
         }), 200
@@ -24092,6 +24135,7 @@ def submit_game_score():
         score = data.get('score')
         max_score = data.get('max_score')
         user_id = data.get('user_id')
+        timed_out = bool(data.get('timed_out'))
         
         # Get user from request body (sent from frontend sessionStorage)
         if not user_id:
@@ -24143,6 +24187,7 @@ def submit_game_score():
         
         return jsonify({
             'success': True,
+            'timed_out': timed_out,
             'score': {
                 'id': game_score.id,
                 'score': game_score.score,

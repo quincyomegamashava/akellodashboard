@@ -10,6 +10,10 @@
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
   <script src="{{ url_for('static', filename='js/quiz_math.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/game_themes.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="{{ url_for('static', filename='js/game_themes_3d.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/game_themes.js') }}"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -101,6 +105,10 @@
       padding: 0 24px;
     }
 
+    .solo-layout .game-main #gameContainer {
+      margin: 0;
+    }
+
     #gameContainer {
       background: #fff;
       border-radius: 16px;
@@ -108,6 +116,18 @@
       border: 1px solid rgba(15, 23, 42, 0.06);
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px rgba(15, 23, 42, 0.05);
       min-height: 500px;
+    }
+
+    @media (max-width: 959px) {
+      .solo-layout {
+        display: flex;
+        flex-direction: column;
+      }
+      .solo-layout .survival-mount {
+        order: -1;
+      }
+      .survival-panel { position: static; }
+      .survival-stage { height: 160px; }
     }
 
     .loading-state {
@@ -227,15 +247,18 @@
     </div>
   </div>
 
-  <div class="game-container">
-    <div id="gameContainer">
-      <div id="gameContent">
-        <div class="loading-state">
-          <i class="fas fa-spinner"></i>
-          <p>Loading game…</p>
+  <div class="solo-layout">
+    <div class="game-main">
+      <div id="gameContainer">
+        <div id="gameContent">
+          <div class="loading-state">
+            <i class="fas fa-spinner"></i>
+            <p>Loading game…</p>
+          </div>
         </div>
       </div>
     </div>
+    <div class="survival-mount" id="survivalMount"></div>
   </div>
 
   <div id="scoreSubmissionStatus">
@@ -259,6 +282,15 @@
       window.location.href = '/game-login';
     }
 
+    let currentGame = null;
+    let soloTheme = 'swim';
+    let timeLimitSeconds = 240;
+    let remainingSeconds = 240;
+    let survivalTimer = null;
+    let survivalEnded = false;
+    let timedOut = false;
+    let scoreObserver = null;
+
     function burstSparkles() {
       const icons = ['✦', '✧', '★'];
       for (let i = 0; i < 10; i++) {
@@ -276,9 +308,89 @@
       }
     }
 
+    function readScoreFromBox() {
+      const scoreBox = document.getElementById('scoreBox');
+      if (!scoreBox) return { score: 0, max: currentGame && currentGame.max_score ? currentGame.max_score : null };
+      const match = (scoreBox.textContent || '').match(/Score:\s*(\d+)\s*\/\s*(\d+)/i);
+      if (match) return { score: parseInt(match[1], 10), max: parseInt(match[2], 10) };
+      return { score: 0, max: currentGame && currentGame.max_score ? currentGame.max_score : null };
+    }
+
+    function updateSurvivalVisuals() {
+      if (!window.GameThemes) return;
+      const mount = document.getElementById('survivalMount');
+      const elapsedFrac = timeLimitSeconds > 0 ? 1 - (remainingSeconds / timeLimitSeconds) : 0;
+      const { score, max } = readScoreFromBox();
+      const scoreFrac = max && max > 0 ? score / max : 0;
+      window.GameThemes.setSurvivalClock(mount, remainingSeconds, timeLimitSeconds);
+      if (!survivalEnded) {
+        window.GameThemes.setSurvivalProgress(mount, soloTheme, elapsedFrac, scoreFrac);
+      }
+    }
+
+    function startSurvivalTimer() {
+      const mount = document.getElementById('survivalMount');
+      if (window.GameThemes) {
+        window.GameThemes.ensureSurvivalShell(mount, soloTheme);
+        window.GameThemes.setSurvivalOutcome(mount, soloTheme, 'playing');
+      }
+      remainingSeconds = timeLimitSeconds;
+      updateSurvivalVisuals();
+      if (survivalTimer) clearInterval(survivalTimer);
+      survivalTimer = setInterval(() => {
+        if (survivalEnded) return;
+        remainingSeconds -= 1;
+        updateSurvivalVisuals();
+        if (remainingSeconds <= 0) {
+          remainingSeconds = 0;
+          handleSoloTimeout();
+        }
+      }, 1000);
+    }
+
+    function stopSurvivalTimer() {
+      if (survivalTimer) {
+        clearInterval(survivalTimer);
+        survivalTimer = null;
+      }
+    }
+
+    function handleSoloTimeout() {
+      if (survivalEnded) return;
+      survivalEnded = true;
+      timedOut = true;
+      stopSurvivalTimer();
+      document.body.classList.add('game-locked');
+      const mount = document.getElementById('survivalMount');
+      if (window.GameThemes) {
+        window.GameThemes.setSurvivalOutcome(mount, soloTheme, 'fail');
+      }
+      const { score, max } = readScoreFromBox();
+      if (window.submitGameScore) {
+        window.submitGameScore(gameId, score, max, true);
+      }
+    }
+
+    function markSoloSuccess() {
+      if (survivalEnded) return;
+      survivalEnded = true;
+      stopSurvivalTimer();
+      const mount = document.getElementById('survivalMount');
+      if (window.GameThemes) {
+        window.GameThemes.setSurvivalOutcome(mount, soloTheme, 'win');
+      }
+    }
+
+    function watchScoreBox() {
+      const box = document.getElementById('scoreBox');
+      if (!box || scoreObserver) return;
+      scoreObserver = new MutationObserver(() => updateSurvivalVisuals());
+      scoreObserver.observe(box, { childList: true, characterData: true, subtree: true });
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
-      await loadGame();
       setupScoreSubmission();
+      await loadGame();
     });
 
     async function loadGame() {
@@ -286,6 +398,11 @@
         const r = await fetch(`/api/games/${gameId}`);
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || 'Failed to load game');
+
+        currentGame = data.game;
+        soloTheme = (data.game.solo_theme || 'swim').toLowerCase();
+        if (!['swim', 'balloon', 'rocket'].includes(soloTheme)) soloTheme = 'swim';
+        timeLimitSeconds = Number(data.game.solo_time_limit_seconds) || 240;
 
         document.getElementById('gameTitleHeader').textContent = data.game.title;
         const container = document.getElementById('gameContent');
@@ -342,6 +459,9 @@
         if (scriptContents.every(s => !s.src)) {
           setTimeout(() => injectScoreSubmissionScript(data.game), 200);
         }
+
+        startSurvivalTimer();
+        setTimeout(watchScoreBox, 600);
       } catch (e) {
         document.getElementById('gameContent').innerHTML =
           '<div style="text-align:center; padding:48px; color:#e11d48;"><i class="fas fa-exclamation-triangle" style="font-size:40px; margin-bottom:16px;"></i><p>Error loading game: ' + e.message + '</p></div>';
@@ -351,8 +471,10 @@
     function injectScoreSubmissionScript(game) {
       setTimeout(() => {
         window.gameScoreSubmit = function(score, maxScore) {
+          if (window._gameScoreSubmitting || timedOut || survivalEnded) return;
+          markSoloSuccess();
           if (window.submitGameScore) {
-            window.submitGameScore(gameId, score, maxScore || game.max_score || null);
+            window.submitGameScore(gameId, score, maxScore || game.max_score || null, false);
           }
         };
 
@@ -363,11 +485,19 @@
             const btn = e.target.closest('#checkBtn');
             if (!btn || btn.disabled) return;
             setTimeout(() => {
+              if (timedOut || survivalEnded) return;
               const scoreBox = document.getElementById('scoreBox');
               if (!scoreBox) return;
               const match = (scoreBox.textContent || '').match(/Score:\s*(\d+)\s*\/\s*(\d+)/i);
               if (match && window.gameScoreSubmit) {
-                window.gameScoreSubmit(parseInt(match[1]), parseInt(match[2]));
+                // Only auto-submit when quiz appears complete (score == max)
+                const sc = parseInt(match[1], 10);
+                const mx = parseInt(match[2], 10);
+                if (mx > 0 && sc >= mx) {
+                  window.gameScoreSubmit(sc, mx);
+                } else {
+                  updateSurvivalVisuals();
+                }
               }
             }, 400);
           });
@@ -376,7 +506,7 @@
     }
 
     function setupScoreSubmission() {
-      window.submitGameScore = async function(gameId, score, maxScore) {
+      window.submitGameScore = async function(gameId, score, maxScore, wasTimedOut) {
         if (window._gameScoreSubmitting) return;
         window._gameScoreSubmitting = true;
         const statusDiv = document.getElementById('scoreSubmissionStatus');
@@ -411,22 +541,33 @@
               game_id: parseInt(gameId),
               score: parseInt(score),
               max_score: maxScore ? parseInt(maxScore) : null,
-              user_id: parseInt(userId)
+              user_id: parseInt(userId),
+              timed_out: !!wasTimedOut
             })
           });
           const data = await r.json();
           if (!r.ok) throw new Error(data.error || 'Failed to submit score');
 
-          statusIcon.className = 'status-icon success';
-          statusIcon.innerHTML = '<i class="fas fa-check"></i>';
-          statusTitle.textContent = 'Score Submitted!';
-          statusMessage.innerHTML = `
-            <strong style="font-size: 22px; color: #0f172a;">${score}${maxScore ? ' / ' + maxScore : ''}</strong><br>
-            ${data.score && data.score.percentage ? '<span style="color: #64748b;">Percentage: ' + data.score.percentage.toFixed(1) + '%</span>' : ''}<br><br>
-            Great job — keep growing!
-          `;
+          if (wasTimedOut) {
+            statusIcon.className = 'status-icon error';
+            statusIcon.innerHTML = '<i class="fas fa-hourglass-end"></i>';
+            statusTitle.textContent = "Time's up — try again!";
+            statusMessage.innerHTML = `
+              <strong style="font-size: 22px; color: #0f172a;">${score}${maxScore ? ' / ' + maxScore : ''}</strong><br>
+              <span style="color: #64748b;">You ran out of time. Practice and come back stronger!</span>
+            `;
+          } else {
+            statusIcon.className = 'status-icon success';
+            statusIcon.innerHTML = '<i class="fas fa-check"></i>';
+            statusTitle.textContent = 'Score Submitted!';
+            statusMessage.innerHTML = `
+              <strong style="font-size: 22px; color: #0f172a;">${score}${maxScore ? ' / ' + maxScore : ''}</strong><br>
+              ${data.score && data.score.percentage ? '<span style="color: #64748b;">Percentage: ' + data.score.percentage.toFixed(1) + '%</span>' : ''}<br><br>
+              Great job — keep growing!
+            `;
+            burstSparkles();
+          }
           statusBtn.style.display = 'block';
-          burstSparkles();
         } catch (e) {
           window._gameScoreSubmitting = false;
           statusIcon.className = 'status-icon error';

@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neon Highway · Quiz Galaxy</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0015;
+      font-family: 'Orbitron', sans-serif;
+      color: #fff;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #score-panel {
+      position: absolute;
+      top: 24px;
+      left: 28px;
+      text-shadow: 0 0 12px #ff2ecd, 0 0 28px #ff2ecd88;
+    }
+
+    #score-panel .label {
+      font-size: 11px;
+      letter-spacing: 0.35em;
+      color: #ff6bdb;
+      opacity: 0.85;
+    }
+
+    #score-panel .value {
+      font-size: 36px;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 0.08em;
+    }
+
+    #speed-panel {
+      position: absolute;
+      top: 24px;
+      right: 28px;
+      text-align: right;
+      text-shadow: 0 0 12px #00f0ff, 0 0 28px #00f0ff88;
+    }
+
+    #speed-panel .label {
+      font-size: 11px;
+      letter-spacing: 0.35em;
+      color: #5cfff7;
+      opacity: 0.85;
+    }
+
+    #speed-panel .value {
+      font-size: 36px;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 0.08em;
+    }
+
+    #title-bar {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.55em;
+      color: #ff2ecd;
+      text-shadow: 0 0 16px #ff2ecd, 0 0 40px #7b2fff;
+      opacity: 0.9;
+    }
+
+    #overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(ellipse at center, #1a003355 0%, #0a0015ee 70%),
+        linear-gradient(180deg, #2d0066aa 0%, #0a0015ee 100%);
+      pointer-events: auto;
+      transition: opacity 0.4s ease;
+    }
+
+    #overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .panel {
+      text-align: center;
+      padding: 48px 56px;
+      max-width: 520px;
+      border: 1px solid #ff2ecd66;
+      background: linear-gradient(160deg, #1a0038cc, #0d0020ee);
+      box-shadow:
+        0 0 40px #ff2ecd33,
+        0 0 80px #7b2fff22,
+        inset 0 0 60px #00f0ff11;
+    }
+
+    .panel h1 {
+      font-size: clamp(28px, 6vw, 48px);
+      font-weight: 900;
+      letter-spacing: 0.2em;
+      background: linear-gradient(90deg, #00f0ff, #ff2ecd, #c44dff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: none;
+      filter: drop-shadow(0 0 20px #ff2ecd88);
+      margin-bottom: 8px;
+    }
+
+    .panel .subtitle {
+      font-size: 12px;
+      letter-spacing: 0.4em;
+      color: #5cfff7;
+      margin-bottom: 28px;
+      opacity: 0.9;
+    }
+
+    .panel p {
+      font-size: 13px;
+      line-height: 1.7;
+      color: #d4b8ff;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+    }
+
+    .panel .final-score {
+      font-size: 42px;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 0 20px #ff2ecd;
+      margin: 16px 0 8px;
+      letter-spacing: 0.1em;
+    }
+
+    .panel button {
+      margin-top: 24px;
+      pointer-events: auto;
+      cursor: pointer;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.3em;
+      padding: 14px 36px;
+      color: #0a0015;
+      background: linear-gradient(90deg, #00f0ff, #ff2ecd);
+      border: none;
+      box-shadow: 0 0 24px #ff2ecd66, 0 0 48px #00f0ff33;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .panel button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 36px #ff2ecd99, 0 0 64px #00f0ff55;
+    }
+
+    #high-scores {
+      margin-top: 20px;
+      font-size: 12px;
+      letter-spacing: 0.15em;
+      color: #a78bfa;
+      line-height: 1.8;
+    }
+
+    #high-scores .hs-title {
+      color: #ff6bdb;
+      letter-spacing: 0.3em;
+      margin-bottom: 6px;
+    }
+
+    #controls-hint {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 0.25em;
+      color: #7b5cff;
+      opacity: 0.7;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    #vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      background: radial-gradient(ellipse at center, transparent 50%, #0a001588 100%);
+    }
+
+    #scanlines {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 6;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.08) 2px,
+        rgba(0, 0, 0, 0.08) 4px
+      );
+      opacity: 0.4;
+    }
+
+    #quiz-panel {
+      position: absolute;
+      left: 50%;
+      bottom: 72px;
+      transform: translateX(-50%);
+      width: min(720px, calc(100vw - 32px));
+      pointer-events: none;
+      text-align: center;
+    }
+    #question {
+      font-size: clamp(14px, 2.4vw, 20px);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.35;
+      color: #fff;
+      text-shadow: 0 0 12px #ff2ecd, 0 0 24px #7b2fff;
+      background: linear-gradient(160deg, #1a0038cc, #0d0020ee);
+      border: 1px solid #ff2ecd66;
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 8px;
+      overflow-wrap: anywhere;
+    }
+    #feedback {
+      min-height: 1.4em;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #5cfff7;
+    }
+    #feedback.good { color: #5cffb0; text-shadow: 0 0 12px #5cffb088; }
+    #feedback.bad { color: #ff6bdb; text-shadow: 0 0 12px #ff2ecd88; }
+    #feedback.read { color: #ffe08a; text-shadow: 0 0 12px #ffe08a66; letter-spacing: 0.18em; }
+    #choice-strip {
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      width: min(720px, calc(100vw - 32px));
+      margin: 0 auto 10px;
+      pointer-events: none;
+      text-align: left;
+    }
+    #choice-strip.show { display: grid; }
+    #choice-strip .choice {
+      background: linear-gradient(160deg, #2a085fcc, #120028ee);
+      border: 2px solid #5cfff7aa;
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: #fff;
+      font-size: clamp(13px, 2.2vw, 17px);
+      font-weight: 700;
+      line-height: 1.3;
+      letter-spacing: 0.02em;
+      text-shadow: 0 0 8px #000;
+      overflow-wrap: anywhere;
+    }
+    #choice-strip .choice .key {
+      display: inline-block;
+      min-width: 1.4em;
+      margin-right: 6px;
+      color: #5cfff7;
+      letter-spacing: 0.12em;
+    }
+    #choice-strip .choice:nth-child(2) { border-color: #ff2ecdaa; }
+    #choice-strip .choice:nth-child(2) .key { color: #ff6bdb; }
+    #choice-strip .choice:nth-child(3) { border-color: #a78bfaaa; }
+    #choice-strip .choice:nth-child(3) .key { color: #c4b5fd; }
+    #choice-strip .choice:nth-child(4) { border-color: #ff00aaaa; }
+    #choice-strip .choice:nth-child(4) .key { color: #ff66cc; }
+    #meta-row {
+      position: absolute;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 16px;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: #a78bfa;
+    }
+    .panel button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+    #galaxyLoadStatus {
+      position: fixed; left: 12px; bottom: 12px; z-index: 50;
+      background: rgba(26,0,56,.9); color: #5cfff7;
+      padding: 8px 12px; border-radius: 10px;
+      font: 700 11px Orbitron, sans-serif; letter-spacing: 0.12em;
+      max-width: 280px; border: 1px solid #ff2ecd55;
+    }
+    #touch-controls {
+      position: absolute;
+      left: 0; right: 0; bottom: 18px;
+      z-index: 12;
+      display: none;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 0 16px;
+      pointer-events: none;
+      gap: 12px;
+    }
+    #touch-controls.show { display: flex; }
+    .touch-btn {
+      pointer-events: auto;
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      border: 2px solid #5cfff7aa;
+      background: rgba(26, 0, 56, 0.72);
+      color: #5cfff7;
+      font: 700 28px Orbitron, sans-serif;
+      letter-spacing: 0;
+      box-shadow: 0 0 18px #ff2ecd44, inset 0 0 12px #5cfff722;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+      user-select: none;
+    }
+    .touch-btn:active, .touch-btn.active {
+      background: rgba(92, 255, 247, 0.28);
+      border-color: #ff2ecd;
+      color: #fff;
+      transform: scale(0.96);
+    }
+    .touch-btn.boost {
+      width: 68px;
+      height: 68px;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      border-color: #ff2ecdaa;
+      color: #ff6bdb;
+      margin: 0 auto 6px;
+    }
+    #touch-mid {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+    }
+    @media (pointer: fine) and (min-width: 900px) {
+      #touch-controls.show { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div id="vignette"></div>
+  <div id="scanlines"></div>
+
+  <div id="hud">
+    <div id="title-bar">NEON HIGHWAY</div>
+    <div id="score-panel">
+      <div class="label">CORRECT</div>
+      <div class="value" id="score-value">0</div>
+    </div>
+    <div id="speed-panel">
+      <div class="label">TIME</div>
+      <div class="value" id="speed-value">1:00</div>
+    </div>
+    <div id="meta-row">
+      <span id="q-badge">QUESTION 0</span>
+      <span id="streak">STREAK 0</span>
+    </div>
+    <div id="quiz-panel">
+      <div id="choice-strip" aria-live="polite"></div>
+      <div id="question" aria-live="polite">Loading quizzes…</div>
+      <div id="feedback"></div>
+    </div>
+    <div id="controls-hint">STEER INTO THE CORRECT ANSWER · KEYS OR ON-SCREEN ← →</div>
+  </div>
+
+  <div id="touch-controls" aria-label="Touch steering">
+    <button type="button" class="touch-btn" id="touch-left" aria-label="Steer left">←</button>
+    <div id="touch-mid">
+      <button type="button" class="touch-btn boost" id="touch-boost" aria-label="Boost">BOOST</button>
+    </div>
+    <button type="button" class="touch-btn" id="touch-right" aria-label="Steer right">→</button>
+  </div>
+
+  <div id="overlay">
+    <div class="panel" id="start-panel">
+      <h1>NEON HIGHWAY</h1>
+      <div class="subtitle">COLLIDE TO ANSWER</div>
+      <p>A question appears. Answer choices rush toward you as neon obstacles.<br/>Steer into the <strong style="color:#5cfff7">correct</strong> answer block.</p>
+      <p style="color:#5cfff7;margin-top:16px;">60 seconds · most correct wins<br/>10s to read each question (timer paused) · Esc to pause<br/>Desktop: arrow keys / A D · Mobile: on-screen ← →</p>
+      <button id="start-btn" type="button" disabled>ENGAGE</button>
+    </div>
+    <div class="panel" id="gameover-panel" style="display:none;">
+      <div id="end-overlay">
+        <div class="card">
+          <h1 id="end-title">RUN COMPLETE</h1>
+          <div class="subtitle">SIGNAL LOCKED</div>
+          <p>CORRECT ANSWERS</p>
+          <div class="final-score" id="final-score">0</div>
+          <p id="end-detail" style="color:#a78bfa;"></p>
+          <button id="replay-btn" class="btn-primary" type="button">RACE AGAIN</button>
+          <p style="margin-top:12px;"><a href="/quiz-galaxy" style="color:#5cfff7;letter-spacing:0.2em;font-size:11px;text-decoration:none;">BACK TO GALAXY</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+
+    // ─── Constants ───────────────────────────────────────────────
+    const ROAD_WIDTH = 14;
+    const LANE_COUNT = 4;
+    const ROUND_SECONDS = 60;
+    const READ_SECONDS = 10;
+    const LANE_WIDTH = ROAD_WIDTH / LANE_COUNT;
+    const SEGMENT_LENGTH = 20;
+    const VISIBLE_SEGMENTS = 40;
+    const CAR_Y = 0.6;
+    const COLORS = {
+      cyan: 0x00f0ff,
+      pink: 0xff2ecd,
+      purple: 0x7b2fff,
+      magenta: 0xff00aa,
+      darkPurple: 0x1a0038,
+      black: 0x0a0015,
+    };
+
+    // ─── State ───────────────────────────────────────────────────
+    let gameState = 'menu'; // menu | playing | dead
+    let distance = 0;
+    let speed = 0;
+    let baseSpeed = 32;
+    let boost = 0;
+    let carX = 0;
+    let carTargetX = 0;
+    let steerInput = 0;
+    let clock = new THREE.Clock();
+    let obstacles = [];
+    let particles = [];
+    let roadSegments = [];
+    let sunMesh, sunGlow;
+    let mountains = [];
+    let stars = [];
+    let nextObstacleZ = -80;
+    let shakeTime = 0;
+    let lastScoreUpdate = 0;
+    let quizState = {
+      playing: false,
+      playerCorrect: 0,
+      streak: 0,
+      asked: 0,
+      secondsLeft: ROUND_SECONDS,
+      deck: [],
+      current: null,
+      locked: false,
+      waveActive: false,
+      waveResolved: false,
+      timerAcc: 0,
+      readLeft: 0,
+    };
+    if (window.GalaxyShell && GalaxyShell.resetDealState) GalaxyShell.resetDealState(quizState);
+      window.__galaxyPlayState = quizState;
+
+    function quizBank() {
+      if (window.GalaxyShell && typeof window.GalaxyShell.quizBank === 'function') {
+        const bank = window.GalaxyShell.quizBank();
+        if (bank && bank.length) return bank;
+      }
+      return window.GALAXY_QUESTIONS || [];
+    }
+    function shellQ(raw) {
+      if (!raw) return null;
+      const choices = raw.choices || raw.options || [];
+      const q = raw.q || raw.prompt || '';
+      if (!q || !Array.isArray(choices) || choices.length < 2) return null;
+      return {
+        q,
+        choices: choices.slice(0, 4),
+        answer: typeof raw.answer === 'number' ? raw.answer : (typeof raw.correctIndex === 'number' ? raw.correctIndex : 0),
+        explain: raw.explain || '',
+        id: raw.id,
+        source: raw.source || '',
+      };
+    }
+    function shuffle(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+    function formatTime(s) {
+      const m = Math.floor(s / 60);
+      return m + ':' + String(Math.max(0, s) % 60).padStart(2, '0');
+    }
+
+    // ─── Renderer / Scene / Camera ───────────────────────────────
+    const canvas = document.getElementById('game-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x120028, 0.018);
+
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 500);
+    camera.position.set(0, 5, 10);
+
+    // ─── Lights ──────────────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0x4a2080, 0.55));
+    const sunLight = new THREE.DirectionalLight(0xff6bdb, 1.2);
+    sunLight.position.set(0, 40, -120);
+    scene.add(sunLight);
+    const carLight = new THREE.PointLight(0x00f0ff, 2.5, 30);
+    scene.add(carLight);
+    const roadGlow = new THREE.PointLight(0xff2ecd, 1.2, 40);
+    roadGlow.position.set(0, 2, 0);
+    scene.add(roadGlow);
+
+    // ─── Sky gradient (large sphere) ─────────────────────────────
+    function createSky() {
+      const geo = new THREE.SphereGeometry(400, 32, 32);
+      const canvas2d = document.createElement('canvas');
+      canvas2d.width = 2;
+      canvas2d.height = 256;
+      const ctx = canvas2d.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0, '#0a0015');
+      grad.addColorStop(0.35, '#1a0040');
+      grad.addColorStop(0.55, '#4a0080');
+      grad.addColorStop(0.72, '#c02080');
+      grad.addColorStop(0.88, '#ff4da6');
+      grad.addColorStop(1, '#ff8ec8');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 2, 256);
+      const tex = new THREE.CanvasTexture(canvas2d);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false });
+      const sky = new THREE.Mesh(geo, mat);
+      scene.add(sky);
+      return sky;
+    }
+    createSky();
+
+    // ─── Stars ───────────────────────────────────────────────────
+    function createStars() {
+      const geo = new THREE.BufferGeometry();
+      const count = 600;
+      const positions = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 500;
+        positions[i * 3 + 1] = Math.random() * 120 + 20;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 500 - 50;
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const mat = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.8,
+        transparent: true,
+        opacity: 0.85,
+        fog: false,
+      });
+      const pts = new THREE.Points(geo, mat);
+      scene.add(pts);
+      stars.push(pts);
+    }
+    createStars();
+
+    // ─── Synthwave sun ───────────────────────────────────────────
+    function createSun() {
+      const group = new THREE.Group();
+      const sunGeo = new THREE.CircleGeometry(28, 64);
+      const sunMat = new THREE.MeshBasicMaterial({
+        color: 0xff4da6,
+        fog: false,
+        transparent: true,
+        opacity: 0.95,
+      });
+      sunMesh = new THREE.Mesh(sunGeo, sunMat);
+      group.add(sunMesh);
+
+      // Horizontal bands (synthwave sun stripes)
+      for (let i = 0; i < 8; i++) {
+        const band = new THREE.Mesh(
+          new THREE.PlaneGeometry(58, 1.2 + i * 0.15),
+          new THREE.MeshBasicMaterial({ color: 0x0a0015, fog: false })
+        );
+        band.position.y = -8 - i * 2.8;
+        band.position.z = 0.1;
+        group.add(band);
+      }
+
+      // Outer glow rings
+      const glowGeo = new THREE.CircleGeometry(38, 64);
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: 0xff2ecd,
+        fog: false,
+        transparent: true,
+        opacity: 0.18,
+      });
+      sunGlow = new THREE.Mesh(glowGeo, glowMat);
+      sunGlow.position.z = -0.5;
+      group.add(sunGlow);
+
+      group.position.set(0, 22, -180);
+      scene.add(group);
+      return group;
+    }
+    createSun();
+
+    // ─── Mountains (low-poly silhouette) ─────────────────────────
+    function createMountains() {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x1a0045,
+        fog: false,
+        transparent: true,
+        opacity: 0.9,
+      });
+      const outlineMat = new THREE.LineBasicMaterial({ color: 0xff2ecd, transparent: true, opacity: 0.5, fog: false });
+
+      for (let layer = 0; layer < 2; layer++) {
+        const shape = new THREE.Shape();
+        shape.moveTo(-200, -20);
+        let x = -200;
+        while (x < 200) {
+          const peakH = 15 + Math.random() * 35 + layer * 10;
+          const width = 20 + Math.random() * 40;
+          shape.lineTo(x + width * 0.5, peakH);
+          shape.lineTo(x + width, -20 + Math.random() * 5);
+          x += width;
+        }
+        shape.lineTo(200, -40);
+        shape.lineTo(-200, -40);
+        const geo = new THREE.ShapeGeometry(shape);
+        const mesh = new THREE.Mesh(geo, mat.clone());
+        mesh.material.color.setHex(layer === 0 ? 0x120035 : 0x0d0028);
+        mesh.position.set(0, 0, -140 - layer * 25);
+        scene.add(mesh);
+        mountains.push(mesh);
+
+        // Neon ridge lines
+        const pts = [];
+        x = -200;
+        pts.push(new THREE.Vector3(x, -5, 0));
+        while (x < 200) {
+          const peakH = 15 + Math.random() * 35 + layer * 10;
+          const width = 20 + Math.random() * 40;
+          pts.push(new THREE.Vector3(x + width * 0.5, peakH, 0));
+          pts.push(new THREE.Vector3(x + width, -5 + Math.random() * 5, 0));
+          x += width;
+        }
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+        const line = new THREE.Line(lineGeo, outlineMat.clone());
+        line.position.set(0, 0, -139.5 - layer * 25);
+        scene.add(line);
+        mountains.push(line);
+      }
+    }
+    createMountains();
+
+    // ─── Neon grid road ──────────────────────────────────────────
+    function createRoadSegment(z) {
+      const group = new THREE.Group();
+      group.position.z = z;
+
+      // Road surface
+      const roadGeo = new THREE.PlaneGeometry(ROAD_WIDTH, SEGMENT_LENGTH);
+      const roadMat = new THREE.MeshStandardMaterial({
+        color: 0x0d0020,
+        emissive: 0x1a0040,
+        emissiveIntensity: 0.3,
+        roughness: 0.8,
+        metalness: 0.2,
+      });
+      const road = new THREE.Mesh(roadGeo, roadMat);
+      road.rotation.x = -Math.PI / 2;
+      group.add(road);
+
+      // Side neon strips
+      [-ROAD_WIDTH / 2, ROAD_WIDTH / 2].forEach((x, i) => {
+        const strip = new THREE.Mesh(
+          new THREE.BoxGeometry(0.15, 0.08, SEGMENT_LENGTH),
+          new THREE.MeshBasicMaterial({ color: i === 0 ? COLORS.cyan : COLORS.pink })
+        );
+        strip.position.set(x, 0.05, 0);
+        group.add(strip);
+
+        // Glow pillars along edges
+        for (let p = 0; p < 2; p++) {
+          const pillar = new THREE.Mesh(
+            new THREE.BoxGeometry(0.2, 2.5, 0.2),
+            new THREE.MeshBasicMaterial({
+              color: i === 0 ? COLORS.cyan : COLORS.pink,
+              transparent: true,
+              opacity: 0.7,
+            })
+          );
+          pillar.position.set(x, 1.25, -SEGMENT_LENGTH / 4 + p * SEGMENT_LENGTH / 2);
+          group.add(pillar);
+
+          const cap = new THREE.Mesh(
+            new THREE.BoxGeometry(0.5, 0.1, 0.5),
+            new THREE.MeshBasicMaterial({ color: 0xffffff })
+          );
+          cap.position.set(x, 2.55, -SEGMENT_LENGTH / 4 + p * SEGMENT_LENGTH / 2);
+          group.add(cap);
+        }
+      });
+
+      // Horizontal grid lines
+      for (let i = 0; i <= 4; i++) {
+        const line = new THREE.Mesh(
+          new THREE.BoxGeometry(ROAD_WIDTH, 0.04, 0.08),
+          new THREE.MeshBasicMaterial({
+            color: COLORS.cyan,
+            transparent: true,
+            opacity: 0.55,
+          })
+        );
+        line.position.set(0, 0.06, -SEGMENT_LENGTH / 2 + (i / 4) * SEGMENT_LENGTH);
+        group.add(line);
+      }
+
+      // Lane dividers
+      for (let lane = 1; lane < LANE_COUNT; lane++) {
+        const x = -ROAD_WIDTH / 2 + lane * LANE_WIDTH;
+        for (let d = 0; d < 4; d++) {
+          const dash = new THREE.Mesh(
+            new THREE.BoxGeometry(0.1, 0.04, 2),
+            new THREE.MeshBasicMaterial({
+              color: COLORS.pink,
+              transparent: true,
+              opacity: 0.4,
+            })
+          );
+          dash.position.set(x, 0.07, -SEGMENT_LENGTH / 2 + 2.5 + d * 5);
+          group.add(dash);
+        }
+      }
+
+      // Side ground panels (grid extending outward)
+      [-1, 1].forEach((side) => {
+        const ground = new THREE.Mesh(
+          new THREE.PlaneGeometry(40, SEGMENT_LENGTH),
+          new THREE.MeshBasicMaterial({
+            color: 0x080018,
+            transparent: true,
+            opacity: 0.85,
+          })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.set(side * (ROAD_WIDTH / 2 + 20), -0.02, 0);
+        group.add(ground);
+
+        // Side grid lines
+        for (let g = 0; g < 6; g++) {
+          const gl = new THREE.Mesh(
+            new THREE.BoxGeometry(40, 0.02, 0.05),
+            new THREE.MeshBasicMaterial({
+              color: COLORS.purple,
+              transparent: true,
+              opacity: 0.25,
+            })
+          );
+          gl.position.set(side * (ROAD_WIDTH / 2 + 20), 0.01, -SEGMENT_LENGTH / 2 + g * (SEGMENT_LENGTH / 5));
+          group.add(gl);
+        }
+      });
+
+      scene.add(group);
+      return group;
+    }
+
+    function initRoad() {
+      for (let i = 0; i < VISIBLE_SEGMENTS; i++) {
+        roadSegments.push(createRoadSegment(-i * SEGMENT_LENGTH));
+      }
+    }
+    initRoad();
+
+    // ─── Player car ──────────────────────────────────────────────
+    const car = new THREE.Group();
+
+    function buildCar() {
+      // Body
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: 0x1a0030,
+        emissive: 0xff2ecd,
+        emissiveIntensity: 0.35,
+        metalness: 0.8,
+        roughness: 0.25,
+      });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.45, 2.4), bodyMat);
+      body.position.y = 0.35;
+      car.add(body);
+
+      // Cabin
+      const cabinMat = new THREE.MeshStandardMaterial({
+        color: 0x0a0020,
+        emissive: 0x7b2fff,
+        emissiveIntensity: 0.4,
+        metalness: 0.9,
+        roughness: 0.15,
+      });
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.4, 1.1), cabinMat);
+      cabin.position.set(0, 0.7, -0.15);
+      car.add(cabin);
+
+      // Windshield
+      const glass = new THREE.Mesh(
+        new THREE.BoxGeometry(1.0, 0.28, 0.05),
+        new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.55 })
+      );
+      glass.position.set(0, 0.72, 0.4);
+      glass.rotation.x = -0.25;
+      car.add(glass);
+
+      // Neon underglow
+      const underglow = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5, 0.05, 2.5),
+        new THREE.MeshBasicMaterial({ color: COLORS.cyan, transparent: true, opacity: 0.6 })
+      );
+      underglow.position.y = 0.05;
+      car.add(underglow);
+
+      // Side neon strips
+      [-0.72, 0.72].forEach((x) => {
+        const strip = new THREE.Mesh(
+          new THREE.BoxGeometry(0.06, 0.08, 2.2),
+          new THREE.MeshBasicMaterial({ color: COLORS.pink })
+        );
+        strip.position.set(x, 0.35, 0);
+        car.add(strip);
+      });
+
+      // Headlights
+      [-0.45, 0.45].forEach((x) => {
+        const hl = new THREE.Mesh(
+          new THREE.BoxGeometry(0.25, 0.12, 0.08),
+          new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        hl.position.set(x, 0.35, 1.22);
+        car.add(hl);
+      });
+
+      // Taillights
+      [-0.5, 0.5].forEach((x) => {
+        const tl = new THREE.Mesh(
+          new THREE.BoxGeometry(0.3, 0.1, 0.06),
+          new THREE.MeshBasicMaterial({ color: COLORS.pink })
+        );
+        tl.position.set(x, 0.4, -1.22);
+        car.add(tl);
+      });
+
+      // Wheels
+      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.5, roughness: 0.4 });
+      const positions = [
+        [-0.7, 0.25, 0.75],
+        [0.7, 0.25, 0.75],
+        [-0.7, 0.25, -0.75],
+        [0.7, 0.25, -0.75],
+      ];
+      positions.forEach(([x, y, z]) => {
+        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.2, 12), wheelMat);
+        w.rotation.z = Math.PI / 2;
+        w.position.set(x, y, z);
+        car.add(w);
+      });
+
+      // Front splitter
+      const splitter = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5, 0.06, 0.4),
+        new THREE.MeshBasicMaterial({ color: COLORS.cyan })
+      );
+      splitter.position.set(0, 0.12, 1.3);
+      car.add(splitter);
+
+      car.position.set(0, CAR_Y, 0);
+      scene.add(car);
+    }
+    buildCar();
+
+    // Headlight beams
+    const headLightL = new THREE.SpotLight(0x88ffff, 3, 40, Math.PI / 7, 0.4, 1);
+    const headLightR = new THREE.SpotLight(0x88ffff, 3, 40, Math.PI / 7, 0.4, 1);
+    scene.add(headLightL, headLightR);
+    scene.add(headLightL.target, headLightR.target);
+
+    // ─── Obstacles ───────────────────────────────────────────────
+    const obstaclePalette = [COLORS.cyan, COLORS.pink, COLORS.purple, COLORS.magenta];
+
+    function makeAnswerLabel(text, colorHex, letter) {
+      const c = document.createElement('canvas');
+      c.width = 768;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, c.width, c.height);
+      const stroke = '#' + new THREE.Color(colorHex).getHexString();
+      ctx.fillStyle = 'rgba(8,0,20,0.94)';
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 10;
+      roundRect(ctx, 10, 10, c.width - 20, c.height - 20, 28);
+      ctx.fill();
+      ctx.stroke();
+      // Letter badge
+      ctx.fillStyle = stroke;
+      ctx.beginPath();
+      ctx.arc(70, c.height / 2, 42, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#0a0015';
+      ctx.font = 'bold 48px Orbitron, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(letter || ''), 70, c.height / 2 + 2);
+      // Answer text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 44px Orbitron, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const label = String(text || '').slice(0, 56);
+      wrapText(ctx, label, 130, c.height / 2, c.width - 170, 48);
+      const tex = new THREE.CanvasTexture(c);
+      tex.needsUpdate = true;
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(6.8, 2.25, 1);
+      sprite.position.y = 3.6;
+      sprite.userData.baseScale = { x: 6.8, y: 2.25 };
+      return sprite;
+    }
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+    function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+      const words = text.split(' ');
+      let line = '';
+      const lines = [];
+      for (let n = 0; n < words.length; n++) {
+        const test = line + words[n] + ' ';
+        if (ctx.measureText(test).width > maxWidth && n > 0) {
+          lines.push(line.trim());
+          line = words[n] + ' ';
+        } else line = test;
+      }
+      lines.push(line.trim());
+      const startY = y - ((lines.length - 1) * lineHeight) / 2;
+      lines.forEach((ln, i) => ctx.fillText(ln, x, startY + i * lineHeight));
+    }
+
+    function createObstacle(lane, z, choiceMeta) {
+      const group = new THREE.Group();
+      const color = obstaclePalette[lane % obstaclePalette.length];
+      const type = lane % 3;
+
+      let mesh;
+      if (type === 0) {
+        mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(1.6, 1.6, 1.6),
+          new THREE.MeshStandardMaterial({
+            color: 0x0a0015,
+            emissive: color,
+            emissiveIntensity: 0.9,
+            metalness: 0.6,
+            roughness: 0.3,
+          })
+        );
+        mesh.position.y = 0.9;
+        group.add(mesh);
+        const wire = new THREE.LineSegments(
+          new THREE.EdgesGeometry(new THREE.BoxGeometry(1.65, 1.65, 1.65)),
+          new THREE.LineBasicMaterial({ color })
+        );
+        wire.position.y = 0.9;
+        group.add(wire);
+      } else if (type === 1) {
+        mesh = new THREE.Mesh(
+          new THREE.OctahedronGeometry(1.1),
+          new THREE.MeshStandardMaterial({
+            color: 0x0a0015,
+            emissive: color,
+            emissiveIntensity: 1.0,
+            metalness: 0.7,
+            roughness: 0.2,
+          })
+        );
+        mesh.position.y = 1.1;
+        group.add(mesh);
+      } else {
+        mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(LANE_WIDTH * 0.85, 2.2, 0.6),
+          new THREE.MeshStandardMaterial({
+            color: 0x0a0015,
+            emissive: color,
+            emissiveIntensity: 0.85,
+            metalness: 0.5,
+            roughness: 0.35,
+          })
+        );
+        mesh.position.y = 1.1;
+        group.add(mesh);
+        const bar = new THREE.Mesh(
+          new THREE.BoxGeometry(LANE_WIDTH * 0.9, 0.15, 0.7),
+          new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        bar.position.y = 2.0;
+        group.add(bar);
+      }
+
+      const light = new THREE.PointLight(color, 2.4, 18);
+      light.position.y = 1.5;
+      group.add(light);
+
+      let labelSprite = null;
+      if (choiceMeta && choiceMeta.label) {
+        const letter = String.fromCharCode(65 + (choiceMeta.choiceIndex || 0));
+        labelSprite = makeAnswerLabel(choiceMeta.label, color, letter);
+        group.add(labelSprite);
+      }
+
+      const laneCenter = -ROAD_WIDTH / 2 + LANE_WIDTH / 2 + lane * LANE_WIDTH;
+      group.position.set(laneCenter, 0, z);
+      group.userData = {
+        lane,
+        hit: false,
+        mesh,
+        light,
+        labelSprite,
+        choiceIndex: choiceMeta ? choiceMeta.choiceIndex : -1,
+        isCorrect: !!(choiceMeta && choiceMeta.isCorrect),
+        label: choiceMeta ? choiceMeta.label : '',
+        isAnswer: !!choiceMeta,
+      };
+      scene.add(group);
+      return group;
+    }
+
+    function setChoiceStrip(choices, visible) {
+      const strip = document.getElementById('choice-strip');
+      if (!strip) return;
+      if (!visible || !choices || !choices.length) {
+        strip.classList.remove('show');
+        strip.innerHTML = '';
+        return;
+      }
+      strip.innerHTML = choices.map((label, i) => {
+        const key = String.fromCharCode(65 + i);
+        return `<div class="choice"><span class="key">${key}</span>${String(label || '')}</div>`;
+      }).join('');
+      strip.classList.add('show');
+    }
+
+    function clearObstacles() {
+      obstacles.forEach((o) => scene.remove(o));
+      obstacles = [];
+      quizState.waveActive = false;
+      quizState.waveResolved = false;
+      quizState.readLeft = 0;
+      setChoiceStrip(null, false);
+    }
+
+    function spawnAnswerWave(question) {
+      clearObstacles();
+      if (!question || !question.choices || !question.choices.length) return;
+      const choices = question.choices.slice(0, LANE_COUNT);
+      // Park close so lane labels are easy to read during the freeze
+      const z = -34;
+      const offset = Math.floor((LANE_COUNT - choices.length) / 2);
+      choices.forEach((label, i) => {
+        const lane = offset + i;
+        obstacles.push(createObstacle(lane, z, {
+          choiceIndex: i,
+          isCorrect: i === question.answer,
+          label,
+        }));
+      });
+      quizState.waveActive = true;
+      quizState.waveResolved = false;
+      quizState.locked = false;
+      quizState.readLeft = READ_SECONDS;
+      setChoiceStrip(choices, true);
+      const fb = document.getElementById('feedback');
+      fb.textContent = 'READ — ' + Math.ceil(quizState.readLeft) + 's';
+      fb.className = 'read';
+    }
+
+    function pulseReadLabels(dt) {
+      const t = performance.now() * 0.004;
+      obstacles.forEach((obs) => {
+        const spr = obs.userData.labelSprite;
+        if (spr && spr.userData.baseScale) {
+          const pulse = 1 + Math.sin(t + (obs.userData.choiceIndex || 0)) * 0.08;
+          spr.scale.x = spr.userData.baseScale.x * pulse;
+          spr.scale.y = spr.userData.baseScale.y * pulse;
+        }
+        if (obs.userData.light) {
+          obs.userData.light.intensity = 2.2 + Math.sin(t * 1.3) * 0.6;
+        }
+      });
+    }
+
+    function releaseAnswerWave() {
+      // Push options farther so learners have approach time after the read pause
+      obstacles.forEach((obs) => {
+        obs.position.z = -95;
+        const spr = obs.userData.labelSprite;
+        if (spr && spr.userData.baseScale) {
+          spr.scale.x = spr.userData.baseScale.x * 0.85;
+          spr.scale.y = spr.userData.baseScale.y * 0.85;
+        }
+      });
+      setChoiceStrip(null, false);
+    }
+
+    function isPaused() {
+      return !!(window.GalaxyUX && GalaxyUX.isPaused && GalaxyUX.isPaused());
+    }
+
+    function isReading() {
+      return quizState.readLeft > 0;
+    }
+
+    // ─── Particles ───────────────────────────────────────────────
+    function spawnExplosion(pos, color = COLORS.pink) {
+      for (let i = 0; i < 40; i++) {
+        const mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.15, 0.15, 0.15),
+          new THREE.MeshBasicMaterial({
+            color: Math.random() > 0.5 ? color : COLORS.cyan,
+            transparent: true,
+            opacity: 1,
+          })
+        );
+        mesh.position.copy(pos);
+        mesh.userData = {
+          vel: new THREE.Vector3(
+            (Math.random() - 0.5) * 18,
+            Math.random() * 14 + 4,
+            (Math.random() - 0.5) * 18
+          ),
+          life: 1,
+        };
+        scene.add(mesh);
+        particles.push(mesh);
+      }
+    }
+
+    function spawnBoostTrail() {
+      if (boost <= 0 || gameState !== 'playing') return;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.2, 0.2, 0.4),
+        new THREE.MeshBasicMaterial({
+          color: Math.random() > 0.5 ? COLORS.cyan : COLORS.pink,
+          transparent: true,
+          opacity: 0.8,
+        })
+      );
+      mesh.position.set(
+        car.position.x + (Math.random() - 0.5) * 0.6,
+        car.position.y + 0.2,
+        car.position.z + 1.2
+      );
+      mesh.userData = {
+        vel: new THREE.Vector3(0, 0.5, 8),
+        life: 0.6,
+      };
+      scene.add(mesh);
+      particles.push(mesh);
+    }
+
+    function updateParticles(dt) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.userData.life -= dt;
+        p.position.addScaledVector(p.userData.vel, dt);
+        p.userData.vel.y -= 12 * dt;
+        p.material.opacity = Math.max(0, p.userData.life);
+        p.scale.setScalar(Math.max(0.1, p.userData.life));
+        if (p.userData.life <= 0) {
+          scene.remove(p);
+          p.geometry.dispose();
+          p.material.dispose();
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+    // ─── Input ───────────────────────────────────────────────────
+    const keys = {};
+    const touchSteer = { left: false, right: false, boost: false };
+
+    window.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) {
+        e.preventDefault();
+      }
+      if ((e.code === 'Enter' || e.code === 'Space') && gameState === 'menu') {
+        const btn = document.getElementById('start-btn');
+        if (btn && !btn.disabled) startGame();
+      }
+      if ((e.code === 'Enter' || e.code === 'Space') && gameState === 'dead') {
+        startGame();
+      }
+    });
+    window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+    function bindTouchButton(el, flag) {
+      if (!el) return;
+      const down = (e) => {
+        e.preventDefault();
+        touchSteer[flag] = true;
+        el.classList.add('active');
+      };
+      const up = (e) => {
+        e.preventDefault();
+        touchSteer[flag] = false;
+        el.classList.remove('active');
+      };
+      el.addEventListener('pointerdown', down);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+      el.addEventListener('pointerleave', up);
+    }
+    bindTouchButton(document.getElementById('touch-left'), 'left');
+    bindTouchButton(document.getElementById('touch-right'), 'right');
+    bindTouchButton(document.getElementById('touch-boost'), 'boost');
+
+    // Tap/hold left or right half of the road as a fallback steer
+    const canvas = document.getElementById('game-canvas');
+    let edgePointerId = null;
+    canvas.addEventListener('pointerdown', (e) => {
+      if (gameState !== 'playing' || isPaused()) return;
+      if (e.target.closest && e.target.closest('#touch-controls, .panel, #galaxy-pause-overlay, #galaxy-pause-btn')) return;
+      edgePointerId = e.pointerId;
+      const x = e.clientX / window.innerWidth;
+      touchSteer.left = x < 0.38;
+      touchSteer.right = x > 0.62;
+    });
+    function clearEdgeSteer(e) {
+      if (edgePointerId !== null && e.pointerId !== edgePointerId) return;
+      edgePointerId = null;
+      // Don't clear button-held steer
+      const leftBtn = document.getElementById('touch-left');
+      const rightBtn = document.getElementById('touch-right');
+      if (!leftBtn || !leftBtn.classList.contains('active')) touchSteer.left = false;
+      if (!rightBtn || !rightBtn.classList.contains('active')) touchSteer.right = false;
+    }
+    window.addEventListener('pointerup', clearEdgeSteer);
+    window.addEventListener('pointercancel', clearEdgeSteer);
+
+    function setTouchControlsVisible(show) {
+      const pad = document.getElementById('touch-controls');
+      if (pad) pad.classList.toggle('show', !!show);
+    }
+
+    // ─── Game flow (Galaxy quiz) ─────────────────────────────────
+    async function ensureBank() {
+      if (quizBank().length) return quizBank();
+      if (window.GalaxyShell && GalaxyShell.ensureQuestions) {
+        await GalaxyShell.ensureQuestions();
+      }
+      return quizBank();
+    }
+
+    function updateQuizHUD() {
+      document.getElementById('score-value').textContent = String(quizState.playerCorrect);
+      document.getElementById('speed-value').textContent = formatTime(quizState.secondsLeft);
+      document.getElementById('q-badge').textContent = 'QUESTION ' + quizState.asked;
+      document.getElementById('streak').textContent = 'STREAK ' + quizState.streak;
+    }
+
+    
+    function dealNextRaw(playState) {
+      if (window.GalaxyShell && typeof window.GalaxyShell.takeNextQuestion === 'function') {
+        return window.GalaxyShell.takeNextQuestion(playState);
+      }
+      if (!playState.deck || !playState.deck.length) {
+        const bank = (typeof quizBank === 'function' ? quizBank() : (window.GALAXY_QUESTIONS || [])).slice();
+        for (let i = bank.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const t = bank[i]; bank[i] = bank[j]; bank[j] = t;
+        }
+        playState.deck = bank;
+      }
+      return playState.deck.pop() || null;
+    }
+
+    function nextQuestion() {
+      if (!quizState.playing || gameState !== 'playing') return;
+      quizState.current = shellQ(dealNextRaw(quizState));
+      if (!quizState.current) {
+        document.getElementById('question').textContent = 'You cleared this question set — great work!';
+        quizState.endedByQuestions = true;
+        quizState.locked = true;
+        if (quizState.timerId) { clearInterval(quizState.timerId); quizState.timerId = null; }
+        if (quizState.rivalId) { clearInterval(quizState.rivalId); quizState.rivalId = null; }
+        setTimeout(function () { if (typeof endRound === 'function') endRound(); }, 450);
+        return;
+      }
+      if (!quizState.current) {
+        document.getElementById('question').textContent = 'No questions loaded. Reopen this world.';
+        return;
+      }
+      quizState.asked += 1;
+      quizState.locked = false;
+      document.getElementById('question').textContent = quizState.current.q;
+      document.getElementById('feedback').textContent = '';
+      document.getElementById('feedback').className = '';
+      updateQuizHUD();
+      spawnAnswerWave(quizState.current);
+      if (window.GalaxyUX) GalaxyUX.onQuestionShown(quizState.current);
+    }
+
+    function selectAnswer(choiceIndex) {
+      if (!quizState.playing || quizState.locked || quizState.waveResolved) return;
+      if (isReading() || isPaused()) return;
+      quizState.locked = true;
+      quizState.waveResolved = true;
+      quizState.readLeft = 0;
+      const current = quizState.current;
+      const correct = current && choiceIndex === current.answer;
+      const fb = document.getElementById('feedback');
+      if (correct) {
+        quizState.playerCorrect += 1;
+        quizState.streak += 1;
+        fb.textContent = 'CORRECT — SIGNAL LOCKED';
+        fb.className = 'good';
+        spawnExplosion(car.position.clone().add(new THREE.Vector3(0, 0.8, 0)), COLORS.cyan);
+      } else {
+        quizState.streak = 0;
+        fb.textContent = 'WRONG LANE';
+        fb.className = 'bad';
+        shakeTime = 0.35;
+        spawnExplosion(car.position.clone().add(new THREE.Vector3(0, 0.8, 0)), COLORS.pink);
+      }
+      if (window.GalaxyUX) {
+        GalaxyUX.afterAnswer({
+          correct,
+          explain: (current && current.explain) || '',
+          prompt: current && current.q,
+          choices: current && current.choices,
+          answerIndex: current && current.answer,
+        });
+      }
+      if (window.GalaxyShell && GalaxyShell.checkpoint) GalaxyShell.checkpoint(quizState);
+      updateQuizHUD();
+      // Clear remaining obstacles shortly, then next Q
+      setTimeout(() => {
+        clearObstacles();
+        setTimeout(nextQuestion, correct ? 350 : 700);
+      }, 280);
+    }
+
+    function missWave(reason) {
+      if (!quizState.playing || quizState.waveResolved) return;
+      quizState.waveResolved = true;
+      quizState.locked = true;
+      quizState.streak = 0;
+      const fb = document.getElementById('feedback');
+      fb.textContent = reason || 'MISSED — DRIVE INTO AN ANSWER';
+      fb.className = 'bad';
+      if (window.GalaxyUX && quizState.current) {
+        GalaxyUX.afterAnswer({
+          correct: false,
+          explain: quizState.current.explain || '',
+          prompt: quizState.current.q,
+          choices: quizState.current.choices,
+          answerIndex: quizState.current.answer,
+        });
+      }
+      updateQuizHUD();
+      setTimeout(() => {
+        clearObstacles();
+        setTimeout(nextQuestion, 650);
+      }, 200);
+    }
+
+    async function startGame() {
+      const bank = await ensureBank();
+      if (!bank.length) {
+        document.getElementById('question').textContent = 'Still loading quizzes… try again in a moment.';
+        return;
+      }
+      obstacles.forEach((o) => scene.remove(o));
+      obstacles = [];
+      particles.forEach((p) => {
+        scene.remove(p);
+        p.geometry.dispose();
+        p.material.dispose();
+      });
+      particles = [];
+
+      distance = 0;
+      speed = baseSpeed;
+      boost = 0;
+      carX = 0;
+      carTargetX = 0;
+      steerInput = 0;
+      nextObstacleZ = -60;
+      shakeTime = 0;
+      car.position.set(0, CAR_Y, 0);
+      car.rotation.set(0, 0, 0);
+      roadSegments.forEach((seg, i) => {
+        seg.position.z = -i * SEGMENT_LENGTH;
+      });
+
+      quizState.playing = true;
+      quizState._ending = false;
+      quizState.endedByQuestions = false;
+      quizState.playerCorrect = 0;
+      quizState.streak = 0;
+      quizState.asked = 0;
+      quizState.secondsLeft = ROUND_SECONDS;
+      quizState.deck = shuffle(bank).map(shellQ).filter(Boolean);
+      quizState.current = null;
+      quizState.locked = false;
+      quizState.waveActive = false;
+      quizState.waveResolved = false;
+      quizState.timerAcc = 0;
+      quizState.readLeft = 0;
+      window.__galaxyPlayState = quizState;
+
+      const resume = window.GALAXY_RESUME;
+      if (resume && resume.status === 'in_progress') {
+        quizState.playerCorrect = resume.playerCorrect || 0;
+        quizState.streak = resume.streak || 0;
+        quizState.asked = resume.asked || 0;
+        if (typeof resume.secondsLeft === 'number' && resume.secondsLeft > 0) {
+          quizState.secondsLeft = resume.secondsLeft;
+        }
+        window.GALAXY_RESUME = null;
+      }
+
+      gameState = 'playing';
+      document.getElementById('overlay').classList.add('hidden');
+      document.getElementById('start-panel').style.display = 'none';
+      document.getElementById('gameover-panel').style.display = 'none';
+      setTouchControlsVisible(true);
+      if (window.GalaxyUX) GalaxyUX.onRoundStart(quizState);
+      updateQuizHUD();
+      clock.getDelta();
+      nextQuestion();
+    }
+
+    async function endRound() {
+      if (gameState !== 'playing' && !quizState.endedByQuestions) return;
+      if (quizState._ending) return;
+      quizState._ending = true;
+      quizState.playing = false;
+      gameState = 'dead';
+      setTouchControlsVisible(false);
+      clearObstacles();
+      try {
+        if (window.GalaxyShell) {
+          const sc = quizState.playerCorrect || 0;
+          const res = await window.GalaxyShell.submitRound(sc, Math.max(sc, 10));
+          if (res && res.progress) window.__galaxyLastProgress = res.progress;
+        }
+      } catch (e) { console.warn('score submit', e); }
+
+      document.getElementById('final-score').textContent = String(quizState.playerCorrect);
+      document.getElementById('end-detail').textContent = quizState.endedByQuestions
+        ? ('Round complete — you finished all questions with ' + quizState.playerCorrect + ' correct.')
+        : ('You locked ' + quizState.playerCorrect + ' correct signal' + (quizState.playerCorrect === 1 ? '' : 's') +
+          ' across ' + quizState.asked + ' questions.');
+      document.getElementById('start-panel').style.display = 'none';
+      document.getElementById('gameover-panel').style.display = 'block';
+      document.getElementById('overlay').classList.remove('hidden');
+      if (window.GalaxyUX) {
+        const coach = (window.__galaxyLastProgress && window.__galaxyLastProgress.coaching_blurb) || null;
+        if (coach) GalaxyUX.setCoaching(coach);
+        setTimeout(() => GalaxyUX.enhanceEndScreen({ coaching: coach, missed: GalaxyUX.getMissed(), progress: window.__galaxyLastProgress }), 50);
+      }
+    }
+
+    document.getElementById('start-btn').addEventListener('click', startGame);
+    document.addEventListener('galaxy-force-start', () => startGame());
+    document.getElementById('replay-btn').addEventListener('click', startGame);
+
+    // ─── Collision ───────────────────────────────────────────────
+    const carBox = new THREE.Box3();
+    const obsBox = new THREE.Box3();
+
+    function checkCollisions() {
+      if (!quizState.waveActive || quizState.waveResolved || quizState.locked) return;
+      if (isReading() || isPaused()) return;
+      carBox.setFromCenterAndSize(
+        new THREE.Vector3(car.position.x, car.position.y + 0.4, car.position.z),
+        new THREE.Vector3(1.2, 0.9, 2.0)
+      );
+
+      for (const obs of obstacles) {
+        if (obs.userData.hit) continue;
+        const mesh = obs.userData.mesh || obs.children[0];
+        if (!mesh) continue;
+        obsBox.setFromObject(mesh);
+        if (carBox.intersectsBox(obsBox)) {
+          const dz = Math.abs(car.position.z - obs.position.z);
+          const dx = Math.abs(car.position.x - obs.position.x);
+          if (dz < 1.8 && dx < 1.6) {
+            obs.userData.hit = true;
+            if (obs.userData.isAnswer) {
+              selectAnswer(obs.userData.choiceIndex);
+            }
+            return;
+          }
+        }
+      }
+    }
+
+    // ─── Update loop helpers ─────────────────────────────────────
+    // Car stays near z=0; the world scrolls toward the camera (+Z)
+    function updateRoad(dt) {
+      const move = speed * dt;
+      for (const seg of roadSegments) {
+        seg.position.z += move;
+        if (seg.position.z > SEGMENT_LENGTH * 2) {
+          seg.position.z -= VISIBLE_SEGMENTS * SEGMENT_LENGTH;
+        }
+      }
+    }
+
+    function updateObstacles(dt) {
+      const move = speed * dt;
+      nextObstacleZ += move;
+      let anyAhead = false;
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obs = obstacles[i];
+        obs.position.z += move;
+        if (obs.userData.mesh) {
+          obs.userData.mesh.rotation.y += 0.02;
+        }
+        if (obs.position.z < 8) anyAhead = true;
+        if (obs.position.z > 18) {
+          scene.remove(obs);
+          obstacles.splice(i, 1);
+        }
+      }
+      // Drove past the whole answer wave without hitting
+      if (quizState.waveActive && !quizState.waveResolved && obstacles.length === 0 && !anyAhead) {
+        missWave('MISSED THE WAVE');
+      } else if (quizState.waveActive && !quizState.waveResolved && obstacles.length && obstacles.every((o) => o.position.z > 6)) {
+        missWave('MISSED THE WAVE');
+      }
+    }
+
+    function updateCar(dt) {
+      steerInput = 0;
+      if (keys['ArrowLeft'] || keys['KeyA'] || touchSteer.left) steerInput -= 1;
+      if (keys['ArrowRight'] || keys['KeyD'] || touchSteer.right) steerInput += 1;
+
+      const steerSpeed = 18;
+      carTargetX += steerInput * steerSpeed * dt;
+      const halfRoad = ROAD_WIDTH / 2 - 1.0;
+      carTargetX = Math.max(-halfRoad, Math.min(halfRoad, carTargetX));
+      carX += (carTargetX - carX) * Math.min(1, 12 * dt);
+      car.position.x = carX;
+      car.position.y = CAR_Y + Math.sin(performance.now() * 0.008) * 0.04;
+      car.position.z = 0;
+      car.rotation.z = -steerInput * 0.12 - (carTargetX - carX) * 0.04;
+      car.rotation.y = -steerInput * 0.05;
+
+      // Boost
+      if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW'] || touchSteer.boost) && gameState === 'playing') {
+        boost = Math.min(1, boost + dt * 1.5);
+      } else {
+        boost = Math.max(0, boost - dt * 2);
+      }
+
+      carLight.position.set(car.position.x, 2, car.position.z);
+      roadGlow.position.set(car.position.x, 1.5, car.position.z - 5);
+
+      headLightL.position.set(car.position.x - 0.45, car.position.y + 0.4, car.position.z + 1.2);
+      headLightR.position.set(car.position.x + 0.45, car.position.y + 0.4, car.position.z + 1.2);
+      headLightL.target.position.set(car.position.x - 0.5, 0, car.position.z - 25);
+      headLightR.target.position.set(car.position.x + 0.5, 0, car.position.z - 25);
+    }
+
+    function updateCamera(dt) {
+      const targetCam = new THREE.Vector3(
+        car.position.x * 0.55,
+        4.2 + boost * 0.4,
+        9.5
+      );
+      camera.position.lerp(targetCam, 1 - Math.pow(0.001, dt));
+
+      let lookAt = new THREE.Vector3(car.position.x * 0.3, 1.2, car.position.z - 18);
+      if (shakeTime > 0) {
+        shakeTime -= dt;
+        camera.position.x += (Math.random() - 0.5) * shakeTime * 2;
+        camera.position.y += (Math.random() - 0.5) * shakeTime * 2;
+      }
+      camera.lookAt(lookAt);
+    }
+
+    function updateHUD() {
+      const now = performance.now();
+      if (now - lastScoreUpdate > 50) {
+        document.getElementById('score-value').textContent = Math.floor(distance).toLocaleString();
+        document.getElementById('speed-value').textContent = Math.floor(speed * 3.6);
+        lastScoreUpdate = now;
+      }
+    }
+
+    // ─── Main loop ───────────────────────────────────────────────
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+
+      if (gameState === 'playing' && quizState.playing) {
+        if (isPaused()) {
+          // Full freeze: car, road, obstacles, and timer stay put
+          updateCamera(dt);
+        } else if (isReading()) {
+          // Reading grace: timer frozen, world frozen; steer to aim
+          quizState.readLeft = Math.max(0, quizState.readLeft - dt);
+          const secs = Math.ceil(quizState.readLeft);
+          const fb = document.getElementById('feedback');
+          if (quizState.readLeft > 0) {
+            fb.textContent = 'READ OPTIONS — ' + secs + 's  ·  STEER TO AIM';
+            fb.className = 'read';
+            pulseReadLabels(dt);
+          } else {
+            releaseAnswerWave();
+            fb.textContent = 'GO!';
+            fb.className = 'good';
+            setTimeout(() => {
+              if (!quizState.waveResolved && document.getElementById('feedback').textContent === 'GO!') {
+                document.getElementById('feedback').textContent = '';
+                document.getElementById('feedback').className = '';
+              }
+            }, 450);
+          }
+          updateCar(dt);
+          updateCamera(dt);
+        } else {
+          const targetSpeed = baseSpeed + Math.min(18, quizState.asked * 0.35) + boost * 22;
+          speed += (targetSpeed - speed) * Math.min(1, 2 * dt);
+          distance += speed * dt;
+
+          updateCar(dt);
+          updateRoad(dt);
+          updateObstacles(dt);
+          checkCollisions();
+          if (Math.random() < boost * 0.6) spawnBoostTrail();
+
+          if (!window.GalaxyUX || GalaxyUX.timerMayTick()) {
+            quizState.timerAcc += dt;
+            if (quizState.timerAcc >= 1) {
+              quizState.timerAcc -= 1;
+              quizState.secondsLeft -= 1;
+              updateQuizHUD();
+              if (quizState.secondsLeft <= 10 && quizState.secondsLeft > 0 && window.GalaxyUX) {
+                GalaxyUX.sfx.tick();
+              }
+              if (quizState.secondsLeft <= 0) endRound();
+            }
+          }
+          updateCamera(dt);
+        }
+      } else {
+        car.position.y = CAR_Y + Math.sin(performance.now() * 0.003) * 0.08;
+        car.rotation.y = Math.sin(performance.now() * 0.001) * 0.15;
+        updateCamera(dt);
+      }
+
+      updateParticles(dt);
+
+      if (sunGlow) {
+        sunGlow.material.opacity = 0.12 + Math.sin(performance.now() * 0.002) * 0.06;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+  </script>
+<div id="galaxyLoadStatus">Loading your quizzes…</div>
+<script src="/static/js/galaxy_shell_bridge.js?v=8"></script>
+<script src="/static/js/galaxy_game_ux.js?v=5"></script>
+</body>
+</html>

@@ -14,6 +14,7 @@ except ImportError:
 
 
 class Config:
+    # Local fallback only — set SECRET_KEY in .env for any shared/prod deploy.
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(basedir, 'app.db')
@@ -71,6 +72,11 @@ class Config:
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
     OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4.1-mini')
 
+    # Caimex (OpenAI-compatible) — Quiz Galaxy solo level/difficulty pacing
+    CAIMEX_BASE_URL = (os.environ.get('CAIMEX_BASE_URL') or 'https://caimex.econetai.co.zw:2052/v1').rstrip('/')
+    CAIMEX_API_KEY = os.environ.get('CAIMEX_API_KEY') or ''
+    CAIMEX_MODEL = os.environ.get('CAIMEX_MODEL') or 'caimex/auto'
+
     # Google Gemini (Generative Language API). AI Studio often exports GOOGLE_API_KEY.
     GEMINI_API_KEY = (
         os.environ.get('GEMINI_API_KEY')
@@ -92,10 +98,16 @@ class Config:
     GENERATION_PROGRESS_TARGET_CHARS = int(os.environ.get('GENERATION_PROGRESS_TARGET_CHARS', '2600'))
 
     # Allow applying Alembic upgrades from /administration (disable via .env in Docker if needed)
-    ALLOW_WEB_MIGRATIONS = os.environ.get('ALLOW_WEB_MIGRATIONS', 'true').lower() in ('true', '1', 't', 'yes', 'y')
+    # Default OFF; set ALLOW_WEB_MIGRATIONS=true in .env for local admin upgrades.
+    ALLOW_WEB_MIGRATIONS = os.environ.get('ALLOW_WEB_MIGRATIONS', 'false').lower() in ('true', '1', 't', 'yes', 'y')
 
     # Allow DDL (create/alter/drop tables & columns) from Database Schema Studio
-    ALLOW_WEB_SCHEMA_CHANGES = os.environ.get('ALLOW_WEB_SCHEMA_CHANGES', 'true').lower() in ('true', '1', 't', 'yes', 'y')
+    # Default OFF; set ALLOW_WEB_SCHEMA_CHANGES=true in .env for Schema Studio.
+    ALLOW_WEB_SCHEMA_CHANGES = os.environ.get('ALLOW_WEB_SCHEMA_CHANGES', 'false').lower() in ('true', '1', 't', 'yes', 'y')
+
+    # Allow editing allowlisted project files (.env, etc.) from Database Studio Files panel
+    # Default OFF in production; enable locally / briefly on server when needed.
+    ALLOW_WEB_FILE_EDITS = os.environ.get('ALLOW_WEB_FILE_EDITS', 'false').lower() in ('true', '1', 't', 'yes', 'y')
 
     # Allow DDL on external MySQL databases (Ruzivo/Library) — keep false in production unless needed
     ALLOW_EXTERNAL_SCHEMA_CHANGES = os.environ.get(

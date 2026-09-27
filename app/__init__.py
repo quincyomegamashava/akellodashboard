@@ -37,6 +37,7 @@ from app import routes, models, monitoring_routes
 from app import mobile_meeting_sales_routes  # noqa: F401 — /api/mobile/meeting-notes & sales-marketing
 from app import pm_routes  # noqa: F401 — extended PM platform routes
 from app import game_race_routes  # noqa: F401 — multiplayer game races
+from app import game_galaxy_routes  # noqa: F401 — Quiz Galaxy hub + shells
 
 # Register the global deletion-audit listener (after models are loaded).
 from app.audit import init_audit
@@ -120,6 +121,18 @@ try:
         logger.info("HBC/STEM games seeded: %s", _stem_seed)
 except Exception:
     logger.exception("STEM game seed skipped (games table may not exist yet)")
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
+
+try:
+    with app.app_context():
+        from app.games.seed_galaxy_games import seed_galaxy_shell_games
+        _galaxy_seed = seed_galaxy_shell_games()
+        logger.info("Quiz Galaxy shells seeded: %s", _galaxy_seed)
+except Exception:
+    logger.exception("Quiz Galaxy shell seed skipped")
     try:
         db.session.rollback()
     except Exception:

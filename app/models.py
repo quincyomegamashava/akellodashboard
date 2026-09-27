@@ -377,12 +377,26 @@ class Game(db.Model):
     ruzivo_source = db.Column(db.String(20), nullable=True)  # primary | hs
     grade = db.Column(db.Integer, nullable=True, index=True)
     difficulty_level = db.Column(db.String(20), nullable=True)  # Difficulty level: 'easy', 'medium', 'hard'
+    solo_theme = db.Column(db.String(30), nullable=False, default='swim')  # swim | balloon | rocket
+    solo_time_limit_seconds = db.Column(db.Integer, nullable=True)  # null => derive from difficulty
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     scores = db.relationship('GameScore', backref='game', lazy=True, cascade='all, delete-orphan')
     bank_items = db.relationship('GameBankItem', backref='game', lazy=True, cascade='all, delete-orphan')
+
+    SOLO_THEME_DEFAULTS = {
+        'easy': 300,
+        'medium': 240,
+        'hard': 180,
+    }
+
+    def resolved_solo_time_limit_seconds(self):
+        if self.solo_time_limit_seconds is not None and int(self.solo_time_limit_seconds) > 0:
+            return int(self.solo_time_limit_seconds)
+        key = (self.difficulty_level or '').strip().lower()
+        return self.SOLO_THEME_DEFAULTS.get(key, 240)
 
     def __repr__(self):
         return f'<Game {self.title}>'
@@ -429,6 +443,29 @@ class GameScore(db.Model):
         return f'<GameScore User:{self.game_user_id} Game:{self.game_id} Score:{self.score}>'
 
 
+class GalaxyProgress(db.Model):
+    """Solo Quiz Galaxy level/difficulty per learner × subject × shell."""
+    __tablename__ = 'galaxy_progress'
+    id = db.Column(db.Integer, primary_key=True)
+    game_user_id = db.Column(db.Integer, db.ForeignKey('game_users.id', ondelete='CASCADE'), nullable=False, index=True)
+    subject = db.Column(db.String(120), nullable=False, index=True)
+    shell = db.Column(db.String(80), nullable=False, index=True)
+    level = db.Column(db.Integer, nullable=False, default=1)
+    difficulty = db.Column(db.String(20), nullable=False, default='medium')
+    coaching_blurb = db.Column(db.String(255), nullable=True)
+    # idle | in_progress | completed — mid-run resume for continue-later
+    session_status = db.Column(db.String(20), nullable=False, default='idle')
+    session_json = db.Column(db.Text, nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('game_user_id', 'subject', 'shell', name='uq_galaxy_progress_user_subject_shell'),
+    )
+
+    def __repr__(self):
+        return f'<GalaxyProgress user:{self.game_user_id} {self.shell} L{self.level}>'
+
+
 class GameRace(db.Model):
     """Timed multiplayer race built from a mixed playlist of puzzles, quizzes, and questions."""
     __tablename__ = 'game_races'
@@ -438,6 +475,7 @@ class GameRace(db.Model):
     starts_at = db.Column(db.DateTime, nullable=False, index=True)
     duration_minutes = db.Column(db.Integer, nullable=False)
     ends_at = db.Column(db.DateTime, nullable=False, index=True)
+    visual_theme = db.Column(db.String(30), nullable=False, default='car')  # car | tug_of_war
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     is_cancelled = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

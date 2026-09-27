@@ -18,6 +18,23 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+def _env_first(*names, default=''):
+    """Return the first non-empty env var among names, else default."""
+    for name in names:
+        val = os.getenv(name)
+        if val is not None and str(val).strip() != '':
+            return val
+    return default
+
+
+def _env_int_first(*names, default=0):
+    raw = _env_first(*names, default=str(default))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return int(default)
+
+
 class DatabaseManager:
     """Manages multiple database connections for query interface"""
     
@@ -30,25 +47,26 @@ class DatabaseManager:
     def _setup_databases(self):
         """Initialize database connections"""
         # Database configurations with better fallbacks
+        # Prefer ASL_/AL_ names; fall back to legacy RUZIVO_/LIBRARY_ names from older .env files.
         self.database_configs = {
             'ruzivo': {
                 'name': 'Ruzivo Database',
                 'type': 'mysql',
-                'host': os.getenv('ASL_DB_HOST', 'localhost'),
-                'port': int(os.getenv('ASL_DB_PORT', 3306)),
-                'database': os.getenv('ASL_DB_NAME', 'ruzivo_2017'),
-                'username': os.getenv('ASL_DB_USER', 'root'),
-                'password': os.getenv('ASL_DB_PASS', ''),
+                'host': _env_first('ASL_DB_HOST', 'RUZIVO_DB_HOST', default='localhost'),
+                'port': _env_int_first('ASL_DB_PORT', 'RUZIVO_DB_PORT', default=3306),
+                'database': _env_first('ASL_DB_NAME', 'RUZIVO_DB_NAME', default='ruzivo_2017'),
+                'username': _env_first('ASL_DB_USER', 'RUZIVO_DB_USER', default='root'),
+                'password': _env_first('ASL_DB_PASS', 'RUZIVO_DB_PASS', 'RUZIVO_DB_PASSWORD', default=''),
                 'description': 'Ruzivo production database for content and user management'
             },
             'library': {
-                'name': 'Library Database', 
+                'name': 'Library Database',
                 'type': 'mysql',
-                'host': os.getenv('AL_DB_HOST', 'localhost'),
-                'port': int(os.getenv('AL_DB_PORT', 3306)),
-                'database': os.getenv('AL_DB_NAME', 'akello_library'),
-                'username': os.getenv('AL_DB_USER', 'root'),
-                'password': os.getenv('AL_DB_PASS', ''),
+                'host': _env_first('AL_DB_HOST', 'LIBRARY_DB_HOST', default='localhost'),
+                'port': _env_int_first('AL_DB_PORT', 'LIBRARY_DB_PORT', default=3306),
+                'database': _env_first('AL_DB_NAME', 'LIBRARY_DB_NAME', default='akello_library'),
+                'username': _env_first('AL_DB_USER', 'LIBRARY_DB_USER', default='root'),
+                'password': _env_first('AL_DB_PASS', 'LIBRARY_DB_PASS', 'LIBRARY_DB_PASSWORD', default=''),
                 'description': 'Library management system database for resources and analytics'
             }
         }

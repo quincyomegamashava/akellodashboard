@@ -151,8 +151,11 @@
         <button type="button" class="side-link" data-tab="home" aria-current="page" onclick="setDashTab('home')">
           <i class="fas fa-house w-5 text-center"></i> Home
         </button>
-        <button type="button" class="side-link" data-tab="play" onclick="setDashTab('play')">
-          <i class="fas fa-play w-5 text-center"></i> Play
+        <button type="button" class="side-link" data-tab="play" onclick="window.location.href='/quiz-galaxy'">
+          <i class="fas fa-globe w-5 text-center"></i> Quiz Galaxy
+        </button>
+        <button type="button" class="side-link" data-tab="play-classic" onclick="setDashTab('play')">
+          <i class="fas fa-play w-5 text-center"></i> Classic library
         </button>
         <button type="button" class="side-link" data-tab="races" onclick="setDashTab('races')">
           <i class="fas fa-flag-checkered w-5 text-center"></i> Races
@@ -175,7 +178,7 @@
       <header class="sticky top-0 z-40 bg-[#f4f5f8]/90 backdrop-blur-md">
         <div class="px-4 sm:px-8 py-4 flex items-center justify-end gap-2">
           <button type="button" class="btn-outline px-4 py-2.5 text-sm" onclick="setDashTab('races')">Join Lobby</button>
-          <button type="button" class="btn-navy px-4 py-2.5 text-sm" onclick="setDashTab('play')">Start Quiz</button>
+          <a href="/quiz-galaxy" class="btn-navy px-4 py-2.5 text-sm inline-flex items-center">Quiz Galaxy</a>
         </div>
       </header>
 
@@ -247,9 +250,16 @@
         </section>
 
         <section id="panel-play" class="dash-panel" role="tabpanel">
+          <div class="portal-card p-5 mb-4 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-sky-50 to-amber-50 border-sky-100">
+            <div>
+              <h3 class="font-extrabold text-slate-900">Akello Quiz Galaxy</h3>
+              <p class="text-sm text-slate-500">Subject worlds with themed challenges — powered by your catalog quizzes.</p>
+            </div>
+            <a href="/quiz-galaxy" class="btn-navy px-4 py-2.5 text-sm">Open Galaxy</a>
+          </div>
           <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
             <div>
-              <h2 class="text-2xl font-extrabold text-slate-900">Play</h2>
+              <h2 class="text-2xl font-extrabold text-slate-900">Classic library</h2>
               <p class="text-sm text-slate-400">Quizzes matched to your age</p>
             </div>
             <div class="seg-track" id="gameSourceTabs">
@@ -319,8 +329,8 @@
       <button type="button" class="dash-tab" data-tab="home" aria-current="page" onclick="setDashTab('home')">
         <i class="fas fa-house"></i> Home
       </button>
-      <button type="button" class="dash-tab" data-tab="play" onclick="setDashTab('play')">
-        <i class="fas fa-play"></i> Play
+      <button type="button" class="dash-tab" data-tab="play" onclick="window.location.href='/quiz-galaxy'">
+        <i class="fas fa-globe"></i> Galaxy
       </button>
       <button type="button" class="dash-tab" data-tab="races" onclick="setDashTab('races')">
         <i class="fas fa-flag-checkered"></i> Races
@@ -512,6 +522,10 @@
       updateToolbarVisibility();
       await Promise.all([loadUserStats(), loadMyScores(), loadLeaderboard(), loadRaces()]);
       renderHomeHub();
+      const hash = (location.hash || '').replace('#', '');
+      if (hash === 'races' || hash === 'leaderboard' || hash === 'play' || hash === 'home') {
+        setDashTab(hash);
+      }
       setInterval(loadRaces, 15000);
     });
 
@@ -756,6 +770,10 @@
           if (finished) action = `<a href="/play-race/${race.id}" class="btn-navy w-full inline-flex items-center justify-center px-4 py-2.5 text-sm">See results</a>`;
           else if (live) action = `<a href="/play-race/${race.id}" class="btn-navy w-full inline-flex items-center justify-center px-4 py-2.5 text-sm">${race.finished ? 'View board' : 'Join race'}</a>`;
           else action = `<a href="/play-race/${race.id}" class="btn-outline w-full inline-flex items-center justify-center px-4 py-2.5 text-sm">Enter lobby</a>`;
+          const theme = race.visual_theme === 'tug_of_war' ? 'tug_of_war' : 'car';
+          const themeBadge = theme === 'tug_of_war'
+            ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase rounded-full px-2 py-1 bg-orange-50 text-orange-700"><i class="fas fa-people-arrows"></i> Tug of war</span>`
+            : `<span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase rounded-full px-2 py-1 bg-sky-50 text-sky-700"><i class="fas fa-car-side"></i> Car race</span>`;
           return `<div class="portal-card portal-card-hover p-5 flex flex-col">
             <div class="flex items-start justify-between gap-2 mb-2">
               <h3 class="font-bold text-slate-900">${escapeHtml(race.title)}</h3>
@@ -763,6 +781,7 @@
                 ${live ? '<span class="live-pulse"></span>' : ''}${race.status}
               </span>
             </div>
+            <div class="mb-2">${themeBadge}</div>
             <p class="text-sm text-slate-400 mb-1">${escapeHtml(mixLabel(race.mix))}</p>
             <p class="text-xs text-slate-400 mb-4">${when} · ${race.player_count || 0} joined · Ages ${escapeHtml(race.age_range || '')} · ${race.duration_minutes} min</p>
             <div class="mt-auto">${action}</div>

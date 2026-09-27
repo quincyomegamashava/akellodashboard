@@ -709,6 +709,136 @@
   border-radius: 10px;
 }
 
+/* --- GitHub-style Files panel --- */
+.studio-files-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 1rem;
+  align-items: stretch;
+  min-height: 520px;
+}
+.studio-files-tree { overflow: hidden; display: flex; flex-direction: column; }
+.studio-files-breadcrumb {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--studio-muted);
+  border-bottom: 1px solid var(--studio-border);
+  background: #f8fafc;
+}
+.studio-files-crumb::before { content: "📁 "; }
+.studio-files-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0;
+  overflow: auto;
+  flex: 1;
+}
+.studio-files-list li button {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 0.55rem 0.85rem;
+  font: 650 0.85rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--studio-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.studio-files-list li button:hover { background: #eef2ff; }
+.studio-files-list li button.active {
+  background: #e0e7ff;
+  color: #3730a3;
+  box-shadow: inset 3px 0 0 #4f46e5;
+}
+.studio-files-list .file-meta {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--studio-muted);
+  font-weight: 600;
+}
+.studio-files-main { display: flex; flex-direction: column; min-width: 0; }
+.studio-files-toolbar { flex-wrap: wrap; gap: 0.75rem; }
+.studio-files-path {
+  font: 800 0.95rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #0f172a;
+}
+.studio-files-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.studio-files-tabs {
+  display: inline-flex;
+  background: #f1f5f9;
+  border-radius: 999px;
+  padding: 3px;
+  border: 1px solid var(--studio-border);
+}
+.studio-files-tab {
+  border: 0;
+  background: transparent;
+  font: 700 0.72rem Nunito, sans-serif;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--studio-muted);
+}
+.studio-files-tab.active {
+  background: #fff;
+  color: #3730a3;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+.studio-files-ace {
+  min-height: 420px;
+  border-top: 1px solid var(--studio-border);
+}
+.studio-files-form { padding: 0.75rem 1rem 1rem; overflow: auto; max-height: 520px; }
+.studio-files-form-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.studio-env-rows { display: flex; flex-direction: column; gap: 0.45rem; }
+.studio-env-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.6fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  padding: 0.45rem;
+}
+.studio-env-row input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font: 600 0.82rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: #fff;
+}
+.studio-env-row input[readonly] { background: #f1f5f9; color: #475569; }
+.studio-env-row .env-key { font-weight: 800; }
+.studio-files-dirty {
+  margin-top: auto;
+  padding: 0.65rem 1rem;
+  background: #fff7ed;
+  color: #9a3412;
+  font: 700 0.8rem Nunito, sans-serif;
+  border-top: 1px solid #fed7aa;
+}
+@media (max-width: 900px) {
+  .studio-files-layout { grid-template-columns: 1fr; }
+  .studio-env-row { grid-template-columns: 1fr; }
+}
+
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --studio-card: #ffffff;

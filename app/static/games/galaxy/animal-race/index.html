@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Animal Race Quiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --sky-top: #87ceeb;
+      --sky-bot: #d4efff;
+      --hill-light: #7bc96f;
+      --hill-dark: #4e9a45;
+      --track: #e85d2a;
+      --track-dark: #c44a1a;
+      --track-lane: #f07840;
+      --wood: #8b5a2b;
+      --wood-dark: #6b4423;
+      --team-blue: #2b6cb0;
+      --team-blue-soft: #ebf4ff;
+      --team-red: #c53030;
+      --team-red-soft: #fff5f5;
+      --chalk: #fffdf8;
+      --ink: #1a2e28;
+      --accent: #f6ad55;
+      --sun: #ffe066;
+      --shadow: rgba(26, 46, 40, 0.16);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      font-family: 'Nunito', sans-serif;
+      color: var(--ink);
+      background: var(--sky-bot);
+    }
+
+    body { min-height: 100vh; display: flex; flex-direction: column; }
+
+    .sky {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 88% 10%, var(--sun) 0 4%, transparent 5%),
+        radial-gradient(circle at 88% 10%, rgba(255, 224, 102, 0.4) 0 11%, transparent 12%),
+        linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bot) 50%, #b8e0a8 50%, var(--hill-light) 68%, var(--hill-dark) 100%);
+    }
+
+    .hill {
+      position: absolute;
+      bottom: 0;
+      border-radius: 50% 50% 0 0;
+      opacity: 0.55;
+    }
+    .hill.h1 { left: -8%; width: 55%; height: 28%; background: #6aad5c; }
+    .hill.h2 { right: -5%; width: 48%; height: 22%; background: #5a9a4e; }
+    .hill.h3 { left: 30%; width: 40%; height: 18%; background: #7bc96f; opacity: 0.4; }
+
+    .cloud {
+      position: absolute;
+      background: #fff;
+      border-radius: 50px;
+      opacity: 0.88;
+      animation: drift linear infinite;
+    }
+    .cloud::before, .cloud::after {
+      content: '';
+      position: absolute;
+      background: #fff;
+      border-radius: 50%;
+    }
+    .cloud.c1 { width: 90px; height: 34px; top: 8%; left: -120px; animation-duration: 52s; }
+    .cloud.c1::before { width: 42px; height: 42px; top: -22px; left: 14px; }
+    .cloud.c1::after { width: 52px; height: 52px; top: -28px; left: 38px; }
+    .cloud.c2 { width: 72px; height: 28px; top: 17%; left: -100px; animation-duration: 64s; animation-delay: -22s; }
+    .cloud.c2::before { width: 36px; height: 36px; top: -18px; left: 10px; }
+    .cloud.c2::after { width: 44px; height: 44px; top: -24px; left: 28px; }
+
+    @keyframes drift {
+      from { transform: translateX(0); }
+      to { transform: translateX(calc(100vw + 200px)); }
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      width: min(920px, 100%);
+      margin: 0 auto;
+      padding: 16px 16px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex: 1;
+    }
+
+    .brand { text-align: center; }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 4px;
+      font-weight: 800;
+      font-size: 0.85rem;
+      color: var(--team-blue);
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .brand h1 {
+      font-family: 'Baloo 2', cursive;
+      font-size: clamp(1.7rem, 5vw, 2.5rem);
+      font-weight: 800;
+      line-height: 1.1;
+      color: var(--ink);
+      text-shadow: 2px 3px 0 rgba(255,255,255,0.5);
+    }
+    .brand p { font-weight: 700; color: #3d5a48; font-size: 0.95rem; }
+
+    .hud {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+    .score-chip {
+      border-radius: 16px;
+      padding: 10px 14px;
+      text-align: center;
+      box-shadow: 0 6px 16px var(--shadow);
+      border: 3px solid transparent;
+    }
+    .score-chip.player { background: var(--team-blue-soft); border-color: rgba(43,108,176,0.25); }
+    .score-chip.rival { background: var(--team-red-soft); border-color: rgba(197,48,48,0.25); }
+    .score-chip .label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      opacity: 0.75;
+    }
+    .score-chip .value {
+      font-family: 'Baloo 2', cursive;
+      font-size: 1.8rem;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+    .score-chip.player .value { color: var(--team-blue); }
+    .score-chip.rival .value { color: var(--team-red); }
+
+    .timer-wrap {
+      background: var(--chalk);
+      border-radius: 18px;
+      padding: 8px 18px;
+      text-align: center;
+      border: 3px solid rgba(26,46,40,0.08);
+      box-shadow: 0 6px 16px var(--shadow);
+    }
+    .timer-wrap .label {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #5a6b5a;
+    }
+    .timer-wrap .time {
+      font-family: 'Baloo 2', cursive;
+      font-size: 1.7rem;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .timer-wrap.urgent .time { color: var(--team-red); animation: pulse 0.6s ease infinite alternate; }
+    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+
+    .arena {
+      position: relative;
+      height: clamp(220px, 38vw, 300px);
+      border-radius: 22px;
+      overflow: hidden;
+      border: 3px solid rgba(26,46,40,0.12);
+      box-shadow: 0 12px 28px var(--shadow);
+      background: linear-gradient(180deg, transparent 0 35%, rgba(78,154,69,0.3) 35%, rgba(78,154,69,0.5) 100%);
+    }
+
+    .track-wrap {
+      position: absolute;
+      left: 4%;
+      right: 14%;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 62%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .lane {
+      flex: 1;
+      position: relative;
+      border-radius: 14px;
+      background: linear-gradient(180deg, var(--track-lane), var(--track));
+      border: 3px solid var(--track-dark);
+      box-shadow: inset 0 4px 0 rgba(255,255,255,0.15), inset 0 -4px 0 rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+
+    .lane::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        90deg,
+        rgba(255,255,255,0.22) 0 18px,
+        transparent 18px 36px
+      );
+      pointer-events: none;
+    }
+
+    .lane-label {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: 'Baloo 2', cursive;
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.85);
+      z-index: 2;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      transform: translateY(-50%) rotate(180deg);
+    }
+
+    .lane.player .lane-label { color: #dbeafe; }
+    .lane.rival .lane-label { color: #fecaca; }
+
+    .animal {
+      position: absolute;
+      top: 50%;
+      left: 4%;
+      transform: translate(-50%, -50%);
+      width: clamp(52px, 9vw, 68px);
+      height: clamp(52px, 9vw, 68px);
+      line-height: 0;
+      z-index: 3;
+      transition: left 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
+      filter: drop-shadow(0 3px 4px rgba(0,0,0,0.25));
+    }
+    .animal svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .animal.bounce {
+      animation: bounce 0.35s ease;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -58%) scale(1.12); }
+    }
+
+    .animal.stumble {
+      animation: stumble 0.4s ease;
+    }
+    @keyframes stumble {
+      0%, 100% { transform: translate(-50%, -50%); }
+      25% { transform: translate(-58%, -42%) rotate(-8deg); }
+      75% { transform: translate(-46%, -50%) rotate(4deg); }
+    }
+
+    .finish-posts {
+      position: absolute;
+      right: 3%;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 72px;
+      height: 78%;
+      z-index: 4;
+    }
+
+    .post {
+      position: absolute;
+      bottom: 0;
+      width: 10px;
+      height: 100%;
+      background: linear-gradient(90deg, var(--wood-dark), var(--wood));
+      border-radius: 3px 3px 0 0;
+      box-shadow: 2px 0 4px rgba(0,0,0,0.2);
+    }
+    .post.left { left: 4px; }
+    .post.right { right: 4px; }
+
+    .finish-banner {
+      position: absolute;
+      top: 8%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 110%;
+      padding: 8px 6px;
+      background: repeating-linear-gradient(
+        90deg,
+        #fff 0 12px,
+        var(--team-red) 12px 24px
+      );
+      border: 3px solid var(--wood-dark);
+      border-radius: 4px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+
+    .finish-banner span {
+      display: block;
+      font-family: 'Baloo 2', cursive;
+      font-size: clamp(0.85rem, 2.5vw, 1.05rem);
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      color: var(--ink);
+      background: rgba(255,255,255,0.92);
+      padding: 4px 8px;
+      border-radius: 3px;
+    }
+
+    .start-flag {
+      position: absolute;
+      left: 2%;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: 'Baloo 2', cursive;
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--team-blue);
+      letter-spacing: 0.05em;
+      z-index: 2;
+    }
+
+    .quiz-panel {
+      background: var(--chalk);
+      border-radius: 22px;
+      border: 3px solid rgba(26,46,40,0.1);
+      padding: 18px;
+      box-shadow: 0 12px 32px var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 240px;
+    }
+
+    .quiz-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #e6f4ea;
+      color: #276749;
+    }
+    .streak { font-size: 0.85rem; font-weight: 800; color: #c05621; }
+    .question {
+      font-family: 'Baloo 2', cursive;
+      font-size: clamp(1.15rem, 3.5vw, 1.45rem);
+      font-weight: 700;
+      line-height: 1.25;
+      min-height: 2.6em;
+    }
+    .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .answer-btn {
+      font-family: 'Nunito', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      text-align: left;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 3px solid transparent;
+      background: #eef6fb;
+      color: var(--ink);
+      cursor: pointer;
+      transition: transform 0.15s, background 0.15s, border-color 0.15s;
+      box-shadow: 0 3px 0 rgba(43,108,176,0.15);
+    }
+    .answer-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      background: #dceef9;
+      border-color: rgba(43,108,176,0.35);
+    }
+    .answer-btn:disabled { cursor: default; }
+    .answer-btn.correct { background: #c6f6d5; border-color: #38a169; color: #22543d; }
+    .answer-btn.wrong { background: #fed7d7; border-color: #e53e3e; color: #742a2a; }
+    .feedback { min-height: 1.4em; font-weight: 800; font-size: 0.95rem; text-align: center; }
+    .feedback.good { color: #276749; }
+    .feedback.bad { color: #c53030; }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background:
+        radial-gradient(ellipse at 50% 30%, rgba(255,224,102,0.3), transparent 50%),
+        linear-gradient(180deg, rgba(135,206,235,0.94), rgba(123,201,111,0.94));
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    .overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+    .card {
+      width: min(480px, 100%);
+      background: var(--chalk);
+      border-radius: 24px;
+      padding: 28px 26px;
+      text-align: center;
+      border: 3px solid rgba(26,46,40,0.1);
+      box-shadow: 0 20px 50px rgba(26,46,40,0.22);
+      animation: cardIn 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(24px) scale(0.94); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .card h2 {
+      font-family: 'Baloo 2', cursive;
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 8px;
+    }
+    .card .lead {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #3d5a48;
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+    .rules {
+      text-align: left;
+      background: #eef6fb;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #2a4365;
+      line-height: 1.45;
+    }
+    .rules li { margin: 6px 0 6px 1.1em; }
+
+    .animal-picker {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .animal-btn {
+      font-family: 'Baloo 2', cursive;
+      font-size: 1rem;
+      font-weight: 800;
+      padding: 14px 10px;
+      border-radius: 16px;
+      border: 3px solid rgba(26,46,40,0.12);
+      background: #fff;
+      cursor: pointer;
+      transition: transform 0.12s, border-color 0.12s, background 0.12s, box-shadow 0.12s;
+      box-shadow: 0 4px 0 rgba(0,0,0,0.08);
+    }
+    .animal-btn:hover {
+      transform: translateY(-2px);
+      border-color: rgba(43,108,176,0.35);
+    }
+    .animal-btn.selected {
+      border-color: var(--team-blue);
+      background: var(--team-blue-soft);
+      box-shadow: 0 4px 0 rgba(43,108,176,0.25);
+    }
+    .animal-btn .animal-preview {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 52px;
+      margin-bottom: 4px;
+    }
+    .animal-btn .animal-preview svg {
+      width: 48px;
+      height: 48px;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.15));
+    }
+
+    .rival-preview {
+      font-size: 0.88rem;
+      font-weight: 800;
+      color: var(--team-red);
+      margin-bottom: 14px;
+      min-height: 1.4em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .rival-preview svg {
+      width: 32px;
+      height: 32px;
+      vertical-align: middle;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+    }
+
+    .result-scores {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 8px 0 18px;
+    }
+    .result-scores div { border-radius: 14px; padding: 12px; font-weight: 800; }
+    .result-scores .you { background: var(--team-blue-soft); color: var(--team-blue); }
+    .result-scores .them { background: var(--team-red-soft); color: var(--team-red); }
+    .result-scores span {
+      display: block;
+      font-family: 'Baloo 2', cursive;
+      font-size: 2rem;
+      line-height: 1.1;
+    }
+
+    .btn-primary {
+      font-family: 'Baloo 2', cursive;
+      font-size: 1.25rem;
+      font-weight: 800;
+      border: none;
+      border-radius: 999px;
+      padding: 14px 32px;
+      background: linear-gradient(180deg, #f6d063, var(--accent));
+      color: #5c3a08;
+      cursor: pointer;
+      box-shadow: 0 5px 0 #d69e2e, 0 10px 20px rgba(214,158,46,0.35);
+      transition: transform 0.12s, box-shadow 0.12s, opacity 0.12s;
+    }
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 7px 0 #d69e2e, 0 14px 24px rgba(214,158,46,0.4);
+    }
+    .btn-primary:active:not(:disabled) {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #d69e2e, 0 4px 10px rgba(214,158,46,0.3);
+    }
+    .btn-primary:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: 0 3px 0 #d69e2e;
+    }
+
+    .muted { margin-top: 12px; font-size: 0.8rem; font-weight: 700; color: #5a6b5a; }
+
+    @media (max-width: 560px) {
+      .answers { grid-template-columns: 1fr; }
+      .animal-picker { grid-template-columns: 1fr 1fr; }
+      .score-chip .value { font-size: 1.45rem; }
+      .timer-wrap .time { font-size: 1.5rem; }
+      .finish-posts { width: 58px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sky" aria-hidden="true">
+    <div class="hill h1"></div>
+    <div class="hill h2"></div>
+    <div class="hill h3"></div>
+    <div class="cloud c1"></div>
+    <div class="cloud c2"></div>
+  </div>
+
+  <div class="app">
+    <header class="brand">
+      <a class="back-link" href="/quiz-galaxy">← Quiz Galaxy</a>
+      <h1>Animal Race</h1>
+      <p>Pick your racer. Answer right. Cross the FINISH line first in brains!</p>
+    </header>
+
+    <div class="hud" id="hud" hidden>
+      <div class="score-chip player">
+        <span class="label">Your score</span>
+        <span class="value" id="player-score">0</span>
+      </div>
+      <div class="timer-wrap" id="timer-wrap">
+        <span class="label">Time</span>
+        <span class="time" id="timer">1:00</span>
+      </div>
+      <div class="score-chip rival">
+        <span class="label">Rival score</span>
+        <span class="value" id="rival-score">0</span>
+      </div>
+    </div>
+
+    <div class="arena" id="arena" aria-hidden="true">
+      <div class="start-flag">START</div>
+      <div class="track-wrap">
+        <div class="lane player">
+          <span class="lane-label" id="player-lane-label">You</span>
+          <span class="animal" id="animal-player" aria-hidden="true"></span>
+        </div>
+        <div class="lane rival">
+          <span class="lane-label" id="rival-lane-label">Rival</span>
+          <span class="animal" id="animal-rival" aria-hidden="true"></span>
+        </div>
+      </div>
+      <div class="finish-posts">
+        <div class="post left"></div>
+        <div class="post right"></div>
+        <div class="finish-banner"><span>FINISH</span></div>
+      </div>
+    </div>
+
+    <section class="quiz-panel" id="quiz-panel" hidden>
+      <div class="quiz-meta">
+        <span class="badge" id="q-badge">Question 1</span>
+        <span class="streak" id="streak">Streak: 0</span>
+      </div>
+      <h2 class="question" id="question">Loading…</h2>
+      <div class="answers" id="answers"></div>
+      <p class="feedback" id="feedback"></p>
+    </section>
+  </div>
+
+  <div class="overlay" id="start-overlay">
+    <div class="card">
+      <h2>Ready, Set… Race!</h2>
+      <p class="lead">Pick your animal racer, then answer questions to sprint ahead.</p>
+      <div class="animal-picker" id="animal-picker">
+        <button type="button" class="animal-btn" data-id="tortoise"><span class="animal-preview"></span>Tortoise</button>
+        <button type="button" class="animal-btn" data-id="rabbit"><span class="animal-preview"></span>Rabbit</button>
+        <button type="button" class="animal-btn" data-id="elephant"><span class="animal-preview"></span>Elephant</button>
+        <button type="button" class="animal-btn" data-id="cheetah"><span class="animal-preview"></span>Cheetah</button>
+      </div>
+      <p class="rival-preview" id="rival-preview">Choose your animal to see your rival.</p>
+      <ul class="rules">
+        <li>You have <strong>60 seconds</strong>.</li>
+        <li>Correct answers move you <strong>one step forward</strong> (+1 score).</li>
+        <li>Wrong answers send you <strong>one step back</strong> (min zero).</li>
+        <li>The rival races on their own — stay ahead!</li>
+        <li><strong>Most correct answers when time runs out wins.</strong></li>
+      </ul>
+      <button class="btn-primary" id="start-btn" type="button" disabled>Start Race</button>
+      <p class="muted">Fast feet need fast facts.</p>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="end-overlay">
+    <div class="card">
+      <h2 id="end-title">You Win!</h2>
+      <p class="lead" id="end-lead">You answered the most questions correctly.</p>
+      <div class="result-scores">
+        <div class="you">You<span id="end-player">0</span></div>
+        <div class="them">Rival<span id="end-rival">0</span></div>
+      </div>
+      <button class="btn-primary" id="replay-btn" type="button">Race Again</button>
+      <p class="muted" id="end-detail"></p>
+    </div>
+  </div>
+
+  <script>
+    const ROUND_SECONDS = 60;
+    const RIVAL_INTERVAL_MS = 4500;
+    const STEPS = 10;
+
+    const ANIMALS = {
+      tortoise: { name: 'Tortoise' },
+      rabbit:   { name: 'Rabbit' },
+      elephant: { name: 'Elephant' },
+      cheetah:  { name: 'Cheetah' },
+    };
+
+    function animalSvg(id) {
+      const art = {
+        tortoise: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><ellipse cx="34" cy="38" rx="22" ry="16" fill="#5a9e4a"/><ellipse cx="34" cy="36" rx="18" ry="12" fill="#7bc96f"/><path d="M18 34 Q14 28 18 22 Q22 18 28 20" fill="none" stroke="#4a7c3a" stroke-width="2"/><circle cx="14" cy="22" r="7" fill="#8fd47a"/><circle cx="12" cy="20" r="1.5" fill="#1a2e28"/><ellipse cx="10" cy="24" rx="2" ry="1.5" fill="#6aad5c"/><ellipse cx="22" cy="48" rx="5" ry="3" fill="#6aad5c"/><ellipse cx="34" cy="50" rx="5" ry="3" fill="#6aad5c"/><ellipse cx="46" cy="48" rx="5" ry="3" fill="#6aad5c"/><path d="M52 36 Q58 34 56 28" fill="none" stroke="#8fd47a" stroke-width="4" stroke-linecap="round"/><circle cx="56" cy="26" r="2" fill="#6aad5c"/></svg>',
+        rabbit: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><ellipse cx="22" cy="14" rx="6" ry="16" fill="#f5ebe0" stroke="#d4c4b0" stroke-width="1.5"/><ellipse cx="42" cy="14" rx="6" ry="16" fill="#f5ebe0" stroke="#d4c4b0" stroke-width="1.5"/><ellipse cx="32" cy="38" rx="16" ry="18" fill="#faf6f0" stroke="#d4c4b0" stroke-width="1.5"/><circle cx="32" cy="32" r="14" fill="#faf6f0" stroke="#d4c4b0" stroke-width="1.5"/><ellipse cx="32" cy="36" rx="8" ry="6" fill="#ffe8d6"/><circle cx="26" cy="30" r="2.5" fill="#1a2e28"/><circle cx="38" cy="30" r="2.5" fill="#1a2e28"/><circle cx="27" cy="29" r="0.8" fill="#fff"/><circle cx="39" cy="29" r="0.8" fill="#fff"/><ellipse cx="32" cy="35" rx="2" ry="1.5" fill="#ffb4a2"/><path d="M28 38 Q32 41 36 38" fill="none" stroke="#c53030" stroke-width="1.2" stroke-linecap="round"/><ellipse cx="48" cy="44" rx="5" ry="4" fill="#faf6f0" stroke="#d4c4b0" stroke-width="1"/></svg>',
+        elephant: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><ellipse cx="32" cy="36" rx="20" ry="18" fill="#9ca3af"/><ellipse cx="32" cy="34" rx="16" ry="14" fill="#b8bcc4"/><ellipse cx="14" cy="28" rx="10" ry="14" fill="#9ca3af"/><ellipse cx="50" cy="28" rx="10" ry="14" fill="#9ca3af"/><circle cx="26" cy="32" r="2.5" fill="#1a2e28"/><circle cx="38" cy="32" r="2.5" fill="#1a2e28"/><path d="M32 38 Q32 52 28 58 Q26 60 24 56 Q22 50 28 44 Q30 40 32 38" fill="#8b9199" stroke="#6b7280" stroke-width="1"/><path d="M18 48 L12 52 L14 46 Z" fill="#9ca3af"/><path d="M46 48 L52 52 L50 46 Z" fill="#9ca3af"/><path d="M24 24 L20 12 L26 18 Z" fill="#b8bcc4"/><path d="M40 24 L44 12 L38 18 Z" fill="#b8bcc4"/></svg>',
+        cheetah: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><ellipse cx="36" cy="36" rx="18" ry="12" fill="#e8a84a" transform="rotate(-8 36 36)"/><ellipse cx="48" cy="28" rx="10" ry="8" fill="#e8a84a"/><circle cx="52" cy="26" r="2" fill="#1a2e28"/><ellipse cx="54" cy="29" rx="2" ry="1.5" fill="#ffb4a2"/><path d="M58 28 L62 27 L60 29 Z" fill="#c4a882"/><ellipse cx="30" cy="22" rx="4" ry="7" fill="#e8a84a" transform="rotate(-20 30 22)"/><ellipse cx="38" cy="20" rx="4" ry="7" fill="#e8a84a" transform="rotate(10 38 20)"/><circle cx="20" cy="38" r="3" fill="#1a2e28" opacity="0.85"/><circle cx="28" cy="34" r="2.5" fill="#1a2e28" opacity="0.85"/><circle cx="36" cy="38" r="3" fill="#1a2e28" opacity="0.85"/><circle cx="44" cy="34" r="2" fill="#1a2e28" opacity="0.85"/><path d="M22 44 L18 50 M28 46 L26 52 M36 46 L36 52 M44 44 L48 50" stroke="#c48830" stroke-width="3" stroke-linecap="round"/><path d="M50 32 Q56 34 58 38" fill="none" stroke="#e8a84a" stroke-width="4" stroke-linecap="round"/></svg>',
+      };
+      return art[id] || art.tortoise;
+    }
+
+    function setAnimalElement(el, id) {
+      el.innerHTML = animalSvg(id);
+    }
+
+    let QUESTIONS = window.GALAXY_QUESTIONS || [];
+    function quizBank() {
+      if (window.GalaxyShell && typeof window.GalaxyShell.quizBank === 'function') {
+        const bank = window.GalaxyShell.quizBank();
+        if (bank && bank.length) return bank;
+      }
+      return window.GALAXY_QUESTIONS || QUESTIONS || [];
+    }
+    function shellQ(raw) {
+      if (!raw) return null;
+      const choices = raw.choices || raw.options || [];
+      const q = raw.q || raw.prompt || '';
+      if (!q || !Array.isArray(choices) || choices.length < 2) return null;
+      return {
+        q: q,
+        choices: choices,
+        answer: typeof raw.answer === 'number' ? raw.answer : (typeof raw.correctIndex === 'number' ? raw.correctIndex : 0),
+        explain: raw.explain || '',
+        id: raw.id,
+        source: raw.source || '',
+      };
+    }
+
+    async function ensureBank() {
+      if (quizBank().length) return quizBank();
+      if (window.GalaxyShell && GalaxyShell.ensureQuestions) {
+        await GalaxyShell.ensureQuestions();
+      }
+      return quizBank();
+    }
+
+    const els = {
+      startOverlay: document.getElementById('start-overlay'),
+      endOverlay: document.getElementById('end-overlay'),
+      startBtn: document.getElementById('start-btn'),
+      replayBtn: document.getElementById('replay-btn'),
+      animalPicker: document.getElementById('animal-picker'),
+      rivalPreview: document.getElementById('rival-preview'),
+      hud: document.getElementById('hud'),
+      quizPanel: document.getElementById('quiz-panel'),
+      arena: document.getElementById('arena'),
+      playerScore: document.getElementById('player-score'),
+      rivalScore: document.getElementById('rival-score'),
+      timer: document.getElementById('timer'),
+      timerWrap: document.getElementById('timer-wrap'),
+      question: document.getElementById('question'),
+      answers: document.getElementById('answers'),
+      feedback: document.getElementById('feedback'),
+      qBadge: document.getElementById('q-badge'),
+      streak: document.getElementById('streak'),
+      animalPlayer: document.getElementById('animal-player'),
+      animalRival: document.getElementById('animal-rival'),
+      playerLaneLabel: document.getElementById('player-lane-label'),
+      rivalLaneLabel: document.getElementById('rival-lane-label'),
+      endTitle: document.getElementById('end-title'),
+      endLead: document.getElementById('end-lead'),
+      endPlayer: document.getElementById('end-player'),
+      endRival: document.getElementById('end-rival'),
+      endDetail: document.getElementById('end-detail'),
+    };
+
+    let selectedAnimal = null;
+    let rivalAnimal = null;
+
+    let state = {
+      playing: false,
+      playerCorrect: 0,
+      rivalCorrect: 0,
+      playerStep: 0,
+      rivalStep: 0,
+      streak: 0,
+      asked: 0,
+      secondsLeft: ROUND_SECONDS,
+      deck: [],
+      current: null,
+      locked: false,
+      timerId: null,
+      rivalId: null,
+    };
+
+    function shuffle(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function formatTime(s) {
+      const m = Math.floor(s / 60);
+      return m + ':' + String(s % 60).padStart(2, '0');
+    }
+
+    function stepToLeft(step) {
+      const min = 4;
+      const max = 88;
+      return min + (step / STEPS) * (max - min);
+    }
+
+    function placeAnimal(el, step, animClass) {
+      el.style.left = stepToLeft(step) + '%';
+      if (animClass) {
+        el.classList.remove('bounce', 'stumble');
+        void el.offsetWidth;
+        el.classList.add(animClass);
+        setTimeout(() => el.classList.remove(animClass), 400);
+      }
+    }
+
+    function pickRival(excludeId) {
+      const ids = Object.keys(ANIMALS).filter((id) => id !== excludeId);
+      return ids[Math.floor(Math.random() * ids.length)];
+    }
+
+    function updateRivalPreview() {
+      if (!selectedAnimal) {
+        els.rivalPreview.textContent = 'Choose your animal to see your rival.';
+        return;
+      }
+      const rival = ANIMALS[rivalAnimal];
+      els.rivalPreview.innerHTML =
+        '<span>Your rival:</span>' + animalSvg(rivalAnimal) + '<span>' + rival.name + '</span>';
+    }
+
+    function updateBoard(animPlayer, animRival) {
+      els.playerScore.textContent = state.playerCorrect;
+      els.rivalScore.textContent = state.rivalCorrect;
+      els.streak.textContent = 'Streak: ' + state.streak;
+      placeAnimal(els.animalPlayer, state.playerStep, animPlayer);
+      placeAnimal(els.animalRival, state.rivalStep, animRival);
+    }
+
+    
+    function dealNextRaw(playState) {
+      if (window.GalaxyShell && typeof window.GalaxyShell.takeNextQuestion === 'function') {
+        return window.GalaxyShell.takeNextQuestion(playState);
+      }
+      if (!playState.deck || !playState.deck.length) {
+        const bank = (typeof quizBank === 'function' ? quizBank() : (window.GALAXY_QUESTIONS || [])).slice();
+        for (let i = bank.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const t = bank[i]; bank[i] = bank[j]; bank[j] = t;
+        }
+        playState.deck = bank;
+      }
+      return playState.deck.pop() || null;
+    }
+
+    function nextQuestion() {
+      if (!state.playing) return;
+      state.current = shellQ(dealNextRaw(state));
+      if (!state.current || !state.current.choices || !state.current.choices.length) {
+        if (els && els.question) els.question.textContent = 'You cleared this question set — great work!';
+        if (els && els.feedback) { els.feedback.textContent = 'No repeats left in this round'; els.feedback.className = 'feedback good'; }
+        state.endedByQuestions = true;
+        state.locked = true;
+        if (state.timerId) { clearInterval(state.timerId); state.timerId = null; }
+        if (state.rivalId) { clearInterval(state.rivalId); state.rivalId = null; }
+        setTimeout(function () { if (typeof endRound === 'function') endRound(); }, 450);
+        return;
+      }
+      state.asked += 1;
+      state.locked = false;
+      els.qBadge.textContent = 'Question ' + state.asked;
+      els.question.textContent = state.current.q;
+      els.feedback.textContent = '';
+      els.feedback.className = 'feedback';
+      els.answers.innerHTML = '';
+      state.current.choices.forEach((text, i) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'answer-btn';
+        btn.textContent = text;
+        btn.addEventListener('click', () => onAnswer(i, btn));
+        els.answers.appendChild(btn);
+      });
+      if (window.GalaxyUX) GalaxyUX.onQuestionShown(state.current);
+    }
+
+    function onAnswer(index, btn) {
+      if (!state.playing || state.locked || !state.current) return;
+      state.locked = true;
+      const correct = index === state.current.answer;
+      const buttons = [...els.answers.querySelectorAll('.answer-btn')];
+      buttons.forEach((b) => { b.disabled = true; });
+
+      if (correct) {
+        btn.classList.add('correct');
+        state.playerCorrect += 1;
+        state.streak += 1;
+        state.playerStep = Math.min(STEPS, state.playerStep + 1);
+        els.feedback.textContent = 'Correct! Sprint ahead!';
+        els.feedback.className = 'feedback good';
+        if (window.GalaxyUX) GalaxyUX.afterAnswer({ correct: true, explain: (state.current && state.current.explain) || '', prompt: state.current && state.current.q, choices: state.current && state.current.choices, answerIndex: state.current && state.current.answer });
+        updateBoard('bounce', null);
+        if (window.GalaxyShell && GalaxyShell.checkpoint) GalaxyShell.checkpoint(state);
+        setTimeout(nextQuestion, 450);
+      } else {
+        btn.classList.add('wrong');
+        const right = buttons[state.current.answer];
+        if (right) right.classList.add('correct');
+        state.streak = 0;
+        state.playerStep = Math.max(0, state.playerStep - 1);
+        els.feedback.textContent = 'Oops — stumble back one step!';
+        els.feedback.className = 'feedback bad';
+        if (window.GalaxyUX) GalaxyUX.afterAnswer({ correct: false, explain: (state.current && state.current.explain) || '', prompt: state.current && state.current.q, choices: state.current && state.current.choices, answerIndex: state.current && state.current.answer });
+        updateBoard('stumble', null);
+        if (window.GalaxyShell && GalaxyShell.checkpoint) GalaxyShell.checkpoint(state);
+        setTimeout(nextQuestion, 700);
+      }
+    }
+
+    function rivalTick() {
+      if (!state.playing) return;
+      if (window.GalaxyUX && !GalaxyUX.rivalMayScore()) return;
+      state.rivalCorrect += 1;
+      state.rivalStep = Math.min(STEPS, state.rivalStep + 1);
+      updateBoard(null, 'bounce');
+    }
+
+    function tickTimer() {
+      if (!state.playing) return;
+      if (window.GalaxyUX && !GalaxyUX.timerMayTick()) return;
+      state.secondsLeft -= 1;
+      els.timer.textContent = formatTime(state.secondsLeft);
+      if (state.secondsLeft <= 10) els.timerWrap.classList.add('urgent');
+      if (state.secondsLeft <= 0) endRound();
+    }
+
+    function setupAnimals() {
+      const player = ANIMALS[selectedAnimal];
+      rivalAnimal = pickRival(selectedAnimal);
+      const rival = ANIMALS[rivalAnimal];
+      setAnimalElement(els.animalPlayer, selectedAnimal);
+      setAnimalElement(els.animalRival, rivalAnimal);
+      els.playerLaneLabel.textContent = player.name;
+      els.rivalLaneLabel.textContent = rival.name;
+      updateRivalPreview();
+    }
+
+    async function startRound() {
+      if (!selectedAnimal) return;
+      const bank = await ensureBank();
+      if (!bank.length) {
+        if (els.question) els.question.textContent = 'Still loading quizzes… please wait, then try again.';
+        return;
+      }
+      clearInterval(state.timerId);
+      clearInterval(state.rivalId);
+      setupAnimals();
+
+      state = {
+        playing: true,
+        playerCorrect: 0,
+        rivalCorrect: 0,
+        playerStep: 0,
+        rivalStep: 0,
+        streak: 0,
+        asked: 0,
+        secondsLeft: ROUND_SECONDS,
+        deck: shuffle(bank).map(shellQ).filter(Boolean),
+        current: null,
+        locked: false,
+        timerId: null,
+        rivalId: null,
+      };
+
+      if (window.GALAXY_RESUME && window.GALAXY_RESUME.status === 'in_progress') {
+        const resume = window.GALAXY_RESUME;
+        ['playerCorrect','rivalCorrect','playerStep','rivalStep','streak','asked'].forEach((k) => {
+          if (resume[k] != null && Object.prototype.hasOwnProperty.call(state, k)) state[k] = resume[k];
+        });
+        if (typeof resume.secondsLeft === 'number' && resume.secondsLeft > 0) state.secondsLeft = resume.secondsLeft;
+        if (Array.isArray(resume.deck) && resume.deck.length) {
+          const restored = resume.deck.map(shellQ).filter(Boolean);
+          if (restored.length) state.deck = restored;
+        }
+        window.GALAXY_RESUME = null;
+      }
+
+      if (window.GalaxyUX) GalaxyUX.onRoundStart(state);
+      els.startOverlay.classList.add('hidden');
+      els.endOverlay.classList.add('hidden');
+      els.hud.hidden = false;
+      els.quizPanel.hidden = false;
+      els.arena.removeAttribute('aria-hidden');
+      els.timerWrap.classList.remove('urgent');
+      els.timer.textContent = formatTime(state.secondsLeft);
+      updateBoard(null, null);
+      nextQuestion();
+      state.timerId = setInterval(tickTimer, 1000);
+      state.rivalId = setInterval(rivalTick, RIVAL_INTERVAL_MS);
+    }
+
+    async function endRound() {
+      if (state && state._ending) return;
+      if (state) state._ending = true;
+      try {
+        if (window.GalaxyShell && typeof state !== 'undefined') {
+          const maxS = (state.playerCorrect || 0) + (state.rivalCorrect || 0) || 20;
+          const sc = state.playerCorrect || 0;
+          const res = await window.GalaxyShell.submitRound(sc, Math.max(sc, 10));
+          if (res && res.progress && res.progress.coaching_blurb) {
+            const el = document.getElementById('galaxyLoadStatus');
+            if (el) el.textContent = res.progress.coaching_blurb;
+          }
+        }
+      } catch (e) { console.warn('score submit', e); }
+      return endRoundInner();
+    }
+    function endRoundInner() {
+      if (window.GalaxyUX) {
+        const coach = (window.__galaxyLastProgress && window.__galaxyLastProgress.coaching_blurb) || null;
+        if (coach) GalaxyUX.setCoaching(coach);
+        setTimeout(() => GalaxyUX.enhanceEndScreen({ coaching: coach, missed: GalaxyUX.getMissed(), progress: window.__galaxyLastProgress }), 50);
+      }
+      state.playing = false;
+      clearInterval(state.timerId);
+      clearInterval(state.rivalId);
+      state.locked = true;
+      [...els.answers.querySelectorAll('.answer-btn')].forEach((b) => { b.disabled = true; });
+
+      const p = state.playerCorrect;
+      const r = state.rivalCorrect;
+      els.endPlayer.textContent = p;
+      els.endRival.textContent = r;
+
+      if (state.endedByQuestions) {
+        els.endTitle.textContent = 'Round Complete!';
+        if (p > r) {
+          els.endLead.textContent = 'You finished every question — and beat the rival!';
+          els.endDetail.textContent = 'You ' + p + ' · Rival ' + r + '.';
+        } else if (p < r) {
+          els.endLead.textContent = 'Questions done, but the rival scored higher.';
+          els.endDetail.textContent = 'You ' + p + ' · Rival ' + r + '. Play again to clear this level.';
+        } else {
+          els.endLead.textContent = 'You finished every question — it is a tie!';
+          els.endDetail.textContent = 'Both at ' + p + ' correct.';
+        }
+      } else if (p > r) {
+        els.endTitle.textContent = 'You Win!';
+        els.endLead.textContent = 'Most correct answers — you crossed the FINISH line in brains!';
+        els.endDetail.textContent = 'Victory by ' + (p - r) + ' correct answer' + (p - r === 1 ? '' : 's') + '.';
+      } else if (p < r) {
+        els.endTitle.textContent = 'Rival Wins';
+        els.endLead.textContent = 'They edged you on correct answers. Rematch?';
+        els.endDetail.textContent = 'They led by ' + (r - p) + '. Answer faster next time!';
+      } else {
+        els.endTitle.textContent = "It's a Tie!";
+        els.endLead.textContent = 'Same number of correct answers — neck and neck at FINISH.';
+        els.endDetail.textContent = 'One more correct would have sealed it.';
+      }
+
+      els.endOverlay.classList.remove('hidden');
+    }
+
+    els.animalPicker.addEventListener('click', (e) => {
+      const btn = e.target.closest('.animal-btn');
+      if (!btn) return;
+      selectedAnimal = btn.dataset.id;
+      rivalAnimal = pickRival(selectedAnimal);
+      els.animalPicker.querySelectorAll('.animal-btn').forEach((b) => {
+        b.classList.toggle('selected', b === btn);
+      });
+      window.__galaxyAnimalPicked = true;
+      // Only unlock Start once quizzes are ready
+      const ready = (window.GalaxyShell && GalaxyShell.isReady && GalaxyShell.isReady())
+        || (window.GALAXY_QUESTIONS && window.GALAXY_QUESTIONS.length);
+      els.startBtn.disabled = !ready;
+      updateRivalPreview();
+    });
+
+    els.startBtn.addEventListener('click', startRound);
+    els.replayBtn.addEventListener('click', () => {
+      els.endOverlay.classList.add('hidden');
+      els.startOverlay.classList.remove('hidden');
+    });
+
+    els.animalPicker.querySelectorAll('.animal-btn').forEach((btn) => {
+      const preview = btn.querySelector('.animal-preview');
+      if (preview) preview.innerHTML = animalSvg(btn.dataset.id);
+    });
+    setAnimalElement(els.animalPlayer, 'tortoise');
+    setAnimalElement(els.animalRival, 'rabbit');
+    placeAnimal(els.animalPlayer, 0);
+    placeAnimal(els.animalRival, 0);
+  </script>
+
+<div id="galaxyLoadStatus" style="position:fixed;left:12px;bottom:12px;z-index:50;background:rgba(255,252,245,.92);color:#1a2744;padding:8px 12px;border-radius:10px;font:700 12px Nunito,sans-serif;max-width:280px;"></div>
+<script src="/static/js/galaxy_shell_bridge.js?v=8"></script>
+<script src="/static/js/galaxy_game_ux.js?v=5"></script>
+
+</body>
+</html>

@@ -43,7 +43,7 @@
   <!-- Page Header -->
   <div class="text-center mb-12">
     <h1 class="text-3xl font-bold text-slate-900 mb-3">Game Events Management</h1>
-    <p class="text-lg text-slate-500 max-w-2xl mx-auto">Manage game users, create educational games, and track performance scores.</p>
+    <p class="text-lg text-slate-500 max-w-2xl mx-auto">Manage game users, classic quizzes, Quiz Galaxy shells (including challenge planets), races, and scores.</p>
   </div>
   
   <!-- Action Cards Grid -->
@@ -83,6 +83,19 @@
         <p class="text-slate-500 text-sm">Create timed multiplayer races mixing puzzles, quizzes, and questions.</p>
       </div>
     </div>
+
+    {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') or current_user.has_privilege('Akello Events') %}
+    <!-- Quiz Galaxy Card -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="openQuizGalaxyModal()">
+      <div class="p-6">
+        <div class="w-12 h-12 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+          <i class="fas fa-globe text-xl"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-slate-900 mb-2">Quiz Galaxy</h3>
+        <p class="text-slate-500 text-sm">Manage subject worlds, challenge planets (Target, Atlas, Memory, Beat, Retrowave), and seed shells.</p>
+      </div>
+    </div>
+    {% endif %}
     
     {% if current_user.userRole == 'Admin' or current_user.has_privilege('Content Development') %}
     <!-- Score Tracking Card -->
@@ -107,6 +120,81 @@
       </div>
     </div>
     {% endif %}
+  </div>
+</div>
+
+<!-- Quiz Galaxy Modal -->
+<div id="quizGalaxyModal" class="fixed inset-0 z-50 hidden overflow-y-auto" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onclick="closeQuizGalaxyModal()"></div>
+  <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+    <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-5xl">
+      <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4 border-b border-slate-100">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <h3 class="text-lg font-semibold leading-6 text-slate-900 flex items-center gap-2">
+            <i class="fas fa-globe text-sky-600"></i> Quiz Galaxy shells
+          </h3>
+          <div class="flex items-center gap-2">
+            <a href="/quiz-galaxy" target="_blank" class="text-sm font-semibold text-sky-700 hover:underline">Open hub</a>
+            <button type="button" class="text-slate-400 hover:text-slate-500" onclick="closeQuizGalaxyModal()" aria-label="Close">
+              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-5 sm:p-6 space-y-4">
+        <div class="flex flex-wrap items-center gap-3 justify-between">
+          <p id="galaxyShellSummary" class="text-sm text-slate-600">Loading shells…</p>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" id="galaxySeedBtn" onclick="seedGalaxyShells()" class="inline-flex items-center gap-2 rounded-lg bg-sky-600 text-white text-sm font-semibold px-3 py-2 hover:bg-sky-700">
+              <i class="fas fa-database"></i> Seed / refresh shells
+            </button>
+            <button type="button" onclick="loadGalaxyShells()" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-semibold px-3 py-2 hover:bg-slate-50">
+              <i class="fas fa-sync"></i> Refresh
+            </button>
+          </div>
+        </div>
+        <p id="galaxyShellStatus" class="text-xs text-slate-500"></p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h4 class="text-sm font-bold text-slate-800 mb-2">Subject worlds</h4>
+            <div id="galaxySubjectList" class="space-y-2 max-h-[420px] overflow-y-auto"></div>
+          </div>
+          <div>
+            <h4 class="text-sm font-bold text-slate-800 mb-2">Challenge planets</h4>
+            <div id="galaxyChallengeList" class="space-y-2 max-h-[420px] overflow-y-auto"></div>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-200 pt-4 mt-2 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <i class="fas fa-trophy text-amber-500"></i> Scores &amp; leaderboard
+            </h4>
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="sr-only" for="galaxyScoreShellFilter">Filter by shell</label>
+              <select id="galaxyScoreShellFilter" onchange="loadGalaxyScores()" class="rounded-lg border-slate-200 text-sm py-2 pl-3 pr-8 focus:border-sky-500 focus:ring focus:ring-sky-200">
+                <option value="">All Galaxy shells</option>
+              </select>
+              <button type="button" onclick="loadGalaxyScores()" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-semibold px-3 py-2 hover:bg-slate-50">
+                <i class="fas fa-sync"></i> Refresh scores
+              </button>
+            </div>
+          </div>
+          <div class="flex gap-2 flex-wrap" role="tablist" aria-label="Galaxy score views">
+            <button type="button" id="galaxyTabLeaderboard" onclick="setGalaxyScoreTab('leaderboard')" class="galaxy-score-tab rounded-full px-3 py-1.5 text-xs font-bold bg-sky-600 text-white">Leaderboard</button>
+            <button type="button" id="galaxyTabRecent" onclick="setGalaxyScoreTab('recent')" class="galaxy-score-tab rounded-full px-3 py-1.5 text-xs font-bold bg-slate-100 text-slate-700">Recent attempts</button>
+            <button type="button" id="galaxyTabProgress" onclick="setGalaxyScoreTab('progress')" class="galaxy-score-tab rounded-full px-3 py-1.5 text-xs font-bold bg-slate-100 text-slate-700">Learner levels</button>
+          </div>
+          <p id="galaxyScoreStatus" class="text-xs text-slate-500"></p>
+          <div id="galaxyScoresPanel" class="rounded-xl border border-slate-200 bg-slate-50/80 min-h-[200px] max-h-[380px] overflow-auto">
+            <div class="p-10 text-center text-slate-400">
+              <i class="fas fa-spinner fa-spin text-xl mb-2"></i>
+              <p class="text-sm">Loading scores…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -474,6 +562,14 @@
               <input type="number" id="raceDuration" min="1" max="180" value="2" class="w-full rounded-lg border-slate-200 text-sm py-2.5" required>
             </div>
           </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Race theme *</label>
+            <select id="raceVisualTheme" class="w-full rounded-lg border-slate-200 text-sm py-2.5">
+              <option value="car">Car race — cars advance as players finish items</option>
+              <option value="tug_of_war">Tug of war — two teams pull the rope</option>
+            </select>
+            <p class="text-xs text-slate-500 mt-1">Visual skin for the live race board. Gameplay (quiz playlist) stays the same.</p>
+          </div>
 
           <div class="border border-slate-200 rounded-xl p-4">
             <div class="flex items-center justify-between mb-3">
@@ -583,6 +679,22 @@
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Solo survival theme</label>
+              <select id="gameSoloTheme" class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5">
+                <option value="swim">Swim (drown on timeout) — default</option>
+                <option value="balloon">Balloon (pop on timeout)</option>
+                <option value="rocket">Rocket (crash on timeout)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Solo time limit (seconds)</label>
+              <input type="number" id="gameSoloTimeLimit" min="30" max="3600" class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="Auto from difficulty">
+              <p class="text-xs text-slate-500 mt-1">Leave blank: easy 300s · medium 240s · hard 180s</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Maximum Score (optional)</label>
               <input type="number" id="gameMaxScore" min="1" class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all text-sm py-2.5" placeholder="e.g., 5">
               <p class="text-xs text-slate-500 mt-1">Leave empty if game calculates its own max score</p>
@@ -646,6 +758,287 @@
   window.openRacesModal = openRacesModal;
   function closeRacesModal() { toggleModal('racesModal', false); }
   window.closeRacesModal = closeRacesModal;
+
+  function openQuizGalaxyModal() {
+    toggleModal('quizGalaxyModal', true);
+    loadGalaxyShells();
+    loadGalaxyScores();
+  }
+  window.openQuizGalaxyModal = openQuizGalaxyModal;
+  function closeQuizGalaxyModal() { toggleModal('quizGalaxyModal', false); }
+  window.closeQuizGalaxyModal = closeQuizGalaxyModal;
+
+  let galaxyScoreTab = 'leaderboard';
+  let galaxyScoreCache = null;
+
+  function setGalaxyScoreTab(tab) {
+    galaxyScoreTab = tab === 'recent' || tab === 'progress' ? tab : 'leaderboard';
+    ['leaderboard', 'recent', 'progress'].forEach((t) => {
+      const btn = document.getElementById('galaxyTab' + t.charAt(0).toUpperCase() + t.slice(1));
+      if (!btn) return;
+      const active = t === galaxyScoreTab;
+      btn.className = 'galaxy-score-tab rounded-full px-3 py-1.5 text-xs font-bold ' +
+        (active ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-700');
+    });
+    renderGalaxyScores();
+  }
+  window.setGalaxyScoreTab = setGalaxyScoreTab;
+
+  function formatGalaxyWhen(iso) {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleString();
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  function renderGalaxyScores() {
+    const panel = document.getElementById('galaxyScoresPanel');
+    const status = document.getElementById('galaxyScoreStatus');
+    if (!panel) return;
+    const data = galaxyScoreCache;
+    if (!data) {
+      panel.innerHTML = '<div class="p-8 text-center text-slate-400 text-sm">No score data yet.</div>';
+      return;
+    }
+    const filt = data.filter || {};
+    if (status) {
+      status.textContent = filt.game_title
+        ? ('Showing: ' + filt.game_title)
+        : (filt.shell ? ('Shell: ' + filt.shell) : 'All Quiz Galaxy shells');
+    }
+
+    if (galaxyScoreTab === 'progress') {
+      const rows = data.progress || [];
+      if (!rows.length) {
+        panel.innerHTML = '<div class="p-8 text-center text-slate-500 text-sm">No learner progress recorded yet.</div>';
+        return;
+      }
+      panel.innerHTML = `
+        <table class="min-w-full text-sm">
+          <thead class="bg-white sticky top-0 border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-500">
+            <tr>
+              <th class="px-3 py-2">Learner</th>
+              <th class="px-3 py-2">Shell</th>
+              <th class="px-3 py-2">Subject</th>
+              <th class="px-3 py-2">Level</th>
+              <th class="px-3 py-2">Difficulty</th>
+              <th class="px-3 py-2">Session</th>
+              <th class="px-3 py-2">Updated</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 bg-white/60">
+            ${rows.map((r) => `
+              <tr>
+                <td class="px-3 py-2 font-semibold text-slate-800">${escapeHtml(r.display_name || r.username || '')}</td>
+                <td class="px-3 py-2 text-slate-600"><code class="text-[11px]">${escapeHtml(r.shell || '')}</code></td>
+                <td class="px-3 py-2 text-slate-600">${escapeHtml(r.subject || '')}</td>
+                <td class="px-3 py-2 font-bold text-sky-700">Lv ${escapeHtml(String(r.level || 1))}</td>
+                <td class="px-3 py-2 capitalize">${escapeHtml(r.difficulty || '')}</td>
+                <td class="px-3 py-2">${escapeHtml(r.session_status || 'idle')}</td>
+                <td class="px-3 py-2 text-slate-500 whitespace-nowrap">${escapeHtml(formatGalaxyWhen(r.updated_at))}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+      return;
+    }
+
+    if (galaxyScoreTab === 'recent') {
+      const rows = data.recent || [];
+      if (!rows.length) {
+        panel.innerHTML = '<div class="p-8 text-center text-slate-500 text-sm">No recent Galaxy attempts yet.</div>';
+        return;
+      }
+      panel.innerHTML = `
+        <table class="min-w-full text-sm">
+          <thead class="bg-white sticky top-0 border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-500">
+            <tr>
+              <th class="px-3 py-2">When</th>
+              <th class="px-3 py-2">Learner</th>
+              <th class="px-3 py-2">Game</th>
+              <th class="px-3 py-2">Score</th>
+              <th class="px-3 py-2">%</th>
+              <th class="px-3 py-2">Attempt</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 bg-white/60">
+            ${rows.map((r) => `
+              <tr>
+                <td class="px-3 py-2 text-slate-500 whitespace-nowrap">${escapeHtml(formatGalaxyWhen(r.played_at))}</td>
+                <td class="px-3 py-2 font-semibold text-slate-800">${escapeHtml(r.display_name || r.username || '')}</td>
+                <td class="px-3 py-2 text-slate-600">${escapeHtml((r.game_title || '').replace(/^Galaxy — /, ''))}</td>
+                <td class="px-3 py-2 font-bold">${escapeHtml(String(r.score ?? 0))}${r.max_score != null ? ' / ' + escapeHtml(String(r.max_score)) : ''}</td>
+                <td class="px-3 py-2">${escapeHtml(String(r.percentage ?? 0))}%</td>
+                <td class="px-3 py-2">#${escapeHtml(String(r.attempt_number || 1))}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+      return;
+    }
+
+    const rows = data.leaderboard || [];
+    if (!rows.length) {
+      panel.innerHTML = '<div class="p-8 text-center text-slate-500 text-sm">No leaderboard scores yet — learners need to finish a Galaxy round.</div>';
+      return;
+    }
+    panel.innerHTML = `
+      <table class="min-w-full text-sm">
+        <thead class="bg-white sticky top-0 border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-500">
+          <tr>
+            <th class="px-3 py-2">#</th>
+            <th class="px-3 py-2">Learner</th>
+            <th class="px-3 py-2">Game</th>
+            <th class="px-3 py-2">Best score</th>
+            <th class="px-3 py-2">%</th>
+            <th class="px-3 py-2">Attempts</th>
+            <th class="px-3 py-2">Last played</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 bg-white/60">
+          ${rows.map((r, i) => `
+            <tr>
+              <td class="px-3 py-2 font-bold text-amber-600">${i + 1}</td>
+              <td class="px-3 py-2 font-semibold text-slate-800">${escapeHtml(r.display_name || r.username || '')}${r.age != null ? ' <span class="text-xs text-slate-400">(' + escapeHtml(String(r.age)) + ')</span>' : ''}</td>
+              <td class="px-3 py-2 text-slate-600">${escapeHtml((r.game_title || '').replace(/^Galaxy — /, ''))}</td>
+              <td class="px-3 py-2 font-bold text-sky-700">${escapeHtml(String(r.score ?? 0))}${r.max_score != null ? ' / ' + escapeHtml(String(r.max_score)) : ''}</td>
+              <td class="px-3 py-2">${escapeHtml(String(r.percentage ?? 0))}%</td>
+              <td class="px-3 py-2">${escapeHtml(String(r.attempts || 1))}</td>
+              <td class="px-3 py-2 text-slate-500 whitespace-nowrap">${escapeHtml(formatGalaxyWhen(r.last_played))}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  async function loadGalaxyScores() {
+    const panel = document.getElementById('galaxyScoresPanel');
+    const status = document.getElementById('galaxyScoreStatus');
+    const filterEl = document.getElementById('galaxyScoreShellFilter');
+    if (panel) {
+      panel.innerHTML = '<div class="p-10 text-center text-slate-400"><i class="fas fa-spinner fa-spin text-xl mb-2"></i><p class="text-sm">Loading scores…</p></div>';
+    }
+    try {
+      const shell = filterEl ? filterEl.value : '';
+      const url = '/api/galaxy/admin/scores' + (shell ? ('?shell=' + encodeURIComponent(shell)) : '');
+      const r = await fetch(url, { credentials: 'same-origin' });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Could not load Galaxy scores');
+      galaxyScoreCache = data;
+      if (filterEl && Array.isArray(data.shells) && filterEl.dataset.filled !== '1') {
+        const current = filterEl.value;
+        filterEl.innerHTML = '<option value="">All Galaxy shells</option>' +
+          data.shells.map((s) =>
+            `<option value="${escapeHtml(s.shell)}">${escapeHtml(s.name || s.label)} (${escapeHtml(s.kind || 'subject')})</option>`
+          ).join('');
+        if (current) filterEl.value = current;
+        filterEl.dataset.filled = '1';
+      }
+      renderGalaxyScores();
+    } catch (err) {
+      if (status) status.textContent = err.message || 'Failed to load scores';
+      if (panel) {
+        panel.innerHTML = `<div class="p-8 text-center text-rose-600 text-sm">${escapeHtml(err.message || 'Failed to load scores')}</div>`;
+      }
+    }
+  }
+  window.loadGalaxyScores = loadGalaxyScores;
+
+  function galaxyShellCard(s) {
+    const seeded = s.seeded
+      ? '<span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-[11px] font-bold">Seeded</span>'
+      : '<span class="text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full text-[11px] font-bold">Not seeded</span>';
+    const kindBadge = s.kind === 'challenge'
+      ? '<span class="text-fuchsia-700 bg-fuchsia-50 px-2 py-0.5 rounded-full text-[11px] font-bold">Challenge</span>'
+      : '<span class="text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full text-[11px] font-bold">Subject</span>';
+    const catalog = (s.catalog_subjects || []).join(', ') || '—';
+    const play = s.play_path || ('/play-galaxy/' + encodeURIComponent(s.shell));
+    const shellJs = JSON.stringify(s.shell || '');
+    return `
+      <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-left">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="font-bold text-slate-900 text-sm">${escapeHtml(s.name || s.label)}</div>
+            <div class="text-xs text-slate-500 mt-0.5">${escapeHtml(s.label)} · <code class="text-[11px]">${escapeHtml(s.shell || '')}</code></div>
+          </div>
+          <div class="flex flex-col items-end gap-1">${kindBadge}${seeded}</div>
+        </div>
+        <div class="text-xs text-slate-600 mt-2">Catalog: ${escapeHtml(catalog)}</div>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <a href="${play}" target="_blank" class="text-xs font-semibold text-sky-700 hover:underline">Play shell</a>
+          <button type="button" class="text-xs font-semibold text-amber-700 hover:underline" onclick='viewGalaxyShellScores(${shellJs})'>Scores</button>
+          <a href="/quiz-galaxy" target="_blank" class="text-xs font-semibold text-slate-600 hover:underline">Hub</a>
+        </div>
+      </div>`;
+  }
+
+  async function viewGalaxyShellScores(shell) {
+    setGalaxyScoreTab('leaderboard');
+    const filterEl = document.getElementById('galaxyScoreShellFilter');
+    if (filterEl && filterEl.dataset.filled !== '1') {
+      await loadGalaxyScores();
+    }
+    if (filterEl) filterEl.value = shell || '';
+    await loadGalaxyScores();
+    const panel = document.getElementById('galaxyScoresPanel');
+    if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  window.viewGalaxyShellScores = viewGalaxyShellScores;
+
+  async function loadGalaxyShells() {
+    const summary = document.getElementById('galaxyShellSummary');
+    const status = document.getElementById('galaxyShellStatus');
+    const subjectList = document.getElementById('galaxySubjectList');
+    const challengeList = document.getElementById('galaxyChallengeList');
+    if (summary) summary.textContent = 'Loading shells…';
+    if (status) status.textContent = '';
+    try {
+      const r = await fetch('/api/galaxy/admin/shells', { credentials: 'same-origin' });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Could not load Galaxy shells');
+      const shells = data.shells || [];
+      const subjects = shells.filter((s) => s.kind === 'subject');
+      const challenges = shells.filter((s) => s.kind === 'challenge');
+      if (subjectList) subjectList.innerHTML = subjects.map(galaxyShellCard).join('') || '<p class="text-sm text-slate-500">No subject worlds.</p>';
+      if (challengeList) challengeList.innerHTML = challenges.map(galaxyShellCard).join('') || '<p class="text-sm text-slate-500">No challenge planets.</p>';
+      const c = data.counts || {};
+      if (summary) {
+        summary.textContent = (c.total || shells.length) + ' shells · ' + (c.subject || 0) + ' subject · ' + (c.challenge || 0) + ' challenge · ' + (c.seeded || 0) + ' seeded';
+      }
+    } catch (e) {
+      if (summary) summary.textContent = 'Could not load Quiz Galaxy shells.';
+      if (status) status.textContent = e.message || String(e);
+      if (subjectList) subjectList.innerHTML = '';
+      if (challengeList) challengeList.innerHTML = '';
+    }
+  }
+  window.loadGalaxyShells = loadGalaxyShells;
+
+  async function seedGalaxyShells() {
+    const btn = document.getElementById('galaxySeedBtn');
+    const status = document.getElementById('galaxyShellStatus');
+    if (btn) btn.disabled = true;
+    if (status) status.textContent = 'Seeding Galaxy shells…';
+    try {
+      const r = await fetch('/api/galaxy/admin/seed', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Seed failed');
+      if (status) {
+        status.textContent = 'Seeded: created ' + (data.created || 0) + ', updated ' + (data.updated || 0) + ' (worlds ' + (data.worlds || 0) + ').';
+      }
+      await loadGalaxyShells();
+    } catch (e) {
+      if (status) status.textContent = e.message || String(e);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+  window.seedGalaxyShells = seedGalaxyShells;
 
   // User Registration Modal
   function openUserRegistrationModal() {
@@ -751,6 +1144,8 @@
     document.getElementById('gameModalTitle').innerHTML = gameId ? '<i class="fas fa-edit text-indigo-600 mr-2"></i> Edit Game' : '<i class="fas fa-plus text-emerald-600 mr-2"></i> Create New Game';
     document.getElementById('gameForm').reset();
     document.getElementById('gameIsActive').checked = true;
+    document.getElementById('gameSoloTheme').value = 'swim';
+    document.getElementById('gameSoloTimeLimit').value = '';
     
     if (gameId) {
       loadGameForEdit(gameId);
@@ -1013,6 +1408,9 @@
       document.getElementById('gameAgeRange').value = data.game.age_range || '';
       refreshGameSubjectOptions(data.game.subject || '');
       document.getElementById('gameDifficulty').value = data.game.difficulty_level || '';
+      document.getElementById('gameSoloTheme').value = data.game.solo_theme || 'swim';
+      const override = data.game.solo_time_limit_override;
+      document.getElementById('gameSoloTimeLimit').value = (override != null && override !== '') ? override : '';
       document.getElementById('gameIsActive').checked = data.game.is_active !== false;
       document.getElementById('gameHtml').value = data.game.html_content || '';
     } catch (e) {
@@ -1029,6 +1427,9 @@
     const ageRange = document.getElementById('gameAgeRange').value;
     const subject = (document.getElementById('gameSubject') || {}).value || '';
     const difficulty = document.getElementById('gameDifficulty').value;
+    const soloTheme = (document.getElementById('gameSoloTheme') || {}).value || 'swim';
+    const soloTimeRaw = (document.getElementById('gameSoloTimeLimit') || {}).value;
+    const soloTimeLimit = soloTimeRaw ? parseInt(soloTimeRaw, 10) : null;
     const isActive = document.getElementById('gameIsActive').checked;
 
     if (!title || !htmlContent || !ageRange || !difficulty) {
@@ -1047,7 +1448,18 @@
       const r = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, max_score: maxScore, html_content: htmlContent, age_range: ageRange, subject, difficulty_level: difficulty, is_active: isActive })
+        body: JSON.stringify({
+          title,
+          description,
+          max_score: maxScore,
+          html_content: htmlContent,
+          age_range: ageRange,
+          subject,
+          difficulty_level: difficulty,
+          solo_theme: soloTheme,
+          solo_time_limit_seconds: soloTimeLimit,
+          is_active: isActive,
+        })
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Failed to save');
@@ -1512,7 +1924,7 @@
         <div class="bg-white rounded-xl border border-slate-200 p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <div class="font-semibold text-slate-800">${escapeHtml(race.title)}</div>
-            <div class="text-xs text-slate-500 mt-1">${escapeHtml(race.status)} · Ages ${escapeHtml(race.age_range)} · ${race.duration_minutes} min · ${escapeHtml(mixText(race.mix))} · ${race.player_count || 0} players</div>
+            <div class="text-xs text-slate-500 mt-1">${escapeHtml(race.status)} · Ages ${escapeHtml(race.age_range)} · ${race.duration_minutes} min · ${(race.visual_theme === 'tug_of_war') ? 'Tug of war' : 'Car race'} · ${escapeHtml(mixText(race.mix))} · ${race.player_count || 0} players</div>
             <div class="text-xs text-slate-400">${formatDate(race.starts_at)} → ${formatDate(race.ends_at)}</div>
           </div>
           <div class="flex flex-wrap gap-2">
@@ -1533,6 +1945,7 @@
     document.getElementById('raceEditorTitle').textContent = raceId ? 'Edit Race' : 'Create Race';
     document.getElementById('raceForm').reset();
     document.getElementById('raceDuration').value = 2;
+    document.getElementById('raceVisualTheme').value = 'car';
     raceDraftItems = [];
     if (raceId) {
       const r = await fetch(`/api/game-races/${raceId}`);
@@ -1546,6 +1959,7 @@
       document.getElementById('raceAgeRange').value = race.age_range || '';
       document.getElementById('raceStartsAt').value = isoToLocalInput(race.starts_at);
       document.getElementById('raceDuration').value = race.duration_minutes || 2;
+      document.getElementById('raceVisualTheme').value = race.visual_theme || 'car';
       raceDraftItems = (race.items || []).map((item) => ({
         item_type: item.item_type,
         points: item.points,
@@ -1783,6 +2197,7 @@
     const ageRange = document.getElementById('raceAgeRange').value;
     const startsAt = document.getElementById('raceStartsAt').value;
     const duration = Number(document.getElementById('raceDuration').value);
+    const visualTheme = document.getElementById('raceVisualTheme').value || 'car';
     if (!title || !ageRange || !startsAt || !duration) {
       alert('Fill in title, age range, start time, and duration');
       return;
@@ -1814,6 +2229,7 @@
       age_range: ageRange,
       starts_at: new Date(startsAt).toISOString(),
       duration_minutes: duration,
+      visual_theme: visualTheme,
       items,
     };
     const raceId = document.getElementById('raceEditId').value;

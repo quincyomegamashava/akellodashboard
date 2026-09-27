@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Akello Quiz Galaxy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --sky: #0b1a3a;
+      --panel: rgba(255, 252, 245, 0.96);
+      --ink: #1a2744;
+      --accent: #ffb347;
+      --play: #2f8f56;
+      --muted: #5a6b8a;
+      --akello: #ffe08a;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: var(--sky); color: #fff;
+      font-family: 'Nunito', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+    .label-3d {
+      pointer-events: none;
+      user-select: none;
+      text-align: center;
+      transform: translate(-50%, -100%);
+    }
+    .label-3d .chip {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 7px 12px 8px;
+      border-radius: 14px;
+      background: rgba(255, 252, 245, 0.94);
+      color: var(--ink);
+      box-shadow: 0 8px 22px rgba(0,0,0,0.28);
+      border: 2px solid rgba(255,255,255,0.65);
+      min-width: 108px;
+    }
+    .label-3d .subject {
+      font-family: 'Baloo 2', cursive;
+      font-size: 0.95rem;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: 0.02em;
+    }
+    .label-3d .game {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--muted);
+      max-width: 140px;
+      line-height: 1.2;
+    }
+    .label-3d.akello .chip {
+      background: linear-gradient(180deg, #fff6d6, #ffe08a);
+      border-color: rgba(255, 200, 80, 0.9);
+      min-width: 128px;
+      padding: 9px 16px 10px;
+    }
+    .label-3d.akello .subject {
+      font-size: 1.15rem;
+      color: #5c3a08;
+      letter-spacing: 0.12em;
+    }
+    .label-3d.akello .game {
+      color: #8a5a12;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .label-3d.selected .chip {
+      outline: 3px solid #5ecf82;
+      transform: scale(1.05);
+    }
+
+    #loader {
+      position: fixed; inset: 0; z-index: 60;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #071428;
+      transition: opacity 0.6s ease;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    #loader .brand {
+      font-family: 'Baloo 2', cursive;
+      font-size: clamp(1.6rem, 5vw, 2.4rem);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: var(--akello);
+      margin-bottom: 1rem;
+    }
+    #loader .bar {
+      width: min(220px, 60vw); height: 8px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 999px; overflow: hidden;
+    }
+    #loader .bar > i {
+      display: block; height: 100%; width: 0%;
+      background: linear-gradient(90deg, #ffb347, #ffe08a);
+      border-radius: 999px;
+      transition: width 0.2s ease;
+    }
+    #loader .status {
+      margin-top: 0.85rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.55);
+    }
+
+    #titles {
+      position: fixed; inset: 0; z-index: 25;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 30%, rgba(7,20,40,0.55) 100%);
+      transition: opacity 0.5s;
+    }
+    #titles.gone { opacity: 0; }
+    #titles h1 {
+      font-family: 'Baloo 2', cursive;
+      font-size: clamp(2rem, 8vw, 3.6rem);
+      font-weight: 800;
+      color: var(--akello);
+      text-shadow: 0 4px 24px rgba(0,0,0,0.45);
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    #titles p {
+      margin-top: 0.6rem;
+      font-size: clamp(0.95rem, 2.5vw, 1.15rem);
+      font-weight: 700;
+      color: rgba(255,255,255,0.85);
+      opacity: 0;
+      transform: translateY(12px);
+      text-align: center;
+      padding: 0 20px;
+    }
+
+    #hint {
+      position: fixed; bottom: 22px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 28;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.55);
+      pointer-events: none;
+      transition: opacity 0.4s;
+      text-align: center;
+      max-width: 90vw;
+    }
+    #hint.hidden { opacity: 0; }
+
+    #corner {
+      position: fixed; top: 18px; left: 18px; z-index: 28;
+      font-family: 'Baloo 2', cursive;
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--akello);
+      text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+      pointer-events: none;
+      line-height: 1.15;
+    }
+    #corner small {
+      display: block;
+      font-family: 'Nunito', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.55);
+      letter-spacing: 0.04em;
+    }
+
+    #welcome {
+      position: fixed; inset: 0; z-index: 35;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(180deg, rgba(7,20,40,0.35), rgba(7,20,40,0.72));
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.6s ease;
+    }
+    #welcome.visible { opacity: 1; pointer-events: auto; }
+    #welcome .card {
+      width: min(420px, 90vw);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 24px;
+      padding: 28px 26px;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+      animation: popIn 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.94); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    #welcome h2 {
+      font-family: 'Baloo 2', cursive;
+      font-size: 1.9rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    #welcome .lead {
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 18px;
+      line-height: 1.45;
+    }
+    .btn {
+      font-family: 'Baloo 2', cursive;
+      font-size: 1.15rem;
+      font-weight: 800;
+      border: none;
+      border-radius: 999px;
+      padding: 12px 28px;
+      cursor: pointer;
+      transition: transform 0.12s, box-shadow 0.12s;
+    }
+    .btn-primary {
+      background: linear-gradient(180deg, #ffd06a, var(--accent));
+      color: #5c3a08;
+      box-shadow: 0 5px 0 #d69e2e, 0 10px 20px rgba(214,158,46,0.35);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 7px 0 #d69e2e, 0 14px 24px rgba(214,158,46,0.4);
+    }
+    .btn-play {
+      background: linear-gradient(180deg, #5ecf82, var(--play));
+      color: #fff;
+      box-shadow: 0 5px 0 #2d7a48, 0 10px 18px rgba(61,154,95,0.35);
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn-play:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 7px 0 #2d7a48, 0 14px 22px rgba(61,154,95,0.4);
+    }
+    .btn-ghost {
+      background: #e8eef8;
+      color: var(--ink);
+      margin-top: 10px;
+      box-shadow: 0 3px 0 #c5d0e0;
+    }
+
+    #infoPanel {
+      position: fixed; top: 50%; right: 18px;
+      transform: translateY(-50%) translateX(120%);
+      z-index: 40;
+      width: min(340px, calc(100vw - 36px));
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 22px;
+      padding: 22px 20px 18px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+      transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1);
+    }
+    #infoPanel.open { transform: translateY(-50%) translateX(0); }
+    #infoPanel .preview {
+      width: 100%;
+      height: 110px;
+      border-radius: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(160deg, #dceeff, #fff8e8);
+      overflow: hidden;
+      border: 2px solid rgba(26,39,68,0.08);
+    }
+    #infoPanel .preview svg { width: 92px; height: 92px; }
+    #infoPanel .subject-tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--play);
+      background: #e6f7ec;
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+    }
+    #infoPanel h2 {
+      font-family: 'Baloo 2', cursive;
+      font-size: 1.4rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 8px;
+    }
+    #infoPanel .fact {
+      font-size: 0.94rem;
+      line-height: 1.45;
+      color: #3a4660;
+      margin-bottom: 12px;
+    }
+    #infoPanel .classic-wrap {
+      margin: 0 0 14px;
+      max-height: 180px;
+      overflow-y: auto;
+      border: 1px solid rgba(26,39,68,0.08);
+      border-radius: 14px;
+      background: #f7f9fc;
+    }
+    #infoPanel .classic-label {
+      font-size: 0.7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #6b7a94;
+      padding: 8px 12px 4px;
+    }
+    #infoPanel .classic-list {
+      list-style: none;
+      margin: 0;
+      padding: 0 6px 8px;
+    }
+    #infoPanel .classic-list li { margin: 0; }
+    #infoPanel .classic-list a {
+      display: block;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: var(--ink);
+      text-decoration: none;
+      line-height: 1.25;
+    }
+    #infoPanel .classic-list a:hover { background: #e8f0ff; color: #1d4ed8; }
+    #infoPanel .classic-list .meta {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #7a869c;
+      margin-top: 2px;
+    }
+    #infoPanel .classic-empty {
+      padding: 8px 12px 12px;
+      font-size: 0.82rem;
+      color: #7a869c;
+    }
+    #classicSearch {
+      width: calc(100% - 16px);
+      margin: 4px 8px 6px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(26,39,68,0.12);
+      font: 700 0.82rem Nunito, sans-serif;
+      background: #fff;
+      color: var(--ink);
+    }
+    #hubStats {
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 0 0 12px;
+    }
+    #hubStats.show { display: grid; }
+    #hubStats .stat {
+      background: #f1f5f9;
+      border-radius: 12px;
+      padding: 10px;
+    }
+    #hubStats .stat b { display:block; font-size: 1.15rem; font-weight: 800; }
+    #hubStats .stat span { font-size: 0.72rem; font-weight: 700; color: #64748b; }
+    #mobileSubjects {
+      display: none;
+      position: fixed;
+      left: 12px; right: 12px; bottom: 64px;
+      z-index: 35;
+      max-height: 38vh;
+      overflow: auto;
+      background: rgba(255,252,245,0.94);
+      border-radius: 18px;
+      padding: 10px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.28);
+    }
+    #mobileSubjects h3 {
+      font-family: 'Baloo 2', cursive;
+      font-size: 0.95rem;
+      margin: 2px 6px 8px;
+      color: #1a2744;
+    }
+    #mobileSubjects .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    #mobileSubjects button {
+      border: 0; border-radius: 14px; padding: 12px 10px; text-align: left;
+      background: #fff; color: #1a2744; font: 800 0.82rem Nunito, sans-serif;
+      box-shadow: 0 2px 0 #dbe3ef; cursor: pointer;
+    }
+    #mobileSubjects button small { display:block; font-weight:700; color:#64748b; margin-top:2px; }
+    @media (max-width: 820px) {
+      #mobileSubjects { display: block; }
+      #hint { bottom: auto; top: 70px; font-size: 0.75rem; }
+    }
+    #infoPanel .actions {
+      display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+    }
+    #infoPanel .actions .btn { width: 100%; text-align: center; }
+
+
+    #topNav {
+      position: fixed; top: 12px; right: 12px; z-index: 40;
+      display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
+    }
+    #topNav a, #topNav button {
+      font-family: Nunito, sans-serif; font-weight: 800; font-size: 0.78rem;
+      padding: 8px 12px; border-radius: 999px; border: none; cursor: pointer;
+      background: rgba(255,252,245,0.92); color: #1a2744; text-decoration: none;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+    }
+    #topNav a.primary, #topNav button.primary { background: #2f8f56; color: #fff; }
+    #loginModal {
+      position: fixed; inset: 0; z-index: 80; display: none;
+      align-items: center; justify-content: center;
+      background: rgba(7,20,40,0.72); padding: 16px;
+    }
+    #loginModal.open { display: flex; }
+    #loginModal .card {
+      width: min(420px, 100%); background: #fffdf8; color: #1a2744;
+      border-radius: 18px; padding: 22px 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    }
+    #loginModal h2 { font-family: 'Baloo 2', cursive; margin-bottom: 6px; }
+    #loginModal .lead { color: #5a6b8a; font-size: 0.9rem; margin-bottom: 14px; }
+    #loginModal label { display:block; font-size:0.75rem; font-weight:800; margin: 8px 0 4px; }
+    #loginModal input {
+      width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #d7deea;
+      font: 700 0.95rem Nunito, sans-serif;
+    }
+    #loginModal .row { display:flex; gap:8px; margin-top: 14px; }
+    #loginModal .err { color: #c53030; font-size: 0.85rem; min-height: 1.2em; margin-top: 8px; }
+    #dobPanel { display:none; }
+
+    @media (max-width: 640px) {
+      #infoPanel {
+        top: auto; bottom: 0; right: 0; left: 0;
+        width: 100%;
+        transform: translateY(110%);
+        border-radius: 22px 22px 0 0;
+      }
+      #infoPanel.open { transform: translateY(0); }
+      .label-3d .chip { min-width: 90px; padding: 5px 8px 6px; }
+      .label-3d .subject { font-size: 0.8rem; }
+      .label-3d .game { font-size: 0.6rem; max-width: 110px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loader">
+    <div class="brand">AKELLO</div>
+    <div class="bar"><i id="loadBar"></i></div>
+    <div class="status" id="loadStatus">Warming up the platform…</div>
+  </div>
+
+  <div id="titles">
+    <h1 id="titleMain">Akello Quiz Galaxy</h1>
+    <p id="titleSub">Subjects orbit the Akello platform — pick a world and play</p>
+  </div>
+
+  
+  <div id="topNav">
+    <a href="/game-dashboard#races">Races</a>
+    <a href="/game-dashboard#leaderboard">Leaderboard</a>
+    <button type="button" id="btnNavLogin" class="primary">Log in</button>
+    <button type="button" id="btnNavLogout" style="display:none;">Log out</button>
+  </div>
+
+  <div id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <div class="card">
+      <h2 id="loginTitle">Learner login</h2>
+      <p class="lead">Sign in to play subject worlds. Your quizzes come from Akello's learning catalog for your age.</p>
+      <div id="credPanel">
+        <label for="loginUser">Username</label>
+        <input id="loginUser" autocomplete="username" />
+        <label for="loginPass">Password</label>
+        <input id="loginPass" type="password" autocomplete="current-password" />
+        <div class="row">
+          <button type="button" class="btn btn-primary" id="btnDoLogin" style="flex:1">Log in</button>
+          <button type="button" class="btn btn-ghost" id="btnCancelLogin" style="flex:1">Cancel</button>
+        </div>
+      </div>
+      <div id="dobPanel">
+        <label for="loginDob">Date of birth</label>
+        <input id="loginDob" type="date" />
+        <div class="row">
+          <button type="button" class="btn btn-primary" id="btnDoDob" style="flex:1">Continue</button>
+        </div>
+      </div>
+      <div class="err" id="loginErr"></div>
+    </div>
+  </div>
+
+  <div id="corner">Akello<small>Learning platform</small></div>
+  <div id="hint">Drag to look around · Click a labelled subject world to play</div>
+
+  <div id="welcome">
+    <div class="card">
+      <h2>Welcome to Akello</h2>
+      <p class="lead">The bright sun is the <strong>Akello platform</strong>. Around it, subject worlds orbit — open one for its Galaxy challenge and all classic quizzes for that subject.</p>
+      <button class="btn btn-primary" id="btnExplore" type="button">Start exploring</button>
+    </div>
+  </div>
+
+  <aside id="infoPanel" aria-live="polite">
+    <div class="preview" id="infoPreview" aria-hidden="true"></div>
+    <span class="subject-tag" id="infoSubject">Subject</span>
+    <h2 id="infoName">—</h2>
+    <p class="fact" id="infoFact">—</p>
+    <div class="classic-wrap" id="classicWrap">
+      <div class="classic-label">Classic quizzes</div>
+      <div id="hubStats" aria-live="polite"></div>
+      <input id="classicSearch" type="search" placeholder="Search quizzes…" autocomplete="off" hidden />
+      <ul class="classic-list" id="classicList"></ul>
+      <div class="classic-empty" id="classicEmpty" hidden>Log in to see quizzes for your age in this subject.</div>
+    </div>
+    <div class="actions">
+      <a class="btn btn-play" id="btnPlay" href="#">Play Galaxy Challenge</a>
+      <button class="btn btn-ghost" id="btnClose" type="button">Close</button>
+    </div>
+  </aside>
+
+  <div id="mobileSubjects" aria-label="Subject worlds">
+    <h3>Subject worlds</h3>
+    <div class="grid" id="mobileSubjectGrid"></div>
+  </div>
+
+  <script>
+    window.GALAXY_WORLDS = {{ worlds|tojson }};
+  </script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
+
+const PREVIEWS = {
+  climb: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><rect width="96" height="96" fill="#b8e4ff"/><path d="M8 88 L48 18 L88 88 Z" fill="#3d7a4a"/><path d="M34 34 L48 18 L62 34 L54 34 L48 26 L42 34 Z" fill="#f4f8fc"/><circle cx="36" cy="62" r="5" fill="#2b6cb0"/><circle cx="60" cy="54" r="5" fill="#c53030"/><g transform="translate(28 48)"><circle cx="8" cy="6" r="5" fill="#e8b896"/><rect x="4" y="11" width="8" height="9" rx="2" fill="#2b6cb0"/><rect x="5" y="20" width="6" height="6" fill="#3d5a40"/></g></svg>`,
+  rocket: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><rect width="96" height="96" fill="#1a2a55"/><circle cx="72" cy="22" r="10" fill="#ffe566"/><circle cx="20" cy="70" r="14" fill="#3d9a5f"/><g transform="translate(40 28) rotate(35)"><path d="M10 0 L18 28 L10 24 L2 28 Z" fill="#f2f5fa"/><path d="M10 0 L14 8 L6 8 Z" fill="#e85d5d"/><rect x="6" y="28" width="8" height="6" fill="#f6a623"/><circle cx="10" cy="14" r="3" fill="#6eb6ff"/></g></svg>`,
+  race: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><rect width="96" height="96" fill="#8ec8f0"/><rect y="50" width="96" height="46" fill="#6bb85a"/><path d="M0 58 H96 V88 H0 Z" fill="#e07a3a"/><path stroke="#fff" stroke-width="2" d="M0 68 H96 M0 78 H96"/><ellipse cx="34" cy="64" rx="12" ry="8" fill="#4e9a45"/><circle cx="28" cy="58" r="5" fill="#4e9a45"/><ellipse cx="62" cy="70" rx="9" ry="7" fill="#d4a574"/><circle cx="68" cy="64" r="5" fill="#f5e6d3"/></svg>`,
+  balloon: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><rect width="96" height="96" fill="#9fd4f5"/><rect y="70" width="96" height="26" fill="#5eaa4a"/><circle cx="58" cy="28" r="10" fill="#e85d5d"/><circle cx="74" cy="36" r="9" fill="#3d9a5f"/><circle cx="66" cy="44" r="8" fill="#3b82c4"/><ellipse cx="30" cy="58" rx="12" ry="10" fill="#a67c52"/><circle cx="30" cy="44" r="11" fill="#c4956a"/><circle cx="26" cy="42" r="2" fill="#2a2a2a"/><circle cx="34" cy="42" r="2" fill="#2a2a2a"/></svg>`,
+  snowman: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><rect width="96" height="96" fill="#d8eefc"/><circle cx="22" cy="22" r="12" fill="#ffd24a"/><circle cx="50" cy="68" r="16" fill="#eef6ff"/><circle cx="50" cy="48" r="12" fill="#eef6ff"/><circle cx="50" cy="32" r="9" fill="#eef6ff"/><rect x="42" y="18" width="16" height="8" fill="#2a2a2a"/><path d="M50 36 L60 38 L50 40 Z" fill="#f6a623"/></svg>`,
+  tug: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><rect width="96" height="96" fill="#8ec8f0"/><rect y="58" width="96" height="38" fill="#6bb85a"/><g transform="translate(14 40)"><circle cx="10" cy="8" r="7" fill="#e8b896"/><path d="M3 2 Q10 -2 17 2" fill="#2c5282"/><rect x="4" y="15" width="12" height="14" rx="3" fill="#2b6cb0"/><rect x="5" y="29" width="4" height="10" fill="#2d3748"/><rect x="11" y="29" width="4" height="10" fill="#2d3748"/></g><g transform="translate(58 40)"><circle cx="10" cy="8" r="7" fill="#e8b896"/><path d="M3 2 Q10 -2 17 2" fill="#742a2a"/><rect x="4" y="15" width="12" height="14" rx="3" fill="#c53030"/><rect x="5" y="29" width="4" height="10" fill="#2d3748"/><rect x="11" y="29" width="4" height="10" fill="#2d3748"/></g><line x1="28" y1="52" x2="68" y2="52" stroke="#c4a574" stroke-width="3"/></svg>`,
+  hub: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><rect width="96" height="96" fill="#1a2744"/><circle cx="48" cy="48" r="28" fill="#f5c542"/><circle cx="48" cy="48" r="18" fill="#ffe9a8"/><rect x="40" y="30" width="16" height="36" rx="4" fill="#1a2744"/><rect x="30" y="40" width="36" height="16" rx="4" fill="#1a2744"/></svg>`,
+  retrowave: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="rwSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a0038"/><stop offset="55%" stop-color="#7b2fff"/><stop offset="100%" stop-color="#ff2ecd"/></linearGradient></defs><rect width="96" height="96" fill="url(#rwSky)"/><circle cx="48" cy="36" r="14" fill="#ff6b9d"/><circle cx="48" cy="36" r="10" fill="#ff2ecd"/><path d="M8 58 L48 48 L88 58 L88 96 L8 96 Z" fill="#0a0015"/><path stroke="#5cfff7" stroke-width="1.5" d="M48 48 V96 M20 62 L48 96 M76 62 L48 96 M12 78 H84"/><rect x="42" y="68" width="12" height="8" rx="2" fill="#ff2ecd"/><rect x="44" y="64" width="8" height="5" rx="1" fill="#5cfff7"/></svg>`,
+  target: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><rect width="96" height="96" fill="#1a2744"/><circle cx="28" cy="58" r="14" fill="#4a3728"/><circle cx="28" cy="48" r="10" fill="#e85d5d"/><circle cx="68" cy="40" r="14" fill="#4a3728"/><circle cx="68" cy="30" r="10" fill="#3182ce"/><circle cx="48" cy="72" r="12" fill="#4a3728"/><circle cx="48" cy="64" r="8" fill="#38a169"/></svg>`,
+  atlas: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><rect width="96" height="96" fill="#9fd4f5"/><ellipse cx="48" cy="50" rx="36" ry="28" fill="#7eb8e0"/><path d="M20 40 L40 28 L48 48 L28 55 Z" fill="#d4e8c8" stroke="#2b6cb0"/><path d="M50 30 L72 32 L70 52 L48 48 Z" fill="#f6ad55" stroke="#2b6cb0"/><path d="M28 58 L48 52 L52 72 L30 74 Z" fill="#d4e8c8" stroke="#2b6cb0"/></svg>`,
+  memory: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><rect width="96" height="96" fill="#12082a"/><rect x="14" y="28" width="28" height="40" rx="6" fill="#7c3aed"/><rect x="54" y="28" width="28" height="40" rx="6" fill="#fff"/><text x="68" y="54" text-anchor="middle" font-size="18" fill="#7c3aed">?</text><rect x="18" y="32" width="20" height="32" rx="4" fill="#4c1d95"/></svg>`,
+  rhythm: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><rect width="96" height="96" fill="#0f172a"/><rect x="12" y="10" width="16" height="76" rx="4" fill="#1e293b" stroke="#38bdf8"/><rect x="36" y="10" width="16" height="76" rx="4" fill="#1e293b" stroke="#38bdf8"/><rect x="60" y="10" width="16" height="76" rx="4" fill="#1e293b" stroke="#38bdf8"/><rect x="12" y="58" width="16" height="12" rx="3" fill="#fbbf24"/><rect x="36" y="34" width="16" height="12" rx="3" fill="#fbbf24"/><rect x="12" y="72" width="16" height="10" rx="2" fill="#38bdf855" stroke="#38bdf8"/></svg>`,
+};
+
+const GAMES = {};
+(window.GALAXY_WORLDS || []).forEach((w) => {
+  const id = w.id || w.planet;
+  GAMES[id] = {
+    subject: w.subject,
+    catalogSubject: w.subject,
+    name: w.name,
+    fact: w.fact,
+    href: w.play_path || ('/play-galaxy/' + w.shell + '?subject=' + encodeURIComponent(w.subject || '')),
+    shell: w.shell,
+    previewKey: w.preview_key || 'climb',
+    color: w.color,
+    accent: w.accent,
+    size: w.size,
+    dist: w.dist,
+    speed: w.speed,
+    rings: !!w.rings,
+    kind: w.kind || 'subject',
+    menu: w.menu || null,
+  };
+});
+
+const loadBar = document.getElementById("loadBar");
+const loadStatus = document.getElementById("loadStatus");
+const loader = document.getElementById("loader");
+const titles = document.getElementById("titles");
+const titleMain = document.getElementById("titleMain");
+const titleSub = document.getElementById("titleSub");
+const welcome = document.getElementById("welcome");
+const hint = document.getElementById("hint");
+const infoPanel = document.getElementById("infoPanel");
+const infoPreview = document.getElementById("infoPreview");
+const infoSubject = document.getElementById("infoSubject");
+const infoName = document.getElementById("infoName");
+const infoFact = document.getElementById("infoFact");
+const btnPlay = document.getElementById("btnPlay");
+const btnClose = document.getElementById("btnClose");
+const btnExplore = document.getElementById("btnExplore");
+const classicList = document.getElementById("classicList");
+const classicEmpty = document.getElementById("classicEmpty");
+let classicLoadToken = 0;
+
+function setLoad(pct, msg) {
+  loadBar.style.width = pct + "%";
+  if (msg) loadStatus.textContent = msg;
+}
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0b1a3a, 0.0075);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 400);
+camera.position.set(0, 32, 78);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x0b1a3a);
+document.body.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(window.innerWidth, window.innerHeight);
+labelRenderer.domElement.style.position = "fixed";
+labelRenderer.domElement.style.inset = "0";
+labelRenderer.domElement.style.pointerEvents = "none";
+labelRenderer.domElement.style.zIndex = "12";
+document.body.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 18;
+controls.maxDistance = 160;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.target.set(0, 0, 0);
+
+scene.add(new THREE.AmbientLight(0xa0b8e0, 0.55));
+const sunLight = new THREE.PointLight(0xffe0a0, 2.2, 220);
+scene.add(sunLight);
+const rim = new THREE.DirectionalLight(0x88aaff, 0.35);
+rim.position.set(-20, 30, -10);
+scene.add(rim);
+
+{
+  const count = 1400;
+  const pos = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const r = 80 + Math.random() * 180;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    pos[i * 3 + 2] = r * Math.cos(phi);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+    color: 0xffffff, size: 0.55, sizeAttenuation: true, transparent: true, opacity: 0.85,
+  })));
+}
+
+setLoad(25, "Lighting Akello…");
+
+function makeLabel(subject, game, isAkello) {
+  const wrap = document.createElement("div");
+  wrap.className = "label-3d" + (isAkello ? " akello" : "");
+  wrap.innerHTML = `<div class="chip"><span class="subject">${subject}</span><span class="game">${game}</span></div>`;
+  return new CSS2DObject(wrap);
+}
+
+/* Akello = central platform (sun) */
+const sunGroup = new THREE.Group();
+sunGroup.userData.id = "akello";
+const sunCore = new THREE.Mesh(
+  new THREE.SphereGeometry(5.8, 48, 48),
+  new THREE.MeshBasicMaterial({ color: 0xffc94a })
+);
+sunGroup.add(sunCore);
+const sunGlow = new THREE.Mesh(
+  new THREE.SphereGeometry(8.2, 28, 28),
+  new THREE.MeshBasicMaterial({ color: 0xff9944, transparent: true, opacity: 0.22, depthWrite: false })
+);
+sunGroup.add(sunGlow);
+/* Soft brand band */
+const band = new THREE.Mesh(
+  new THREE.TorusGeometry(5.95, 0.22, 12, 64),
+  new THREE.MeshBasicMaterial({ color: 0xffe08a })
+);
+band.rotation.x = Math.PI / 2.4;
+sunGroup.add(band);
+const akelloLabel = makeLabel("AKELLO", "Learning Platform", true);
+akelloLabel.position.set(0, 8.2, 0);
+sunGroup.add(akelloLabel);
+scene.add(sunGroup);
+
+setLoad(45, "Orbiting subject worlds…");
+
+const worldList = [];
+const labelEls = {};
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let selected = null;
+
+function planetTexture(base, accent) {
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 128;
+  const ctx = c.getContext("2d");
+  const g = ctx.createLinearGradient(0, 0, 256, 128);
+  g.addColorStop(0, "#" + new THREE.Color(base).getHexString());
+  g.addColorStop(1, "#" + new THREE.Color(accent).getHexString());
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 256, 128);
+  for (let i = 0; i < 40; i++) {
+    ctx.fillStyle = `rgba(255,255,255,${0.05 + Math.random() * 0.12})`;
+    ctx.beginPath();
+    ctx.arc(Math.random() * 256, Math.random() * 128, 2 + Math.random() * 10, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeWorld(id, def) {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({
+    map: planetTexture(def.color, def.accent),
+    roughness: 0.55,
+    metalness: 0.08,
+    emissive: new THREE.Color(def.color).multiplyScalar(0.12),
+  });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(def.size, 40, 40), mat);
+  group.add(mesh);
+
+  group.add(new THREE.Mesh(
+    new THREE.SphereGeometry(def.size * 1.12, 24, 24),
+    new THREE.MeshBasicMaterial({
+      color: def.accent, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.BackSide,
+    })
+  ));
+
+  if (def.rings) {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(def.size * 1.35, def.size * 2.1, 48),
+      new THREE.MeshStandardMaterial({
+        color: 0xffd080, side: THREE.DoubleSide, transparent: true, opacity: 0.7, roughness: 0.8,
+      })
+    );
+    ring.rotation.x = Math.PI / 2.2;
+    group.add(ring);
+  }
+
+  // Progress ring (updated after learner-summary loads)
+  const progressRing = new THREE.Mesh(
+    new THREE.RingGeometry(def.size * 1.18, def.size * 1.28, 48),
+    new THREE.MeshBasicMaterial({
+      color: 0x94a3b8, side: THREE.DoubleSide, transparent: true, opacity: 0.35, depthWrite: false,
+    })
+  );
+  progressRing.rotation.x = Math.PI / 2.05;
+  progressRing.userData.isProgress = true;
+  group.add(progressRing);
+
+  const orbit = new THREE.Mesh(
+    new THREE.RingGeometry(def.dist - 0.08, def.dist + 0.08, 96),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false,
+    })
+  );
+  orbit.rotation.x = Math.PI / 2;
+  scene.add(orbit);
+
+  const label = makeLabel(def.subject, def.name, false);
+  label.position.set(0, def.size + 1.6, 0);
+  group.add(label);
+  labelEls[id] = label.element;
+
+  group.userData = {
+    id, def, mesh, progressRing,
+    angle: (Object.keys(GAMES).indexOf(id) / Object.keys(GAMES).length) * Math.PI * 2,
+    dist: def.dist,
+    speed: def.speed,
+    spin: 0.55 + Math.random() * 0.7,
+    level: 1,
+  };
+  scene.add(group);
+  worldList.push(group);
+}
+
+
+(function mergeWorlds() {
+  const worlds = window.GALAXY_WORLDS || [];
+  worlds.forEach((w) => {
+    const g = GAMES[w.id];
+    if (!g) return;
+    g.href = w.play_path || ('/play-galaxy/' + w.shell);
+    g.shell = w.shell;
+    g.catalogSubject = (w.catalog_subjects && w.catalog_subjects[0]) || w.subject;
+    g.subject = w.subject;
+    g.name = w.name;
+    g.fact = w.fact;
+  });
+})();
+
+Object.entries(GAMES).forEach(([id, def]) => makeWorld(id, def));
+setLoad(75, "Calibrating cameras…");
+
+let learnerSummary = null;
+const classicSearch = document.getElementById("classicSearch");
+const hubStats = document.getElementById("hubStats");
+const mobileSubjectGrid = document.getElementById("mobileSubjectGrid");
+
+function buildMobileGrid() {
+  if (!mobileSubjectGrid) return;
+  mobileSubjectGrid.innerHTML = Object.entries(GAMES).map(([id, g]) => {
+    const lvl = (learnerSummary && (learnerSummary.subjects || []).find((s) =>
+      s.subject === g.catalogSubject || s.subject === g.subject
+    ) || {}).level || 1;
+    return `<button type="button" data-world="${id}"><span>${g.subject}</span><small>${g.kind === "hub" ? "Menu" : (g.kind === "challenge" ? ("Challenge · " + g.name) : ("Lv " + lvl + " · " + g.name))}</small></button>`;
+  }).join("");
+  mobileSubjectGrid.querySelectorAll("button[data-world]").forEach((btn) => {
+    btn.addEventListener("click", () => showPanel(btn.getAttribute("data-world")));
+  });
+}
+buildMobileGrid();
+
+function applyProgressRings() {
+  const bySubject = {};
+  (learnerSummary && learnerSummary.subjects || []).forEach((s) => { bySubject[s.subject] = s; });
+  worldList.forEach((w) => {
+    const g = GAMES[w.userData.id];
+    if (!g || g.kind === "hub") {
+      if (w.userData.progressRing) w.userData.progressRing.material.color.setHex(0xf5c542);
+      return;
+    }
+    const row = bySubject[g.catalogSubject || g.subject];
+    const level = (row && row.level) || 1;
+    w.userData.level = level;
+    const ring = w.userData.progressRing;
+    if (!ring) return;
+    // Green-ish as level rises
+    const t = Math.min(1, (level - 1) / 8);
+    const color = new THREE.Color().setHSL(0.33 * t + 0.08, 0.75, 0.45 + t * 0.1);
+    ring.material.color.copy(color);
+    ring.material.opacity = 0.35 + t * 0.45;
+  });
+  buildMobileGrid();
+}
+
+async function loadLearnerSummary() {
+  const uid = sessionStorage.getItem("gameUserId");
+  if (!uid) return;
+  try {
+    const r = await fetch("/api/galaxy/learner-summary?user_id=" + encodeURIComponent(uid));
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "summary failed");
+    learnerSummary = data;
+    applyProgressRings();
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+function renderHubStats() {
+  if (!hubStats) return;
+  if (!learnerSummary) {
+    hubStats.classList.remove("show");
+    hubStats.innerHTML = "";
+    return;
+  }
+  const xp = learnerSummary.xp || {};
+  const st = learnerSummary.stats || {};
+  hubStats.classList.add("show");
+  hubStats.innerHTML = `
+    <div class="stat"><b>Lv ${xp.level || 1}</b><span>${xp.into_level || 0} / ${xp.to_next || 1000} XP</span></div>
+    <div class="stat"><b>${st.streak_days || 0}d</b><span>Play streak</span></div>
+    <div class="stat"><b>${st.total_games || 0}</b><span>Quizzes played</span></div>
+    <div class="stat"><b>${st.best_score || 0}</b><span>Best score</span></div>
+  `;
+}
+
+function filterClassicList(q) {
+  const query = (q || "").trim().toLowerCase();
+  if (!classicList) return;
+  classicList.querySelectorAll("li").forEach((li) => {
+    const text = (li.textContent || "").toLowerCase();
+    li.style.display = !query || text.includes(query) ? "" : "none";
+  });
+}
+if (classicSearch) {
+  classicSearch.addEventListener("input", () => filterClassicList(classicSearch.value));
+}
+
+function openMissionControl() {
+  if (GAMES.mission_control) showPanel("mission_control");
+}
+
+function goClassic(path) {
+  window.location.href = path;
+}
+
+async function loadClassicGames(subject) {
+  const token = ++classicLoadToken;
+  if (!classicList || !classicEmpty) return;
+  classicList.innerHTML = "";
+  classicEmpty.hidden = false;
+  classicEmpty.textContent = "Loading classic quizzes…";
+  const uid = sessionStorage.getItem("gameUserId");
+  if (!uid) {
+    classicEmpty.textContent = "Log in to see quizzes for your age in this subject.";
+    return;
+  }
+  try {
+    const url = "/api/galaxy/classic-games?subject=" + encodeURIComponent(subject) + "&user_id=" + encodeURIComponent(uid);
+    const r = await fetch(url);
+    const data = await r.json();
+    if (token !== classicLoadToken) return;
+    if (!r.ok) throw new Error(data.error || "Could not load quizzes");
+    const games = data.games || [];
+    if (!games.length) {
+      classicEmpty.textContent = "No classic quizzes for your age in this subject yet.";
+      return;
+    }
+    classicEmpty.hidden = true;
+    classicList.innerHTML = games.map((g) => {
+      const meta = [g.age_range, g.grade != null ? ("Grade " + g.grade) : null].filter(Boolean).join(" · ");
+      const path = g.play_path || ("/play-game/" + g.id);
+      return `<li><a href="${path}" data-classic-path="${path}"><span>${g.title}</span>${meta ? `<span class="meta">${meta}</span>` : ""}</a></li>`;
+    }).join("");
+    classicList.querySelectorAll("a[data-classic-path]").forEach((a) => {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        const path = a.getAttribute("data-classic-path");
+        if (!isLoggedIn()) {
+          openLoginModal(null, subject);
+          pendingPlay.classicPath = path;
+          return;
+        }
+        goClassic(path);
+      });
+    });
+  } catch (ex) {
+    if (token !== classicLoadToken) return;
+    classicEmpty.hidden = false;
+    classicEmpty.textContent = ex.message || "Could not load quizzes.";
+  }
+}
+
+function showPanel(id) {
+  const g = GAMES[id];
+  if (!g) return;
+  selected = id;
+  const previewKey = g.previewKey || id;
+  infoPreview.innerHTML = PREVIEWS[previewKey] || PREVIEWS.climb || "";
+  const isHub = g.kind === "hub";
+  infoSubject.textContent = isHub
+    ? "Mission Control · Learner Menu"
+    : (g.kind === "challenge" ? (g.subject + " · Challenge Planet") : (g.subject + " · Subject World"));
+  infoName.textContent = g.name;
+  infoFact.textContent = g.fact;
+  btnPlay.href = g.href || "#";
+  btnPlay.textContent = isHub ? "Open Learner Hub" : "Play Galaxy Challenge";
+
+  const classicWrap = document.getElementById("classicWrap");
+  const classicLabel = classicWrap ? classicWrap.querySelector(".classic-label") : null;
+  if (isHub) {
+    if (classicLabel) classicLabel.textContent = "Navigation";
+    if (classicSearch) classicSearch.hidden = true;
+    renderHubStats();
+    if (classicList) {
+      classicList.innerHTML = (g.menu || []).map((m) =>
+        `<li><a href="${m.href}"><span>${m.label}</span></a></li>`
+      ).join("");
+    }
+    if (classicEmpty) classicEmpty.hidden = true;
+    btnPlay.onclick = (e) => {
+      e.preventDefault();
+      if (!isLoggedIn()) {
+        openLoginModal(null, null);
+        pendingPlay.classicPath = "/game-dashboard#home";
+        return;
+      }
+      window.location.href = g.href || "/game-dashboard";
+    };
+  } else {
+    if (classicLabel) classicLabel.textContent = "Classic quizzes";
+    if (hubStats) { hubStats.classList.remove("show"); hubStats.innerHTML = ""; }
+    if (classicSearch) {
+      classicSearch.hidden = false;
+      classicSearch.value = "";
+    }
+    const shell = g.shell || ((g.href || "").split("/play-galaxy/")[1] || "").split("?")[0] || id;
+    btnPlay.onclick = (e) => {
+      e.preventDefault();
+      if (typeof isLoggedIn === "function" && !isLoggedIn()) {
+        openLoginModal(shell, g.catalogSubject || g.subject);
+        return;
+      }
+      if (typeof goPlay === "function") goPlay(shell, g.catalogSubject || "");
+      else window.location.href = g.href;
+    };
+    loadClassicGames(g.catalogSubject || g.subject);
+  }
+  infoPanel.classList.add("open");
+  Object.entries(labelEls).forEach(([key, el]) => {
+    el.classList.toggle("selected", key === id);
+  });
+  worldList.forEach((w) => {
+    w.userData.mesh.material.emissiveIntensity = w.userData.id === id ? 0.55 : 0.2;
+  });
+}
+
+function closePanel() {
+  infoPanel.classList.remove("open");
+  selected = null;
+  Object.values(labelEls).forEach((el) => el.classList.remove("selected"));
+  worldList.forEach((w) => { w.userData.mesh.material.emissiveIntensity = 0.2; });
+}
+
+btnClose.addEventListener("click", closePanel);
+
+function onPointer(clientX, clientY) {
+  pointer.x = (clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(worldList.map((w) => w.userData.mesh));
+  if (hits.length) showPanel(hits[0].object.parent.userData.id);
+}
+
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  const sx = e.clientX, sy = e.clientY;
+  const up = (ev) => {
+    if (Math.abs(ev.clientX - sx) < 6 && Math.abs(ev.clientY - sy) < 6) {
+      onPointer(ev.clientX, ev.clientY);
+    }
+    window.removeEventListener("pointerup", up);
+  };
+  window.addEventListener("pointerup", up);
+});
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  labelRenderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function animateTitle() {
+  return new Promise((resolve) => {
+    titleMain.style.transition = "opacity 0.7s, transform 0.7s";
+    titleSub.style.transition = "opacity 0.7s 0.2s, transform 0.7s 0.2s";
+    requestAnimationFrame(() => {
+      titleMain.style.opacity = "1";
+      titleMain.style.transform = "translateY(0)";
+      titleSub.style.opacity = "1";
+      titleSub.style.transform = "translateY(0)";
+    });
+    setTimeout(() => {
+      titles.classList.add("gone");
+      setTimeout(resolve, 500);
+    }, 2200);
+  });
+}
+
+btnExplore.addEventListener("click", () => {
+  welcome.classList.remove("visible");
+  hint.classList.remove("hidden");
+  if (isLoggedIn()) {
+    loadLearnerSummary().then(() => openMissionControl());
+  } else {
+    openMissionControl();
+  }
+});
+
+const clock = new THREE.Clock();
+function tick() {
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  sunGroup.rotation.y += dt * 0.12;
+  sunGlow.scale.setScalar(1 + Math.sin(t * 2) * 0.03);
+
+  worldList.forEach((w) => {
+    const ud = w.userData;
+    ud.angle += ud.speed * dt * 0.35;
+    w.position.x = Math.cos(ud.angle) * ud.dist;
+    w.position.z = Math.sin(ud.angle) * ud.dist;
+    w.position.y = Math.sin(ud.angle * 1.3) * 0.55;
+    ud.mesh.rotation.y += ud.spin * dt * 0.5;
+  });
+
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+
+setLoad(100, "Ready!");
+setTimeout(async () => {
+  loader.classList.add("hidden");
+  await animateTitle();
+  welcome.classList.add("visible");
+  hint.classList.add("hidden");
+}, 400);
+
+tick();
+  
+
+/* --- Akello auth gate --- */
+const pendingPlay = { shell: null, subject: null, classicPath: null };
+function isLoggedIn() { return !!sessionStorage.getItem('gameUserId'); }
+function refreshNav() {
+  const li = document.getElementById('btnNavLogin');
+  const lo = document.getElementById('btnNavLogout');
+  if (!li || !lo) return;
+  if (isLoggedIn()) { li.style.display = 'none'; lo.style.display = 'inline-block'; loadLearnerSummary(); }
+  else { li.style.display = 'inline-block'; lo.style.display = 'none'; }
+}
+function openLoginModal(shell, subject) {
+  pendingPlay.shell = shell || null;
+  pendingPlay.subject = subject || null;
+  if (!shell) pendingPlay.classicPath = pendingPlay.classicPath || null;
+  else pendingPlay.classicPath = null;
+  document.getElementById('loginErr').textContent = '';
+  document.getElementById('credPanel').style.display = 'block';
+  document.getElementById('dobPanel').style.display = 'none';
+  document.getElementById('loginModal').classList.add('open');
+}
+function closeLoginModal() {
+  document.getElementById('loginModal').classList.remove('open');
+}
+function playUrl(shell, subject) {
+  const s = subject ? ('?subject=' + encodeURIComponent(subject)) : '';
+  return '/play-galaxy/' + shell + s;
+}
+function goPlay(shell, subject) {
+  window.location.href = playUrl(shell, subject);
+}
+
+document.getElementById('btnNavLogin')?.addEventListener('click', () => openLoginModal(null, null));
+document.getElementById('btnNavLogout')?.addEventListener('click', () => {
+  sessionStorage.clear();
+  refreshNav();
+});
+document.getElementById('btnCancelLogin')?.addEventListener('click', closeLoginModal);
+document.getElementById('btnDoLogin')?.addEventListener('click', async () => {
+  const err = document.getElementById('loginErr');
+  err.textContent = '';
+  try {
+    const r = await fetch('/api/game-users/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('loginUser').value.trim(),
+        password: document.getElementById('loginPass').value,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Login failed');
+    const u = data.user;
+    sessionStorage.setItem('gameUserId', String(u.id));
+    sessionStorage.setItem('gameUsername', u.username || '');
+    sessionStorage.setItem('gameUserName', ((u.firstname||'') + ' ' + (u.surname||'')).trim());
+    if (u.age != null) sessionStorage.setItem('gameUserAge', String(u.age));
+    if (data.needs_dob || u.needs_dob) {
+      document.getElementById('credPanel').style.display = 'none';
+      document.getElementById('dobPanel').style.display = 'block';
+      return;
+    }
+    closeLoginModal();
+    refreshNav();
+    loadLearnerSummary().then(() => {
+      if (pendingPlay.classicPath) {
+        const p = pendingPlay.classicPath;
+        pendingPlay.classicPath = null;
+        goClassic(p);
+      } else if (pendingPlay.shell) goPlay(pendingPlay.shell, pendingPlay.subject || '');
+      else openMissionControl();
+    });
+  } catch (ex) { err.textContent = ex.message; }
+});
+document.getElementById('btnDoDob')?.addEventListener('click', async () => {
+  const err = document.getElementById('loginErr');
+  err.textContent = '';
+  const uid = sessionStorage.getItem('gameUserId');
+  try {
+    const r = await fetch('/api/game-users/' + uid + '/dob', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dob: document.getElementById('loginDob').value }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not save date of birth');
+    if (data.user && data.user.dob) sessionStorage.setItem('gameUserDob', data.user.dob);
+    closeLoginModal();
+    refreshNav();
+    loadLearnerSummary().then(() => {
+      if (pendingPlay.classicPath) {
+        const p = pendingPlay.classicPath;
+        pendingPlay.classicPath = null;
+        goClassic(p);
+      } else if (pendingPlay.shell) goPlay(pendingPlay.shell, pendingPlay.subject || '');
+      else openMissionControl();
+    });
+  } catch (ex) { err.textContent = ex.message; }
+});
+
+// Deep-link: ?login=1&next=shell
+const qs = new URLSearchParams(location.search);
+if (qs.get('login') === '1') {
+  openLoginModal(qs.get('next') || null, qs.get('subject') || null);
+}
+refreshNav();
+
+</script>
+</body>
+</html>

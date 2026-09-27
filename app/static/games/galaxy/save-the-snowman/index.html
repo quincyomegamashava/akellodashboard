@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Save the Snowman</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --sky-top: #9fd4f5;
+      --sky-bot: #d4ecfb;
+      --snow-ground: #eef7ff;
+      --snow-shadow: #c8dff0;
+      --sun: #ffd54f;
+      --sun-glow: rgba(255, 213, 79, 0.45);
+      --player: #2b6cb0;
+      --player-soft: #ebf4ff;
+      --rival: #c53030;
+      --rival-soft: #fff5f5;
+      --chalk: #fffdf8;
+      --ink: #1a3040;
+      --accent: #5eb8e8;
+      --freezer: #4a90c2;
+      --shadow: rgba(26, 48, 64, 0.16);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      font-family: 'Nunito', sans-serif;
+      color: var(--ink);
+      background: var(--sky-bot);
+      overflow-x: hidden;
+    }
+
+    body { min-height: 100vh; display: flex; flex-direction: column; }
+
+    .sky {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bot) 62%, var(--snow-ground) 62%, #f5fbff 100%);
+    }
+
+    .cloud {
+      position: absolute;
+      background: #fff;
+      border-radius: 50px;
+      opacity: 0.88;
+      animation: drift linear infinite;
+    }
+    .cloud::before, .cloud::after {
+      content: '';
+      position: absolute;
+      background: #fff;
+      border-radius: 50%;
+    }
+    .cloud.c1 { width: 92px; height: 34px; top: 10%; left: -120px; animation-duration: 52s; }
+    .cloud.c1::before { width: 42px; height: 42px; top: -22px; left: 14px; }
+    .cloud.c1::after { width: 52px; height: 52px; top: -28px; left: 38px; }
+    .cloud.c2 { width: 72px; height: 28px; top: 20%; left: -100px; animation-duration: 68s; animation-delay: -22s; }
+    .cloud.c2::before { width: 36px; height: 36px; top: -18px; left: 10px; }
+    .cloud.c2::after { width: 44px; height: 44px; top: -24px; left: 28px; }
+
+    @keyframes drift {
+      from { transform: translateX(0); }
+      to { transform: translateX(calc(100vw + 220px)); }
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      width: min(920px, 100%);
+      margin: 0 auto;
+      padding: 16px 16px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex: 1;
+    }
+
+    .brand { text-align: center; }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 4px;
+      font-weight: 800;
+      font-size: 0.85rem;
+      color: var(--player);
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .brand h1 {
+      font-family: 'Baloo 2', cursive;
+      font-size: clamp(1.7rem, 5vw, 2.45rem);
+      font-weight: 800;
+      line-height: 1.1;
+      color: var(--ink);
+      text-shadow: 2px 3px 0 rgba(255,255,255,0.55);
+    }
+    .brand p { font-weight: 700; color: #3d6078; font-size: 0.95rem; }
+
+    .hud {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+    .score-chip {
+      border-radius: 16px;
+      padding: 10px 14px;
+      text-align: center;
+      box-shadow: 0 6px 16px var(--shadow);
+      border: 3px solid transparent;
+    }
+    .score-chip.player { background: var(--player-soft); border-color: rgba(43,108,176,0.25); }
+    .score-chip.rival { background: var(--rival-soft); border-color: rgba(197,48,48,0.25); }
+    .score-chip .label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      opacity: 0.75;
+    }
+    .score-chip .value {
+      font-family: 'Baloo 2', cursive;
+      font-size: 1.8rem;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+    .score-chip.player .value { color: var(--player); }
+    .score-chip.rival .value { color: var(--rival); }
+    .timer-wrap {
+      background: var(--chalk);
+      border-radius: 18px;
+      padding: 8px 18px;
+      text-align: center;
+      border: 3px solid rgba(26,48,64,0.08);
+      box-shadow: 0 6px 16px var(--shadow);
+    }
+    .timer-wrap .label {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #5a7080;
+    }
+    .timer-wrap .time {
+      font-family: 'Baloo 2', cursive;
+      font-size: 1.7rem;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .timer-wrap.urgent .time { color: var(--rival); animation: pulse 0.6s ease infinite alternate; }
+    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+
+    /* —— Arena —— */
+    .arena {
+      position: relative;
+      height: clamp(260px, 42vw, 340px);
+      border-radius: 22px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(159,212,245,0.35) 0%, transparent 45%),
+        linear-gradient(180deg, var(--snow-ground) 55%, var(--snow-shadow) 100%);
+      border: 3px solid rgba(26,48,64,0.1);
+      box-shadow: 0 12px 28px var(--shadow);
+    }
+
+    .snow-hill {
+      position: absolute;
+      left: -5%;
+      right: -5%;
+      bottom: -8%;
+      height: 42%;
+      background: radial-gradient(ellipse at 50% 0%, #fff 0%, var(--snow-ground) 70%);
+      border-radius: 50% 50% 0 0;
+      box-shadow: inset 0 8px 0 rgba(255,255,255,0.8);
+    }
+
+    .playground-fence {
+      position: absolute;
+      bottom: 18%;
+      left: 6%;
+      right: 6%;
+      height: 28px;
+      display: flex;
+      justify-content: space-between;
+      opacity: 0.35;
+      pointer-events: none;
+    }
+    .playground-fence span {
+      width: 4px;
+      height: 100%;
+      background: #8bb8d4;
+      border-radius: 2px;
+    }
+
+    /* Smiling sun threat */
+    .sun {
+      position: absolute;
+      top: 6%;
+      right: 8%;
+      width: 72px;
+      height: 72px;
+      z-index: 4;
+    }
+    .sun .disc {
+      position: absolute;
+      inset: 12px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #fff3a0, var(--sun));
+      box-shadow: 0 0 0 8px var(--sun-glow), 0 0 28px var(--sun-glow);
+      animation: sunPulse 3s ease-in-out infinite;
+    }
+    .sun .ray {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 4px;
+      height: 14px;
+      margin-left: -2px;
+      margin-top: -7px;
+      background: var(--sun);
+      border-radius: 2px;
+      transform-origin: center 36px;
+    }
+    .sun .face {
+      position: absolute;
+      inset: 22px;
+      z-index: 2;
+    }
+    .sun .eye {
+      position: absolute;
+      top: 14px;
+      width: 6px;
+      height: 8px;
+      background: #5c4a00;
+      border-radius: 50%;
+    }
+    .sun .eye.left { left: 10px; }
+    .sun .eye.right { right: 10px; }
+    .sun .smile {
+      position: absolute;
+      left: 50%;
+      bottom: 10px;
+      width: 22px;
+      height: 12px;
+      margin-left: -11px;
+      border: 3px solid #5c4a00;
+      border-top: none;
+      border-radius: 0 0 16px 16px;
+    }
+    @keyframes sunPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+
+    /* Freezer shelters */
+    .freezer {
+      position: absolute;
+      bottom: 22%;
+      width: 56px;
+      height: 64px;
+      z-index: 3;
+      transition: transform 0.3s ease;
+    }
+    .freezer.player-side { left: 4%; }
+    .freezer.rival-side { right: 4%; }
+    .freezer .box {
+      position: absolute;
+      inset: 8px 0 0;
+      background: linear-gradient(180deg, #e8f4fc, var(--freezer));
+      border-radius: 8px 8px 4px 4px;
+      border: 3px solid #2d6a9a;
+      box-shadow: 0 4px 0 #1e4f72;
+    }
+    .freezer .door {
+      position: absolute;
+      left: 50%;
+      top: 18px;
+      width: 28px;
+      height: 28px;
+      margin-left: -14px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.35);
+      border: 2px solid rgba(255,255,255,0.6);
+    }
+    .freezer .handle {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      width: 4px;
+      height: 10px;
+      margin-top: -5px;
+      background: #fff;
+      border-radius: 2px;
+    }
+    .freezer .label {
+      position: absolute;
+      bottom: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Baloo 2', cursive;
+      font-size: 0.62rem;
+      font-weight: 800;
+      color: #2d6a9a;
+      white-space: nowrap;
+      letter-spacing: 0.04em;
+    }
+    .freezer.glow .box {
+      box-shadow: 0 0 16px rgba(94,184,232,0.7), 0 4px 0 #1e4f72;
+    }
+
+    /* Snowman zone */
+    .snowman-wrap {
+      position: absolute;
+      bottom: 20%;
+      width: 100px;
+      transition: left 0.45s cubic-bezier(0.34, 1.2, 0.64, 1), right 0.45s cubic-bezier(0.34, 1.2, 0.64, 1);
+      z-index: 5;
+    }
+    .snowman-wrap.player-side { left: 28%; transform: translateX(-50%); }
+    .snowman-wrap.rival-side { right: 28%; transform: translateX(50%); }
+
+    .snowman {
+      position: relative;
+      display: flex;
+      flex-direction: column-reverse;
+      align-items: center;
+      transition: transform 0.35s ease, opacity 0.35s ease;
+      filter: drop-shadow(0 4px 8px rgba(26, 48, 64, 0.12));
+    }
+    .snowman.shake { animation: shake 0.4s ease; }
+    .snowman.bounce { animation: bounce 0.45s ease; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px) rotate(-2deg); }
+      75% { transform: translateX(4px) rotate(2deg); }
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-8px); }
+    }
+
+    .ball {
+      position: relative;
+      line-height: 0;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    .ball svg { display: block; overflow: visible; }
+    .ball.b1 { width: 56px; height: 56px; z-index: 1; margin-top: -8px; }
+    .ball.b2 { width: 44px; height: 44px; z-index: 2; margin-top: -10px; }
+    .ball.b3 { width: 34px; height: 34px; z-index: 3; margin-top: -9px; }
+    .ball.b4 { width: 26px; height: 26px; z-index: 4; margin-top: -8px; }
+    .ball.hidden { transform: scale(0); opacity: 0; height: 0; margin: 0; overflow: hidden; pointer-events: none; }
+
+    .snowman-head {
+      position: relative;
+      width: 44px;
+      height: 52px;
+      z-index: 6;
+      margin-top: -8px;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    .snowman-head .head-ball {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      width: 44px;
+      height: 44px;
+      margin-left: -22px;
+    }
+    .snowman-head .head-ball svg { width: 100%; height: 100%; display: block; }
+    .snowman-head.gone { transform: scale(0); opacity: 0; height: 0; margin: 0; overflow: hidden; }
+
+    .top-hat {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      transform: translateX(-50%);
+      width: 48px;
+      height: 28px;
+      z-index: 7;
+      pointer-events: none;
+    }
+    .top-hat svg { width: 100%; height: 100%; display: block; }
+    .snowman-wrap.player-side .top-hat .hat-band { fill: var(--player); }
+    .snowman-wrap.rival-side .top-hat .hat-band { fill: var(--rival); }
+
+    .face-features {
+      position: absolute;
+      left: 50%;
+      bottom: 6px;
+      width: 44px;
+      height: 44px;
+      margin-left: -22px;
+      z-index: 8;
+      pointer-events: none;
+    }
+    .face-features svg { width: 100%; height: 100%; display: block; }
+
+    .stick-arm {
+      position: absolute;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .stick-arm svg { display: block; overflow: visible; }
+    .stick-arm.left {
+      left: -22px;
+      top: 52px;
+      width: 36px;
+      height: 36px;
+      transform: rotate(-8deg);
+    }
+    .stick-arm.right {
+      right: -22px;
+      top: 52px;
+      width: 36px;
+      height: 36px;
+      transform: scaleX(-1) rotate(-8deg);
+    }
+
+    .puddle {
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%) scale(0);
+      width: 78px;
+      height: 18px;
+      opacity: 0;
+      transition: opacity 0.35s, transform 0.35s;
+      z-index: 0;
+      line-height: 0;
+    }
+    .puddle svg { width: 100%; height: 100%; display: block; }
+    .puddle.show {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+      animation: puddlePulse 1.8s ease-in-out infinite;
+    }
+    @keyframes puddlePulse {
+      0%, 100% { transform: translateX(-50%) scale(1); }
+      50% { transform: translateX(-50%) scale(1.08); }
+    }
+
+    .melt-drop {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 6px;
+      height: 10px;
+      margin-left: -3px;
+      background: rgba(94,184,232,0.7);
+      border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 8;
+    }
+    .melt-drop.fall {
+      animation: drip 0.7s ease forwards;
+    }
+    @keyframes drip {
+      0% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(36px); }
+    }
+
+    .fx-bubble {
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Baloo 2', cursive;
+      font-size: 0.95rem;
+      font-weight: 800;
+      opacity: 0;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 10;
+    }
+    .fx-bubble.show { animation: floatFx 0.75s ease-out forwards; }
+    .fx-bubble.good { color: var(--player); }
+    .fx-bubble.bad { color: var(--rival); }
+    .fx-bubble.rival-fx { color: var(--rival); }
+    @keyframes floatFx {
+      0% { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.85); }
+      30% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.1); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-24px) scale(1); }
+    }
+
+    .name-tag {
+      position: absolute;
+      bottom: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Baloo 2', cursive;
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 2px 10px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .snowman-wrap.player-side .name-tag { background: var(--player-soft); color: var(--player); }
+    .snowman-wrap.rival-side .name-tag { background: var(--rival-soft); color: var(--rival); }
+
+    /* —— Quiz —— */
+    .quiz-panel {
+      background: var(--chalk);
+      border-radius: 22px;
+      border: 3px solid rgba(26,48,64,0.1);
+      padding: 18px;
+      box-shadow: 0 12px 32px var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 240px;
+    }
+    .quiz-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+    .streak { font-size: 0.85rem; font-weight: 800; color: #0277bd; }
+    .snowball-count {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: #4a6785;
+    }
+    .question {
+      font-family: 'Baloo 2', cursive;
+      font-size: clamp(1.15rem, 3.5vw, 1.45rem);
+      font-weight: 700;
+      line-height: 1.25;
+      min-height: 2.6em;
+    }
+    .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .answer-btn {
+      font-family: 'Nunito', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      text-align: left;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 3px solid transparent;
+      background: #eef6fb;
+      color: var(--ink);
+      cursor: pointer;
+      transition: transform 0.15s, background 0.15s, border-color 0.15s;
+      box-shadow: 0 3px 0 rgba(43,108,176,0.15);
+    }
+    .answer-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      background: #dceef9;
+      border-color: rgba(43,108,176,0.35);
+    }
+    .answer-btn:disabled { cursor: default; }
+    .answer-btn.correct { background: #c6f6d5; border-color: #38a169; color: #22543d; }
+    .answer-btn.wrong { background: #fed7d7; border-color: #e53e3e; color: #742a2a; }
+    .feedback { min-height: 1.4em; font-weight: 800; font-size: 0.95rem; text-align: center; }
+    .feedback.good { color: #276749; }
+    .feedback.bad { color: #c53030; }
+
+    /* —— Overlays —— */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background:
+        radial-gradient(ellipse at 80% 18%, rgba(255,213,79,0.28), transparent 45%),
+        linear-gradient(180deg, rgba(159,212,245,0.94), rgba(238,247,255,0.96));
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    .overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    .card {
+      width: min(440px, 100%);
+      background: var(--chalk);
+      border-radius: 24px;
+      padding: 28px 26px;
+      text-align: center;
+      border: 3px solid rgba(26,48,64,0.1);
+      box-shadow: 0 20px 50px rgba(26,48,64,0.22);
+      animation: cardIn 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(24px) scale(0.94); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .card h2 {
+      font-family: 'Baloo 2', cursive;
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 8px;
+    }
+    .card .lead { font-size: 1rem; font-weight: 700; color: #3d6078; margin-bottom: 16px; line-height: 1.4; }
+    .rules {
+      text-align: left;
+      background: #eef6fb;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #2a4365;
+      line-height: 1.45;
+    }
+    .rules li { margin: 6px 0 6px 1.1em; }
+    .result-scores { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 18px; }
+    .result-scores div { border-radius: 14px; padding: 12px; font-weight: 800; }
+    .result-scores .you { background: var(--player-soft); color: var(--player); }
+    .result-scores .them { background: var(--rival-soft); color: var(--rival); }
+    .result-scores span {
+      display: block;
+      font-family: 'Baloo 2', cursive;
+      font-size: 2rem;
+      line-height: 1.1;
+    }
+    .btn-primary {
+      font-family: 'Baloo 2', cursive;
+      font-size: 1.25rem;
+      font-weight: 800;
+      border: none;
+      border-radius: 999px;
+      padding: 14px 32px;
+      background: linear-gradient(180deg, #7ec8f5, var(--accent));
+      color: #0d3d5c;
+      cursor: pointer;
+      box-shadow: 0 5px 0 #3a8fc4, 0 10px 20px rgba(58,143,196,0.35);
+      transition: transform 0.12s, box-shadow 0.12s;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 7px 0 #3a8fc4, 0 14px 24px rgba(58,143,196,0.4);
+    }
+    .btn-primary:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #3a8fc4, 0 4px 10px rgba(58,143,196,0.3);
+    }
+    .muted { margin-top: 12px; font-size: 0.8rem; font-weight: 700; color: #5a7080; }
+
+    @media (max-width: 560px) {
+      .answers { grid-template-columns: 1fr; }
+      .score-chip .value { font-size: 1.45rem; }
+      .timer-wrap .time { font-size: 1.5rem; }
+      .sun { width: 58px; height: 58px; top: 4%; right: 4%; }
+      .snowman-wrap { width: 82px; }
+      .ball.b1 { width: 48px; height: 48px; }
+      .ball.b2 { width: 38px; height: 38px; }
+      .ball.b3 { width: 30px; height: 30px; }
+      .ball.b4 { width: 22px; height: 22px; }
+      .snowman-head { width: 38px; height: 46px; }
+      .snowman-head .head-ball { width: 38px; height: 38px; margin-left: -19px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sky" aria-hidden="true">
+    <div class="cloud c1"></div>
+    <div class="cloud c2"></div>
+  </div>
+
+  <div class="app">
+    <header class="brand">
+      <a class="back-link" href="/quiz-galaxy">← Quiz Galaxy</a>
+      <h1>Save the Snowman</h1>
+      <p>Answer right. Stay frozen. Beat the sun.</p>
+    </header>
+
+    <div class="hud" id="hud" hidden>
+      <div class="score-chip player">
+        <span class="label">Your correct</span>
+        <span class="value" id="player-score">0</span>
+      </div>
+      <div class="timer-wrap" id="timer-wrap">
+        <span class="label">Time</span>
+        <span class="time" id="timer">1:00</span>
+      </div>
+      <div class="score-chip rival">
+        <span class="label">Rival correct</span>
+        <span class="value" id="rival-score">0</span>
+      </div>
+    </div>
+
+    <div class="arena" id="arena" aria-hidden="true">
+      <div class="sun" aria-hidden="true">
+        <div class="ray" style="transform: rotate(0deg)"></div>
+        <div class="ray" style="transform: rotate(45deg)"></div>
+        <div class="ray" style="transform: rotate(90deg)"></div>
+        <div class="ray" style="transform: rotate(135deg)"></div>
+        <div class="ray" style="transform: rotate(180deg)"></div>
+        <div class="ray" style="transform: rotate(225deg)"></div>
+        <div class="ray" style="transform: rotate(270deg)"></div>
+        <div class="ray" style="transform: rotate(315deg)"></div>
+        <div class="disc"></div>
+        <div class="face">
+          <div class="eye left"></div>
+          <div class="eye right"></div>
+          <div class="smile"></div>
+        </div>
+      </div>
+
+      <div class="playground-fence" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+
+      <div class="freezer player-side" id="freezer-player" aria-hidden="true">
+        <div class="box"><div class="door"><div class="handle"></div></div></div>
+        <span class="label">FREEZER</span>
+      </div>
+      <div class="freezer rival-side" id="freezer-rival" aria-hidden="true">
+        <div class="box"><div class="door"><div class="handle"></div></div></div>
+        <span class="label">FREEZER</span>
+      </div>
+
+      <div class="snow-hill"></div>
+
+      <div class="snowman-wrap player-side" id="wrap-player" style="left: 28%">
+        <div class="fx-bubble good" id="fx-player">+1 Snow!</div>
+        <div class="snowman" id="snowman-player">
+          <div class="stick-arm left" aria-hidden="true">
+            <svg viewBox="0 0 36 36"><path d="M4 20 Q18 16 32 8" fill="none" stroke="#5c3d1e" stroke-width="3" stroke-linecap="round"/><path d="M30 6 L34 8 L31 12 Z" fill="#5c3d1e"/></svg>
+          </div>
+          <div class="stick-arm right" aria-hidden="true">
+            <svg viewBox="0 0 36 36"><path d="M4 20 Q18 16 32 8" fill="none" stroke="#5c3d1e" stroke-width="3" stroke-linecap="round"/><path d="M30 6 L34 8 L31 12 Z" fill="#5c3d1e"/></svg>
+          </div>
+          <div class="ball b1" data-ball="1">
+            <svg viewBox="0 0 56 56"><defs><radialGradient id="sb-p1" cx="32%" cy="28%" r="68%"><stop offset="0%" stop-color="#fff"/><stop offset="55%" stop-color="#e8f4fc"/><stop offset="100%" stop-color="#b8d4e8"/></radialGradient></defs><circle cx="28" cy="28" r="26" fill="url(#sb-p1)" stroke="#a8c8dc" stroke-width="1"/><circle cx="20" cy="22" r="2.2" fill="#1a1a1a"/><circle cx="28" cy="24" r="2.2" fill="#1a1a1a"/><circle cx="36" cy="26" r="2.2" fill="#1a1a1a"/></svg>
+          </div>
+          <div class="ball b2" data-ball="2">
+            <svg viewBox="0 0 44 44"><defs><radialGradient id="sb-p2" cx="32%" cy="28%" r="68%"><stop offset="0%" stop-color="#fff"/><stop offset="55%" stop-color="#e8f4fc"/><stop offset="100%" stop-color="#b8d4e8"/></radialGradient></defs><circle cx="22" cy="22" r="20" fill="url(#sb-p2)" stroke="#a8c8dc" stroke-width="1"/><circle cx="22" cy="26" r="2" fill="#1a1a1a"/></svg>
+          </div>
+          <div class="ball b3" data-ball="3">
+            <svg viewBox="0 0 34 34"><defs><radialGradient id="sb-p3" cx="32%" cy="28%" r="68%"><stop offset="0%" stop-color="#fff"/><stop offset="55%" stop-color="#e8f4fc"/><stop offset="100%" stop-color="#b8d4e8"/></radialGradient></defs><circle cx="17" cy="17" r="15" fill="url(#sb-p3)" stroke="#a8c8dc" stroke-width="0.8"/></svg>
+          </div>
+          <div class="ball b4 hidden" data-ball="4">
+            <svg viewBox="0 0 26 26"><defs><radialGradient id="sb-p4" cx="32%" cy="28%" r="68%"><stop offset="0%" stop-color="#fff"/><stop offset="55%" stop-color="#e8f4fc"/><stop offset="100%" stop-color="#b8d4e8"/></radialGradient></defs><circle cx="13" cy="13" r="11.5" fill="url(#sb-p4)" stroke="#a8c8dc" stroke-width="0.6"/></svg>
+          </div>
+          <div class="snowman-head">
+            <div class="top-hat" aria-hidden="true">
+              <svg viewBox="0 0 48 28"><rect x="8" y="20" width="32" height="5" rx="2" fill="#1a1a2e"/><rect x="14" y="6" width="20" height="16" rx="1" fill="#1a1a2e"/><rect class="hat-band" x="14" y="14" width="20" height="4" fill="#2b6cb0"/></svg>
+            </div>
+            <div class="ball b3 head-ball" aria-hidden="true">
+              <svg viewBox="0 0 44 44"><defs><radialGradient id="sb-p-head-pl" cx="32%" cy="28%" r="68%"><stop offset="0%" stop-color="#fff"/><stop offset="55%" stop-color="#e8f4fc"/><stop offset="100%" stop-color="#b8d4e8"/></radialGradient></defs><circle cx="22" cy="22" r="20" fill="url(#sb-p-head-pl)" stroke="#a8c8dc" stroke-width="1"/></svg>
+            </div>
+            <div class="face-features" aria-hidden="true">
+              <svg viewBox="0 0 44 44"><circle cx="15" cy="20" r="2.5" fill="#1a1a1a"/><circle cx="29" cy="20" r="2.5" fill="#1a1a1a"/><path d="M28 24 L38 26 L28 28 Z" fill="#e65c00" stroke="#c2410c" stroke-width="0.5"/><circle cx="26" cy="25" r="1" fill="#3d8b40"/><circle cx="16" cy="32" r="1.8" fill="#1a1a1a"/><circle cx="20" cy="33" r="1.8" fill="#1a1a1a"/><circle cx="24" cy="33" r="1.8" fill="#1a1a1a"/><circle cx="28" cy="32" r="1.8" fill="#1a1a1a"/></svg>
+            </div>
+          </div>
+          <div class="melt-drop" id="drop-player"></div>
+        </div>
+        <div class="puddle" id="puddle-player" aria-hidden="true">
+          <svg viewBox="0 0 78 18"><ellipse cx="39" cy="10" rx="36" ry="7" fill="rgba(94,184,232,0.45)"/><ellipse cx="39" cy="9" rx="28" ry="4" fill="rgba(255,255,255,0.35)"/></svg>
+        </div>
+        <span class="name-tag">You</span>
+      </div>
+
+      <div class="snowman-wrap rival-side" id="wrap-rival" style="right: 28%">
+        <div class="fx-bubble rival-fx" id="fx-rival">+1!</div>
+        <div class="snowman" id="snowman-rival">
+          <div class="stick-arm left" aria-hidden="true">
+            <svg viewBox="0 0 36 36"><path d="M4 20 Q18 16 32 8" fill="none" stroke="#5c3d1e" stroke-width="3" stroke-linecap="round"/><path d="M30 6 L34 8 L31 12 Z" fill="#5c3d1e"/></svg>
+          </div>
+          <div class="stick-arm right" aria-hidden="true">
+            <svg viewBox="0 0 36 36"><path d="M4 20 Q18 16 32 8" fill="none" stroke="#5c3d1e" stroke-width="3" stroke-linecap="round"/><path d="M30 6 L34 8 L31 12 Z" fill="#5c3d1e"/></svg>
+          </div>
+          <div class="ball b1" data-ball="1">
+            <svg viewBox="0 0 56 56"><defs><radialGradient id="sb-r1" cx="32%" cy="28%" r="68%"><stop offset="0%" stop-color="#fff"/><stop offset="55%" stop-color="#e8f4fc"/><stop offset="100%" stop-color="#b8d4e8"/></radialGradient></defs><circle cx="28" cy="28" r="26" fill="url(#sb-r1)" stroke="#a8c8dc" stroke-width="1"/><circle cx="20" cy="22" r="2.2" fill="#1a1a1a"/><circle cx="28" cy="24" r="2.2" fill="#1a1a1a"/><circle cx="36" cy="26" r="2.2" fill="#1a1a1a"/></svg>
+          </div>
+          <div class="ball b2" data-ball="2">
+            <svg viewBox="0 0 44 44"><defs><radialGradient id="sb-r2" cx="32%" cy="28%" r="68%"><stop offset="0%" stop-color="#fff"/><stop offset="55%" stop-color="#e8f4fc"/><stop offset="100%" stop-color="#b8d4e8"/></radialGradient></defs><circle cx="22" cy="22" r="20" fill="url(#sb-r2)" stroke="#a8c8dc" stroke-width="1"/><circle cx="22" cy="26" r="2" fill="#1a1a1a"/></svg>
+          </div>
+          <div class="ball b3" data-ball="3">
+            <svg viewBox="0 0 34 34"><defs><radialGradient id="sb-r3" cx="32%" cy="28%" r="68%"><stop offset="0%" stop-color="#fff"/><stop offset="55%" stop-color="#e8f4fc"/><stop offset="100%" stop-color="#b8d4e8"/></radialGradient></defs><circle cx="17" cy="17" r="15" fill="url(#sb-r3)" stroke="#a8c8dc" stroke-width="0.8"/></svg>
+          </div>
+          <div class="ball b4 hidden" data-ball="4">
+            <svg viewBox="0 0 26 26"><defs><radialGradient id="sb-r4" cx="32%" cy="28%" r="68%"><stop offset="0%" stop-color="#fff"/><stop offset="55%" stop-color="#e8f4fc"/><stop offset="100%" stop-color="#b8d4e8"/></radialGradient></defs><circle cx="13" cy="13" r="11.5" fill="url(#sb-r4)" stroke="#a8c8dc" stroke-width="0.6"/></svg>
+          </div>
+          <div class="snowman-head">
+            <div class="top-hat" aria-hidden="true">
+              <svg viewBox="0 0 48 28"><rect x="8" y="20" width="32" height="5" rx="2" fill="#1a1a2e"/><rect x="14" y="6" width="20" height="16" rx="1" fill="#1a1a2e"/><rect class="hat-band" x="14" y="14" width="20" height="4" fill="#c53030"/></svg>
+            </div>
+            <div class="ball b3 head-ball" aria-hidden="true">
+              <svg viewBox="0 0 44 44"><defs><radialGradient id="sb-p-head-rl" cx="32%" cy="28%" r="68%"><stop offset="0%" stop-color="#fff"/><stop offset="55%" stop-color="#e8f4fc"/><stop offset="100%" stop-color="#b8d4e8"/></radialGradient></defs><circle cx="22" cy="22" r="20" fill="url(#sb-p-head-rl)" stroke="#a8c8dc" stroke-width="1"/></svg>
+            </div>
+            <div class="face-features" aria-hidden="true">
+              <svg viewBox="0 0 44 44"><circle cx="15" cy="20" r="2.5" fill="#1a1a1a"/><circle cx="29" cy="20" r="2.5" fill="#1a1a1a"/><path d="M28 24 L38 26 L28 28 Z" fill="#e65c00" stroke="#c2410c" stroke-width="0.5"/><circle cx="26" cy="25" r="1" fill="#3d8b40"/><circle cx="16" cy="32" r="1.8" fill="#1a1a1a"/><circle cx="20" cy="33" r="1.8" fill="#1a1a1a"/><circle cx="24" cy="33" r="1.8" fill="#1a1a1a"/><circle cx="28" cy="32" r="1.8" fill="#1a1a1a"/></svg>
+            </div>
+          </div>
+          <div class="melt-drop" id="drop-rival"></div>
+        </div>
+        <div class="puddle" id="puddle-rival" aria-hidden="true">
+          <svg viewBox="0 0 78 18"><ellipse cx="39" cy="10" rx="36" ry="7" fill="rgba(94,184,232,0.45)"/><ellipse cx="39" cy="9" rx="28" ry="4" fill="rgba(255,255,255,0.35)"/></svg>
+        </div>
+        <span class="name-tag">Rival</span>
+      </div>
+    </div>
+
+    <section class="quiz-panel" id="quiz-panel" hidden>
+      <div class="quiz-meta">
+        <span class="badge" id="q-badge">Question 1</span>
+        <span class="snowball-count" id="snowball-hud">❄️ Snowballs: 3 / 5</span>
+        <span class="streak" id="streak">Streak: 0</span>
+      </div>
+      <h2 class="question" id="question">Loading…</h2>
+      <div class="answers" id="answers"></div>
+      <p class="feedback" id="feedback"></p>
+    </section>
+  </div>
+
+  <div class="overlay" id="start-overlay">
+    <div class="card">
+      <h2>Winter Quiz Rescue!</h2>
+      <p class="lead">Keep your snowman frozen before the smiling sun wins.</p>
+      <ul class="rules">
+        <li>You have <strong>60 seconds</strong>.</li>
+        <li>Correct answers add a snowball (max 5) and move you toward the <strong>freezer</strong>.</li>
+        <li>Wrong answers melt one snowball — watch for puddles!</li>
+        <li>The rival scores on their own — stay ahead on correct answers.</li>
+        <li><strong>Most correct answers when time runs out wins.</strong></li>
+      </ul>
+      <button class="btn-primary" id="start-btn" type="button" disabled>Start Saving!</button>
+      <p class="muted">Brains beat the heat every time.</p>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="end-overlay">
+    <div class="card">
+      <h2 id="end-title">You Win!</h2>
+      <p class="lead" id="end-lead">You answered the most questions correctly.</p>
+      <div class="result-scores">
+        <div class="you">You<span id="end-player">0</span></div>
+        <div class="them">Rival<span id="end-rival">0</span></div>
+      </div>
+      <button class="btn-primary" id="replay-btn" type="button">Play Again</button>
+      <p class="muted" id="end-detail"></p>
+    </div>
+  </div>
+
+  <script>
+    const ROUND_SECONDS = 60;
+    const RIVAL_INTERVAL_MS = 4500;
+    const MAX_SNOWBALLS = 5;
+    const START_SNOWBALLS = 3;
+    const PLAYER_START = 28;
+    const PLAYER_FREEZER = 14;
+    const PLAYER_DANGER = 42;
+    const RIVAL_START = 28;
+    const RIVAL_FREEZER = 14;
+    const RIVAL_DANGER = 42;
+
+    let QUESTIONS = window.GALAXY_QUESTIONS || [];
+    function quizBank() {
+      if (window.GalaxyShell && typeof window.GalaxyShell.quizBank === 'function') {
+        const bank = window.GalaxyShell.quizBank();
+        if (bank && bank.length) return bank;
+      }
+      return window.GALAXY_QUESTIONS || QUESTIONS || [];
+    }
+    function shellQ(raw) {
+      if (!raw) return null;
+      return {
+        q: raw.q || raw.prompt || '',
+        choices: raw.choices || raw.options || [],
+        answer: typeof raw.answer === 'number' ? raw.answer : (raw.correctIndex || 0),
+        explain: raw.explain || '',
+        id: raw.id,
+        source: raw.source || '',
+      };
+    }
+
+    const els = {
+      startOverlay: document.getElementById('start-overlay'),
+      endOverlay: document.getElementById('end-overlay'),
+      startBtn: document.getElementById('start-btn'),
+      replayBtn: document.getElementById('replay-btn'),
+      hud: document.getElementById('hud'),
+      quizPanel: document.getElementById('quiz-panel'),
+      arena: document.getElementById('arena'),
+      playerScore: document.getElementById('player-score'),
+      rivalScore: document.getElementById('rival-score'),
+      timer: document.getElementById('timer'),
+      timerWrap: document.getElementById('timer-wrap'),
+      question: document.getElementById('question'),
+      answers: document.getElementById('answers'),
+      feedback: document.getElementById('feedback'),
+      qBadge: document.getElementById('q-badge'),
+      streak: document.getElementById('streak'),
+      snowballHud: document.getElementById('snowball-hud'),
+      wrapPlayer: document.getElementById('wrap-player'),
+      wrapRival: document.getElementById('wrap-rival'),
+      snowmanPlayer: document.getElementById('snowman-player'),
+      snowmanRival: document.getElementById('snowman-rival'),
+      puddlePlayer: document.getElementById('puddle-player'),
+      puddleRival: document.getElementById('puddle-rival'),
+      dropPlayer: document.getElementById('drop-player'),
+      dropRival: document.getElementById('drop-rival'),
+      fxPlayer: document.getElementById('fx-player'),
+      fxRival: document.getElementById('fx-rival'),
+      freezerPlayer: document.getElementById('freezer-player'),
+      freezerRival: document.getElementById('freezer-rival'),
+      endTitle: document.getElementById('end-title'),
+      endLead: document.getElementById('end-lead'),
+      endPlayer: document.getElementById('end-player'),
+      endRival: document.getElementById('end-rival'),
+      endDetail: document.getElementById('end-detail'),
+    };
+
+    let state = {
+      playing: false,
+      playerCorrect: 0,
+      rivalCorrect: 0,
+      playerSnowballs: START_SNOWBALLS,
+      rivalSnowballs: START_SNOWBALLS,
+      playerPos: PLAYER_START,
+      rivalPos: RIVAL_START,
+      streak: 0,
+      asked: 0,
+      secondsLeft: ROUND_SECONDS,
+      deck: [],
+      current: null,
+      locked: false,
+      timerId: null,
+      rivalId: null,
+    };
+
+    function shuffle(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function formatTime(s) {
+      const m = Math.floor(s / 60);
+      return m + ':' + String(s % 60).padStart(2, '0');
+    }
+
+    function renderSnowballs(snowmanEl, count) {
+      const bodyBalls = [...snowmanEl.querySelectorAll('.ball[data-ball]')];
+      const head = snowmanEl.querySelector('.snowman-head');
+      bodyBalls.forEach((ball) => {
+        const n = parseInt(ball.dataset.ball, 10);
+        ball.classList.toggle('hidden', n >= count);
+      });
+      if (head) head.classList.toggle('gone', count <= 0);
+      snowmanEl.style.opacity = count === 0 ? '0.4' : '1';
+      snowmanEl.style.transform = count === 0 ? 'scale(0.75)' : 'scale(1)';
+    }
+
+    function updatePuddle(puddleEl, count) {
+      puddleEl.classList.toggle('show', count <= 1);
+    }
+
+    function showFx(fxEl, text, good) {
+      fxEl.textContent = text;
+      fxEl.className = 'fx-bubble show ' + (good ? 'good' : 'bad');
+      setTimeout(() => { fxEl.className = 'fx-bubble ' + (good ? 'good' : 'rival-fx'); }, 750);
+    }
+
+    function drip(dropEl) {
+      dropEl.classList.remove('fall');
+      void dropEl.offsetWidth;
+      dropEl.classList.add('fall');
+    }
+
+    function animateSnowman(snowmanEl, type) {
+      snowmanEl.classList.remove('shake', 'bounce');
+      void snowmanEl.offsetWidth;
+      snowmanEl.classList.add(type);
+      setTimeout(() => snowmanEl.classList.remove(type), 450);
+    }
+
+    function updatePositions() {
+      els.wrapPlayer.style.left = state.playerPos + '%';
+      els.wrapRival.style.right = state.rivalPos + '%';
+      const playerNear = state.playerPos <= PLAYER_FREEZER + 4;
+      const rivalNear = state.rivalPos <= RIVAL_FREEZER + 4;
+      els.freezerPlayer.classList.toggle('glow', playerNear);
+      els.freezerRival.classList.toggle('glow', rivalNear);
+    }
+
+    function updateBoard() {
+      els.playerScore.textContent = state.playerCorrect;
+      els.rivalScore.textContent = state.rivalCorrect;
+      els.streak.textContent = 'Streak: ' + state.streak;
+      els.snowballHud.textContent = '❄️ Snowballs: ' + state.playerSnowballs + ' / ' + MAX_SNOWBALLS;
+      renderSnowballs(els.snowmanPlayer, state.playerSnowballs);
+      renderSnowballs(els.snowmanRival, state.rivalSnowballs);
+      updatePuddle(els.puddlePlayer, state.playerSnowballs);
+      updatePuddle(els.puddleRival, state.rivalSnowballs);
+      updatePositions();
+    }
+
+    function nudgeTowardFreezer(isPlayer, correct) {
+      if (isPlayer) {
+        if (correct) {
+          state.playerPos = Math.max(PLAYER_FREEZER, state.playerPos - 3);
+        } else {
+          state.playerPos = Math.min(PLAYER_DANGER, state.playerPos + 4);
+        }
+      } else {
+        if (correct) {
+          state.rivalPos = Math.max(RIVAL_FREEZER, state.rivalPos - 3);
+        }
+      }
+    }
+
+    
+    function dealNextRaw(playState) {
+      if (window.GalaxyShell && typeof window.GalaxyShell.takeNextQuestion === 'function') {
+        return window.GalaxyShell.takeNextQuestion(playState);
+      }
+      if (!playState.deck || !playState.deck.length) {
+        const bank = (typeof quizBank === 'function' ? quizBank() : (window.GALAXY_QUESTIONS || [])).slice();
+        for (let i = bank.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const t = bank[i]; bank[i] = bank[j]; bank[j] = t;
+        }
+        playState.deck = bank;
+      }
+      return playState.deck.pop() || null;
+    }
+
+    function nextQuestion() {
+      if (!state.playing) return;
+      state.current = shellQ(dealNextRaw(state));
+      if (!state.current || !state.current.choices || !state.current.choices.length) {
+        if (els && els.question) els.question.textContent = 'You cleared this question set — great work!';
+        if (els && els.feedback) { els.feedback.textContent = 'No repeats left in this round'; els.feedback.className = 'feedback good'; }
+        state.endedByQuestions = true;
+        state.locked = true;
+        if (state.timerId) { clearInterval(state.timerId); state.timerId = null; }
+        if (state.rivalId) { clearInterval(state.rivalId); state.rivalId = null; }
+        setTimeout(function () { if (typeof endRound === 'function') endRound(); }, 450);
+        return;
+      }
+      state.asked += 1;
+      state.locked = false;
+      els.qBadge.textContent = 'Question ' + state.asked;
+      els.question.textContent = state.current.q;
+      els.feedback.textContent = '';
+      els.feedback.className = 'feedback';
+      els.answers.innerHTML = '';
+      state.current.choices.forEach((text, i) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'answer-btn';
+        btn.textContent = text;
+        btn.addEventListener('click', () => onAnswer(i, btn));
+        els.answers.appendChild(btn);
+      });
+      if (window.GalaxyUX) GalaxyUX.onQuestionShown(state.current);
+    }
+
+    function onAnswer(index, btn) {
+      if (!state.playing || state.locked) return;
+      state.locked = true;
+      const correct = index === state.current.answer;
+      const buttons = [...els.answers.querySelectorAll('.answer-btn')];
+      buttons.forEach((b) => { b.disabled = true; });
+
+      if (correct) {
+        btn.classList.add('correct');
+        state.playerCorrect += 1;
+        state.streak += 1;
+        state.playerSnowballs = Math.min(MAX_SNOWBALLS, state.playerSnowballs + 1);
+        nudgeTowardFreezer(true, true);
+        els.feedback.textContent = 'Correct! Snowball restored — heading to the freezer!';
+        els.feedback.className = 'feedback good';
+        if (window.GalaxyUX) GalaxyUX.afterAnswer({ correct: true, explain: (state.current && state.current.explain) || '', prompt: state.current && state.current.q, choices: state.current && state.current.choices, answerIndex: state.current && state.current.answer });
+        animateSnowman(els.snowmanPlayer, 'bounce');
+        showFx(els.fxPlayer, '+1 Snow!', true);
+        updateBoard();
+        if (window.GalaxyShell && GalaxyShell.checkpoint) GalaxyShell.checkpoint(state);
+        setTimeout(nextQuestion, 450);
+      } else {
+        btn.classList.add('wrong');
+        const right = buttons[state.current.answer];
+        if (right) right.classList.add('correct');
+        state.streak = 0;
+        state.playerSnowballs = Math.max(0, state.playerSnowballs - 1);
+        nudgeTowardFreezer(true, false);
+        els.feedback.textContent = state.playerSnowballs <= 1
+          ? 'Oops — melting fast! Get to the freezer!'
+          : 'Wrong — a snowball melted!';
+        els.feedback.className = 'feedback bad';
+        if (window.GalaxyUX) GalaxyUX.afterAnswer({ correct: false, explain: (state.current && state.current.explain) || '', prompt: state.current && state.current.q, choices: state.current && state.current.choices, answerIndex: state.current && state.current.answer });
+        animateSnowman(els.snowmanPlayer, 'shake');
+        drip(els.dropPlayer);
+        showFx(els.fxPlayer, 'Melt!', false);
+        updateBoard();
+        if (window.GalaxyShell && GalaxyShell.checkpoint) GalaxyShell.checkpoint(state);
+        setTimeout(nextQuestion, 700);
+      }
+    }
+
+    function rivalTick() {
+      if (!state.playing) return;
+      if (window.GalaxyUX && !GalaxyUX.rivalMayScore()) return;
+      state.rivalCorrect += 1;
+      state.rivalSnowballs = Math.min(MAX_SNOWBALLS, state.rivalSnowballs + 1);
+      nudgeTowardFreezer(false, true);
+      animateSnowman(els.snowmanRival, 'bounce');
+      showFx(els.fxRival, '+1!', true);
+      updateBoard();
+    }
+
+    function tickTimer() {
+      if (!state.playing) return;
+      if (window.GalaxyUX && !GalaxyUX.timerMayTick()) return;
+      state.secondsLeft -= 1;
+      els.timer.textContent = formatTime(state.secondsLeft);
+      if (state.secondsLeft <= 10) els.timerWrap.classList.add('urgent');
+      if (state.secondsLeft <= 0) endRound();
+    }
+
+    function startRound() {
+      const bank = quizBank();
+      if (!bank.length) {
+        if (els.question) els.question.textContent = 'Still loading quizzes… please wait a moment, then try again.';
+        if (els.feedback) {
+          els.feedback.textContent = 'Questions are not ready yet.';
+          els.feedback.className = 'feedback bad';
+        }
+        if (window.GalaxyShell && GalaxyShell.loadQuestions) {
+          GalaxyShell.loadQuestions({ fresh: true }).then((qs) => {
+            if (qs && qs.length && window.GalaxyShell.setStartEnabled) {
+              GalaxyShell.setStartEnabled(true);
+            }
+          });
+        }
+        return;
+      }
+      clearInterval(state.timerId);
+      clearInterval(state.rivalId);
+
+      state = {
+        playing: true,
+        playerCorrect: 0,
+        rivalCorrect: 0,
+        playerSnowballs: START_SNOWBALLS,
+        rivalSnowballs: START_SNOWBALLS,
+        playerPos: PLAYER_START,
+        rivalPos: RIVAL_START,
+        streak: 0,
+        asked: 0,
+        secondsLeft: ROUND_SECONDS,
+        deck: shuffle(quizBank()),
+        current: null,
+        locked: false,
+        timerId: null,
+        rivalId: null,
+      };
+
+      if (window.GALAXY_RESUME && window.GALAXY_RESUME.status === 'in_progress') {
+        const resume = window.GALAXY_RESUME;
+        ['playerCorrect','rivalCorrect','playerStep','rivalStep','streak','asked'].forEach((k) => {
+          if (resume[k] != null && Object.prototype.hasOwnProperty.call(state, k)) state[k] = resume[k];
+        });
+        if (typeof resume.secondsLeft === 'number' && resume.secondsLeft > 0) state.secondsLeft = resume.secondsLeft;
+        if (Array.isArray(resume.deck) && resume.deck.length) state.deck = resume.deck.map(shellQ).filter(Boolean);
+        window.GALAXY_RESUME = null;
+      }
+
+      if (window.GalaxyUX) GalaxyUX.onRoundStart(state);
+      els.startOverlay.classList.add('hidden');
+      els.endOverlay.classList.add('hidden');
+      els.hud.hidden = false;
+      els.quizPanel.hidden = false;
+      els.arena.removeAttribute('aria-hidden');
+      els.timerWrap.classList.remove('urgent');
+      els.timer.textContent = formatTime(ROUND_SECONDS);
+      updateBoard();
+      nextQuestion();
+
+      state.timerId = setInterval(tickTimer, 1000);
+      state.rivalId = setInterval(rivalTick, RIVAL_INTERVAL_MS);
+    }
+
+    async function endRound() {
+      if (state && state._ending) return;
+      if (state) state._ending = true;
+      try {
+        if (window.GalaxyShell && typeof state !== 'undefined') {
+          const maxS = (state.playerCorrect || 0) + (state.rivalCorrect || 0) || 20;
+          const sc = state.playerCorrect || 0;
+          const res = await window.GalaxyShell.submitRound(sc, Math.max(sc, 10));
+          if (res && res.progress && res.progress.coaching_blurb) {
+            const el = document.getElementById('galaxyLoadStatus');
+            if (el) el.textContent = res.progress.coaching_blurb;
+          }
+        }
+      } catch (e) { console.warn('score submit', e); }
+      return endRoundInner();
+    }
+    function endRoundInner() {
+      if (window.GalaxyUX) {
+        const coach = (window.__galaxyLastProgress && window.__galaxyLastProgress.coaching_blurb) || null;
+        if (coach) GalaxyUX.setCoaching(coach);
+        setTimeout(() => GalaxyUX.enhanceEndScreen({ coaching: coach, missed: GalaxyUX.getMissed(), progress: window.__galaxyLastProgress }), 50);
+      }
+      state.playing = false;
+      clearInterval(state.timerId);
+      clearInterval(state.rivalId);
+      state.locked = true;
+      [...els.answers.querySelectorAll('.answer-btn')].forEach((b) => { b.disabled = true; });
+
+      const p = state.playerCorrect;
+      const r = state.rivalCorrect;
+      els.endPlayer.textContent = p;
+      els.endRival.textContent = r;
+
+      if (p > r) {
+        els.endTitle.textContent = 'You Win!';
+        els.endLead.textContent = 'Most correct answers — your snowman stays frozen!';
+        els.endDetail.textContent = 'Victory by ' + (p - r) + ' correct answer' + (p - r === 1 ? '' : 's') + '.';
+      } else if (p < r) {
+        els.endTitle.textContent = 'Rival Wins';
+        els.endLead.textContent = 'They answered more correctly. The sun got too warm!';
+        els.endDetail.textContent = 'They led by ' + (r - p) + '. Keep practicing!';
+      } else {
+        els.endTitle.textContent = "It's a Tie!";
+        els.endLead.textContent = 'Same number of correct answers — double snowmen saved!';
+        els.endDetail.textContent = 'One more correct would have sealed it.';
+      }
+
+      els.endOverlay.classList.remove('hidden');
+    }
+
+    updateBoard();
+    els.startBtn.addEventListener('click', startRound);
+    els.replayBtn.addEventListener('click', startRound);
+  </script>
+
+<div id="galaxyLoadStatus" style="position:fixed;left:12px;bottom:12px;z-index:50;background:rgba(255,252,245,.92);color:#1a2744;padding:8px 12px;border-radius:10px;font:700 12px Nunito,sans-serif;max-width:280px;"></div>
+<script src="/static/js/galaxy_shell_bridge.js?v=8"></script>
+<script src="/static/js/galaxy_game_ux.js?v=5"></script>
+
+</body>
+</html>

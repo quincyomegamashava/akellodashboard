@@ -41,6 +41,7 @@
     <button type="button" class="studio-nav-item" data-panel="sql"><i class="fas fa-terminal"></i></button>
     <button type="button" class="studio-nav-item" data-panel="er"><i class="fas fa-project-diagram"></i></button>
     <button type="button" class="studio-nav-item" data-panel="migrations"><i class="fas fa-code-branch"></i></button>
+    <button type="button" class="studio-nav-item" data-panel="files"><i class="fas fa-folder-open"></i></button>
     <button type="button" class="studio-nav-item" data-panel="activity"><i class="fas fa-history"></i></button>
   </nav>
 
@@ -51,6 +52,7 @@
       <button type="button" class="studio-nav-item" data-panel="sql"><i class="fas fa-terminal"></i> SQL Console</button>
       <button type="button" class="studio-nav-item" data-panel="er"><i class="fas fa-project-diagram"></i> ER Diagram</button>
       <button type="button" class="studio-nav-item" data-panel="migrations"><i class="fas fa-code-branch"></i> Migrations</button>
+      <button type="button" class="studio-nav-item" data-panel="files"><i class="fas fa-folder-open"></i> Files</button>
       <button type="button" class="studio-nav-item" data-panel="activity"><i class="fas fa-history"></i> Activity</button>
     </nav>
 
@@ -179,6 +181,59 @@
             <a id="auditLogLink" href="#" class="studio-btn studio-btn-sm">Full audit log</a>
           </div>
           <div id="activityList"></div>
+        </div>
+      </section>
+
+      <!-- Files (GitHub-style allowlisted config editor) -->
+      <section id="panel-files" class="studio-panel">
+        <div id="filesDisabledBanner" class="studio-warning-banner" style="display:none;background:#fef3c7;border-color:#fde68a;color:#92400e;">
+          <i class="fas fa-lock"></i>
+          File editing is <strong>disabled</strong>. Set <code>ALLOW_WEB_FILE_EDITS=true</code> in <code>.env</code>, then restart the app.
+        </div>
+        <div class="studio-files-layout">
+          <aside class="studio-files-tree studio-card">
+            <div class="studio-card-header">
+              <h3><i class="fas fa-code-branch"></i> Repository</h3>
+              <button type="button" id="filesRefreshBtn" class="studio-btn studio-btn-sm"><i class="fas fa-sync-alt"></i></button>
+            </div>
+            <div class="studio-files-breadcrumb" id="filesBreadcrumb">
+              <span class="studio-files-crumb">akellodashboard</span>
+            </div>
+            <ul id="filesTree" class="studio-files-list"></ul>
+          </aside>
+          <div class="studio-files-main studio-card">
+            <div class="studio-card-header studio-files-toolbar">
+              <div>
+                <div class="studio-files-path" id="filesCurrentPath">Select a file</div>
+                <div class="studio-files-desc text-xs text-slate-500" id="filesCurrentDesc"></div>
+              </div>
+              <div class="studio-files-actions">
+                <div class="studio-files-tabs" id="filesViewTabs" style="display:none;">
+                  <button type="button" class="studio-files-tab active" data-view="form" id="filesTabForm">Key / value</button>
+                  <button type="button" class="studio-files-tab" data-view="raw" id="filesTabRaw">Raw file</button>
+                </div>
+                <button type="button" id="filesDiscardBtn" class="studio-btn studio-btn-sm" disabled>Discard</button>
+                <button type="button" id="filesSaveBtn" class="studio-btn studio-btn-primary studio-btn-sm" disabled><i class="fas fa-save"></i> Commit changes</button>
+              </div>
+            </div>
+            <div id="filesEmpty" class="studio-empty" style="padding:3rem 1rem;">Pick a file from the left — like browsing a GitHub repo.</div>
+            <div id="filesFormView" class="studio-files-form" style="display:none;">
+              <div class="studio-files-form-head">
+                <button type="button" id="filesAddEntryBtn" class="studio-btn studio-btn-sm"><i class="fas fa-plus"></i> Add variable</button>
+                <label class="studio-checkbox-row" style="margin:0;">
+                  <input type="checkbox" id="filesShowSecrets">
+                  <span>Show secret values</span>
+                </label>
+              </div>
+              <div id="filesEnvRows" class="studio-env-rows"></div>
+            </div>
+            <div id="filesRawView" style="display:none;">
+              <div id="filesEditorAce" class="studio-files-ace"></div>
+            </div>
+            <div id="filesDirtyBar" class="studio-files-dirty" style="display:none;">
+              <i class="fas fa-pencil-alt"></i> Unsaved changes — review carefully before committing.
+            </div>
+          </div>
         </div>
       </section>
     </main>
